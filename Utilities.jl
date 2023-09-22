@@ -19,6 +19,16 @@ function DH_η(t::M;η::M) where M<:AbstractFloat
     end
 end
 
+# Material interpolation
+Base.@kwdef struct SmoothErsatzMaterialInterpolation{M<:AbstractFloat}
+    η::M # Smoothing radius
+    ϵₘ::M = 10^-3 # Void material multiplier
+    H = x -> H_η(x,η=η)
+    DH = x -> DH_η(x,η=η)
+    I = φ -> (1 - H(φ)) + ϵₘ*H(φ)
+    ρ = φ -> 1 - H(φ)
+end
+
 write_vtk(Ω,path,φh,uh,H) = writevtk(Ω,path,cellfields=["phi"=>φh,
     "H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh)),"uh"=>uh])
 

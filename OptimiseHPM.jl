@@ -70,43 +70,6 @@ function main(ranks,mesh_partition,setup::Function,path::String)
     end
 end
 
-# Material interpolation
-Base.@kwdef struct SmoothErsatzMaterialInterpolation{M<:AbstractFloat}
-    η::M # Smoothing radius
-    ϵₘ::M = 10^-3 # Void material multiplier
-    H = x -> H_η(x,η=η)
-    DH = x -> DH_η(x,η=η)
-    I = φ -> (1 - H(φ)) + ϵₘ*H(φ)
-    ρ = φ -> 1 - H(φ)
-end
-
-# Objective and constraint
-function thermal_compliance(φh::DistributedCellField,g,D::M,solve_data::NT,interp::T) where {
-        M<:AbstractFloat,T<:SmoothErsatzMaterialInterpolation,NT<:NamedTuple}
-    I = interp.I; dΩ=solve_data.dΩ; dΓ_N=solve_data.dΓ_N;
-    ## Weak form
-    a(u,v) = ∫((I ∘ φh)*D*∇(u)⋅∇(v))dΩ
-    l(v) = ∫(v*g)dΓ_N
-    ## Assembly
-    op = AffineFEOperator(a,l,solve_data.U,solve_data.V,solve_data.assem)
-    K = op.op.matrix;
-    ## Solve
-    ls = PETScLinearSolver()
-    uh = solve(ls,op)
-    u = correct_ghost_layout(uh,K.col_partition)
-    ## Compute J and v_J
-    J = dot(u,(K*u))
-    v_J = interpolate(-D*∇(uh)⋅∇(uh),solve_data.V_L2)
-    return J,v_J,uh
-end
-function vol(φh::DistributedCellField,interp::T,dΩ::ME,V_L2::V,vol_D::M) where {
-        M<:AbstractFloat,T<:SmoothErsatzMaterialInterpolation,
-        V<:DistributedFESpace,ME<:DistributedMeasure}
-    ρ = interp.ρ;
-    vol = sum(∫(ρ ∘ φh)dΩ)/vol_D;
-    v_vol = interpolate(x->one(M)/vol_D,V_L2)
-    return vol,v_vol
-end
 # Hilbertian extension-regulariation
 function hilbertian_ext(vh::DistributedCellField,φh::DistributedCellField,hilb_data::NT,
         interp::T) where {T<:SmoothErsatzMaterialInterpolation,NT<:NamedTuple}
@@ -123,5 +86,3 @@ function hilbertian_ext(vh::DistributedCellField,φh::DistributedCellField,hilb_
     x = correct_ghost_layout(xh,K.col_partition)
     return FEFunction(hilb_data.U_reg,x)
 end
-
-

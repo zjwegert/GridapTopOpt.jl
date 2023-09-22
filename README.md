@@ -9,7 +9,7 @@
     * (HPC) It is best to utilise pre-exisiting MPI and PETSc installations on the HPC. The PBS Pro script provided below builds required packges with system settings.
 4. Run 
     * (Desktop) `mpiexecjl` from terminal. E.g.,
-        `mpiexecjl --project=. -n 4 julia DistributedThermo.jl pipe_setup_2d 2 2`
+        `mpiexecjl --project=. -n 4 julia MainMPI.jl pipe_setup_2d 2 2`
     * (HPC) Queue a run script - see examples provided.
 
 The following PBS script is provided for setting up `MPI.jl` in conjuction with `GridapDistributed.jl`, `GridapPETSc.jl`, and `MUMPS` on a PBS Pro-based HPC cluster:
