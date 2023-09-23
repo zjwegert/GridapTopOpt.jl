@@ -23,10 +23,10 @@ import GridapDistributed.DistributedFESpace
 import GridapDistributed.DistributedDiscreteModel
 import GridapDistributed.DistributedMeasure
 
-include("Setup.jl");
-include("LevelSet.jl");
-include("ProjectionMethod.jl");
 include("Utilities.jl");
+include("LevelSet.jl");
+include("Setup.jl");
+include("ProjectionMethod.jl");
 include("OptimiseALM.jl");
 
 const mesh_partition = length(ARGS) == 3 ? parse.(Int,(ARGS[2],ARGS[3])) : 
