@@ -8,7 +8,7 @@
     * (Desktop) install `mpiexecjl` by running `using MPI; MPI.install_mpiexecjl()` in Julia. Add `.../.julia/bin/` to system path.
     * (HPC) It is best to utilise pre-exisiting MPI and PETSc installations on the HPC. The PBS Pro script provided below builds required packges with system settings.
 4. Run 
-    * (Desktop) `mpiexecjl` from terminal. E.g.,
+    * (Desktop) `mpiexecjl` from terminal (GIT Bash if on Windows). E.g.,
         `mpiexecjl --project=. -n 4 julia MainMPI.jl pipe_setup_2d 2 2`
     * (HPC) Queue a run script - see examples provided.
 
