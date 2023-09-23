@@ -163,7 +163,6 @@ function pipe_3d(ranks,mesh_partition,order::T,coord_max::NTuple{3,M},
     A(u,v) = α^2*∫(∇(u) ⊙ ∇(v))dΩ + ∫(u ⋅ v)dΩ;
     Hilb_assem=SparseMatrixAssembler(Tm,Tv,U_reg,V_reg)
     K = assemble_matrix(A,Hilb_assem,U_reg,V_reg)
-    # K = assemble_matrix(A,U_reg,V_reg)
     ## Collect data
     solve_data = (U=U,V=V,assem=assem,V_L2=V_L2,dΩ=dΩ,dΓ_N=dΓ_N)
     hilb_data = (U_reg=U_reg,V_reg=V_reg,assem=Hilb_assem,dΩ=dΩ,K=K)
@@ -189,7 +188,7 @@ function elastic_compliance(φh::DistributedCellField,g,C::S,solve_data::NT,inte
     u = correct_ghost_layout(uh,K.col_partition)
     ## Compute J and v_J
     J = dot(u,(K*u))
-    v_J = interpolate(-C ⊙ ε(uh) ⊙ ε(uh),V_L2)
+    v_J = interpolate(-C ⊙ ε(uh) ⊙ ε(uh),solve_data.V_L2)
     return J,v_J,uh
 end
 
@@ -227,7 +226,7 @@ function cantilever_setup_2d()
     vf = 0.5; # Required volume fraction
     ## Material and loading
     C = isotropic_2d(1.0,0.3) # Stiffness tensor
-    g = VectorValue(0,-0.5); # Loading
+    g = VectorValue(0,-0.1); # Loading
     ## FE Parameters
     fe_order = 1;
     coord_max=(2.0,1.0);
@@ -252,7 +251,7 @@ function cantilever_setup_3d()
     vf = 0.5; # Required volume fraction
     ## Material and loading
     C = isotropic_3d(1.0,0.3) # Stiffness tensor
-    g = VectorValue(0,0,-0.5); # Loading
+    g = VectorValue(0,0,-0.1); # Loading
     ## FE Parameters
     fe_order = 1;
     coord_max=(2.0,1.0,1.0);
