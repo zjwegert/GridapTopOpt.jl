@@ -1,10 +1,3 @@
-# Get nodal values of normal velocities
-function get_vel_at_lsf(gh_Ω::T,V_φ::V) where {T<:DistributedCellField,V<:FESpace}
-    gh_Ω_full = interpolate(gh_Ω,V_φ)
-    g_Ω = get_free_dof_values(gh_Ω_full);
-    return g_Ω
-end
-
 # Generate initial LSF
 gen_lsf(ξ,a) = x::VectorValue -> -1/4*prod(cos.(get_array(ξ*pi*x))) - a/4
 

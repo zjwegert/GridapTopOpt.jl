@@ -35,7 +35,7 @@ function pipe_setup_2d()
     ## FE Parameters
     fe_order = 1;
     coord_max=(1.0,1.0);
-    el=(400,400); # Elements in axial directions
+    el=(800,800); # Elements in axial directions
     ## LS Paramters
     lsf = gen_lsf(4,0.2); # Initial LSF
     η_coeff = 2 # Interpolation radius coefficent
@@ -56,7 +56,7 @@ function pipe_setup_3d()
     vf = 0.5; # Required volume fraction
     ## Material and loading
     D = 1.0 # Thermal coefficient
-    g = 3.0 #6.0; # Heat flow
+    g = 3.0 # Heat flow
     ## FE Parameters
     fe_order = 1;
     coord_max=(1.0,1.0,1.0);

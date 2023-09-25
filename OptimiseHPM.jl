@@ -34,7 +34,8 @@ function main(ranks,mesh_partition,setup::Function,path::String)
         ext_v_C = hilbertian_ext(v_C,φh,hilb_data,interp)
         θn_h = project(get_free_dof_values(ext_v_J),[C-vf],[get_free_dof_values(ext_v_C)],
             hilb_data.K,hilb_data.U_reg,HPM)
-        g_Ω = get_vel_at_lsf(θn_h,V_φ);
+        θn_h_full = interpolate(θn_h,V_φ)
+        g_Ω = get_free_dof_values(θn_h_full);
         ## Line search
         for k ∈ 1:10
             ## Advect  & Reinitialise

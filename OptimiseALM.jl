@@ -14,13 +14,7 @@ function main(ranks,mesh_partition,setup::Function,path::String)
     φ = get_free_dof_values(φh)
     reinit!(φ,model,Δ,0.5,2000,reinit_tol)
     ### Main loop
-    J_new,_,uh = obj(φh,g,mat,solve_data,interp)
-    C_new,_ = vol(φh,interp,solve_data.dΩ,solve_data.V_L2,vol_D)
-    L_new = J_new - λ*(C_new - vf) + 1/(2Λ)*(C_new - vf)^2
-    history = NaN*zeros(1000,3); history[1,:] = [J_new,C_new,L_new]
-    MPI.Comm_rank(comm) == root ? println("it: ",0," | J: ",
-        round(J_new;digits=5)," | ","Vol: ",round(C_new;digits=5)) : 0
-    write_vtk(Ω,"$path/struc_0",φh,uh,interp.H)
+    history = NaN*zeros(1000,3);
     for it in 1:1000
         ## Calculate objective and constraints
         J_new,v_J,uh = obj(φh,g,mat,solve_data,interp)
@@ -47,8 +41,9 @@ function main(ranks,mesh_partition,setup::Function,path::String)
         # Augmented Lagrangian method
         λ -= 1/Λ*(C_new - vf); 
         iszero(it % 5) ? Λ *= ζ : 0;
-        v_Lh = FEFunction(hilb_data.U_reg,ext_v_J - λ*ext_v_C + 1/Λ*(C_new - vf)*ext_v_C)
-        g_Ω = get_vel_at_lsf(v_Lh,V_φ);        
+        v_Lh = FEFunction(hilb_data.U_reg,ext_v_J - λ*ext_v_C + 1/Λ*(C_new - vf)*ext_v_C)    
+        v_Lh_full = interpolate(v_Lh,V_φ)
+        g_Ω = get_free_dof_values(v_Lh_full);
         ## Advect  & Reinitialise
         advect!(φ,g_Ω,model,Δ,γ,steps)
         reinit!(φ,model,Δ,0.5,2000,reinit_tol)        

@@ -27,6 +27,10 @@ include("Utilities.jl");
 include("LevelSet.jl");
 include("Setup.jl");
 include("ProjectionMethod.jl");
+# Currently, to switch between augmented Lagrangian method and 
+#   Hilbertian projection method for constrained optimisation
+#   replace "OptimiseALM.jl" with "OptimiseHPM.jl". This will
+#   change later.
 include("OptimiseALM.jl");
 
 const mesh_partition = length(ARGS) == 3 ? parse.(Int,(ARGS[2],ARGS[3])) : 

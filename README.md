@@ -12,6 +12,13 @@
         `mpiexecjl --project=. -n 4 julia MainMPI.jl pipe_setup_2d 2 2`
     * (HPC) Queue a run script - see examples provided.
 
+## Algorithm Overview:
+The flowchart below gives a rough overview of the augmented Lagrangian-based optimisation algorithm for the problem `pipe_setup_2d` with objective `thermal_compliance`.
+
+![Screenshot](Images/Algorithm.png)
+
+## HPC PBS Scripts:
+
 The following PBS script is provided for setting up `MPI.jl` in conjuction with `GridapDistributed.jl`, `GridapPETSc.jl`, and `MUMPS` on a PBS Pro-based HPC cluster:
 ```
 #!/bin/bash -l
