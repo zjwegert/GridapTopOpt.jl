@@ -216,8 +216,6 @@ function pipe2_3d(ranks,mesh_partition,order::T,coord_max::NTuple{3,M},
     update_labels!(2,model,f_Γ_N,coord_max,"Gamma_N")
     ## Triangulations and measures
     Ω = Triangulation(model)
-    writevtk(model,"OUT")
-    error()
     Γ_N = BoundaryTriangulation(model,tags="Gamma_N")
     dΩ = Measure(Ω,2order)
     dΓ_N = Measure(Γ_N,2order)
