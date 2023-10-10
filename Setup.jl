@@ -197,21 +197,30 @@ end
 function pipe2_3d(ranks,mesh_partition,order::T,coord_max::NTuple{3,M},
         el_size::NTuple{3,T},α::M) where {T<:Integer,M<:AbstractFloat}
     ## Model
+    @assert isone(coord_max[1]) && isone(coord_max[2]) && isone(coord_max[3])
     dom = (0,coord_max[1],0,coord_max[2],0,coord_max[3]);
     model = CartesianDiscreteModel(ranks,mesh_partition,dom,el_size);
     ## Define Γ_N and Γ_D
-    f_Γ_D(x) = (max(abs(x[1]-0.2),abs(x[2]-0.5),abs(x[3]-0.5)) < 0.05 ||
-        max(abs(x[1]-0.8),abs(x[2]-0.5),abs(x[3]-0.5)) < 0.05 ||
-        max(abs(x[1]-0.5),abs(x[2]-0.2),abs(x[3]-0.5)) < 0.05 ||
-        max(abs(x[1]-0.5),abs(x[2]-0.8),abs(x[3]-0.5)) < 0.05) ? true : false;
-    f_Γ_N(x) = (max(abs(x[1]-0.1),abs(x[2]-0.1),abs(x[3]-0.1)) < 0.05 ||
-        max(abs(x[1]-0.9),abs(x[2]-0.1),abs(x[3]-0.1)) < 0.05 ||
-        max(abs(x[1]-0.1),abs(x[2]-0.9),abs(x[3]-0.1)) < 0.05 ||
-        max(abs(x[1]-0.9),abs(x[2]-0.9),abs(x[3]-0.1)) < 0.05 ||
-        max(abs(x[1]-0.1),abs(x[2]-0.1),abs(x[3]-0.9)) < 0.05 ||
-        max(abs(x[1]-0.9),abs(x[2]-0.1),abs(x[3]-0.9)) < 0.05 ||
-        max(abs(x[1]-0.1),abs(x[2]-0.9),abs(x[3]-0.9)) < 0.05 ||
-        max(abs(x[1]-0.9),abs(x[2]-0.9),abs(x[3]-0.9)) < 0.05) ? true : false;
+    f_Γ_D(x) = (max(abs(x[1]-0.2),abs(x[2]-0.5),abs(x[3]-0.5)) <= 0.05+eps() ||
+        max(abs(x[1]-0.8),abs(x[2]-0.5),abs(x[3]-0.5)) <= 0.05+eps() ||
+        max(abs(x[1]-0.5),abs(x[2]-0.2),abs(x[3]-0.5)) <= 0.05+eps() ||
+        max(abs(x[1]-0.5),abs(x[2]-0.8),abs(x[3]-0.5)) <= 0.05+eps()) ? true : false;
+    f_Γ_N(x) = (max(abs(x[1]),abs(x[2]),abs(x[3])) <= 0.05+eps() && (iszero(x[1]) || iszero(x[2]) || iszero(x[3])))||
+        (max(abs(x[1]-1),abs(x[2]),abs(x[3])) <= 0.05+eps() && (isone(x[1]) || iszero(x[2]) || iszero(x[3])))||
+        (max(abs(x[1]),abs(x[2]-1),abs(x[3])) <= 0.05+eps() && (iszero(x[1]) || isone(x[2]) || iszero(x[3])))||
+        (max(abs(x[1]-1),abs(x[2]-1),abs(x[3])) <= 0.05+eps() && (isone(x[1]) || isone(x[2]) || iszero(x[3])))||
+        (max(abs(x[1]),abs(x[2]),abs(x[3]-1)) <= 0.05+eps() && (iszero(x[1]) || iszero(x[2]) || isone(x[3])))||
+        (max(abs(x[1]-1),abs(x[2]),abs(x[3]-1)) <= 0.05+eps() && (isone(x[1]) || iszero(x[2]) || isone(x[3])))||
+        (max(abs(x[1]),abs(x[2]-1),abs(x[3]-1)) <= 0.05+eps() && (iszero(x[1]) || isone(x[2]) || isone(x[3])))||
+        (max(abs(x[1]-1),abs(x[2]-1),abs(x[3]-1)) <= 0.05+eps() && (isone(x[1]) || isone(x[2]) || isone(x[3]))) ? true : false;
+        # f_Γ_N(x) = (max(abs(x[1]-0.1),abs(x[2]-0.1),abs(x[3]-0.1)) <= 0.05 ||
+    #     max(abs(x[1]-0.9),abs(x[2]-0.1),abs(x[3]-0.1)) <= 0.05 ||
+    #     max(abs(x[1]-0.1),abs(x[2]-0.9),abs(x[3]-0.1)) <= 0.05 ||
+    #     max(abs(x[1]-0.9),abs(x[2]-0.9),abs(x[3]-0.1)) <= 0.05 ||
+    #     max(abs(x[1]-0.1),abs(x[2]-0.1),abs(x[3]-0.9)) <= 0.05 ||
+    #     max(abs(x[1]-0.9),abs(x[2]-0.1),abs(x[3]-0.9)) <= 0.05 ||
+    #     max(abs(x[1]-0.1),abs(x[2]-0.9),abs(x[3]-0.9)) <= 0.05 ||
+    #     max(abs(x[1]-0.9),abs(x[2]-0.9),abs(x[3]-0.9)) <= 0.05) ? true : false;
     update_labels!(1,model,f_Γ_D,coord_max,"Gamma_D")
     update_labels!(2,model,f_Γ_N,coord_max,"Gamma_N")
     ## Triangulations and measures
