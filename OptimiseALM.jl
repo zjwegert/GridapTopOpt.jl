@@ -27,8 +27,8 @@ function main(ranks,mesh_partition,setup::Function,path::String)
             println("λ = ",λ," Λ = ",Λ)
             writedlm("$path/history.csv",history)
         end
-        # iszero(it % 30) ? write_vtk(Ω,"$path/struc_$it",φh,uh,interp.H) : 0
-        write_vtk(Ω,"$path/struc_$it",φh,uh,interp.H)
+        iszero(it % 30) ? write_vtk(Ω,"$path/struc_$it",φh,uh,interp.H) : 0
+        # write_vtk(Ω,"$path/struc_$it",φh,uh,interp.H)
         ## Check stopping criteria
         if it > 10 && all(@.(abs(L_new-history[it-5:it-1,3])) .< 1/5/maximum(el)*L_new) &&
                 abs(C_new-vf) < 0.0001
