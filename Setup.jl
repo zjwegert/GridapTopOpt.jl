@@ -173,10 +173,10 @@ function pipe2_setup_3d()
     ## FE setup name
     prob = pipe2_3d
     obj = thermal_compliance
-    vf = 0.5; # Required volume fraction
+    vf = 0.3; # Required volume fraction
     ## Material and loading
     D = 1.0 # Thermal coefficient
-    g = 1.0 # Heat flow
+    g = 5.0 # Heat flow
     ## FE Parameters
     fe_order = 1;
     coord_max=(1.0,1.0,1.0);
@@ -213,14 +213,6 @@ function pipe2_3d(ranks,mesh_partition,order::T,coord_max::NTuple{3,M},
         (max(abs(x[1]-1),abs(x[2]),abs(x[3]-1)) <= 0.05+eps() && (isone(x[1]) || iszero(x[2]) || isone(x[3])))||
         (max(abs(x[1]),abs(x[2]-1),abs(x[3]-1)) <= 0.05+eps() && (iszero(x[1]) || isone(x[2]) || isone(x[3])))||
         (max(abs(x[1]-1),abs(x[2]-1),abs(x[3]-1)) <= 0.05+eps() && (isone(x[1]) || isone(x[2]) || isone(x[3]))) ? true : false;
-        # f_Γ_N(x) = (max(abs(x[1]-0.1),abs(x[2]-0.1),abs(x[3]-0.1)) <= 0.05 ||
-    #     max(abs(x[1]-0.9),abs(x[2]-0.1),abs(x[3]-0.1)) <= 0.05 ||
-    #     max(abs(x[1]-0.1),abs(x[2]-0.9),abs(x[3]-0.1)) <= 0.05 ||
-    #     max(abs(x[1]-0.9),abs(x[2]-0.9),abs(x[3]-0.1)) <= 0.05 ||
-    #     max(abs(x[1]-0.1),abs(x[2]-0.1),abs(x[3]-0.9)) <= 0.05 ||
-    #     max(abs(x[1]-0.9),abs(x[2]-0.1),abs(x[3]-0.9)) <= 0.05 ||
-    #     max(abs(x[1]-0.1),abs(x[2]-0.9),abs(x[3]-0.9)) <= 0.05 ||
-    #     max(abs(x[1]-0.9),abs(x[2]-0.9),abs(x[3]-0.9)) <= 0.05) ? true : false;
     update_labels!(1,model,f_Γ_D,coord_max,"Gamma_D")
     update_labels!(2,model,f_Γ_N,coord_max,"Gamma_N")
     ## Triangulations and measures
