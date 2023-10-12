@@ -223,8 +223,8 @@ function pipe2_3d(ranks,mesh_partition,order::T,coord_max::NTuple{3,M},
     ## Spaces
     reffe = ReferenceFE(lagrangian,Float64,order)
     V = TestFESpace(model,reffe;conformity=:H1,
-        dirichlet_tags=["Gamma_D"],dirichlet_masks=[true])
-    U = TrialFESpace(V,[0.0])
+        dirichlet_tags=["Gamma_N","Gamma_D"],dirichlet_masks=[true,true])
+    U = TrialFESpace(V,[0.0,0.0])
     ## Assembler
     Tm=SparseMatrixCSR{0,PetscScalar,PetscInt}
     Tv=Vector{PetscScalar}
@@ -233,8 +233,8 @@ function pipe2_3d(ranks,mesh_partition,order::T,coord_max::NTuple{3,M},
     V_L2 = TestFESpace(model,reffe;conformity=:L2)
     # Space in Hilb. ext.-reg. endowed with H-regularity
     V_reg = TestFESpace(model,reffe;conformity=:H1,
-        dirichlet_tags=["Gamma_N"],dirichlet_masks=[true])
-    U_reg = TrialFESpace(V_reg,[0.0])
+        dirichlet_tags=["Gamma_N","Gamma_D"],dirichlet_masks=[true,true])
+    U_reg = TrialFESpace(V_reg,[0.0,0.0])
     # FE space for LSF 
     V_φ = TestFESpace(model,reffe;conformity=:H1)
     ## Build stiffness matrix for Hilbertian ext-reg
