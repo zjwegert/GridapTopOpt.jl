@@ -16,11 +16,13 @@
 We typically execute `mpiexecjl` from the terminal via the following
     `mpiexecjl --project=. -n NP julia MainMPI.jl SETUP_NAME NX NY NZ`
 where
-* `NP` -> Number of processes to launch,
+* `NP` -> Number of processors to launch,
 * `SETUP_NAME` -> Name of setup function,
 * `NX` -> Number of partitions in X,
 * `NY` -> Number of partitions in Y,
 * `NZ` -> Number of partitions in Z (optional).
+
+
 `MainMPI` can also be replaced by `MainSerial` to run the code in serial mode (currently this is quite slow?).
 
 ## Output & Visualisation
