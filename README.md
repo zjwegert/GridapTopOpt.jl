@@ -24,7 +24,7 @@ where
 `MainMPI` can also be replaced by `MainSerial` to run the code in serial mode (currently this is quite slow?).
 
 ## Output & Visualisation
-Output files consist of a `.csv` file containing iteration history, `.pvtu` files and `.vtu` files in a corresponding subdirectory. For the augmented Lagrangian method the `history.csv` file consists of three columns for the objective, volume, and Lagrangian respectively.
+Output files consist of a `.csv` file containing the iteration history, `.pvtu` files and `.vtu` files in corresponding subdirectories. For the augmented Lagrangian method the `history.csv` file consists of three columns for the objective, volume, and Lagrangian respectively.
 
 Results can be visualised in Paraview via the following:
 
