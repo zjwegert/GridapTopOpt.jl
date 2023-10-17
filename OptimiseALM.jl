@@ -1,4 +1,4 @@
-function main(ranks,mesh_partition,setup::Function,path::String)
+function optimise(ranks,mesh_partition,setup::Function,path::String)
     ### Get parameters
     prob,obj,lsf,vf,mat,g,fe_order,coord_max,el,η_coeff,
         α_coeff,_,_,_,γ,steps,reinit_tol = setup()  
@@ -25,9 +25,9 @@ function main(ranks,mesh_partition,setup::Function,path::String)
         if MPI.Comm_rank(comm) == root 
             println("it: ",it," | J: ",round(J_new;digits=5)," | ","Vol: ",round(C_new;digits=5))
             println("λ = ",λ," Λ = ",Λ)
-            writedlm("$path/history.csv",history)
+            writedlm("$path/history.csv",history[1:it,:])
         end
-        iszero(it % 30) ? write_vtk(Ω,"$path/struc_$it",φh,uh,interp.H) : 0
+        isone(it) || iszero(it % 30) ? write_vtk(Ω,"$path/struc_$it",φh,uh,interp.H) : 0
         # write_vtk(Ω,"$path/struc_$it",φh,uh,interp.H)
         ## Check stopping criteria
         if it > 10 && all(@.(abs(L_new-history[it-5:it-1,3])) .< 1/5/maximum(el)*L_new) &&

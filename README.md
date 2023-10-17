@@ -12,6 +12,27 @@
         `mpiexecjl --project=. -n 4 julia MainMPI.jl pipe_setup_2d 2 2`
     * (HPC) Queue a run script - see examples provided.
 
+## Options:
+We typically execute `mpiexecjl` from the terminal via the following
+    `mpiexecjl --project=. -n NP julia MainMPI.jl SETUP_NAME NX NY NZ`
+where
+* `NP` -> Number of processes to launch,
+* `SETUP_NAME` -> Name of setup function,
+* `NX` -> Number of partitions in X,
+* `NY` -> Number of partitions in Y,
+* `NZ` -> Number of partitions in Z (optional).
+`MainMPI` can also be replaced by `MainSerial` to run the code in serial mode (currently this is quite slow?).
+
+## Visualisation
+Output files for visualisation consist of `.pvtu` and `.vtu` files in a corresponding subdirectory. These can be viewed in Paraview via:
+
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Open (any `.pvtu`) -> Apply -> `CTRL + Space` -> `Iso Volume`
+
+Use the following settings in the `Iso Volume` filter: `Input Scalars` = `phi`, `Minimum` = -1, `Maximum` = 0.
+
+Bug: Currently `.pvtu` files contain the whole path to the corresponding `.vtu` instead of the relative path. This is caused by passing the whole path to `write_vtk`. Passing the relative path to `write_vtk` includes the location folder in the path to each piece (`.vtu` file). If moving several visualisation files use the command (replace `/` by `\/` in `PATH` below)
+    `sed -i 's/PATH/./g' *.pvtu`
+
 ## Algorithm Overview:
 The flowchart below gives a rough overview of the augmented Lagrangian-based optimisation algorithm for the problem `pipe_setup_2d` with objective `thermal_compliance`.
 
@@ -37,7 +58,7 @@ module load openmpi/4.1.4-gcc-11.3.0
 # Path to PETSc Library - replace with appropriate system path
 export JULIA_PETSC_LIBRARY=$EBROOTPETSC/lib/libpetsc.so 
 
-cd "$FOLDER NAME$/"
+cd $PBS_O_WORKDIR
 
 julia --project=. -e 'using Pkg; Pkg.instantiate()'
 echo '------------------------------------------------------------'
@@ -75,7 +96,7 @@ module load openmpi/4.1.4-gcc-11.3.0
 export JULIA_PETSC_LIBRARY=$EBROOTPETSC/lib/libpetsc.so
 export mpiexecjl=~/.julia/bin/mpiexecjl
 
-cd "LSTO_Distributed/"
+cd $PBS_O_WORKDIR
 
 $mpiexecjl --project=. -n 27 julia ./MainMPI.jl pipe_setup_3d 3 3 3
 ```

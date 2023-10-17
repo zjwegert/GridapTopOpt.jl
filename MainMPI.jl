@@ -56,7 +56,7 @@ function main(mesh_partition,distribute)
     t = PTimer(ranks)
     tic!(t)
     GridapPETSc.with(args=split(options)) do
-        main(ranks,mesh_partition,setup,path)
+        optimise(ranks,mesh_partition,setup,path)
     end
     toc!(t,"Run time")
     t
