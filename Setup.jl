@@ -4,6 +4,24 @@
 #   Thermal Compliance   #
 ##########################
 ## Objective and shape sensitivity
+function li2019_mumps_setup(ksp)
+    pc       = Ref{GridapPETSc.PETSC.PC}()
+    mumpsmat = Ref{GridapPETSc.PETSC.Mat}()
+    @check_error_code GridapPETSc.PETSC.KSPView(ksp[],C_NULL)
+    @check_error_code GridapPETSc.PETSC.KSPSetType(ksp[],GridapPETSc.PETSC.KSPPREONLY)
+    @check_error_code GridapPETSc.PETSC.KSPGetPC(ksp[],pc)
+    @check_error_code GridapPETSc.PETSC.PCSetType(pc[],GridapPETSc.PETSC.PCLU)
+    @check_error_code GridapPETSc.PETSC.PCFactorSetMatSolverType(pc[],GridapPETSc.PETSC.MATSOLVERMUMPS)
+    @check_error_code GridapPETSc.PETSC.PCFactorSetUpMatSolverType(pc[])
+    @check_error_code GridapPETSc.PETSC.PCFactorGetMatrix(pc[],mumpsmat)
+    @check_error_code GridapPETSc.PETSC.MatMumpsSetIcntl(mumpsmat[],  4, 1)
+    @check_error_code GridapPETSc.PETSC.MatMumpsSetIcntl(mumpsmat[],  7, 0)
+  # @check_error_code GridapPETSc.PETSC.MatMumpsSetIcntl(mumpsmat[], 14, 1000)
+    @check_error_code GridapPETSc.PETSC.MatMumpsSetIcntl(mumpsmat[], 28, 2)
+    @check_error_code GridapPETSc.PETSC.MatMumpsSetIcntl(mumpsmat[], 29, 2)
+    @check_error_code GridapPETSc.PETSC.MatMumpsSetCntl(mumpsmat[], 3, 1.0e-6)
+end
+
 function thermal_compliance(φh::DistributedCellField,g,D::M,solve_data::NT,interp::T) where {
         M<:AbstractFloat,T<:SmoothErsatzMaterialInterpolation,NT<:NamedTuple}
     I = interp.I; dΩ=solve_data.dΩ; dΓ_N=solve_data.dΓ_N;
@@ -14,7 +32,7 @@ function thermal_compliance(φh::DistributedCellField,g,D::M,solve_data::NT,inte
     op = AffineFEOperator(a,l,solve_data.U,solve_data.V,solve_data.assem)
     K = op.op.matrix;
     ## Solve
-    ls = PETScLinearSolver()
+    ls = PETScLinearSolver(li2019_mumps_setup)
     uh = solve(ls,op)
     u = correct_ghost_layout(uh,K.col_partition)
     ## Compute J and v_J
