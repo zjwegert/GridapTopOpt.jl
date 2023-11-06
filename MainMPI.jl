@@ -1,12 +1,3 @@
-using MPI
-if !MPI.Initialized()
-    MPI.Init()
-end
-const comm = MPI.COMM_WORLD;
-const root = 0;
-
-MPI.Barrier(comm)
-
 using SparseMatricesCSR
 using SparseArrays
 using Gridap, Gridap.TensorValues
@@ -48,7 +39,7 @@ function main(mesh_partition,distribute)
     # Create results path
     ptn_str = replace(string(mesh_partition),"("=>"",")"=>"",", "=>"x")
     path = "$(pwd())/Results_p$(ptn_str)_$setup"
-    if MPI.Comm_rank(comm) == root
+    if i_am_main(ranks)
         !isdir(path) ? mkdir(path) : rm(path,recursive=true);
         !isdir(path) ? mkdir(path) : 0;
     end

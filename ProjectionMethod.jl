@@ -28,7 +28,7 @@ function project(V::VT,Cᵥ::Vector{M},C::P,B::T,VSpace::VS,m::HilbertianProject
     compute_α!(α,C_orthog,C,len_sq,C_len,B)
     ∑α² =λ^2*dot(α,α);
     # Printing and check ∑α² and update λ if required
-    # if MPI.Comm_rank(comm) == root
+    # i_am_main(ranks)
     #     print("\n  ↱----------------------------------------------------------↰\n")
     #     printstyled("   Orthogonalisation method: gram_schmidt_orthog  ",color=:yellow);
     #     @printf("\n      --> Orthogonality inf-norm: %e\n",norm(orth_norm,Inf))
@@ -36,17 +36,17 @@ function project(V::VT,Cᵥ::Vector{M},C::P,B::T,VSpace::VS,m::HilbertianProject
     #     println("      -->          Basis nullity: ",nullity)
     # end
     if ∑α² ≈ zero(M)
-        # MPI.Comm_rank(comm) == root ? println("      --> Constraints satisfied: ∑α² ≈ 0.") : 0;
+        # i_am_main(ranks) ? println("      --> Constraints satisfied: ∑α² ≈ 0.") : 0;
     elseif ∑α² > α_max
        λ *= sqrt(α_max/∑α²)
        ∑α² = α_max
-    #    MPI.Comm_rank(comm) == root ? @printf("      --> ∑α² > α_max, scaling λ: %e\n",λ) : 0;
+    #    i_am_main(ranks) ? @printf("      --> ∑α² > α_max, scaling λ: %e\n",λ) : 0;
     elseif ∑α² < α_min
        λ *= sqrt(α_min/∑α²)
        ∑α² = α_min
-    #    MPI.Comm_rank(comm) == root ? @printf("      --> ∑α² < α_max, scaling λ: %e\n",λ) : 0;
+    #    i_am_main(ranks) ? @printf("      --> ∑α² < α_max, scaling λ: %e\n",λ) : 0;
     end
-    # MPI.Comm_rank(comm) == root ? print("  ↳----------------------------------------------------------↲\n") : 0;
+    # i_am_main(ranks) ? print("  ↳----------------------------------------------------------↲\n") : 0;
     α .*= λ
     # Calculate direction
     idx_non_zero = (Base.OneTo(k))[.~iszero.(C_len)]

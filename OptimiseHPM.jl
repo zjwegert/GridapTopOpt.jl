@@ -19,7 +19,7 @@ function optimise(ranks,mesh_partition,setup::Function,path::String)
     C_new,_ = vol(φh,interp,solve_data.dΩ,solve_data.V_L2,vol_D)
     history = NaN*zeros(1000,2);
     history[1,:] = [J_new,C_new]
-    MPI.Comm_rank(comm) == root ? println("it: ",0," | J: ",
+    i_am_main(ranks) ? println("it: ",0," | J: ",
         round(J_new;digits=5)," | ","Vol: ",round(C_new;digits=5)) : 0
     write_vtk(Ω,"$path/struc_0",φh,uh,interp.H)
     for it in 1:1000
@@ -57,7 +57,7 @@ function optimise(ranks,mesh_partition,setup::Function,path::String)
         end
         ## Log
         history[it,:] = [J_new,C_new]
-        if MPI.Comm_rank(comm) == root 
+        if i_am_main(ranks) 
             println("it: ",it," | J: ",round(J_new;digits=5)," | ","Vol: ",round(C_new;digits=5))
             writedlm("$path/history.csv",history[1:it,:])
         end
