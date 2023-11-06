@@ -61,11 +61,11 @@ function update_labels!(e::Int,model::D,f_Γ::F,::T,name::String) where {
         # Vertices
         vtx_coords = model.grid_topology.vertex_coordinates
         vtxs_Γ = findall(isone,f_Γ.(vtx_coords))
-        vtx_edge_connectivity = Array(model.grid_topology.n_m_to_nface_to_mfaces[1,2][vtxs_Γ]);
+        vtx_edge_connectivity = Array(Geometry.get_faces(model.grid_topology,0,1)[vtxs_Γ])
         # Edges
-        edge_entires = [findall(x->any(x .∈  vtx_edge_connectivity[1:end.!=j]),
+        edge_entries = [findall(x->any(x .∈  vtx_edge_connectivity[1:end.!=j]),
             vtx_edge_connectivity[j]) for j = 1:length(vtx_edge_connectivity)]
-        edge_Γ = unique(reduce(vcat,getindex.(vtx_edge_connectivity,edge_entires),init=[]))
+        edge_Γ = unique(reduce(vcat,getindex.(vtx_edge_connectivity,edge_entries),init=[]))
         labels.d_to_dface_to_entity[1][vtxs_Γ] .= entity
         labels.d_to_dface_to_entity[2][edge_Γ] .= entity
         add_tag!(labels,name,[entity])
@@ -85,16 +85,16 @@ function update_labels!(e::Int,model::D,f_Γ::F,::T,name::String) where {
         # Vertices
         vtx_coords = model.grid_topology.vertex_coordinates
         vtxs_Γ = findall(isone,f_Γ.(vtx_coords))
-        vtx_edge_connectivity = Array(model.grid_topology.n_m_to_nface_to_mfaces[1,2][vtxs_Γ]);
-        vtx_face_connectivity = Array(model.grid_topology.n_m_to_nface_to_mfaces[1,3][vtxs_Γ]);
+        vtx_edge_connectivity = Array(Geometry.get_faces(model.grid_topology,0,1)[vtxs_Γ])
+        vtx_face_connectivity = Array(Geometry.get_faces(model.grid_topology,0,2)[vtxs_Γ])
         # Edges
-        edge_entires = [findall(x->any(x .∈  vtx_edge_connectivity[1:end.!=j]),
+        edge_entries = [findall(x->any(x .∈  vtx_edge_connectivity[1:end.!=j]),
             vtx_edge_connectivity[j]) for j = 1:length(vtx_edge_connectivity)]
-        edge_Γ = unique(reduce(vcat,getindex.(vtx_edge_connectivity,edge_entires),init=[]))
+        edge_Γ = unique(reduce(vcat,getindex.(vtx_edge_connectivity,edge_entries),init=[]))
         # Faces
-        face_entires = [findall(x->count(x .∈  vtx_face_connectivity[1:end.!=j])>2,
+        face_entries = [findall(x->count(x .∈  vtx_face_connectivity[1:end.!=j])>2,
             vtx_face_connectivity[j]) for j = 1:length(vtx_face_connectivity)]
-        face_Γ = unique(reduce(vcat,getindex.(vtx_face_connectivity,face_entires),init=[]))
+        face_Γ = unique(reduce(vcat,getindex.(vtx_face_connectivity,face_entries),init=[]))
         labels.d_to_dface_to_entity[1][vtxs_Γ] .= entity
         labels.d_to_dface_to_entity[2][edge_Γ] .= entity
         labels.d_to_dface_to_entity[3][face_Γ] .= entity

@@ -1,15 +1,6 @@
-using MPI
-if !MPI.Initialized()
-    MPI.Init()
-end
-const comm = MPI.COMM_WORLD;
-const root = 0;
-
-MPI.Barrier(comm)
-
 using SparseMatricesCSR
 using SparseArrays
-using Gridap, Gridap.TensorValues
+using Gridap, Gridap.TensorValues, Gridap.Geometry
 using GridapDistributed
 using GridapPETSc
 using GridapPETSc: PetscScalar, PetscInt, PETSC,  @check_error_code
@@ -41,14 +32,14 @@ function main(mesh_partition,distribute)
     ranks  = distribute(LinearIndices((prod(mesh_partition),)))
     # Set PETSc options
     options = "-pc_type gamg -ksp_type cg -ksp_error_if_not_converged true
-         -ksp_converged_reason -ksp_rtol 1.0e-12"
+          -ksp_converged_reason -ksp_rtol 1.0e-12"
     # Get setup function and check exists
     setup = getfield(Main, Symbol(ARGS[1]))
     @assert @isdefined(setup) && isa(setup,Function) "Setup not defined"
     # Create results path
     ptn_str = replace(string(mesh_partition),"("=>"",")"=>"",", "=>"x")
     path = "$(pwd())/Results_p$(ptn_str)_$setup"
-    if MPI.Comm_rank(comm) == root
+    if i_am_main(ranks)
         !isdir(path) ? mkdir(path) : rm(path,recursive=true);
         !isdir(path) ? mkdir(path) : 0;
     end

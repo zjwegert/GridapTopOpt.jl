@@ -22,7 +22,7 @@ function optimise(ranks,mesh_partition,setup::Function,path::String)
         L_new = J_new - λ*(C_new - vf) + 1/(2Λ)*(C_new - vf)^2
         ## Log
         history[it,:] = [J_new,C_new,L_new]
-        if MPI.Comm_rank(comm) == root 
+        if i_am_main(ranks) 
             println("it: ",it," | J: ",round(J_new;digits=5)," | ","Vol: ",round(C_new;digits=5))
             println("λ = ",λ," Λ = ",Λ)
             writedlm("$path/history.csv",history[1:it,:])
