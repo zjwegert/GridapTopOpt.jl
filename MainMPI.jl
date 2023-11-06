@@ -1,6 +1,6 @@
 using SparseMatricesCSR
 using SparseArrays
-using Gridap, Gridap.TensorValues
+using Gridap, Gridap.TensorValues, Gridap.Geometry
 using GridapDistributed
 using GridapPETSc
 using GridapPETSc: PetscScalar, PetscInt, PETSC,  @check_error_code
