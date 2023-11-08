@@ -6,13 +6,12 @@ function main()
 
     # Problem setup, defining the blocks
 
-
-    caches = setup!(optimizer,...)
+    φh
+    caches = setup!(optimizer,...) # <- must include first iteration
     for k in 1:nsteps
-        results = step!(optimizer,...)
+        J_new,C_new,φh_new = step!(optimizer,...)
         # Logging using results
         # Check convergence criteria, using results
-        
     end
 
 end
