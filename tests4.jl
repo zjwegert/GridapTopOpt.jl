@@ -94,9 +94,9 @@ function reinit!(s::Stencil{3},φ_out,φ_in,S,Δt,caches)
     D⁻ˣ[i],D⁺ˣ[i],D⁻ʸ[i],D⁺ʸ[i],D⁻ᶻ[i],D⁺ᶻ[i] = res[1], res[2], res[3], res[4], res[5], res[6]
   end
 
-  ∇⁺ .= @. sqrt(max(D⁻ʸ,0)^2 + min(D⁺ʸ,0)^2 + max(D⁻ˣ,0)^2 + min(D⁺ˣ,0)^2 + max(D⁻ᶻ,0)^2 + min(D⁺ᶻ,0)^2);
-  ∇⁻ .= @. sqrt(max(D⁺ʸ,0)^2 + min(D⁻ʸ,0)^2 + max(D⁺ˣ,0)^2 + min(D⁻ˣ,0)^2 + max(D⁺ᶻ,0)^2 + min(D⁻ᶻ,0)^2);
-  φ_out .= @. φ_in - Δt*(max(S,0)*∇⁺ + min(S,0)*∇⁻ - S)
+  #∇⁺ .= @. sqrt(max(D⁻ʸ,0)^2 + min(D⁺ʸ,0)^2 + max(D⁻ˣ,0)^2 + min(D⁺ˣ,0)^2 + max(D⁻ᶻ,0)^2 + min(D⁺ᶻ,0)^2);
+  #∇⁻ .= @. sqrt(max(D⁺ʸ,0)^2 + min(D⁻ʸ,0)^2 + max(D⁺ˣ,0)^2 + min(D⁻ˣ,0)^2 + max(D⁺ᶻ,0)^2 + min(D⁻ᶻ,0)^2);
+  #φ_out .= @. φ_in - Δt*(max(S,0)*∇⁺ + min(S,0)*∇⁻ - S)
   return φ_out
 end
 
@@ -180,7 +180,7 @@ vel2 = reshape(vel,sz);
 
 # 3D 
 
-sz = (104,108,100); n = prod(sz)
+sz = (104,108,10); n = prod(sz)
 s = Stencil(3,sz,(0.5,0.5,0.5))
 
 x = randn(n)
