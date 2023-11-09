@@ -49,7 +49,7 @@ function isotropic_2d(E::M,ν::M) where M<:AbstractFloat
 end
 
 ######################################################
-begin
+# begin
 ## FE Setup
 order = 1;
 el_size = (200,200);
@@ -142,7 +142,9 @@ K = op.op.matrix;
 ## Solve
 uh = solve(op)
 ## Compute J and v_J
-_J(u,φ) = (a(uh,uh,φ)) # ∫(interp.ρ ∘ φ)dΩ
+_J(u,φ) = (a(u,u,φ)) # ∫(interp.ρ ∘ φ)dΩ
+# _J(u,φ) = ∫(1+(u⋅u)*(u⋅u)+φ)dΩ # <- weird stuff works here
+
 
 φ_to_u = AffineFEStateMap(a,l,res,V_φ,U,V)
 u_to_j =  LossFunction(_J,V_φ,U)
@@ -170,7 +172,7 @@ dϕh  = interpolate_everywhere(FEFunction(V_φ,dϕ),U_reg)
 # Analytic
 J′(v,v_h) = ∫(-v_h*v*(interp.DH ∘ φh)*(norm ∘ ∇(φh)))dΩ;
 v_J = -(C ⊙ ε(uh) ⊙ ε(uh))
-b = assemble_vector(v->J′(v,-v_J),V_reg)
+b = assemble_vector(v->J′(v,v_J),V_reg)
 analytic_J′ = FEFunction(V_reg,b)
 
 abs_error = abs(dϕh-analytic_J′)
@@ -184,7 +186,7 @@ hilb_K = assemble_matrix(A,U_reg,V_reg)
 
 ## Autodiff result
 # -dϕh is AD version of J′ that we plug in usually!
-op = AffineFEOperator(U_reg,V_reg,hilb_K,-dϕh.free_values)
+op = AffineFEOperator(U_reg,V_reg,hilb_K,dϕh.free_values)
 dϕh_Ω = solve(op)
 
 ## Analytic result
@@ -209,4 +211,4 @@ writevtk(Ω,path,cellfields=["phi"=>φh,
     "v_J_Ω"=>v_J_Ω,
     "dJϕh_Ω"=>dϕh_Ω
 ])
-end
+# end
