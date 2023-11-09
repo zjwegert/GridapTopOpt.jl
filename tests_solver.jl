@@ -53,12 +53,11 @@ function fe_setup(ranks,mesh_partition,order::T,coord_max::NTuple{3,M},
     ## Triangulations and measures
     Ω = Triangulation(model)
     Γ_N = BoundaryTriangulation(model,tags="Gamma_N")
-    dΩ = Measure(Ω,2order)
-    dΓ_N = Measure(Γ_N,2order)
+    dΩ = Measure(Ω,2*order)
+    dΓ_N = Measure(Γ_N,2*order)
     ## Spaces
     reffe = ReferenceFE(lagrangian,VectorValue{3,Float64},order)
-    V = TestFESpace(model,reffe;conformity=:H1,dirichlet_tags=["Gamma_D"],
-        dirichlet_masks=[(true,true,true)])
+    V = TestFESpace(model,reffe;conformity=:H1,dirichlet_tags=["Gamma_D"])
     U = TrialFESpace(V,[VectorValue(0.0,0.0,0.0)])
     ## Assembler
     Tm=SparseMatrixCSR{0,PetscScalar,PetscInt}
@@ -109,18 +108,17 @@ function ksp_setup(ksp,dim,nloc,coords)
     @check_error_code GridapPETSc.PETSC.PCSetCoordinates(pc[],dim,nloc,coords)
 end
 
-function get_coords(trian::DistributedTriangulation{Dc}) where Dc
-    coords = map(local_views(trian)) do trian
-        node_coords = Gridap.Geometry.get_node_coordinates(trian)
-        coords = Vector{PetscScalar}(undef,Dc*length(node_coords))
-        k = 1
-        for p in node_coords
-          for d in 1:Dc
-            coords[k] = p[d]
-            k += 1
-          end
-        end
-        return coords
+function get_coords(trian::DistributedTriangulation{Dc},V) where Dc
+    coords = map(local_views(trian),local_views(V)) do trian, V
+      node_coords = Gridap.Geometry.get_node_coordinates(trian)
+      dof_to_node = V.metadata.free_dof_to_node
+      dof_to_comp = V.metadata.free_dof_to_comp
+  
+      coords = Vector{PetscScalar}(undef,length(dof_to_node))
+      for (i,(n,c)) in enumerate(zip(dof_to_node,dof_to_comp))
+        coords[i] = node_coords[n][c]
+      end
+      return coords
     end
     coords = PartitionedArrays.getany(coords)
     return Dc, length(coords)÷Dc, coords
@@ -130,13 +128,18 @@ end
 
 function main(mesh_partition,distribute)
     ranks  = distribute(LinearIndices((prod(mesh_partition),)))
-    options = "-ksp_error_if_not_converged true -ksp_converged_reason"
+    options = "
+        -ksp_type cg -ksp_rtol 1.0e-12 -ksp_norm_type unpreconditioned
+        -pc_type gamg -mat_block_size 3
+        -mg_levels_ksp_type chebyshev -mg_levels_esteig_ksp_type cg -mg_coarse_sub_pc_type cholesky
+        -ksp_converged_reason -ksp_error_if_not_converged true
+        "
     el_size = (20,20,20)
     coord_max = (2.,1.,1.)
     order = 1;
     Δ = coord_max./el_size;
     path = (@__DIR__)*"/Results/LinearElastic3DSolverTesting";
-    t = PTimer(ranks)
+    t = PTimer(ranks;verbose=true)
     GridapPETSc.with(args=split(options)) do
         model,Ω,V_φ,solve_data = fe_setup(ranks,mesh_partition,order,coord_max,el_size)
         interp = SmoothErsatzMaterialInterpolation(η = 2*maximum(Δ))
@@ -145,9 +148,10 @@ function main(mesh_partition,distribute)
         φh = interpolate(x->-sqrt((x[1]-0.5)^2+(x[2]-0.5)^2+(x[3]-0.5)^2)+0.25,V_φ)
 
         # Solver
-        dim, nloc, coords = get_coords(Ω)
+        dim, nloc, coords = get_coords(Ω,solve_data.V)
         _ksp_setup(ksp) = ksp_setup(ksp,dim,nloc,coords)
-        solver = PETScLinearSolver(_ksp_setup)
+        #solver = PETScLinearSolver(_ksp_setup)
+        solver = PETScLinearSolver()
 
         J,v_J,uh = elastic_compliance(φh,g,C,solve_data,interp,t,solver)
         display("Objective = $J")
