@@ -102,8 +102,8 @@ function main(distribute)
   np = Tuple(fill(np_x_dim,D)) #Tuple([fill(np_x_dim,D-1)...,1])
   ranks = distribute(LinearIndices((prod(np),)))
 
-  n_tags = (D==2) ? "tag_5" : "tag_21"
-  d_tags = (D==2) ? ["tag_6","tag_7","tag_8"] : ["tag_22","tag_23","tag_24","tag_25","tag_26"]
+  n_tags = (D==2) ? "tag_6" : "tag_22"
+  d_tags = (D==2) ? ["tag_5"] : ["tag_21"]
 
   nc = (D==2) ? (n,n) : (n,n,n)
   domain = (D==2) ? (0,1,0,1) : (0,1,0,1,0,1)
@@ -120,7 +120,7 @@ function main(distribute)
   dΩ = Measure(Ω,2*order)
   dΓ = Measure(Γ,2*order)
   C = (D == 2) ? isotropic_2d(1.,0.3) : isotropic_3d(1.,0.3)
-  g = (D == 2) ? VectorValue(0.0,-1.0) : VectorValue(0.0,0.0,-1.0)
+  g = (D == 2) ? VectorValue(1.0,0.0) : VectorValue(1.0,0.0,0.0)
   a(u,v) = ∫((C ⊙ ε(u) ⊙ ε(v)))dΩ
   l(v)   = ∫(v ⋅ g)dΓ
 
