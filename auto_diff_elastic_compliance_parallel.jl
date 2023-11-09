@@ -231,6 +231,107 @@ display(t)
 
 ########################################################################################
 
+struct Functional{N}
+    F
+    dΩ
+    state::NTuple{N}
+    function Functional(F,dΩ,args...)
+        N = length(args)
+        new{N}(F,dΩ,args)
+    end
+end
+
+# evaluate(F::Functional) = F.F(F.state...,dΩ)
+
+struct FunctionalGradient{N,K}
+    F::Functional{N}
+    function FunctionalGradient(F::Functional{N},K) where N
+        @assert 0<K<=N
+        new{N,K}(F)
+    end
+end
+
+function (fg::FunctionalGradient{N,K})(uh::GridapDistributed.DistributedCellField) where {N,K}
+    fields = map(i->i==K ? uh : fg.F.state[i],1:N)
+    local_fields = map(local_views,fields)
+    contribs = map(local_views(fg.F.dΩ),local_fields...) do dΩ,lf...
+        _f = u -> fg.F.F(lf[1:K-1]...,u,lf[K+1:end]...,dΩ)
+        return Gridap.Fields.gradient(_f,lf[K])
+    end
+    return GridapDistributed.DistributedDomainContribution(contribs)
+end
+
+function (fg::FunctionalGradient{N,K})(uh::FEFunction) where {N,K}
+    fields = map(i->i==K ? uh : fg.F.state[i],1:N)
+    _f = u -> fg.F.F(fields[1:K-1]...,u,fields[K+1:end]...,dΩ)
+    return Gridap.Fields.gradient(_f,fields[K])
+end
+
+ranks = with_debug() do distribute
+    distribute(LinearIndices((1,)))
+end
+
+model = CartesianDiscreteModel(ranks,(1,1),(0,1,0,1),(2,2))
+
+#model = CartesianDiscreteModel((0,1,0,1),(2,2))
+V = FESpace(model,ReferenceFE(lagrangian,VectorValue{2,Float64},1)) # <- this breaks stuff!
+V_ϕ = FESpace(model,ReferenceFE(lagrangian,Float64,1))
+
+Ω = Triangulation(model)
+dΩ = Measure(Ω,2)
+
+uh = zero(V)
+ϕh = zero(V_ϕ)
+
+J = (u,ϕ,dΩ) -> ∫(1+(u⋅u)*(u⋅u)+ϕ)dΩ
+J_func = Functional(J,dΩ,uh,ϕh)
+sum(J(uh,ϕh,dΩ))
+
+djdu = FunctionalGradient(J_func,1)(uh)
+
+loss = DistributedLossFunction(J_func,V,V_ϕ)
+
+j, j_pullback = rrule(loss,get_free_dof_values(uh),get_free_dof_values(ϕh))
+_, du, dϕ₍ⱼ₎  = j_pullback(1); # dj = 1
+
+
+struct DistributedLossFunction{P,U}
+    loss::Functional
+    state_sp::U
+    param_sp::P
+    # assem::Assembler
+end
+
+function (u_to_j::DistributedLossFunction)(u,ϕ)
+    loss=u_to_j.loss
+    U=u_to_j.state_sp
+    Q=u_to_j.param_sp
+    uh=FEFunction(U,u)
+    ϕh=FEFunction(Q,ϕ)
+    sum(loss.F(uh,ϕh,loss.dΩ))
+end
+
+function ChainRulesCore.rrule(u_to_j::DistributedLossFunction,u,ϕ)
+    loss=u_to_j.loss
+    U=u_to_j.state_sp
+    Q=u_to_j.param_sp
+    uh=FEFunction(U,u)
+    ϕh=FEFunction(Q,ϕ)
+    jp=sum(loss.F(uh,ϕh,loss.dΩ))
+    function u_to_j_pullback(dj)
+        djdu = FunctionalGradient(J_func,1)(uh)
+        djdu_vec = assemble_vector(djdu,U)
+        djdϕ = FunctionalGradient(J_func,2)(ϕh)
+        djdϕ_vec = assemble_vector(djdϕ,Q)
+        (  NoTangent(), dj*djdu_vec, dj*djdϕ_vec )
+    end
+    jp, u_to_j_pullback
+end
+
+
+
+######################################
+## Compare to single state case
 # struct DistributedFunctional
 #     f
 #     dΩ
@@ -244,79 +345,11 @@ display(t)
 #     return GridapDistributed.DistributedDomainContribution(contribs)
 # end
 
-struct Functional{N}
-    F
-    dΩ
-    state::NTuple{N}
-    function Functional(F,dΩ,args...)
-        N = length(args)
-        new{N}(F,dΩ,args)
-    end
-end
+# J_u_only = (u,dΩ) -> ∫(u⋅u)dΩ
+# df = DistributedFunctional(J_u_only,dΩ)
 
-struct FunctionalGradient{N,K}
-    F::Functional{N}
-    function FunctionalGradient(F::Functional{N},K) where N
-        @assert 0<K<=N
-        new{N,K}(F)
-    end
-end
-
-function (fg::FunctionalGradient{N,K})(uh::GridapDistributed.DistributedCellField) where {N,K}
-    fields = map(i->i==K ? uh : fg.F.state[K],1:N)
-    local_fields = map(local_views,fields)
-    contribs = map(local_views(fg.F.dΩ),local_fields...) do dΩ,lf...
-        _f = u -> fg.F.F(lf[1:K-1]...,u,lf[K+1:end]...,dΩ)
-        @show _f 
-        return Gridap.Fields.gradient(_f,lf[K])
-    end
-    return GridapDistributed.DistributedDomainContribution(contribs)
-end
-
-function (fg::FunctionalGradient{N,K})(uh::FEFunction) where {N,K}
-    fields = map(i->i==K ? uh : fg.F.state[K],1:N)
-    _f = u -> fg.F.F(fields[1:K-1]...,u,fields[K+1:end]...,dΩ)
-    return Gridap.Fields.gradient(_f,fields[K])
-end
-
-
-# struct DistributedLossFunction{P,U}
-#     loss::DistributedFunctional
-#     param_sp::P
-#     state_sp::U
-#     # assem::Assembler
-#   end
-
-# function (u_to_j::DistributedLossFunction)(u,ϕ)
-#     loss=u_to_j.loss
-#     U=u_to_j.state_sp
-#     Q=u_to_j.param_sp
-#     uₕ=FEFunction(U,u)
-#     ϕₕ=FEFunction(Q,ϕ)
-#     sum(loss.f(uₕ,ϕₕ,loss.dΩ))
-# end
-
-
-ranks = with_debug() do distribute
-    distribute(LinearIndices((1,)))
-end
-
-model = CartesianDiscreteModel(ranks,(1,1),(0,1,0,1),(2,2))
-
-#model = CartesianDiscreteModel((0,1,0,1),(2,2))
-reffe = ReferenceFE(lagrangian,Float64,1)
-V = FESpace(model,reffe)
-
-Ω = Triangulation(model)
-dΩ = Measure(Ω,2)
-
-uh = zero(V)
-ϕh = zero(V)
-
-J = (u,ϕh,dΩ) -> ∫(u⋅u+ϕh)dΩ
-J_func = Functional(J,dΩ,uh,ϕh)
-
-dJdu = FunctionalGradient(J_func,1)(uh)
+# diff = maximum(abs,assemble_vector(dJdu,V) - assemble_vector(∇(df,uh),V))
+######################################
 
 nothing
 
