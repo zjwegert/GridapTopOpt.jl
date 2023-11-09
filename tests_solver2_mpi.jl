@@ -149,3 +149,7 @@ function main(distribute)
     solve!(x,ns,b)
   end
 end
+
+with_mpi() do distribute
+  main(distribute)
+end
