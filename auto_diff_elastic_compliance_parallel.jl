@@ -229,32 +229,72 @@ t = with_debug() do distribute
 end;
 display(t)
 
-struct DistributedFunctional
-    f
+########################################################################################
+
+# struct DistributedFunctional
+#     f
+#     dΩ
+# end
+
+# function Gridap.Fields.gradient(f::DistributedFunctional,uh::GridapDistributed.DistributedCellField)
+#     contribs = map(local_views(uh),local_views(f.dΩ)) do uh, dΩ
+#         _f = uh -> f.f(uh,dΩ)
+#         return Gridap.Fields.gradient(_f,uh)
+#     end
+#     return GridapDistributed.DistributedDomainContribution(contribs)
+# end
+
+struct Functional{N}
+    F
     dΩ
+    state::NTuple{N}
+    function Functional(F,dΩ,args...)
+        N = length(args)
+        new{N}(F,dΩ,args)
+    end
 end
 
-(f::DistributedFunctional)(uh) = f.f(uh,f.dΩ)
+struct FunctionalGradient{N,K}
+    F::Functional{N}
+    function FunctionalGradient(F::Functional{N},K) where N
+        @assert 0<K<=N
+        new{N,K}(F)
+    end
+end
 
-function Gridap.Fields.gradient(f::DistributedFunctional,uh::GridapDistributed.DistributedCellField)
-    #fuh = f(uh)
-    #Gridap.FESpaces._gradient(f,uh,fuh)
-    contribs = map(local_views(uh),local_views(f.dΩ)) do uh, dΩ
-        _f = uh -> f.f(uh,dΩ)
-        return Gridap.Fields.gradient(_f,uh)
+function (fg::FunctionalGradient{N,K})(uh::GridapDistributed.DistributedCellField) where {N,K}
+    fields = map(i->i==K ? uh : fg.F.state[K],1:N)
+    local_fields = map(local_views,fields)
+    contribs = map(local_views(fg.F.dΩ),local_fields...) do dΩ,lf...
+        _f = u -> fg.F.F(lf[1:K-1]...,u,lf[K+1:end]...,dΩ)
+        @show _f 
+        return Gridap.Fields.gradient(_f,lf[K])
     end
     return GridapDistributed.DistributedDomainContribution(contribs)
 end
 
-"""
-function Gridap.FESpaces._gradient(f::DistributedFunctional,uh::GridapDistributed.DistributedCellField,fuh::GridapDistributed.DistributedDomainContribution)
-    map(local_views(uh),local_views(d.dΩ),local_views(fuh)) do uh, dΩ, fuh
-        _f = uh -> f.f(uh,dΩ)
-
-    end
+function (fg::FunctionalGradient{N,K})(uh::FEFunction) where {N,K}
+    fields = map(i->i==K ? uh : fg.F.state[K],1:N)
+    _f = u -> fg.F.F(fields[1:K-1]...,u,fields[K+1:end]...,dΩ)
+    return Gridap.Fields.gradient(_f,fields[K])
 end
-"""
 
+
+# struct DistributedLossFunction{P,U}
+#     loss::DistributedFunctional
+#     param_sp::P
+#     state_sp::U
+#     # assem::Assembler
+#   end
+
+# function (u_to_j::DistributedLossFunction)(u,ϕ)
+#     loss=u_to_j.loss
+#     U=u_to_j.state_sp
+#     Q=u_to_j.param_sp
+#     uₕ=FEFunction(U,u)
+#     ϕₕ=FEFunction(Q,ϕ)
+#     sum(loss.f(uₕ,ϕₕ,loss.dΩ))
+# end
 
 
 ranks = with_debug() do distribute
@@ -271,19 +311,73 @@ V = FESpace(model,reffe)
 dΩ = Measure(Ω,2)
 
 uh = zero(V)
+ϕh = zero(V)
 
-J = ((u,v) -> ∫(u⋅u)dΩ)
-loss = LossFunction(J,V,V)
+J = (u,ϕh,dΩ) -> ∫(u⋅u+ϕh)dΩ
+J_func = Functional(J,dΩ,uh,ϕh)
 
-u = get_free_dof_values(uh)
-loss(u,u)
+dJdu = FunctionalGradient(J_func,1)(uh)
 
-J2 = (u -> ∫(u⋅u)dΩ)
-djdu = ∇(uh->J2(uh))
-contr = djdu(uh)
+nothing
 
-J3 = (u,dΩ) -> ∫(u⋅u)dΩ
-df = DistributedFunctional(J3,dΩ)
+# J = ((u,v) -> ∫(u⋅u)dΩ)
+# loss = LossFunction(J,V,V)
 
-djdu = ∇(df,uh)
-contr = djdu(uh)
+# u = get_free_dof_values(uh)
+# loss(u,u)
+
+# J2 = (u -> ∫(u⋅u)dΩ)
+# djdu = ∇(uh->J2(uh))
+# contr = djdu(uh)
+
+# J3 = (u,dΩ) -> ∫(u⋅u)dΩ
+# df = DistributedFunctional(J3,dΩ)
+
+# djdu = ∇(df,uh)
+# assemble_vector(djdu,V)
+
+# ## Loss function
+# _J4 = (u,φ) -> ∫(u⋅u)dΩ
+# _loss = LossFunction(_J4,V,V)
+# _loss(get_free_dof_values(uh),get_free_dof_values(uh))
+
+# ## Distributed loss function
+# J4 = (u,φ,dΩ) -> ∫(u⋅u+φ)dΩ
+# df = DistributedFunctional(J4,dΩ)
+# loss = DistributedLossFunction(df,V,V)
+# loss(get_free_dof_values(uh),get_free_dof_values(ϕh))
+
+# ## u_to_j_pullback
+# jp, u_to_j_pullback = ChainRulesCore.rrule(loss,get_free_dof_values(uh),get_free_dof_values(uh))
+
+# # This breaks:
+# NEW_df = DistributedFunctional((uh,dΩ)->loss.loss.f(uh,ϕh,dΩ),loss.loss.dΩ)
+# NEW_df()
+
+
+
+# djdu = ∇(DistributedFunctional((uh,dΩ)->loss.loss.f(uh,ϕh,dΩ),loss.loss.dΩ),uh)
+
+# djdϕ = ∇(DistributedFunctional((ϕh,dΩ)->loss.loss.f(uh,ϕh,dΩ),loss.loss.dΩ),ϕh)
+
+# u_to_j_pullback(1)
+
+
+# function ChainRulesCore.rrule(u_to_j::DistributedLossFunction,u,ϕ)
+#     loss=u_to_j.loss
+#     U=u_to_j.state_sp
+#     Q=u_to_j.param_sp
+#     uh=FEFunction(U,u)
+#     ϕh=FEFunction(Q,ϕ)
+#     jp=u_to_j(u,ϕ) # === jp=sum(loss.f(uₕ,ϕₕ,loss.dΩ))
+#     function u_to_j_pullback(dj)
+#         # djdu = ∇(uₕ->loss.f(uₕ,ϕₕ,loss.dΩ),uₕ)
+#         djdu = ∇(DistributedFunctional((uh,dΩ)->loss.f(uh,ϕh,dΩ),loss.dΩ),uh)
+#         djdu_vec = assemble_vector(djdu,U)
+#         # djdϕ = ∇(ϕₕ->loss.f(uh,ϕh,loss.dΩ),ϕh)
+#         djdϕ =  ∇(DistributedFunctional((ϕh,dΩ)->loss.f(uh,ϕh,dΩ),loss.dΩ),ϕh)
+#         djdϕ_vec = assemble_vector(djdϕ,Q)
+#         (  NoTangent(), dj*djdu_vec, dj*djdϕ_vec )
+#     end
+#     jp, u_to_j_pullback
+# end

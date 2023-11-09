@@ -58,10 +58,7 @@ function ChainRulesCore.rrule(u_to_j::LossFunction,u,ϕ)
   ϕₕ=FEFunction(Q,ϕ)
   jp=sum(loss(uₕ,ϕₕ))
   function u_to_j_pullback(dj)
-    djdu = ∇(uₕ->loss(uₕ,ϕₕ))#(uₕ)
-    @show typeof(djdu)  
-    
-    
+    djdu = ∇(uₕ->loss(uₕ,ϕₕ))(uₕ)
     djdu_vec = assemble_vector(djdu,U)
     djdϕ = ∇(ϕₕ->loss(uₕ,ϕₕ))(ϕₕ)
     djdϕ_vec = assemble_vector(djdϕ,Q)
