@@ -63,7 +63,7 @@ abstract type AbstractStateFunctional end
         J₁: (u,ϕ,dΩ) ↦ ∫_Ω f(u(ϕ),ϕ) dΩ,
         J₂: (u,ϕ,dΓ) ↦ ∫_Γ g(u(ϕ),ϕ) dΓ,
         J₃: (u,ϕ,[dΩ,dΓ]) ↦ ∫_Ω f(u(ϕ),ϕ) dΩ + ∫_Γ g(u(ϕ),ϕ) dΓ,
-    where u is a state field and ϕ is auxilary. Currently, the signature MUST be (u,ϕ,d(⋅)).
+    where u is a state field and ϕ is auxilary. The signature MUST match the weak form.
 
     The number of states refers to number of solutions to PDEs (e.g., u above).
     We assume that there is only one additional auxilary field ϕ for purpose of AD.
@@ -93,9 +93,9 @@ function ChainRulesCore.rrule(u_to_j::SingleStateFunctional,u,ϕ)
     ϕh=FEFunction(V_ϕ,ϕ)
     jp=sum(F.F(uh,ϕh,F.dΩ...))
     function u_to_j_pullback(dj)
-        djdu = FunctionalGradient(J_func,1)(uh)
+        djdu = FunctionalGradient(F,1)(uh)
         djdu_vec = assemble_vector(djdu,U)
-        djdϕ = FunctionalGradient(J_func,2)(ϕh)
+        djdϕ = FunctionalGradient(F,2)(ϕh)
         djdϕ_vec = assemble_vector(djdϕ,V_ϕ)
         (  NoTangent(), dj*djdu_vec, dj*djdϕ_vec )
     end
@@ -149,7 +149,7 @@ function Adjoint(ϕ,uh,du,adjoint_op,res,F::AffineFEStateMap{S} where S<:SingleS
     λ = solve(LUSolver(),Aᵀ,du)
     λh = FEFunction(V,λ)
     ϕh = FEFunction(V_ϕ,ϕ)
-    res_functional = Functional(res,dΩ,uh,λh,ϕh)
+    res_functional = Functional(res,F.F.F.dΩ,uh,λh,ϕh)
     dϕ() = FunctionalGradient(res_functional,3)(ϕh)
     dϕ = -assemble_vector(dϕ(),V_ϕ)
 end
