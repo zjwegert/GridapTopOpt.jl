@@ -203,10 +203,9 @@ function main(mesh_partition,distribute)
     ])
 end
 
-t = with_mpi() do distribute
+with_mpi() do distribute
     main((3,3),distribute)
 end;
-display(t)
 
 ####################
 #   Debug Testing  #
