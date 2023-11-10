@@ -38,6 +38,7 @@ Bug: Currently `.pvtu` files contain the whole path to the corresponding `.vtu` 
     `sed -i 's/PATH/./g' *.pvtu`
 
 ## Algorithm Overview:
+
 The flowchart below gives a rough overview of the augmented Lagrangian-based optimisation algorithm for the problem `pipe_setup_2d` with objective `thermal_compliance`.
 
 ![Screenshot](Images/Algorithm.png)
