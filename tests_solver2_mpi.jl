@@ -44,10 +44,10 @@ function ksp_setup(ksp)
   rtol = PetscScalar(1.e-12)
   atol = GridapPETSc.PETSC.PETSC_DEFAULT
   dtol = GridapPETSc.PETSC.PETSC_DEFAULT
-  maxits = PetscInt(200)
+  maxits = PetscInt(100)
 
   @check_error_code GridapPETSc.PETSC.KSPView(ksp[],C_NULL)
-  @check_error_code GridapPETSc.PETSC.KSPSetType(ksp[],GridapPETSc.PETSC.KSPCG)
+  @check_error_code GridapPETSc.PETSC.KSPSetType(ksp[],GridapPETSc.PETSC.KSPGMRES)
   @check_error_code GridapPETSc.PETSC.KSPSetTolerances(ksp[], rtol, atol, dtol, maxits)
 
   pc = Ref{GridapPETSc.PETSC.PC}()
@@ -79,7 +79,6 @@ function my_numerical_setup(ss::GridapPETSc.PETScLinearSolverSS,A::AbstractMatri
 
   B = convert(PETScMatrix,A)
   null = Ref{GridapPETSc.PETSC.MatNullSpace}()
-  #@check_error_code GridapPETSc.PETSC.MatSetBlockSize(B.mat[],dim)
   @check_error_code GridapPETSc.PETSC.MatNullSpaceCreateRigidBody(pcoords.vec[],null)
   @check_error_code GridapPETSc.PETSC.MatSetNearNullSpace(B.mat[],null[])
 
@@ -136,10 +135,9 @@ function main(distribute)
     -ksp_converged_reason -ksp_error_if_not_converged true -ksp_monitor_short
     "
   GridapPETSc.with(args=split(options)) do
-    #solver = PETScLinearSolver(ksp_setup)
-    solver = PETScLinearSolver()
+    solver = PETScLinearSolver(ksp_setup)
+    #solver = PETScLinearSolver() # From options
     ss = symbolic_setup(solver,A)
-    #ns = numerical_setup(ss,A)
     ns = my_numerical_setup(ss,A,pcoords,dim)
 
     x  = pfill(PetscScalar(1.0),partition(axes(A,2)))

@@ -12,6 +12,7 @@ import GridapDistributed.DistributedMeasure
 import GridapDistributed.DistributedTriangulation
 
 include("Utilities.jl"); # <- For some useful functions 
+include("src/Solvers.jl")
 
 function elastic_compliance(φh,g,C,solve_data,interp,t,solver)
     I = interp.I; dΩ=solve_data.dΩ; dΓ_N=solve_data.dΓ_N;
@@ -92,40 +93,6 @@ end
 
 ############################################################################################
 
-function ksp_setup(ksp,dim,nloc,coords)
-    rtol = PetscScalar(1.e-12)
-    atol = GridapPETSc.PETSC.PETSC_DEFAULT
-    dtol = GridapPETSc.PETSC.PETSC_DEFAULT
-    maxits = GridapPETSc.PETSC.PETSC_DEFAULT
-  
-    @check_error_code GridapPETSc.PETSC.KSPView(ksp[],C_NULL)
-    @check_error_code GridapPETSc.PETSC.KSPSetType(ksp[],GridapPETSc.PETSC.KSPCG)
-    @check_error_code GridapPETSc.PETSC.KSPSetTolerances(ksp[], rtol, atol, dtol, maxits)
-  
-    pc = Ref{GridapPETSc.PETSC.PC}()
-    @check_error_code GridapPETSc.PETSC.KSPGetPC(ksp[],pc)
-    @check_error_code GridapPETSc.PETSC.PCSetType(pc[],GridapPETSc.PETSC.PCGAMG)
-    @check_error_code GridapPETSc.PETSC.PCSetCoordinates(pc[],dim,nloc,coords)
-end
-
-function get_coords(trian::DistributedTriangulation{Dc},V) where Dc
-    coords = map(local_views(trian),local_views(V)) do trian, V
-      node_coords = Gridap.Geometry.get_node_coordinates(trian)
-      dof_to_node = V.metadata.free_dof_to_node
-      dof_to_comp = V.metadata.free_dof_to_comp
-  
-      coords = Vector{PetscScalar}(undef,length(dof_to_node))
-      for (i,(n,c)) in enumerate(zip(dof_to_node,dof_to_comp))
-        coords[i] = node_coords[n][c]
-      end
-      return coords
-    end
-    coords = PartitionedArrays.getany(coords)
-    return Dc, length(coords)÷Dc, coords
-end
-
-############################################################################################
-
 function main(mesh_partition,distribute)
     ranks  = distribute(LinearIndices((prod(mesh_partition),)))
     options = "
@@ -147,12 +114,7 @@ function main(mesh_partition,distribute)
         g = VectorValue(0.,0.,-1.0)
         φh = interpolate(x->-sqrt((x[1]-0.5)^2+(x[2]-0.5)^2+(x[3]-0.5)^2)+0.25,V_φ)
 
-        # Solver
-        dim, nloc, coords = get_coords(Ω,solve_data.V)
-        _ksp_setup(ksp) = ksp_setup(ksp,dim,nloc,coords)
-        #solver = PETScLinearSolver(_ksp_setup)
-        solver = PETScLinearSolver()
-
+        solver = ElasticitySolver(Ω,solve_data.V)
         J,v_J,uh = elastic_compliance(φh,g,C,solve_data,interp,t,solver)
         display("Objective = $J")
         writevtk(Ω,path,cellfields=["phi"=>φh,"H(phi)"=>(interp.H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh)),"uh"=>uh])
@@ -160,7 +122,7 @@ function main(mesh_partition,distribute)
     t
 end
 
-t = with_debug() do distribute
-    main((1,1,1),distribute)
+t = with_mpi() do distribute
+    main((2,1,1),distribute)
 end;
 display(t)
