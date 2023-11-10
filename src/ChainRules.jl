@@ -80,22 +80,22 @@ function (u_to_j::SingleStateFunctional)(u,ϕ) # <- function signature may have 
     F=u_to_j.F
     U=u_to_j.trial_space
     V_ϕ=u_to_j.aux_space
-    uh=FEFunction(U,u)
-    ϕh=FEFunction(V_ϕ,ϕ)
-    sum(F.F(uh,ϕh,F.dΩ...))
+    _uh=FEFunction(U,u)
+    _φh=FEFunction(V_ϕ,ϕ)
+    sum(F.F(_uh,_φh,F.dΩ...))
 end
 
 function ChainRulesCore.rrule(u_to_j::SingleStateFunctional,u,ϕ)
     F=u_to_j.F
     U=u_to_j.trial_space
     V_ϕ=u_to_j.aux_space
-    uh=FEFunction(U,u)
-    ϕh=FEFunction(V_ϕ,ϕ)
-    jp=sum(F.F(uh,ϕh,F.dΩ...))
+    _uh=FEFunction(U,u)
+    _φh=FEFunction(V_ϕ,ϕ)
+    jp=sum(F.F(_uh,_φh,F.dΩ...))
     function u_to_j_pullback(dj)
-        djdu = FunctionalGradient(F,1)(uh)
+        djdu = FunctionalGradient(F,1)(_uh)
         djdu_vec = assemble_vector(djdu,U)
-        djdϕ = FunctionalGradient(F,2)(ϕh)
+        djdϕ = FunctionalGradient(F,2)(_φh)
         djdϕ_vec = assemble_vector(djdϕ,V_ϕ)
         (  NoTangent(), dj*djdu_vec, dj*djdϕ_vec )
     end
@@ -134,23 +134,23 @@ function ChainRulesCore.rrule(ϕ_to_u::AffineFEStateMap{S} where S<:SingleStateF
     meas = ϕ_to_u.F.F.dΩ
     op = AffineFEOperator(a(ϕ,meas...),l(ϕ,meas...),U,V)#,assem)
     adjoint_op = AffineFEOperator(a(ϕ,meas...),l(ϕ,meas...),U,V)#,assem)
-    uh = Gridap.solve(op)
+    _uh = Gridap.solve(op)
     function ϕ_to_u_pullback(du)
-        dϕ = Adjoint(ϕ,uh,du,adjoint_op,res,ϕ_to_u)     
+        dϕ = Adjoint(ϕ,_uh,du,adjoint_op,res,ϕ_to_u)     
         ( NoTangent(),dϕ)
     end
-    get_free_dof_values(uh), ϕ_to_u_pullback
+    get_free_dof_values(_uh), ϕ_to_u_pullback
 end
 
-function Adjoint(ϕ,uh,du,adjoint_op,res,F::AffineFEStateMap{S} where S<:SingleStateFunctional)
+function Adjoint(ϕ,_uh,du,adjoint_op,res,F::AffineFEStateMap{S} where S<:SingleStateFunctional)
     V_ϕ = F.F.aux_space
-    Aᵀ = Gridap.jacobian(adjoint_op,uh) # = dr/du
+    Aᵀ = Gridap.jacobian(adjoint_op,_uh) # = dr/du
     V = adjoint_op.trial
     λ = solve(LUSolver(),Aᵀ,du)
     λh = FEFunction(V,λ)
-    ϕh = FEFunction(V_ϕ,ϕ)
-    res_functional = Functional(res,F.F.F.dΩ,uh,λh,ϕh)
-    dϕ() = FunctionalGradient(res_functional,3)(ϕh)
+    _φh = FEFunction(V_ϕ,ϕ)
+    res_functional = Functional(res,F.F.F.dΩ,_uh,λh,_φh)
+    dϕ() = FunctionalGradient(res_functional,3)(_φh)
     dϕ = -assemble_vector(dϕ(),V_ϕ)
 end
 
