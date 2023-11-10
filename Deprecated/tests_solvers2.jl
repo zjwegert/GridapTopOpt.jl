@@ -107,20 +107,21 @@ d_tags = (D==2) ? ["tag_5"] : ["tag_21"]
 
 nc = (D==2) ? (n,n) : (n,n,n)
 domain = (D==2) ? (0,1,0,1) : (0,1,0,1,0,1)
-model  = CartesianDiscreteModel(ranks,np,domain,nc)
+model  = CartesianDiscreteModel(domain,nc)
 Ω = Triangulation(model)
 Γ = Boundary(model,tags=n_tags)
+ΓD = Boundary(model,tags=d_tags)
 
 poly  = (D==2) ? QUAD : HEX
 reffe = LagrangianRefFE(VectorValue{D,Float64},poly,order)
 V = TestFESpace(model,reffe;dirichlet_tags=d_tags)
 U = TrialFESpace(V)
-assem = SparseMatrixAssembler(SparseMatrixCSR{0,PetscScalar,PetscInt},Vector{PetscScalar},U,V,FullyAssembledRows())
+assem = SparseMatrixAssembler(SparseMatrixCSR{0,PetscScalar,PetscInt},Vector{PetscScalar},U,V)#,FullyAssembledRows())
 
 dΩ = Measure(Ω,2*order)
 dΓ = Measure(Γ,2*order)
 C = (D == 2) ? isotropic_2d(1.,0.3) : isotropic_3d(1.,0.3)
-g = (D == 2) ? VectorValue(1.0,0.0) : VectorValue(1.0,0.0,0.0)
+g = (D == 2) ? VectorValue(0.0,1.0) : VectorValue(0.0,0.0,1.0)
 a(u,v) = ∫((C ⊙ ε(u) ⊙ ε(v)))dΩ
 l(v)   = ∫(v ⋅ g)dΓ
 
