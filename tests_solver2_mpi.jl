@@ -44,7 +44,7 @@ function ksp_setup(ksp)
   rtol = PetscScalar(1.e-12)
   atol = GridapPETSc.PETSC.PETSC_DEFAULT
   dtol = GridapPETSc.PETSC.PETSC_DEFAULT
-  maxits = GridapPETSc.PETSC.PETSC_DEFAULT
+  maxits = PetscInt(200)
 
   @check_error_code GridapPETSc.PETSC.KSPView(ksp[],C_NULL)
   @check_error_code GridapPETSc.PETSC.KSPSetType(ksp[],GridapPETSc.PETSC.KSPCG)
@@ -96,10 +96,10 @@ end
 function main(distribute)
   D = 3
   order = 1
-  n = 20
+  n = 30
 
   np_x_dim = 2
-  np = Tuple(fill(np_x_dim,D)) #Tuple([fill(np_x_dim,D-1)...,1])
+  np = Tuple([np_x_dim,fill(1,D-1)...])
   ranks = distribute(LinearIndices((prod(np),)))
 
   n_tags = (D==2) ? "tag_6" : "tag_22"
@@ -120,29 +120,26 @@ function main(distribute)
   dΩ = Measure(Ω,2*order)
   dΓ = Measure(Γ,2*order)
   C = (D == 2) ? isotropic_2d(1.,0.3) : isotropic_3d(1.,0.3)
-  g = (D == 2) ? VectorValue(1.0,0.0) : VectorValue(1.0,0.0,0.0)
+  g = (D == 2) ? VectorValue(0.0,1.0) : VectorValue(1.0,1.0,1.0)
   a(u,v) = ∫((C ⊙ ε(u) ⊙ ε(v)))dΩ
   l(v)   = ∫(v ⋅ g)dΓ
 
   op   = AffineFEOperator(a,l,U,V,assem)
   A, b = get_matrix(op), get_vector(op);
-
   dim, coords = get_coords(Ω,V);
-
   pcoords = PVector(coords,partition(axes(A,1)))
 
-  #pcoords = pfill(0.0,partition(axes(A,2)))
-  #copy!(pcoords,_pcoords)
-  #consistent!(pcoords) |> fetch
-
   options = "
-    -ksp_type cg -ksp_rtol 1.0e-12
-    -pc_type gamg -mat_block_size $D
-    -ksp_converged_reason -ksp_error_if_not_converged true
+    -ksp_type gmres -ksp_rtol 1.0e-12 -ksp_max_it 200
+    -pc_type gamg
+    -mg_levels_ksp_type chebyshev -mg_levels_esteig_ksp_type cg
+    -ksp_converged_reason -ksp_error_if_not_converged true -ksp_monitor_short
     "
   GridapPETSc.with(args=split(options)) do
-    solver = PETScLinearSolver(ksp_setup)
+    #solver = PETScLinearSolver(ksp_setup)
+    solver = PETScLinearSolver()
     ss = symbolic_setup(solver,A)
+    #ns = numerical_setup(ss,A)
     ns = my_numerical_setup(ss,A,pcoords,dim)
 
     x  = pfill(PetscScalar(1.0),partition(axes(A,2)))
