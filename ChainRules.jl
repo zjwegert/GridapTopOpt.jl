@@ -70,7 +70,7 @@ end
 # ϕ -> u : Struct that represents the FE solution of a parameterised Affine PDE. It is a map from the parameter space P to a FESpace
 # ==================================================================================================================================
 
-struct AffineFEStateMap{P,U <: FESpace, V <: FESpace}
+struct _AffineFEStateMap{P,U <: FESpace, V <: FESpace}
 	a::Function
 	ℓ::Function
   res::Function
@@ -80,7 +80,7 @@ struct AffineFEStateMap{P,U <: FESpace, V <: FESpace}
 	# assem::Assembler
 end
 
-function (ϕ_to_u::AffineFEStateMap)(ϕ)
+function (ϕ_to_u::_AffineFEStateMap)(ϕ)
   a=ϕ_to_u.a
   l=ϕ_to_u.ℓ
   res=ϕ_to_u.res
@@ -91,7 +91,7 @@ function (ϕ_to_u::AffineFEStateMap)(ϕ)
   get_free_dof_values(Gridap.solve(op))
 end
 
-function ChainRulesCore.rrule(ϕ_to_u::AffineFEStateMap,ϕ)
+function ChainRulesCore.rrule(ϕ_to_u::_AffineFEStateMap,ϕ)
   a=ϕ_to_u.a
   l=ϕ_to_u.ℓ
   res=ϕ_to_u.res

@@ -231,186 +231,70 @@ display(t)
 
 ########################################################################################
 
-struct Functional{N}
-    F
-    dΩ
-    state::NTuple{N}
-    function Functional(F,dΩ,args...)
-        N = length(args)
-        new{N}(F,dΩ,args)
-    end
-end
-
-# evaluate(F::Functional) = F.F(F.state...,dΩ)
-
-struct FunctionalGradient{N,K}
-    F::Functional{N}
-    function FunctionalGradient(F::Functional{N},K) where N
-        @assert 0<K<=N
-        new{N,K}(F)
-    end
-end
-
-function (fg::FunctionalGradient{N,K})(uh::GridapDistributed.DistributedCellField) where {N,K}
-    fields = map(i->i==K ? uh : fg.F.state[i],1:N)
-    local_fields = map(local_views,fields)
-    contribs = map(local_views(fg.F.dΩ),local_fields...) do dΩ,lf...
-        _f = u -> fg.F.F(lf[1:K-1]...,u,lf[K+1:end]...,dΩ)
-        return Gridap.Fields.gradient(_f,lf[K])
-    end
-    return GridapDistributed.DistributedDomainContribution(contribs)
-end
-
-function (fg::FunctionalGradient{N,K})(uh::FEFunction) where {N,K}
-    fields = map(i->i==K ? uh : fg.F.state[i],1:N)
-    _f = u -> fg.F.F(fields[1:K-1]...,u,fields[K+1:end]...,dΩ)
-    return Gridap.Fields.gradient(_f,fields[K])
-end
+include("src/ChainRules.jl")
 
 ranks = with_debug() do distribute
     distribute(LinearIndices((1,)))
 end
 
-model = CartesianDiscreteModel(ranks,(1,1),(0,1,0,1),(2,2))
-
-#model = CartesianDiscreteModel((0,1,0,1),(2,2))
-V = FESpace(model,ReferenceFE(lagrangian,VectorValue{2,Float64},1)) # <- this breaks stuff!
+# model = CartesianDiscreteModel(ranks,(1,1),(0,1,0,1),(2,2))
+model = CartesianDiscreteModel((0,1,0,1),(2,2))
+V = FESpace(model,ReferenceFE(lagrangian,VectorValue{2,Float64},1),dirichlet_tags=["tag_5"])
+U = TrialFESpace(V,VectorValue(0,0))
 V_ϕ = FESpace(model,ReferenceFE(lagrangian,Float64,1))
 
 Ω = Triangulation(model)
 dΩ = Measure(Ω,2)
 
-uh = zero(V)
-ϕh = zero(V_ϕ)
+# Weak forms
+function a(u,v,ϕ,dΩ)
+    ϕh = ϕ_to_ϕₕ(ϕ,V_ϕ)
+    ∫((ϕh)*(u⋅v))dΩ
+end
+a(ϕ,dΩ) = (u,v) -> a(u,v,ϕ,dΩ)
+l(v,ϕh,dΩ) = ∫(v ⋅ VectorValue(1,0))dΩ
+l(ϕ,dΩ) = v -> l(v,ϕ,dΩ)
+res(u,v,ϕ,dΩ) = a(u,v,ϕ,dΩ) - l(v,ϕ,dΩ)
 
-J = (u,ϕ,dΩ) -> ∫(1+(u⋅u)*(u⋅u)+ϕ)dΩ
+ϕh = interpolate(x->1,V_ϕ);
+ϕ = get_free_dof_values(ϕh)
+
+op = AffineFEOperator(a(ϕ,dΩ),l(ϕ,dΩ),U,V)
+uh = solve(op)
+
+J = (u,ϕ,dΩ) -> ∫(1+(u⋅u)*(u⋅u)+ϕ)dΩ # <- this is what the user sees.
 J_func = Functional(J,dΩ,uh,ϕh)
 sum(J(uh,ϕh,dΩ))
 
-djdu = FunctionalGradient(J_func,1)(uh)
+ϕ = get_free_dof_values(ϕh)
 
-loss = DistributedLossFunction(J_func,V,V_ϕ)
+loss = SingleStateFunctional(J_func,U,V,V_ϕ);
+φ_to_u = AffineFEStateMap(a,l,res,loss);
 
-j, j_pullback = rrule(loss,get_free_dof_values(uh),get_free_dof_values(ϕh))
+u, u_pullback = rrule(φ_to_u,ϕ);
+j, j_pullback = rrule(loss,u,ϕ);
 _, du, dϕ₍ⱼ₎  = j_pullback(1); # dj = 1
+_, dϕ₍ᵤ₎      = u_pullback(du);
+dϕ            = dϕ₍ᵤ₎ + dϕ₍ⱼ₎
 
-
-struct DistributedLossFunction{P,U}
-    loss::Functional
-    state_sp::U
-    param_sp::P
-    # assem::Assembler
-end
-
-function (u_to_j::DistributedLossFunction)(u,ϕ)
-    loss=u_to_j.loss
-    U=u_to_j.state_sp
-    Q=u_to_j.param_sp
-    uh=FEFunction(U,u)
-    ϕh=FEFunction(Q,ϕ)
-    sum(loss.F(uh,ϕh,loss.dΩ))
-end
-
-function ChainRulesCore.rrule(u_to_j::DistributedLossFunction,u,ϕ)
-    loss=u_to_j.loss
-    U=u_to_j.state_sp
-    Q=u_to_j.param_sp
-    uh=FEFunction(U,u)
-    ϕh=FEFunction(Q,ϕ)
-    jp=sum(loss.F(uh,ϕh,loss.dΩ))
-    function u_to_j_pullback(dj)
-        djdu = FunctionalGradient(J_func,1)(uh)
-        djdu_vec = assemble_vector(djdu,U)
-        djdϕ = FunctionalGradient(J_func,2)(ϕh)
-        djdϕ_vec = assemble_vector(djdϕ,Q)
-        (  NoTangent(), dj*djdu_vec, dj*djdϕ_vec )
-    end
-    jp, u_to_j_pullback
-end
-
-
-
-######################################
-## Compare to single state case
-# struct DistributedFunctional
-#     f
-#     dΩ
+# # # Connor's implementation:
+# # Commented out for parallel
+# function a(u,v,φ) 
+#     φh = ϕ_to_ϕₕ(φ,V_ϕ)
+#     ∫((φh)*(u⋅v))dΩ
 # end
+# a(φ) = (u,v) -> a(u,v,φ)
+# l(v,ϕh) = ∫(v ⋅ VectorValue(1,0))dΩ
+# l(φ) = v -> l(v,φ)
+# res(u,v,φ,V_ϕ) = a(u,v,φ) - l(v,φ)
 
-# function Gridap.Fields.gradient(f::DistributedFunctional,uh::GridapDistributed.DistributedCellField)
-#     contribs = map(local_views(uh),local_views(f.dΩ)) do uh, dΩ
-#         _f = uh -> f.f(uh,dΩ)
-#         return Gridap.Fields.gradient(_f,uh)
-#     end
-#     return GridapDistributed.DistributedDomainContribution(contribs)
-# end
+# φ_to_u = _AffineFEStateMap(a,l,res,V_ϕ,U,V)
+# u_to_j =  LossFunction((u,ϕ) -> J(u,ϕ,dΩ),V_ϕ,U)
 
-# J_u_only = (u,dΩ) -> ∫(u⋅u)dΩ
-# df = DistributedFunctional(J_u_only,dΩ)
+# u, u_pullback   = rrule(φ_to_u,ϕ)
+# j, j_pullback   = rrule(u_to_j,u,ϕ)
+# _, du, dϕ₍ⱼ₎    = j_pullback(1) # dj = 1
+# _, dϕ₍ᵤ₎        = u_pullback(du)
+#    dϕ_connor           = dϕ₍ᵤ₎ + dϕ₍ⱼ₎
 
-# diff = maximum(abs,assemble_vector(dJdu,V) - assemble_vector(∇(df,uh),V))
-######################################
-
-nothing
-
-# J = ((u,v) -> ∫(u⋅u)dΩ)
-# loss = LossFunction(J,V,V)
-
-# u = get_free_dof_values(uh)
-# loss(u,u)
-
-# J2 = (u -> ∫(u⋅u)dΩ)
-# djdu = ∇(uh->J2(uh))
-# contr = djdu(uh)
-
-# J3 = (u,dΩ) -> ∫(u⋅u)dΩ
-# df = DistributedFunctional(J3,dΩ)
-
-# djdu = ∇(df,uh)
-# assemble_vector(djdu,V)
-
-# ## Loss function
-# _J4 = (u,φ) -> ∫(u⋅u)dΩ
-# _loss = LossFunction(_J4,V,V)
-# _loss(get_free_dof_values(uh),get_free_dof_values(uh))
-
-# ## Distributed loss function
-# J4 = (u,φ,dΩ) -> ∫(u⋅u+φ)dΩ
-# df = DistributedFunctional(J4,dΩ)
-# loss = DistributedLossFunction(df,V,V)
-# loss(get_free_dof_values(uh),get_free_dof_values(ϕh))
-
-# ## u_to_j_pullback
-# jp, u_to_j_pullback = ChainRulesCore.rrule(loss,get_free_dof_values(uh),get_free_dof_values(uh))
-
-# # This breaks:
-# NEW_df = DistributedFunctional((uh,dΩ)->loss.loss.f(uh,ϕh,dΩ),loss.loss.dΩ)
-# NEW_df()
-
-
-
-# djdu = ∇(DistributedFunctional((uh,dΩ)->loss.loss.f(uh,ϕh,dΩ),loss.loss.dΩ),uh)
-
-# djdϕ = ∇(DistributedFunctional((ϕh,dΩ)->loss.loss.f(uh,ϕh,dΩ),loss.loss.dΩ),ϕh)
-
-# u_to_j_pullback(1)
-
-
-# function ChainRulesCore.rrule(u_to_j::DistributedLossFunction,u,ϕ)
-#     loss=u_to_j.loss
-#     U=u_to_j.state_sp
-#     Q=u_to_j.param_sp
-#     uh=FEFunction(U,u)
-#     ϕh=FEFunction(Q,ϕ)
-#     jp=u_to_j(u,ϕ) # === jp=sum(loss.f(uₕ,ϕₕ,loss.dΩ))
-#     function u_to_j_pullback(dj)
-#         # djdu = ∇(uₕ->loss.f(uₕ,ϕₕ,loss.dΩ),uₕ)
-#         djdu = ∇(DistributedFunctional((uh,dΩ)->loss.f(uh,ϕh,dΩ),loss.dΩ),uh)
-#         djdu_vec = assemble_vector(djdu,U)
-#         # djdϕ = ∇(ϕₕ->loss.f(uh,ϕh,loss.dΩ),ϕh)
-#         djdϕ =  ∇(DistributedFunctional((ϕh,dΩ)->loss.f(uh,ϕh,dΩ),loss.dΩ),ϕh)
-#         djdϕ_vec = assemble_vector(djdϕ,Q)
-#         (  NoTangent(), dj*djdu_vec, dj*djdϕ_vec )
-#     end
-#     jp, u_to_j_pullback
-# end
+# dϕ_connor - dϕ
