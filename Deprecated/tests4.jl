@@ -201,5 +201,3 @@ vel2 = reshape(vel,sz)
 
 @benchmark reinit!($s,$y1,$x,$vel,0.1,$caches)
 @benchmark reinit_step!($y2,$y_tmp,$vel2,(false,false,false,false,false,false),(0.5,0.5,0.5),0.1,$caches2)
-
-

@@ -9,8 +9,10 @@ import GridapDistributed.DistributedCellField
 import GridapDistributed.DistributedFESpace
 import GridapDistributed.DistributedDiscreteModel
 import GridapDistributed.DistributedMeasure
+import GridapDistributed.DistributedTriangulation
 
 include("Utilities.jl"); # <- For some useful functions 
+include("src/Solvers.jl")
 
 function elastic_compliance(φh,g,C,solve_data,interp,t,solver)
     I = interp.I; dΩ=solve_data.dΩ; dΓ_N=solve_data.dΓ_N;
@@ -52,12 +54,11 @@ function fe_setup(ranks,mesh_partition,order::T,coord_max::NTuple{3,M},
     ## Triangulations and measures
     Ω = Triangulation(model)
     Γ_N = BoundaryTriangulation(model,tags="Gamma_N")
-    dΩ = Measure(Ω,2order)
-    dΓ_N = Measure(Γ_N,2order)
+    dΩ = Measure(Ω,2*order)
+    dΓ_N = Measure(Γ_N,2*order)
     ## Spaces
     reffe = ReferenceFE(lagrangian,VectorValue{3,Float64},order)
-    V = TestFESpace(model,reffe;conformity=:H1,dirichlet_tags=["Gamma_D"],
-        dirichlet_masks=[(true,true,true)])
+    V = TestFESpace(model,reffe;conformity=:H1,dirichlet_tags=["Gamma_D"])
     U = TrialFESpace(V,[VectorValue(0.0,0.0,0.0)])
     ## Assembler
     Tm=SparseMatrixCSR{0,PetscScalar,PetscInt}
@@ -92,40 +93,28 @@ end
 
 ############################################################################################
 
-function ksp_setup(ksp)
-    rtol = PetscScalar(1.e-12)
-    atol = GridapPETSc.PETSC.PETSC_DEFAULT
-    dtol = GridapPETSc.PETSC.PETSC_DEFAULT
-    maxits = GridapPETSc.PETSC.PETSC_DEFAULT
-  
-    @check_error_code GridapPETSc.PETSC.KSPView(ksp[],C_NULL)
-    @check_error_code GridapPETSc.PETSC.KSPSetType(ksp[],GridapPETSc.PETSC.KSPCG)
-  
-    pc = Ref{GridapPETSc.PETSC.PC}()
-    @check_error_code GridapPETSc.PETSC.KSPGetPC(ksp[],pc)
-    @check_error_code GridapPETSc.PETSC.PCSetType(pc[],GridapPETSc.PETSC.PCGAMG)
-    @check_error_code GridapPETSc.PETSC.KSPSetTolerances(ksp[], rtol, atol, dtol, maxits)
-end
-
-
-############################################################################################
-
 function main(mesh_partition,distribute)
     ranks  = distribute(LinearIndices((prod(mesh_partition),)))
-    options = "-ksp_error_if_not_converged true -ksp_converged_reason"
+    options = "
+        -ksp_type cg -ksp_rtol 1.0e-12 -ksp_norm_type unpreconditioned
+        -pc_type gamg -mat_block_size 3
+        -mg_levels_ksp_type chebyshev -mg_levels_esteig_ksp_type cg -mg_coarse_sub_pc_type cholesky
+        -ksp_converged_reason -ksp_error_if_not_converged true
+        "
     el_size = (20,20,20)
     coord_max = (2.,1.,1.)
     order = 1;
     Δ = coord_max./el_size;
     path = (@__DIR__)*"/Results/LinearElastic3DSolverTesting";
-    t = PTimer(ranks)
+    t = PTimer(ranks;verbose=true)
     GridapPETSc.with(args=split(options)) do
         model,Ω,V_φ,solve_data = fe_setup(ranks,mesh_partition,order,coord_max,el_size)
         interp = SmoothErsatzMaterialInterpolation(η = 2*maximum(Δ))
         C = _isotropic_3d(1.,0.3)
         g = VectorValue(0.,0.,-1.0)
         φh = interpolate(x->-sqrt((x[1]-0.5)^2+(x[2]-0.5)^2+(x[3]-0.5)^2)+0.25,V_φ)
-        solver = PETScLinearSolver(ksp_setup)
+
+        solver = ElasticitySolver(Ω,solve_data.V)
         J,v_J,uh = elastic_compliance(φh,g,C,solve_data,interp,t,solver)
         display("Objective = $J")
         writevtk(Ω,path,cellfields=["phi"=>φh,"H(phi)"=>(interp.H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh)),"uh"=>uh])
@@ -133,7 +122,7 @@ function main(mesh_partition,distribute)
     t
 end
 
-t = with_debug() do distribute
-    main((2,2,2),distribute)
+t = with_mpi() do distribute
+    main((2,1,1),distribute)
 end;
 display(t)
