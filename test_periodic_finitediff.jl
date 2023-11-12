@@ -44,10 +44,10 @@ function setup_mock_2d()
 end
 
 function mock_2d(ranks,mesh_partition,order::T,coord_max::NTuple{2,M},
-        el_size::NTuple{2,T},α::M) where {T<:Integer,M<:AbstractFloat}
+        el_size::NTuple{2,T},α::M,isperiodic) where {T<:Integer,M<:AbstractFloat}
     ## Model
     dom = (0,coord_max[1],0,coord_max[2]);
-    model = CartesianDiscreteModel(ranks,mesh_partition,dom,el_size,isperiodic=(true,true));
+    model = CartesianDiscreteModel(ranks,mesh_partition,dom,el_size,isperiodic=(isperiodic,isperiodic));
     ## Triangulations and measures
     Ω = Triangulation(model)
     dΩ = Measure(Ω,2order)
@@ -134,9 +134,9 @@ function mock_3d(ranks,mesh_partition,order::T,coord_max::NTuple{3,M},
     return model,Ω,V_φ,solve_data,hilb_data
 end
 
-mesh_partition = (3,3,3);
-isperiodic = true;
-prob_setup = setup_mock_3d;
+mesh_partition = (3,3);
+isperiodic = false;
+prob_setup = setup_mock_2d;
 
 ranks = with_debug() do distribute 
     ranks = distribute(LinearIndices((prod(mesh_partition),)));
@@ -152,4 +152,9 @@ model,Ω,V_φ,solve_data,hilb_data = prob(ranks,mesh_partition,fe_order,coord_ma
 φ = get_free_dof_values(φh)
 reinit!(φ,model,Δ,0.5,2000,reinit_tol)
 
-writevtk(Ω,(@__DIR__)*"\\Results\\test_reinit_3d_periodic",cellfields=["phi"=>φh,"H(phi)"=>(interp.H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh))]);
+vh = interpolate(x->1,V_φ)
+v = get_free_dof_values(vh)
+advect!(φ,v,model,Δ,γ,50)
+reinit!(φ,model,Δ,0.5,2000,reinit_tol)
+
+writevtk(Ω,(@__DIR__)*"\\Results\\test_reinit_2d_plus_advect",cellfields=["phi"=>φh,"H(phi)"=>(interp.H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh))]);

@@ -32,16 +32,100 @@ struct FirstOrderStencil{D,T} <: AdvectionStencil
   end
 end
 
-function allocate_caches(::FirstOrderStencil,φ,vel)
-  # Copy code here...
+function allocate_caches(::FirstOrderStencil{2},φ,vel)
+  D⁺ʸ = similar(φ); D⁺ˣ = similar(φ)
+  D⁻ʸ = similar(φ); D⁻ˣ = similar(φ)
+  ∇⁺  = similar(φ); ∇⁻  = similar(φ)
+  return D⁺ʸ, D⁺ˣ, D⁻ʸ, D⁻ˣ, ∇⁺, ∇⁻
 end
 
-function reinit!(::FirstOrderStencil,φ_new,φ_old,vel,Δt,Δx,caches)
-  # Copy code here...
+function reinit!(::FirstOrderStencil{2,T},φ_new,φ,vel,Δt,Δx,caches) where T
+  D⁺ʸ, D⁺ˣ, D⁻ʸ, D⁻ˣ, ∇⁺, ∇⁻ = caches
+  Δx, Δy = Δx
+  # Prepare shifted lsf
+  circshift!(D⁺ʸ,φ,(0,-1)); circshift!(D⁻ʸ,φ,(0,1))
+  circshift!(D⁺ˣ,φ,(-1,0)); circshift!(D⁻ˣ,φ,(1,0))
+  # Forward (+) & Backward (-)
+  D⁺ʸ .= @. (D⁺ʸ - φ)/Δy; D⁺ʸ[:,end] .= zero(T)
+  D⁺ˣ .= @. (D⁺ˣ - φ)/Δx; D⁺ˣ[end,:] .= zero(T)
+  D⁻ʸ .= @. (φ - D⁻ʸ)/Δy; D⁻ʸ[:,1]   .= zero(T)
+  D⁻ˣ .= @. (φ - D⁻ˣ)/Δx; D⁻ˣ[1,:]   .= zero(T)
+  # Operators
+  ∇⁺ .= @. sqrt(max(D⁻ʸ,0)^2 + min(D⁺ʸ,0)^2 + max(D⁻ˣ,0)^2 + min(D⁺ˣ,0)^2);
+  ∇⁻ .= @. sqrt(max(D⁺ʸ,0)^2 + min(D⁻ʸ,0)^2 + max(D⁺ˣ,0)^2 + min(D⁻ˣ,0)^2);
+  # Update
+  φ_new .= @. φ - Δt*(max(vel,0)*∇⁺ + min(vel,0)*∇⁻ - vel)
+  return φ_new
 end
 
-function advect!(::FirstOrderStencil,φ,vel,Δt,Δx,caches)
-  # Copy code here...
+function advect!(::FirstOrderStencil{2,T},φ,vel,Δt,Δx,caches) where T
+  D⁺ʸ, D⁺ˣ, D⁻ʸ, D⁻ˣ, ∇⁺, ∇⁻ = caches
+  Δx, Δy = Δx
+  # Prepare shifted lsf
+  circshift!(D⁺ʸ,φ,(0,-1)); circshift!(D⁻ʸ,φ,(0,1))
+  circshift!(D⁺ˣ,φ,(-1,0)); circshift!(D⁻ˣ,φ,(1,0))
+  # Forward (+) & Backward (-)
+  D⁺ʸ .= @. (D⁺ʸ - φ)/Δy; D⁺ʸ[:,end] .= zero(T)
+  D⁺ˣ .= @. (D⁺ˣ - φ)/Δx; D⁺ˣ[end,:] .= zero(T)
+  D⁻ʸ .= @. (φ - D⁻ʸ)/Δy; D⁻ʸ[:,1]   .= zero(T)
+  D⁻ˣ .= @. (φ - D⁻ˣ)/Δx; D⁻ˣ[1,:]   .= zero(T)
+  # Operators
+  ∇⁺ .= @. sqrt(max(D⁻ʸ,0)^2 + min(D⁺ʸ,0)^2 + max(D⁻ˣ,0)^2 + min(D⁺ˣ,0)^2)
+  ∇⁻ .= @. sqrt(max(D⁺ʸ,0)^2 + min(D⁻ʸ,0)^2 + max(D⁺ˣ,0)^2 + min(D⁻ˣ,0)^2)
+  # Update
+  φ .= @. φ - Δt*(max(vel,0)*∇⁺ + min(vel,0)*∇⁻)
+  return φ
+end
+
+function allocate_caches(::FirstOrderStencil{3},φ,vel)
+  D⁺ᶻ = similar(φ); D⁺ʸ = similar(φ); D⁺ˣ = similar(φ)
+  D⁻ᶻ = similar(φ); D⁻ʸ = similar(φ); D⁻ˣ = similar(φ)
+  ∇⁺  = similar(φ); ∇⁻  = similar(φ)
+  return D⁺ᶻ, D⁺ʸ, D⁺ˣ, D⁻ᶻ, D⁻ʸ, D⁻ˣ, ∇⁺, ∇⁻
+end
+
+function reinit!(::FirstOrderStencil{3,T},φ_new,φ,vel,Δt,Δx,caches) where T
+  D⁺ᶻ, D⁺ʸ, D⁺ˣ, D⁻ᶻ, D⁻ʸ, D⁻ˣ, ∇⁺, ∇⁻=caches
+  Δx, Δy, Δz = Δx
+  # Prepare shifted lsf
+  circshift!(D⁺ʸ,φ,(0,-1,0)); circshift!(D⁻ʸ,φ,(0,1,0))
+  circshift!(D⁺ˣ,φ,(-1,0,0)); circshift!(D⁻ˣ,φ,(1,0,0))
+  circshift!(D⁺ᶻ,φ,(0,0,-1)); circshift!(D⁻ᶻ,φ,(0,0,1))
+  # Forward (+) & Backward (-)
+  D⁺ʸ .= (D⁺ʸ - φ)/Δy; D⁺ʸ[:,end,:] .= zero(T)
+  D⁺ˣ .= (D⁺ˣ - φ)/Δx; D⁺ˣ[end,:,:] .= zero(T)
+  D⁺ᶻ .= (D⁺ᶻ - φ)/Δz; D⁺ᶻ[:,:,end] .= zero(T)
+  D⁻ʸ .= (φ - D⁻ʸ)/Δy; D⁻ʸ[:,1,:]   .= zero(T)
+  D⁻ˣ .= (φ - D⁻ˣ)/Δx; D⁻ˣ[1,:,:]   .= zero(T)
+  D⁻ᶻ .= (φ - D⁻ᶻ)/Δz; D⁻ᶻ[:,:,1]   .= zero(T)
+  # Operators
+  ∇⁺ .= @. sqrt(max(D⁻ʸ,0)^2 + min(D⁺ʸ,0)^2 + max(D⁻ˣ,0)^2 + min(D⁺ˣ,0)^2 + max(D⁻ᶻ,0)^2 + min(D⁺ᶻ,0)^2)
+  ∇⁻ .= @. sqrt(max(D⁺ʸ,0)^2 + min(D⁻ʸ,0)^2 + max(D⁺ˣ,0)^2 + min(D⁻ˣ,0)^2 + max(D⁺ᶻ,0)^2 + min(D⁻ᶻ,0)^2)
+  # Update
+  φ_new .= @. φ - Δt*(max(vel,0)*∇⁺ + min(S,0)*∇⁻ - vel)
+  return φ_new
+end
+
+function advect!(::FirstOrderStencil{3,T},φ,vel,Δt,Δx,caches) where T
+  D⁺ᶻ, D⁺ʸ, D⁺ˣ, D⁻ᶻ, D⁻ʸ, D⁻ˣ, ∇⁺, ∇⁻=caches
+  Δx, Δy, Δz = Δx
+  # Prepare shifted lsf
+  circshift!(D⁺ʸ,φ,(0,-1,0)); circshift!(D⁻ʸ,φ,(0,1,0))
+  circshift!(D⁺ˣ,φ,(-1,0,0)); circshift!(D⁻ˣ,φ,(1,0,0))
+  circshift!(D⁺ᶻ,φ,(0,0,-1)); circshift!(D⁻ᶻ,φ,(0,0,1))
+  # Forward (+) & Backward (-)
+  D⁺ʸ .= (D⁺ʸ - φ)/Δy; D⁺ʸ[:,end,:] .= zero(T)
+  D⁺ˣ .= (D⁺ˣ - φ)/Δx; D⁺ˣ[end,:,:] .= zero(T)
+  D⁺ᶻ .= (D⁺ᶻ - φ)/Δz; D⁺ᶻ[:,:,end] .= zero(T)
+  D⁻ʸ .= (φ - D⁻ʸ)/Δy; D⁻ʸ[:,1,:]   .= zero(T)
+  D⁻ˣ .= (φ - D⁻ˣ)/Δx; D⁻ˣ[1,:,:]   .= zero(T)
+  D⁻ᶻ .= (φ - D⁻ᶻ)/Δz; D⁻ᶻ[:,:,1]   .= zero(T)
+  # Operators
+  ∇⁺ .= @. sqrt(max(D⁻ʸ,0)^2 + min(D⁺ʸ,0)^2 + max(D⁻ˣ,0)^2 + min(D⁺ˣ,0)^2 + max(D⁻ᶻ,0)^2 + min(D⁺ᶻ,0)^2)
+  ∇⁻ .= @. sqrt(max(D⁺ʸ,0)^2 + min(D⁻ʸ,0)^2 + max(D⁺ˣ,0)^2 + min(D⁻ˣ,0)^2 + max(D⁺ᶻ,0)^2 + min(D⁻ᶻ,0)^2)
+  # Update
+  φ .= @. φ - Δt*(max(vel,0)*∇⁺ + min(vel,0)*∇⁻)
+  return φ
 end
 
 function compute_Δt(s::FirstOrderStencil{D,T},φ,vel) where {D,T}

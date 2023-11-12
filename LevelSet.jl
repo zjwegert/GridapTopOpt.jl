@@ -1,29 +1,57 @@
 # Generate initial LSF
 gen_lsf(ξ,a) = x::VectorValue -> -1/4*prod(cos.(get_array(ξ*pi*x))) - a/4
 
+# struct LevelSetUpdate{N,M}
+#     model
+#     fe_space
+#     γ
+#     max_steps
+#     cache
+
+#     function LevelSetUpdate{M,N}() where {M,N}
+#         new{M,N}()
+#     end
+
+# end
+
+# struct VelocityExtension
+#     U
+#     V
+#     assem
+#     dΩ
+#     K
+#     cache
+# end
+
+# struct LevelSetCache{N,M} 
+
+#     φ_tmp
+
+# end
+
 ## H-J and reinit
 """
     Single step for first order upwind method for H-J equation (2D)
 """
-function advect_step!(φ::T,V::T,g_loc::NTuple{4,Bool},Δ::NTuple{2,M},Δt::M) where {M,T<:Array{M,2}}
-    (X⁻,X⁺,Y⁻,Y⁺) = g_loc
-    Δx,Δy = Δ 
+function advect!(φ::T,V::T,Δ::NTuple{2,M},Δt::M,caches) where {M,T<:Array{M,2}}
+    D⁺ʸ,D⁺ˣ,D⁻ʸ,D⁻ˣ,∇⁺,∇⁻=caches
+    Δx,Δy = Δ
     # Prepare shifted lsf
-    φ⁺ʸ = circshift(φ,(0,-1)); φ⁻ʸ = circshift(φ,(0,1)); 
-    φ⁺ˣ = circshift(φ,(-1,0)); φ⁻ˣ = circshift(φ,(1,0)); 
+    circshift!(D⁺ʸ,φ,(0,-1)); circshift!(D⁻ʸ,φ,(0,1)); 
+    circshift!(D⁺ˣ,φ,(-1,0)); circshift!(D⁻ˣ,φ,(1,0)); 
     # Forward (+) & Backward (-)
-    D⁺ʸ = @. (φ⁺ʸ - φ)/Δy;
-    D⁺ˣ = @. (φ⁺ˣ - φ)/Δx;
-    D⁻ʸ = @. (φ - φ⁻ʸ)/Δy;
-    D⁻ˣ = @. (φ - φ⁻ˣ)/Δx;
+    D⁺ʸ .= @. (D⁺ʸ - φ)/Δy;
+    D⁺ˣ .= @. (D⁺ˣ - φ)/Δx;
+    D⁻ʸ .= @. (φ - D⁻ʸ)/Δy;
+    D⁻ˣ .= @. (φ - D⁻ˣ)/Δx;
     # Check for boundaries with ghost nodes
-    (~Y⁺) ? D⁺ʸ[:,end] .= zero(M) : 0;
-    (~X⁺) ? D⁺ˣ[end,:] .= zero(M) : 0;
-    (~Y⁻) ? D⁻ʸ[:,1] .= zero(M) : 0;
-    (~X⁻) ? D⁻ˣ[1,:] .= zero(M) : 0;
+    D⁺ʸ[:,end] .= zero(M);
+    D⁺ˣ[end,:] .= zero(M);
+    D⁻ʸ[:,1] .= zero(M);
+    D⁻ˣ[1,:] .= zero(M);
     # Operators
-    ∇⁺ = @. sqrt(max(D⁻ʸ,0)^2 + min(D⁺ʸ,0)^2 + max(D⁻ˣ,0)^2 + min(D⁺ˣ,0)^2);
-    ∇⁻ = @. sqrt(max(D⁺ʸ,0)^2 + min(D⁻ʸ,0)^2 + max(D⁺ˣ,0)^2 + min(D⁻ˣ,0)^2);
+    ∇⁺ .= @. sqrt(max(D⁻ʸ,0)^2 + min(D⁺ʸ,0)^2 + max(D⁻ˣ,0)^2 + min(D⁺ˣ,0)^2);
+    ∇⁻ .= @. sqrt(max(D⁺ʸ,0)^2 + min(D⁻ʸ,0)^2 + max(D⁺ˣ,0)^2 + min(D⁻ˣ,0)^2);
     # Update
     φ .= @. φ - Δt*(max(V,0)*∇⁺ + min(V,0)*∇⁻); 
     return nothing
@@ -32,25 +60,25 @@ end
 """
     Single step for first order upwind method for reinitialisation equation (2D)
 """
-function reinit_step!(φ::T,φ_tmp::T,S::T,g_loc::NTuple{4,Bool},Δ::NTuple{2,M},Δt::M) where {M,T<:Array{M,2}}
-    (X⁻,X⁺,Y⁻,Y⁺) = g_loc
-    Δx,Δy = Δ 
+function reinit!(φ::T,φ_tmp::T,S::T,Δ::NTuple{2,M},Δt::M,caches) where {M,T<:Array{M,2}}
+    D⁺ʸ,D⁺ˣ,D⁻ʸ,D⁻ˣ,∇⁺,∇⁻=caches
+    Δx,Δy = Δ
     # Prepare shifted lsf
-    φ⁺ʸ = circshift(φ,(0,-1)); φ⁻ʸ = circshift(φ,(0,1)); 
-    φ⁺ˣ = circshift(φ,(-1,0)); φ⁻ˣ = circshift(φ,(1,0)); 
+    circshift!(D⁺ʸ,φ,(0,-1)); circshift!(D⁻ʸ,φ,(0,1)); 
+    circshift!(D⁺ˣ,φ,(-1,0)); circshift!(D⁻ˣ,φ,(1,0)); 
     # Forward (+) & Backward (-)
-    D⁺ʸ = @. (φ⁺ʸ - φ)/Δy;
-    D⁺ˣ = @. (φ⁺ˣ - φ)/Δx;
-    D⁻ʸ = @. (φ - φ⁻ʸ)/Δy;
-    D⁻ˣ = @. (φ - φ⁻ˣ)/Δx;
+    D⁺ʸ .= @. (D⁺ʸ - φ)/Δy;
+    D⁺ˣ .= @. (D⁺ˣ - φ)/Δx;
+    D⁻ʸ .= @. (φ - D⁻ʸ)/Δy;
+    D⁻ˣ .= @. (φ - D⁻ˣ)/Δx;
     # Check for boundaries with ghost nodes
-    (~Y⁺) ? D⁺ʸ[:,end] .= zero(M) : 0;
-    (~X⁺) ? D⁺ˣ[end,:] .= zero(M) : 0;
-    (~Y⁻) ? D⁻ʸ[:,1] .= zero(M) : 0;
-    (~X⁻) ? D⁻ˣ[1,:] .= zero(M) : 0;
+    D⁺ʸ[:,end] .= zero(M);
+    D⁺ˣ[end,:] .= zero(M);
+    D⁻ʸ[:,1] .= zero(M);
+    D⁻ˣ[1,:] .= zero(M);
     # Operators
-    ∇⁺ = @. sqrt(max(D⁻ʸ,0)^2 + min(D⁺ʸ,0)^2 + max(D⁻ˣ,0)^2 + min(D⁺ˣ,0)^2);
-    ∇⁻ = @. sqrt(max(D⁺ʸ,0)^2 + min(D⁻ʸ,0)^2 + max(D⁺ˣ,0)^2 + min(D⁻ˣ,0)^2);
+    ∇⁺ .= @. sqrt(max(D⁻ʸ,0)^2 + min(D⁺ʸ,0)^2 + max(D⁻ˣ,0)^2 + min(D⁺ˣ,0)^2);
+    ∇⁻ .= @. sqrt(max(D⁺ʸ,0)^2 + min(D⁻ʸ,0)^2 + max(D⁺ˣ,0)^2 + min(D⁻ˣ,0)^2);
     # Update
     φ_tmp .= @. φ - Δt*(max(S,0)*∇⁺ + min(S,0)*∇⁻ - S); 
     return nothing
@@ -59,30 +87,30 @@ end
 """
     Single step for first order upwind method for H-J equation (3D)
 """
-function advect_step!(φ::T,V::T,g_loc::NTuple{6,Bool},Δ::NTuple{3,M},Δt::M) where {M,T<:Array{M,3}}
-    (X⁻,X⁺,Y⁻,Y⁺,Z⁻,Z⁺) = g_loc
+function advect!(φ::T,V::T,Δ::NTuple{3,M},Δt::M,caches) where {M,T<:Array{M,3}}
+    D⁺ʸ,D⁺ˣ,D⁻ʸ,D⁻ˣ,∇⁺,∇⁻=caches
     Δx,Δy,Δz = Δ 
     # Prepare shifted lsf
-    φ⁺ʸ = circshift(φ,(0,-1,0)); φ⁻ʸ = circshift(φ,(0,1,0)); 
-    φ⁺ˣ = circshift(φ,(-1,0,0)); φ⁻ˣ = circshift(φ,(1,0,0));
-    φ⁺ᶻ = circshift(φ,(0,0,-1)); φ⁻ᶻ = circshift(φ,(0,0,1));
+    circshift!(D⁺ʸ,φ,(0,-1,0)); circshift!(D⁻ʸ,φ,(0,1,0)); 
+    circshift!(D⁺ˣ,φ,(-1,0,0)); circshift!(D⁻ˣ,φ,(1,0,0));
+    circshift!(D⁺ᶻ,φ,(0,0,-1)); circshift!(D⁻ᶻ,φ,(0,0,1));
     # Forward (+) & Backward (-)
-    D⁺ʸ = (φ⁺ʸ - φ)/Δy;
-    D⁺ˣ = (φ⁺ˣ - φ)/Δx;
-    D⁺ᶻ = (φ⁺ᶻ - φ)/Δz;
-    D⁻ʸ = (φ - φ⁻ʸ)/Δy;
-    D⁻ˣ = (φ - φ⁻ˣ)/Δx;
-    D⁻ᶻ = (φ - φ⁻ᶻ)/Δz;
+    D⁺ʸ .= (D⁺ʸ - φ)/Δy;
+    D⁺ˣ .= (D⁺ˣ - φ)/Δx;
+    D⁺ᶻ .= (D⁺ᶻ - φ)/Δz;
+    D⁻ʸ .= (φ - D⁻ʸ)/Δy;
+    D⁻ˣ .= (φ - D⁻ˣ)/Δx;
+    D⁻ᶻ .= (φ - D⁻ᶻ)/Δz;
     # Check for boundaries with ghost nodes
-    (~Y⁺) ? D⁺ʸ[:,end,:] .= zero(M) : 0;
-    (~X⁺) ? D⁺ˣ[end,:,:] .= zero(M) : 0;
-    (~Z⁺) ? D⁺ᶻ[:,:,end] .= zero(M) : 0;
-    (~Y⁻) ? D⁻ʸ[:,1,:] .= zero(M) : 0;
-    (~X⁻) ? D⁻ˣ[1,:,:] .= zero(M) : 0;
-    (~Z⁻) ? D⁻ᶻ[:,:,1] .= zero(M) : 0;
+    D⁺ʸ[:,end,:] .= zero(M);
+    D⁺ˣ[end,:,:] .= zero(M);
+    D⁺ᶻ[:,:,end] .= zero(M);
+    D⁻ʸ[:,1,:] .= zero(M);
+    D⁻ˣ[1,:,:] .= zero(M);
+    D⁻ᶻ[:,:,1] .= zero(M);
     # Operators
-    ∇⁺ = @. sqrt(max(D⁻ʸ,0)^2 + min(D⁺ʸ,0)^2 + max(D⁻ˣ,0)^2 + min(D⁺ˣ,0)^2 + max(D⁻ᶻ,0)^2 + min(D⁺ᶻ,0)^2);
-    ∇⁻ = @. sqrt(max(D⁺ʸ,0)^2 + min(D⁻ʸ,0)^2 + max(D⁺ˣ,0)^2 + min(D⁻ˣ,0)^2 + max(D⁺ᶻ,0)^2 + min(D⁻ᶻ,0)^2);
+    ∇⁺ .= @. sqrt(max(D⁻ʸ,0)^2 + min(D⁺ʸ,0)^2 + max(D⁻ˣ,0)^2 + min(D⁺ˣ,0)^2 + max(D⁻ᶻ,0)^2 + min(D⁺ᶻ,0)^2);
+    ∇⁻ .= @. sqrt(max(D⁺ʸ,0)^2 + min(D⁻ʸ,0)^2 + max(D⁺ˣ,0)^2 + min(D⁻ˣ,0)^2 + max(D⁺ᶻ,0)^2 + min(D⁻ᶻ,0)^2);
     # Update
     φ .= @. φ - Δt*(max(V,0)*∇⁺ + min(V,0)*∇⁻); 
     return nothing
@@ -91,30 +119,30 @@ end
 """
     Single step for first order upwind method for reinitialisation equation (3D)
 """
-function reinit_step!(φ::T,φ_tmp::T,S::T,g_loc::NTuple{6,Bool},Δ::NTuple{3,M},Δt::M) where {M,T<:Array{M,3}}
-    (X⁻,X⁺,Y⁻,Y⁺,Z⁻,Z⁺) = g_loc
+function reinit!(φ::T,φ_tmp::T,S::T,Δ::NTuple{3,M},Δt::M) where {M,T<:Array{M,3}}
+    D⁺ʸ,D⁺ˣ,D⁻ʸ,D⁻ˣ,∇⁺,∇⁻=caches
     Δx,Δy,Δz = Δ 
     # Prepare shifted lsf
-    φ⁺ʸ = circshift(φ,(0,-1,0)); φ⁻ʸ = circshift(φ,(0,1,0)); 
-    φ⁺ˣ = circshift(φ,(-1,0,0)); φ⁻ˣ = circshift(φ,(1,0,0));
-    φ⁺ᶻ = circshift(φ,(0,0,-1)); φ⁻ᶻ = circshift(φ,(0,0,1));
+    circshift!(D⁺ʸ,φ,(0,-1,0)); circshift!(D⁻ʸ,φ,(0,1,0)); 
+    circshift!(D⁺ˣ,φ,(-1,0,0)); circshift!(D⁻ˣ,φ,(1,0,0));
+    circshift!(D⁺ᶻ,φ,(0,0,-1)); circshift!(D⁻ᶻ,φ,(0,0,1));
     # Forward (+) & Backward (-)
-    D⁺ʸ = (φ⁺ʸ - φ)/Δy;
-    D⁺ˣ = (φ⁺ˣ - φ)/Δx;
-    D⁺ᶻ = (φ⁺ᶻ - φ)/Δz;
-    D⁻ʸ = (φ - φ⁻ʸ)/Δy;
-    D⁻ˣ = (φ - φ⁻ˣ)/Δx;
-    D⁻ᶻ = (φ - φ⁻ᶻ)/Δz;
+    D⁺ʸ .= (D⁺ʸ - φ)/Δy;
+    D⁺ˣ .= (D⁺ˣ - φ)/Δx;
+    D⁺ᶻ .= (D⁺ᶻ - φ)/Δz;
+    D⁻ʸ .= (φ - D⁻ʸ)/Δy;
+    D⁻ˣ .= (φ - D⁻ˣ)/Δx;
+    D⁻ᶻ .= (φ - D⁻ᶻ)/Δz;
     # Check for boundaries with ghost nodes
-    (~Y⁺) ? D⁺ʸ[:,end,:] .= zero(M) : 0;
-    (~X⁺) ? D⁺ˣ[end,:,:] .= zero(M) : 0;
-    (~Z⁺) ? D⁺ᶻ[:,:,end] .= zero(M) : 0;
-    (~Y⁻) ? D⁻ʸ[:,1,:] .= zero(M) : 0;
-    (~X⁻) ? D⁻ˣ[1,:,:] .= zero(M) : 0;
-    (~Z⁻) ? D⁻ᶻ[:,:,1] .= zero(M) : 0;
+    D⁺ʸ[:,end,:] .= zero(M);
+    D⁺ˣ[end,:,:] .= zero(M);
+    D⁺ᶻ[:,:,end] .= zero(M);
+    D⁻ʸ[:,1,:] .= zero(M);
+    D⁻ˣ[1,:,:] .= zero(M);
+    D⁻ᶻ[:,:,1] .= zero(M);
     # Operators
-    ∇⁺ = @. sqrt(max(D⁻ʸ,0)^2 + min(D⁺ʸ,0)^2 + max(D⁻ˣ,0)^2 + min(D⁺ˣ,0)^2 + max(D⁻ᶻ,0)^2 + min(D⁺ᶻ,0)^2);
-    ∇⁻ = @. sqrt(max(D⁺ʸ,0)^2 + min(D⁻ʸ,0)^2 + max(D⁺ˣ,0)^2 + min(D⁻ˣ,0)^2 + max(D⁺ᶻ,0)^2 + min(D⁻ᶻ,0)^2);
+    ∇⁺ .= @. sqrt(max(D⁻ʸ,0)^2 + min(D⁺ʸ,0)^2 + max(D⁻ˣ,0)^2 + min(D⁺ˣ,0)^2 + max(D⁻ᶻ,0)^2 + min(D⁺ᶻ,0)^2);
+    ∇⁻ .= @. sqrt(max(D⁺ʸ,0)^2 + min(D⁻ʸ,0)^2 + max(D⁺ˣ,0)^2 + min(D⁻ˣ,0)^2 + max(D⁺ᶻ,0)^2 + min(D⁻ᶻ,0)^2);
     # Update
     φ_tmp .= @. φ - Δt*(max(S,0)*∇⁺ + min(S,0)*∇⁻ - S); 
     return nothing
@@ -141,30 +169,26 @@ function advect!(φ::T,V::T,model::D,Δ::NTuple{N,M},γ::M,max_steps::Int) where
     end
 end
 
-function reinit!(φ::T,model::D,Δ::NTuple{N,M},γ::M,max_steps::Int,tol::M) where {N,M,
+function reinit!(φ::T,model::D,Δ::NTuple{N,M},γ::M,max_steps::Int,tol::M,caches) where {N,M,
         T<:PVector{Vector{M}},D<:DistributedDiscreteModel}
     # Initalise φ_tmp
-    φ_tmp = zero(φ)
+    φ_tmp = zero(φ) # <- cache me
     # Compute approx sign function S
     ∏Δ = prod(Δ);
-    S = zero(φ)
+    S = zero(φ) # <- cache me
     map(local_views(S),local_views(φ)) do S,φ
         S .= @. φ/sqrt(φ^2 + ∏Δ)
     end
-    consistent!(S) |> fetch
     ## CFL Condition (requires γ≤0.5)
-    Δt = γ*min(Δ...)#/(eps(M)^2+infnorm(S)) # As inform(S)=1
-    # Find part size and location of boundaries with ghost nodes
-    part_size,g_loc = map(ghost_values(φ),local_views(model)) do φ_ghost,model
-            part_size = size(model.grid.node_coords)
-            g_loc = find_part_ghost_boundaries(φ_ghost,part_size)
-            part_size,g_loc
-    end |> tuple_of_arrays
+    Δt = γ*min(Δ...)
+    part_size = map(local_views(model)) do model # <- in setup
+        get_cartesian_descriptor(model).partition .+ 1
+    end
     # Apply operations across partitions
     for _ ∈ Base.OneTo(max_steps)
         # Step of 1st order upwind reinitialisation equation
-        map(local_views(φ),local_views(φ_tmp),local_views(S),part_size,g_loc) do φ,φ_tmp,S,part_size,g_loc
-            reinit_step!(reshape(φ,part_size),reshape(φ_tmp,part_size),reshape(S,part_size),g_loc,Δ,Δt)
+        map(local_views(φ),local_views(φ_tmp),local_views(S),part_size) do φ,φ_tmp,S,part_size
+            reinit_step!(reshape(φ,part_size),reshape(φ_tmp,part_size),reshape(S,part_size),Δ,Δt,caches)
         end
         # Update ghost nodes
         consistent!(φ_tmp) |> fetch
@@ -178,31 +202,4 @@ function reinit!(φ::T,model::D,Δ::NTuple{N,M},γ::M,max_steps::Int,tol::M) whe
         end
         consistent!(φ) |> fetch
     end
-end
-
-# Detect location of ghost cells (hacky but works...)
-function find_part_ghost_boundaries(φ_ghost,part_size::NTuple{2,M}) where M<:Integer
-    ghost_indxs = φ_ghost.indices[1]
-    part_indxs = collect(reshape(Base.OneTo(prod(part_size)),part_size))
-    part_indxs[2:end-1,2:end-1] .= -1
-    # Check if ghost boundary lies on each side of array
-    X⁻ = length(part_indxs[1,2:end-1] ∩ ghost_indxs) == part_size[2]-2
-    X⁺ = length(part_indxs[end,2:end-1] ∩ ghost_indxs) == part_size[2]-2
-    Y⁻ = length(part_indxs[2:end-1,1] ∩ ghost_indxs) == part_size[1]-2
-    Y⁺ = length(part_indxs[2:end-1,end] ∩ ghost_indxs) == part_size[1]-2
-    return (X⁻,X⁺,Y⁻,Y⁺)
-end
-
-function find_part_ghost_boundaries(φ_ghost,part_size::NTuple{3,M}) where M<:Integer
-    ghost_indxs = φ_ghost.indices[1]
-    part_indxs = collect(reshape(Base.OneTo(prod(part_size)),part_size))
-    part_indxs[2:end-1,2:end-1,2:end-1] .= -1
-    # Check if ghost boundary lies on each side of array
-    X⁻ = length(part_indxs[1,2:end-1,2:end-1] ∩ ghost_indxs) == part_size[2]*part_size[3]-2part_size[2]-2part_size[3]+4
-    X⁺ = length(part_indxs[end,2:end-1,2:end-1] ∩ ghost_indxs) == part_size[2]*part_size[3]-2part_size[2]-2part_size[3]+4
-    Y⁻ = length(part_indxs[2:end-1,1,2:end-1] ∩ ghost_indxs) == part_size[1]*part_size[3]-2part_size[1]-2part_size[3]+4
-    Y⁺ = length(part_indxs[2:end-1,end,2:end-1] ∩ ghost_indxs) == part_size[1]*part_size[3]-2part_size[1]-2part_size[3]+4
-    Z⁻ = length(part_indxs[2:end-1,2:end-1,1] ∩ ghost_indxs) == part_size[1]*part_size[2]-2part_size[1]-2part_size[2]+4
-    Z⁺ = length(part_indxs[2:end-1,2:end-1,end] ∩ ghost_indxs) == part_size[1]*part_size[2]-2part_size[1]-2part_size[2]+4
-    return (X⁻,X⁺,Y⁻,Y⁺,Z⁻,Z⁺)
 end
