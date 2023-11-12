@@ -25,7 +25,7 @@ function VelocityExtension(model,
                            dirichlet_tags::Vector{String}=[],
                            dirichlet_values=zeros(PetscScalar,length(dirichlet_tags)),
                            ls = PETScLinearSolver())
-    @assert isequal(length(dtags),length(dvals))
+    @assert isequal(length(dirichlet_tags),length(dirichlet_values))
 
     ## FE Spaces
     reffe = ReferenceFE(lagrangian,PetscScalar,order)
