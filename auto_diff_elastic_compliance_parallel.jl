@@ -6,7 +6,7 @@ using PartitionedArrays
 using SparseMatricesCSR
 
 using ChainRulesCore
-using Zygote
+using Zygote # <- I don't think we actually need Zygote as chainrules done manually.
 include("src/ChainRules.jl")
 
 # Heaviside function
@@ -248,18 +248,17 @@ function test(;run_as_serial::Bool=true)
     J = (u,ϕ,dΩ) -> ∫(1+(u⋅u)*(u⋅u)+ϕ)dΩ # <- this is what the user sees?
     J_func = Functional(J,dΩ,uh,ϕh)
     loss = SingleStateFunctional(J_func,U,V,V_ϕ);
-    φ_to_u = AffineFEStateMap(ϕh,a,l,res,loss,ls=LUSolver(),adjoint_ls=LUSolver());
+    φ_to_u = AffineFEStateMap(ϕh,loss,a,l,res,ls=LUSolver(),adjoint_ls=LUSolver());
 
     ϕ = get_free_dof_values(ϕh)
 
-    u, u_pullback = rrule(φ_to_u,ϕh);
-    j, j_pullback = rrule(loss,uh,ϕh);
-    _, du, dϕ₍ⱼ₎  = j_pullback(1); #dj = 1
-    _, dϕ₍ᵤ₎      = u_pullback(du);
+    u, u_pullback = rrule(φ_to_u,ϕh); # Compute fwd problem
+    j, j_pullback = rrule(loss,uh,ϕh); # Compute objective
+    _, du, dϕ₍ⱼ₎  = j_pullback(1); # Compute derivatives of J wrt to u and ϕ
+    _, dϕ₍ᵤ₎      = u_pullback(du); # Compute adjoint for derivatives of ϕ wrt to u 
     dϕ            = dϕ₍ᵤ₎ + dϕ₍ⱼ₎
 
     ### Connor's implementation:
-    ### Commented out for parallel
     if run_as_serial
         function _a(u,v,φ) 
             φh = ϕ_to_ϕₕ(φ,V_ϕ)
@@ -280,9 +279,13 @@ function test(;run_as_serial::Bool=true)
             dϕ_connor     = _dϕ₍ᵤ₎ + _dϕ₍ⱼ₎
 
         dϕ_connor - dϕ
-        return dϕ_connor - dϕ
+        return dϕ,dϕ_connor - dϕ
     else 
-        return dϕ
+        return dϕ,nothing
     end
 end
-out = test(run_as_serial=true)
+_out_serial,_diff = test(run_as_serial=true);
+
+_out,_ = test(run_as_serial=false);
+
+@show norm(_out_serial-_out.vector_partition.items[1],Inf) 

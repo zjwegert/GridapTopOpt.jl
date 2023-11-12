@@ -54,8 +54,6 @@ end
 
 abstract type AbstractStateFunctional end
 
-DFESpace = GridapDistributed.DistributedFESpace
-
 """
     SingleStateFunctional
 
@@ -68,37 +66,28 @@ DFESpace = GridapDistributed.DistributedFESpace
     The number of states refers to number of solutions to PDEs (e.g., u above).
     We assume that there is only one additional auxilary field ϕ for purpose of AD.
 """
-struct SingleStateFunctional{U,V,Vϕ} <: AbstractStateFunctional
-    F::Functional{2}
-    trial_space::U
-    test_space::V
-    aux_space::Vϕ
-    trial_assem::Assembler
-    aux_assem::Assembler
-    djdu_vec
-    djdϕ_vec
-    dϕdu_vec
-    function SingleStateFunctional(F::Functional{2},trial_space::U,test_space::V,aux_space::Vϕ) where {
-            U<:DFESpace,V<:DFESpace,Vϕ<:DFESpace}
+struct SingleStateFunctional{A,B,C} <: AbstractStateFunctional
+    F           ::Functional{2}
+    spaces      ::A
+    assemblers  ::B
+    caches      ::C
+
+    function SingleStateFunctional(F::Functional{2},
+                                U,
+                                V,
+                                V_ϕ)
         Tm=SparseMatrixCSR{0,PetscScalar,PetscInt}
         Tv=Vector{PetscScalar}
-        trial_assem=SparseMatrixAssembler(Tm,Tv,trial_space,test_space)
-        aux_assem=SparseMatrixAssembler(Tm,Tv,aux_space,aux_space)
-        djdu_vec = pfill(PetscScalar(0.0),partition(trial_space.gids));
-        djdϕ_vec = pfill(PetscScalar(0.0),partition(aux_space.gids));
-        dϕdu_vec = pfill(PetscScalar(0.0),partition(aux_space.gids));
-        new{U,V,Vϕ}(F,trial_space,test_space,aux_space,trial_assem,aux_assem,djdu_vec,djdϕ_vec,dϕdu_vec)
-    end
-    function SingleStateFunctional(F::Functional{2},trial_space::U,test_space::V,aux_space::Vϕ) where {
-            U<:FESpace,V<:FESpace,Vϕ<:FESpace}
-        Tm=SparseMatrixCSR{0,PetscScalar,Int64}
-        Tv=Vector{PetscScalar}
-        trial_assem=SparseMatrixAssembler(Tm,Tv,trial_space,test_space)
-        aux_assem=SparseMatrixAssembler(Tm,Tv,aux_space,aux_space)
-        djdu_vec = zero_free_values(trial_space);
-        djdϕ_vec = zero_free_values(aux_space);
-        dϕdu_vec = zero_free_values(aux_space);
-        new{U,V,Vϕ}(F,trial_space,test_space,aux_space,trial_assem,aux_assem,djdu_vec,djdϕ_vec,dϕdu_vec)
+        trial_assem=SparseMatrixAssembler(Tm,Tv,U,V)
+        aux_assem=SparseMatrixAssembler(Tm,Tv,V_ϕ,V_ϕ)
+        djdu_vec = zero_free_values(U)
+        djdϕ_vec = zero_free_values(V_ϕ)
+        dϕdu_vec = zero_free_values(V_ϕ)
+        assemblers = (trial_assem,aux_assem)
+        spaces = (U,V,V_ϕ)
+        caches = (djdu_vec,djdϕ_vec,dϕdu_vec)
+        new{typeof(spaces),typeof(assemblers),typeof(caches)}(
+            F,spaces,assemblers,caches)
     end
 end
 
@@ -109,12 +98,9 @@ end
 
 function ChainRulesCore.rrule(u_to_j::SingleStateFunctional,_uh,_ϕh)
     F=u_to_j.F
-    U=u_to_j.trial_space
-    V_ϕ=u_to_j.aux_space
-    trial_assem = u_to_j.trial_assem
-    aux_assem = u_to_j.aux_assem
-    djdu_vec = u_to_j.djdu_vec
-    djdϕ_vec = u_to_j.djdϕ_vec
+    U,_,V_ϕ = u_to_j.spaces
+    trial_assem,aux_assem = u_to_j.assemblers
+    djdu_vec,djdϕ_vec,_ = u_to_j.caches
     function u_to_j_pullback(dj)
         djdu = FunctionalGradient(F,1)(_uh)
         djdu_vecdata = collect_cell_vector(U,djdu)
@@ -129,55 +115,31 @@ function ChainRulesCore.rrule(u_to_j::SingleStateFunctional,_uh,_ϕh)
     u_to_j(_uh,_ϕh), u_to_j_pullback
 end
 
-struct AffineFEStateMap{S}
-    a::Function
-    l::Function
-    res::Function
-    F::S
-    ns
-    adjoint_ns
-    adjoint_assem
-    K
-    b
-    x
-    adjoint_K
-    adjoint_b
-    adjoint_x
-    function AffineFEStateMap(ϕh,a::Function,l::Function,res::Function,F::S;
-            ls = PETScLinearSolver(),adjoint_ls = PETScLinearSolver()) where {
-            S<:SingleStateFunctional{U} where U<:DFESpace}
-        ## This should only happen during setup!!
-        # K,b,x
+struct AffineFEStateMap{A<:SingleStateFunctional,B,C,D,E,F}
+    F               ::A
+    a               ::B
+    l               ::C
+    res             ::D
+    caches          ::E
+    adjoint_caches  ::F
+
+    function AffineFEStateMap(ϕh,
+                            F::A,
+                            a::B,
+                            l::C,
+                            res::D;
+                            ls = PETScLinearSolver(),
+                            adjoint_ls = PETScLinearSolver()) where {A<:SingleStateFunctional,B,C,D}
+        U,V,_ = F.spaces
+        trial_assem,_ = F.assemblers
+        
+        ## K,b,x
         meas = F.F.dΩ
-        U = F.trial_space; V = F.test_space;
-        assem = F.trial_assem
-        op = AffineFEOperator(a(ϕh,meas...),l(ϕh,meas...),U,V,assem)
+        op = AffineFEOperator(a(ϕh,meas...),l(ϕh,meas...),U,V,trial_assem)
         K = get_matrix(op); b = get_vector(op); 
-        x = pfill(PetscScalar(0.0),partition(axes(K,2)))
-        # Adjoint K,b,x
-        Tm=SparseMatrixCSR{0,PetscScalar,PetscInt}
-        Tv=Vector{PetscScalar}
-        adjoint_assem=SparseMatrixAssembler(Tm,Tv,V,U)
-        adjoint_op = AffineFEOperator(a(ϕh,meas...),l(ϕh,meas...),V,U,adjoint_assem)
-        adjoint_K = get_matrix(adjoint_op); adjoint_b = get_vector(adjoint_op); 
-        adjoint_x = pfill(PetscScalar(0.0),partition(axes(adjoint_K,2)))
-        # NSs
-        ns = numerical_setup(symbolic_setup(ls,K),K)
-        adjoint_ns = numerical_setup(symbolic_setup(adjoint_ls,adjoint_K),adjoint_K)
-        new{S}(a,l,res,F,ns,adjoint_ns,adjoint_assem,K,b,x,adjoint_K,adjoint_b,adjoint_x)
-    end
-    function AffineFEStateMap(ϕh,a::Function,l::Function,res::Function,F::S;
-            ls = PETScLinearSolver(),adjoint_ls = PETScLinearSolver()) where {
-            S<:SingleStateFunctional{U} where U<:FESpace}
-        ## This should only happen during setup!!
-        # K,b,x
-        meas = F.F.dΩ
-        U = F.trial_space; V = F.test_space;
-        assem = F.trial_assem
-        op = AffineFEOperator(a(ϕh,meas...),l(ϕh,meas...),U,V,assem)
-        K = get_matrix(op); b = get_vector(op); 
-        x = zero(b)
-        # Adjoint K,b,x
+        x = get_free_dof_values(zero(U))
+        
+        ## Adjoint K,b,x
         Tm=SparseMatrixCSR{0,PetscScalar,PetscInt}
         Tv=Vector{PetscScalar}
         adjoint_assem=SparseMatrixAssembler(Tm,Tv,V,U)
@@ -185,30 +147,28 @@ struct AffineFEStateMap{S}
         du = get_trial_fe_basis(U)
         data = collect_cell_matrix_and_vector(V,U,a(du,dv,ϕh,meas...),l(dv,ϕh,meas...))
         adjoint_K, adjoint_b = assemble_matrix_and_vector(adjoint_assem,data)
-        adjoint_x = zero(b)
-        # NSs
+        adjoint_x = get_free_dof_values(zero(V))
+        
+        ## Numerical setups
         ns = numerical_setup(symbolic_setup(ls,K),K)
         adjoint_ns = numerical_setup(symbolic_setup(adjoint_ls,adjoint_K),adjoint_K)
-        new{S}(a,l,res,F,ns,adjoint_ns,adjoint_assem,K,b,x,adjoint_K,adjoint_b,adjoint_x)
+        
+        ## Caches and adjoint caches
+        caches = (ns,K,b,x)
+        adjoint_caches = (adjoint_ns,adjoint_K,adjoint_b,adjoint_x,adjoint_assem)
+        return new{A,B,C,D,typeof(caches),typeof(adjoint_caches)}(F,a,l,res,caches,adjoint_caches)
     end
 end
 
 function (ϕ_to_u::AffineFEStateMap{S} where S<:SingleStateFunctional)(_ϕh)
-    # Forms
     a=ϕ_to_u.a
     l=ϕ_to_u.l
-    res=ϕ_to_u.res
-    # Spaces and solver
-    U=ϕ_to_u.F.trial_space
-    V=ϕ_to_u.F.test_space
-    ns = ϕ_to_u.ns
-    # Measures and assembler
+    U,V,_ = ϕ_to_u.F.spaces
+    ns,K,b,x = ϕ_to_u.caches
     meas = ϕ_to_u.F.F.dΩ
-    trial_assem = ϕ_to_u.F.trial_assem
-    # Cache
-    K = ϕ_to_u.K
-    b = ϕ_to_u.b
-    x = ϕ_to_u.x    
+    trial_assem,_ = ϕ_to_u.F.assemblers
+    
+    ## Reassemble and solve
     dv = get_fe_basis(V)
     du = get_trial_fe_basis(U)
     data = collect_cell_matrix_and_vector(U,V,a(du,dv,_ϕh,meas...),l(dv,_ϕh,meas...))
@@ -220,23 +180,19 @@ end
 
 function ChainRulesCore.rrule(ϕ_to_u::AffineFEStateMap{S} where S<:SingleStateFunctional,_ϕh)
     a=ϕ_to_u.a
-    l=ϕ_to_u.l
     res=ϕ_to_u.res
-    V_ϕ=ϕ_to_u.F.aux_space
-    U=ϕ_to_u.F.trial_space
-    V=ϕ_to_u.F.test_space
+    U,V,_ = ϕ_to_u.F.spaces
     meas = ϕ_to_u.F.F.dΩ
-    # Forward problem
+    
+    ## Forward problem
     _uh = ϕ_to_u(_ϕh)
-    # Adjoint operator
-    adjoint_assem = ϕ_to_u.adjoint_assem
-    adjoint_K = ϕ_to_u.adjoint_K
-    adjoint_b = ϕ_to_u.adjoint_b # <- This can always be a zero vector? Only need to form AffineFEOperator
+    
+    ## Adjoint operator
+    _,adjoint_K,adjoint_b,_,adjoint_assem = ϕ_to_u.adjoint_caches
     dv = get_fe_basis(V)
     du = get_trial_fe_basis(U)
     adjoint_data = collect_cell_matrix(V,U,a(dv,du,_ϕh,meas...))
     assemble_matrix!(adjoint_K,adjoint_assem,adjoint_data)
-    # numerical_setup!(ϕ_to_u.adjoint_ns,adjoint_K) # <- This happens in Adjoint
     adjoint_op = AffineFEOperator(V,U,adjoint_K,adjoint_b)
     function ϕ_to_u_pullback(du)
         dϕ = Adjoint(_ϕh,_uh,du,adjoint_op,res,ϕ_to_u)     
@@ -246,18 +202,19 @@ function ChainRulesCore.rrule(ϕ_to_u::AffineFEStateMap{S} where S<:SingleStateF
 end
 
 function Adjoint(_ϕh,_uh,du,adjoint_op,res,F::AffineFEStateMap{S} where S<:SingleStateFunctional)
-    V_ϕ = F.F.aux_space
-    Aᵀ = Gridap.jacobian(adjoint_op,_uh)
-    adjoint_ns = F.adjoint_ns
-    numerical_setup!(adjoint_ns,Aᵀ)
     V = adjoint_op.trial
-    # Adjoint solve
-    λ = F.adjoint_x
+    _,_,V_ϕ = F.F.spaces
+    adjoint_ns,_,λ,_ = F.adjoint_caches
+    
+    ## Adjoint Solve
+    Aᵀ = Gridap.jacobian(adjoint_op,_uh)
+    numerical_setup!(adjoint_ns,Aᵀ)
     solve!(λ,adjoint_ns,du)
     λh = FEFunction(V,λ)
-    # Compute grad
-    dϕdu_vec = F.F.dϕdu_vec;
-    aux_assem = F.F.aux_assem
+    
+    ## Compute grad
+    _,_,dϕdu_vec = F.F.caches
+    _,aux_assem = F.F.assemblers
     res_functional = Functional(res,F.F.F.dΩ,_uh,λh,_ϕh)
     dϕ() = FunctionalGradient(res_functional,3)(_ϕh)
     dϕdu_vecdata = collect_cell_vector(V_ϕ,dϕ())
