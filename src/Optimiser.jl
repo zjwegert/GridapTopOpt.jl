@@ -8,11 +8,11 @@ function step!(...) where T<:AbstractOptimiser
     @abstractmethod
 end
 
-# function check_stopping_criteria(...) where T<:AbstractOptimiser
-#     @abstractmethod
-# end
+function update_params!(::AbstractOptimiser,args...)
+    return nothing
+end
 
-struct AugmentedLagrangian <: AbstractOptimiser 
+struct AugmentedLagrangian <: AbstractOptimiser
     ζ
     update_mod::Int
     params
