@@ -1,4 +1,4 @@
-using Gridap, Gridap.TensorValues, Gridap.Geometry, Gridap.FESpaces
+using Gridap, Gridap.TensorValues, Gridap.Geometry, Gridap.FESpaces, Gridap.Helpers
 using GridapDistributed
 using GridapPETSc
 using GridapPETSc: PetscScalar, PetscInt, PETSC,  @check_error_code
@@ -6,8 +6,7 @@ using PartitionedArrays
 using SparseMatricesCSR
 
 using ChainRulesCore
-using Zygote
-# include("ChainRules.jl");
+# using Zygote # <- I don't think we actually need Zygote as chainrules done manually.
 include("src/ChainRules.jl")
 
 # Heaviside function
@@ -121,12 +120,14 @@ function main(mesh_partition,distribute)
     C = isotropic_2d(1.,0.3)
     g = VectorValue(0.,-1.0)
     φh = interpolate(x->-sqrt((x[1]-0.5)^2+(x[2]-0.5)^2)+0.25,V_φ)
+    uh = zero(U)
 
     ## Weak form
     I = interp.I;
+    DH = interp.DH
 
     function a(u,v,φ,dΩ,dΓ_N)
-        _φh = ϕ_to_ϕₕ(φ,V_φ)
+        _φh = φ_to_φₕ(φ,V_φ)
         ∫((I ∘ _φh)*(C ⊙ ε(u) ⊙ ε(v)))dΩ
     end
     a(φ,dΩ,dΓ_N) = (u,v) -> a(u,v,φ,dΩ,dΓ_N)
@@ -134,58 +135,42 @@ function main(mesh_partition,distribute)
     l(φ,dΩ,dΓ_N) = v -> l(v,φ,dΩ,dΓ_N)
     res(u,v,φ,dΩ,dΓ_N) = a(u,v,φ,dΩ,dΓ_N) - l(v,φ,dΩ,dΓ_N)
 
-    ## Solve finite element problem
-    op = AffineFEOperator(a(φh,dΩ,dΓ_N),l(φh,dΩ,dΓ_N),U,V,assem)
-    ## Solve
-    uh = solve(op)
-
-    φ = get_free_dof_values(φh)
-    u = get_free_dof_values(uh)
-
-    ## Compute J and v_J
+    ## Functionals J and DJ
     J = (u,φ,dΩ,dΓ_N) -> a(u,u,φ,dΩ,dΓ_N)
+    DJ = (q,u,φ,dΩ,dΓ_N) -> ∫((C ⊙ ε(u) ⊙ ε(u))*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ;
+    # Functional types
     J_func = Functional(J,[dΩ,dΓ_N],uh,φh)
-
-    loss = SingleStateFunctional(J_func,U,V,V_φ);
-    φ_to_u = AffineFEStateMap(a,l,res,loss);
-
-    u, u_pullback   = rrule(φ_to_u,φ)
-    j, j_pullback   = rrule(loss,u,φ)
-    _, du, dϕ₍ⱼ₎    = j_pullback(1) # dj = 1
-    _, dϕ₍ᵤ₎        = u_pullback(du)
-    dϕ           = dϕ₍ᵤ₎ + dϕ₍ⱼ₎
-
+    J_func_analytic = Functional(J,[dΩ,dΓ_N],uh,φh;DF=DJ)
+    # FE state map
+    J_smap, C_smaps = AffineFEStateMap(J_func,[J_func_analytic],U,V,V_φ,a,l,res;ls = LUSolver())
+    # Solve
+    J_smap(φh)
+    
     ## Shape derivative
     # Autodiff
-    dϕh  = interpolate_everywhere(FEFunction(V_φ,-dϕ),U_reg)
-
+    dFh = compute_shape_derivative!(φh,J_smap)
+    uh,φh = J_func.state # <- due to weird bug
     # Analytic
-    J′(v,v_h) = ∫(-v_h*v*(interp.DH ∘ φh)*(norm ∘ ∇(φh)))dΩ;
-    v_J = -(C ⊙ ε(uh) ⊙ ε(uh))
-    b = assemble_vector(v->J′(v,-v_J),V_reg)
-    analytic_J′ = FEFunction(V_reg,b)
+    dFh_analytic = compute_shape_derivative!(φh,C_smaps[1])
+    uh,φh = J_func.state # <- due to weird bug
 
-    abs_error = abs(dϕh-analytic_J′)
-    rel_error = (abs(dϕh-analytic_J′))/abs(analytic_J′)
+    abs_error = abs(dFh-dFh_analytic)
+    rel_error = (abs(dFh-dFh_analytic))/abs(dFh_analytic)
 
-    #############################
     ## Hilb ext reg
     α = 4*maximum(eΔ)
     A(u,v) = α^2*∫(∇(u) ⊙ ∇(v))dΩ + ∫(u ⋅ v)dΩ;
     Hilb_assem=SparseMatrixAssembler(Tm,Tv,U_reg,V_reg)
     hilb_K = assemble_matrix(A,Hilb_assem,U_reg,V_reg)
-
     ## Autodiff result
-    op = AffineFEOperator(U_reg,V_reg,hilb_K,-get_free_dof_values(dϕh))
-    dϕh_Ω = solve(op)
-
+    op = AffineFEOperator(U_reg,V_reg,hilb_K,-get_free_dof_values(interpolate_everywhere(dFh,U_reg)))
+    dFh_Ω = solve(op)
     ## Analytic result
-    b = assemble_vector(v->J′(v,v_J),V_reg)
-    op = AffineFEOperator(U_reg,V_reg,hilb_K,b)
-    v_J_Ω = solve(op)
+    op = AffineFEOperator(U_reg,V_reg,hilb_K,-get_free_dof_values(interpolate_everywhere(dFh_analytic,U_reg)))
+    dFh_analytic_Ω = solve(op)
 
-    hilb_abs_error = abs(dϕh_Ω-v_J_Ω)
-    hilb_rel_error = (abs(dϕh_Ω-v_J_Ω))/abs(v_J_Ω)
+    hilb_abs_error = abs(dFh_Ω-dFh_analytic_Ω)
+    hilb_rel_error = (abs(dFh_Ω-dFh_analytic_Ω))/abs(dFh_analytic_Ω)
 
     path = "./Results/AutoDiffTesting_Parallel";
     writevtk(Ω,path,cellfields=["phi"=>φh,
@@ -194,86 +179,104 @@ function main(mesh_partition,distribute)
         "uh"=>uh,
         "J′_abs_error"=>abs_error,
         "J′_rel_error"=>rel_error,
-        "J′_analytic"=>analytic_J′,
-        "J′_autodiff"=>dϕh,
+        "J′_analytic"=>dFh_analytic,
+        "J′_autodiff"=>dFh,
         "hilb_abs_error"=>hilb_abs_error,
         "hilb_rel_error"=>hilb_rel_error,
-        "v_J_Ω"=>v_J_Ω,
-        "dJϕh_Ω"=>dϕh_Ω
+        "v_J_Ω"=>dFh_analytic_Ω,
+        "dJφh_Ω"=>dFh_Ω
     ])
 end
 
-with_mpi() do distribute
+with_debug() do distribute
     main((3,3),distribute)
 end;
 
 ####################
 #   Debug Testing  #
 ####################
-# include("src/ChainRules.jl")
+using BenchmarkTools
+include("ChainRules.jl");
+function test(;run_as_serial::Bool=true)
+    ranks = with_debug() do distribute
+        distribute(LinearIndices((1,)))
+    end
 
-# ranks = with_debug() do distribute
-#     distribute(LinearIndices((1,)))
-# end
+    model = if run_as_serial
+        CartesianDiscreteModel((0,1,0,1),(2,2))
+    else
+        CartesianDiscreteModel(ranks,(1,1),(0,1,0,1),(2,2))
+    end
+    
+    V = FESpace(model,ReferenceFE(lagrangian,VectorValue{2,Float64},1),dirichlet_tags=["tag_5"])
+    U = TrialFESpace(V,VectorValue(0,0))
+    V_φ = FESpace(model,ReferenceFE(lagrangian,Float64,1))
 
-# # model = CartesianDiscreteModel(ranks,(1,1),(0,1,0,1),(2,2))
-# model = CartesianDiscreteModel((0,1,0,1),(2,2))
-# V = FESpace(model,ReferenceFE(lagrangian,VectorValue{2,Float64},1),dirichlet_tags=["tag_5"])
-# U = TrialFESpace(V,VectorValue(0,0))
-# V_ϕ = FESpace(model,ReferenceFE(lagrangian,Float64,1))
+    Ω = Triangulation(model)
+    dΩ = Measure(Ω,2)
 
-# Ω = Triangulation(model)
-# dΩ = Measure(Ω,2)
+    # Weak forms
+    function a(u,v,φ,dΩ)
+        φh = φ_to_φₕ(φ,V_φ)
+        ∫((φh)*(u⋅v))dΩ
+    end
+    a(φ,dΩ) = (u,v) -> a(u,v,φ,dΩ)
+    l(v,φh,dΩ) = ∫(v ⋅ VectorValue(1,0))dΩ
+    l(φ,dΩ) = v -> l(v,φ,dΩ)
+    res(u,v,φ,dΩ) = a(u,v,φ,dΩ) - l(v,φ,dΩ)
 
-# # Weak forms
-# function a(u,v,ϕ,dΩ)
-#     ϕh = ϕ_to_ϕₕ(ϕ,V_ϕ)
-#     ∫((ϕh)*(u⋅v))dΩ
-# end
-# a(ϕ,dΩ) = (u,v) -> a(u,v,ϕ,dΩ)
-# l(v,ϕh,dΩ) = ∫(v ⋅ VectorValue(1,0))dΩ
-# l(ϕ,dΩ) = v -> l(v,ϕ,dΩ)
-# res(u,v,ϕ,dΩ) = a(u,v,ϕ,dΩ) - l(v,ϕ,dΩ)
+    φh = interpolate(x->1,V_φ);
+    uh = zero(U);
 
-# ϕh = interpolate(x->1,V_ϕ);
-# ϕ = get_free_dof_values(ϕh)
+    _J = (u,φ,dΩ) -> ∫(1+(u⋅u)*(u⋅u)+φ)dΩ
+    J = Functional(_J,dΩ,uh,φh)
+    J_smap, C_smaps = AffineFEStateMap(J,typeof(J)[],U,V,V_φ,a,l,res;ls = LUSolver())
+    J_smap(φh) # <- compute uh in place
+    J_smap.F.F() # <- compute objective
 
-# op = AffineFEOperator(a(ϕ,dΩ),l(ϕ,dΩ),U,V)
-# uh = solve(op)
+    ## Printing
+    # @show get_free_dof_values(uh)
+    # println("Objective value = $(J_smap.F.F())")
 
-# J = (u,ϕ,dΩ) -> ∫(1+(u⋅u)*(u⋅u)+ϕ)dΩ # <- this is what the user sees.
-# J_func = Functional(J,dΩ,uh,ϕh)
-# sum(J(uh,ϕh,dΩ))
+    ## Shape derivative
+    # @show typeof(φh)
+    dFh = compute_shape_derivative!(φh,J_smap)
+    # @show typeof(φh) # <- The type changes! Unclear why. Jordi?
+    dφ = get_free_dof_values(dFh)
 
-# ϕ = get_free_dof_values(ϕh)
+    ### Connor's implementation:
+    uh,φh = J.state
+    φ = get_free_dof_values(φh)
+    if run_as_serial
+        function _a(u,v,φ) 
+            φh = φ_to_φₕ(φ,V_φ)
+            ∫((φh)*(u⋅v))dΩ
+        end
+        _a(φ) = (u,v) -> _a(u,v,φ)
+        _l(v,φh) = ∫(v ⋅ VectorValue(1,0))dΩ
+        _l(φ) = v -> _l(v,φ)
+        _res(u,v,φ,V_φ) = _a(u,v,φ) - _l(v,φ)
 
-# loss = SingleStateFunctional(J_func,U,V,V_ϕ);
-# φ_to_u = AffineFEStateMap(a,l,res,loss);
+        _φ_to_u = _AffineFEStateMap(_a,_l,_res,V_φ,U,V)
+        _u_to_j =  LossFunction((u,φ) -> _J(u,φ,dΩ),V_φ,U)
 
-# u, u_pullback = rrule(φ_to_u,ϕ);
-# j, j_pullback = rrule(loss,u,ϕ);
-# _, du, dϕ₍ⱼ₎  = j_pullback(1); # dj = 1
-# _, dϕ₍ᵤ₎      = u_pullback(du);
-# dϕ            = dϕ₍ᵤ₎ + dϕ₍ⱼ₎
+        _u, _u_pullback   = rrule(_φ_to_u,φ)
+        _j, _j_pullback   = rrule(_u_to_j,_u,φ)
+        _,  _du, _dφ₍ⱼ₎   = _j_pullback(1) # dj = 1
+        _,  _dφ₍ᵤ₎        = _u_pullback(_du)
+            dφ_connor     = _dφ₍ᵤ₎ + _dφ₍ⱼ₎
 
-# # # # Connor's implementation:
-# # # Commented out for parallel
-# # function a(u,v,φ) 
-# #     φh = ϕ_to_ϕₕ(φ,V_ϕ)
-# #     ∫((φh)*(u⋅v))dΩ
-# # end
-# # a(φ) = (u,v) -> a(u,v,φ)
-# # l(v,ϕh) = ∫(v ⋅ VectorValue(1,0))dΩ
-# # l(φ) = v -> l(v,φ)
-# # res(u,v,φ,V_ϕ) = a(u,v,φ) - l(v,φ)
+        dφ_connor - dφ
+        return dφ,dφ_connor - dφ
+    else 
+        return dφ,nothing
+    end
+end
 
-# # φ_to_u = _AffineFEStateMap(a,l,res,V_ϕ,U,V)
-# # u_to_j =  LossFunction((u,ϕ) -> J(u,ϕ,dΩ),V_ϕ,U)
+PartitionedArrays.consistent!(::Vector{M}) where M = nothing # <- is this OK Jordi?
 
-# # u, u_pullback   = rrule(φ_to_u,ϕ)
-# # j, j_pullback   = rrule(u_to_j,u,ϕ)
-# # _, du, dϕ₍ⱼ₎    = j_pullback(1) # dj = 1
-# # _, dϕ₍ᵤ₎        = u_pullback(du)
-# #    dϕ_connor           = dϕ₍ᵤ₎ + dϕ₍ⱼ₎
+_out_serial,_diff = test(run_as_serial=true);
 
-# # dϕ_connor - dϕ
+_out,_ = test(run_as_serial=false);
+
+@show norm(_out_serial-_out.vector_partition.items[1],Inf) 
