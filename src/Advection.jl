@@ -1,7 +1,7 @@
 
 using Gridap.Helpers
 using GridapDistributed: DistributedDiscreteModel
-using PartitionedArrays: getany
+using PartitionedArrays: getany, tuple_of_arrays
 
 # API definition for AdvectionStencil
 
@@ -25,7 +25,7 @@ end
 
 # First order stencil
 
-struct FirstOrderStencil{D,T} <: AdvectionStencil
+mutable struct FirstOrderStencil{D,T} <: AdvectionStencil
   γ :: T
   function FirstOrderStencil(D::Integer,γ::T) where T
     new{D,T}(γ)
@@ -137,37 +137,44 @@ end
 # Distributed advection stencil
 
 struct DistributedAdvectionStencil
-  stencil :: AdvectionStencil
+  stencil         :: AdvectionStencil
+  reinit_stencil  :: AdvectionStencil
   model
   max_steps
+  reinit_max_steps
   tol
   Δ
   local_sizes
 end
 
 function AdvectionStencil(stencil::AdvectionStencil,
+                          reinit_stencil::AdvectionStencil,
                           model::DistributedDiscreteModel,
                           max_steps::Int,
+                          reinit_max_steps::Int,
                           tol::T) where T
   local_sizes, local_Δ = map(local_views(model)) do model
     desc = get_cartesian_descriptor(model)
     return desc.partition .+ 1, desc.sizes
   end
   Δ = PartitionedArrays.getany(local_Δ)
-  return DistributedAdvectionStencil(stencil,model,max_steps,tol,Δ,local_sizes)
+  return DistributedAdvectionStencil(stencil,reinit_stencil,model,
+    max_steps,reinit_max_steps,tol,Δ,local_sizes)
 end
 
 function allocate_caches(s::DistributedAdvectionStencil,φ::PVector,vel::PVector)
   local_caches = map(local_views(φ),local_views(vel)) do φ,vel
-    allocate_caches(s.stencil,φ,vel)
-  end
+    s_cache = allocate_caches(s.stencil,φ,vel)
+    rs_cache = allocate_caches(s.reinit_stencil,φ,vel)
+    (s_cache,rs_cache)
+  end |> tuple_of_arrays
   φ_tmp   = similar(φ)
   vel_tmp = similar(vel)
-  return φ_tmp, vel_tmp, local_caches
+  return φ_tmp, vel_tmp, local_caches[1], local_caches[2]
 end
 
 function advect!(s::DistributedAdvectionStencil,φ::PVector,vel::PVector,caches)
-  _, _, local_caches = caches
+  _, _, local_caches, _ = caches
 
   ## CFL Condition (requires γ≤1.0)
   Δt = compute_Δt(s.stencil,φ,vel)
@@ -185,7 +192,7 @@ function advect!(s::DistributedAdvectionStencil,φ::PVector,vel::PVector,caches)
 end
 
 function reinit!(s::DistributedAdvectionStencil,φ::PVector,vel::PVector,caches)
-  φ_tmp, vel_tmp, local_caches = caches
+  φ_tmp, vel_tmp, _, local_caches = caches
 
   # Compute approx sign function S
   vel_tmp .= @. φ / sqrt(φ*φ + prod(Δ))
