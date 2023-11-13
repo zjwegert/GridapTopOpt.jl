@@ -9,7 +9,8 @@ Base.@kwdef struct SmoothErsatzMaterialInterpolation{M<:AbstractFloat}
 end
 
 # Heaviside function
-function H_η(t::M,η::M) where M<:AbstractFloat
+function H_η(t,η)
+    M = typeof(η*t)
     if t<-η
         return zero(M)
     elseif abs(t)<=η
@@ -19,7 +20,8 @@ function H_η(t::M,η::M) where M<:AbstractFloat
     end
 end
 
-function DH_η(t::M,η::M) where M<:AbstractFloat
+function DH_η(t,η)
+    M = typeof(η*t)
     if t<-η
         return zero(M)
     elseif abs(t)<=η

@@ -33,17 +33,18 @@ function setup!(m::AugmentedLagrangian)
 end
 
 function step!(m::AugmentedLagrangian,iter,J,C,caches)
-    [λ,Λ] = m.params
-    # @assert isone(length(C)) 
+    @assert isone(length(C)) 
 
     ## Extend shape sensitivities
     ext_v_J = hilbertian_ext(v_J,φh,hilb_data,interp) |> get_free_dof_values
     ext_v_C = hilbertian_ext(v_C,φh,hilb_data,interp) |> get_free_dof_values
-    # Augmented Lagrangian method
-    [λ_new,Λ_new] = update!(m,iter,C_new,vf)
+    
+    ## Augmented Lagrangian method
+    λ,Λ = update!(m,iter,C_new,vf)
     v_Lh = FEFunction(hilb_data.U_reg,ext_v_J - λ_new*ext_v_C + 1/Λ_new*(C_new - vf)*ext_v_C)    
     v_Lh_full = interpolate(v_Lh,V_φ)
     g_Ω = get_free_dof_values(v_Lh_full);
+    
     ## Advect  & Reinitialise
     advect!(φ,g_Ω,model,Δ,γ,steps)
     reinit!(φ,model,Δ,0.5,2000,reinit_tol)       
