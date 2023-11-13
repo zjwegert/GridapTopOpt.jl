@@ -61,10 +61,28 @@ function main_3D(mesh_partition,distribute)
     reinit!(adv_stencil,φ,caches)
 
     ## Optimisation functionals
-    J = (u,ϕ,dΩ,dΓ_N) -> a(u,u,ϕ,dΩ,dΓ_N)
-    v_J = u -> -D*∇(u)⋅∇(u) # <- without autodiff
-    C1 = (u,ϕ,dΩ,dΓ_N) -> ∫(((ρ ∘ ϕ) - 0.5)/vol_D)dΩ # <- volume constraint C1(...) = 0
-    v_C1 = u -> 1
+    using_ad = true;
+    J = (u,ϕ,dΩ,dΓ_N) -> ∫((I ∘ ϕ)*D*∇(u)⋅∇(u))dΩ
+    dJ = using_ad ? nothing : (q,u,ϕ,dΩ,dΓ_N) -> ∫(-D*∇(u)⋅∇(u)*v*(DH ∘ ϕ)*(norm ∘ ∇(ϕ)))dΩ;
+    C1 = (u,ϕ,dΩ,dΓ_N) -> ∫(((ρ ∘ ϕ) - 0.5)/vol_D)dΩ;
+    dC1 = using_ad ? nothing : (q,u,ϕ,dΩ,dΓ_N) -> ∫(1/vol_D*v*(DH ∘ ϕ)*(norm ∘ ∇(ϕ)))dΩ
+
+    J_func = Functional(J,dΩ,uh,ϕh;dF = dJ)
+    C1_func = Functional(C1,dΩ,uh,ϕh;dF = dC1)
+
+    """
+    For each of J_func, Ci_func (i=1:n) there is a 
+        smap = AffineFEStateMap(ϕh,loss,a,l,res);
+    for AD purposes. Can these be setup in the optimiser `setup!` phase?
+
+    Some important properties of these:
+    1. The caches of both should point to all the same objects (?)
+    2. We may only want AD for particular functionals (e.g., only J_func and a subset of {Ci})
+    3. J_func() or J_func(state...) returns value of functional J_func at current state
+    4. smap(ϕ) should compute FE problem in place and return FEFunction
+    5. We can call `compute_shape_derivative!` on a functional & cache to compute the shape derivative in place and return FEFunction
+    """
+
     optimiser = AugmentedLagrangian();
 
     ## Hilbertian extension-regularisation problems
@@ -75,7 +93,7 @@ function main_3D(mesh_partition,distribute)
     caches = setup!(optimizer,...) # <- Needs to run first iteration and get sensitivities etc.
 
     for k in 1:nsteps
-        J_new,C_new,φh_new = step!(optimizer,...)
+        J_new,C_new,φh_new = step!(optimizer,...) # Change to iterator like other julia packages and remove for loop
         # Logging using results
         # Check convergence criteria, using results
     end
