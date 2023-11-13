@@ -148,11 +148,11 @@ struct DistributedStencil
 end
 
 function Stencil(stencil::Stencil,
-                          reinit_stencil::Stencil,
-                          model::DistributedDiscreteModel,
-                          max_steps::Int,
-                          reinit_max_steps::Int,
-                          tol::T) where T
+                 reinit_stencil::Stencil,
+                 model::DistributedDiscreteModel,
+                 max_steps::Int,
+                 reinit_max_steps::Int,
+                 tol::T) where T
   local_sizes, local_Δ = map(local_views(model)) do model
     desc = get_cartesian_descriptor(model)
     return desc.partition .+ 1, desc.sizes
