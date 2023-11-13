@@ -13,7 +13,7 @@ abstract type AbstractFunctional end
     - DF: a function defining the shape derivative of F. This function takes a test function q plus the 
         same arguments as F. If DF is nothing, automatic differentation is used to determine the shape derivative.
 
-        E.g., for `F = (u,ϕ,dΩ) -> ∫(H ∘ ϕ)dΩ`, DF = (q,u,ϕ,dΩ) -> ∫(1*q*(DH ∘ φh)*(norm ∘ ∇(φh)))dΩ
+        E.g., for `F = (u,φ,dΩ) -> ∫(H ∘ φ)dΩ`, DF = (q,u,φ,dΩ) -> ∫(1*q*(DH ∘ φh)*(norm ∘ ∇(φh)))dΩ
         where `DH(φh)*|∇(φh)|dΩ ≈ dΓ`, `H` is the smoothed Heaviside function, and `dH` is the
         smoothed delta function.        
 """
@@ -60,11 +60,11 @@ abstract type AbstractStateFunctional end
     SingleStateFunctional
 
     Assume that we have a Functional of the following form:
-        F: (u,ϕ,[dΩ,dΓ]) ↦ ∫_Ω f(u(ϕ),ϕ) dΩ + ∫_Γ g(u(ϕ),ϕ) dΓ,
-    where u is a state field and ϕ is auxilary. The signature MUST match the weak form.
+        F: (u,φ,[dΩ,dΓ]) ↦ ∫_Ω f(u(φ),φ) dΩ + ∫_Γ g(u(φ),φ) dΓ,
+    where u is a state field and φ is auxilary. The signature MUST match the weak form.
 
     The number of states refers to number of solutions to PDEs (e.g., u above).
-    We assume that there is only one additional auxilary field ϕ for purpose of AD.
+    We assume that there is only one additional auxilary field φ for purpose of AD.
 """
 struct SingleStateFunctional{A,B<:Tuple,C<:Tuple,D<:Tuple} <: AbstractStateFunctional
     F           ::Functional{2}
@@ -77,40 +77,40 @@ end
 function SingleStateFunctional(F::Functional{2},
         U,
         V,
-        V_ϕ)
+        V_φ)
     Tm=SparseMatrixCSR{0,PetscScalar,PetscInt}
     Tv=Vector{PetscScalar}
     trial_assem=SparseMatrixAssembler(Tm,Tv,U,V)
-    aux_assem=SparseMatrixAssembler(Tm,Tv,V_ϕ,V_ϕ)
-    dF_vec = zero(V_ϕ)
+    aux_assem=SparseMatrixAssembler(Tm,Tv,V_φ,V_φ)
+    dF_vec = zero(V_φ)
     djdu_vec = zero_free_values(U)
-    djdϕ_vec = zero_free_values(V_ϕ)
-    dϕdu_vec = zero_free_values(V_ϕ)
+    djdφ_vec = zero_free_values(V_φ)
+    dφdu_vec = zero_free_values(V_φ)
     assemblers = (trial_assem,aux_assem)
-    spaces = (U,V,V_ϕ)
-    caches = (djdu_vec,djdϕ_vec,dϕdu_vec)
+    spaces = (U,V,V_φ)
+    caches = (djdu_vec,djdφ_vec,dφdu_vec)
     SingleStateFunctional(F,dF_vec,spaces,assemblers,caches)
 end
 
-(u_to_j::SingleStateFunctional)(_uh,_ϕh) = u_to_j.F(_uh,_ϕh)
+(u_to_j::SingleStateFunctional)(_uh,_φh) = u_to_j.F(_uh,_φh)
 
-function ChainRulesCore.rrule(u_to_j::SingleStateFunctional,_uh,_ϕh)
+function ChainRulesCore.rrule(u_to_j::SingleStateFunctional,_uh,_φh)
     F=u_to_j.F
-    U,_,V_ϕ = u_to_j.spaces
+    U,_,V_φ = u_to_j.spaces
     trial_assem,aux_assem = u_to_j.assemblers
-    djdu_vec,djdϕ_vec,_ = u_to_j.caches
+    djdu_vec,djdφ_vec,_ = u_to_j.caches
     function u_to_j_pullback(dj)
         djdu = ∇(F,_uh,1)
         djdu_vecdata = collect_cell_vector(U,djdu)
         assemble_vector!(djdu_vec,trial_assem,djdu_vecdata)
-        djdϕ = ∇(F,_ϕh,2)
-        djdϕ_vecdata = collect_cell_vector(V_ϕ,djdϕ)
-        assemble_vector!(djdϕ_vec,aux_assem,djdϕ_vecdata)
+        djdφ = ∇(F,_φh,2)
+        djdφ_vecdata = collect_cell_vector(V_φ,djdφ)
+        assemble_vector!(djdφ_vec,aux_assem,djdφ_vecdata)
         djdu_vec .*= dj
-        djdϕ_vec .*= dj
-        (  NoTangent(), djdu_vec, djdϕ_vec )
+        djdφ_vec .*= dj
+        (  NoTangent(), djdu_vec, djdφ_vec )
     end
-    u_to_j(_uh,_ϕh), u_to_j_pullback
+    u_to_j(_uh,_φh), u_to_j_pullback
 end
 
 ####################################################################
@@ -134,9 +134,9 @@ function AffineFEStateMap(
     trial_assem,_ = F.assemblers
     
     ## K,b,x
-    _,_ϕh = F.F.state;
+    _,_φh = F.F.state;
     meas = F.F.dΩ
-    op = AffineFEOperator(a(_ϕh,meas...),l(_ϕh,meas...),U,V,trial_assem)
+    op = AffineFEOperator(a(_φh,meas...),l(_φh,meas...),U,V,trial_assem)
     K = get_matrix(op); b = get_vector(op); 
     x = get_free_dof_values(zero(U))
     
@@ -146,7 +146,7 @@ function AffineFEStateMap(
     adjoint_assem=SparseMatrixAssembler(Tm,Tv,V,U)
     dv = get_fe_basis(V)
     du = get_trial_fe_basis(U)
-    data = collect_cell_matrix_and_vector(V,U,a(du,dv,_ϕh,meas...),l(dv,_ϕh,meas...))
+    data = collect_cell_matrix_and_vector(V,U,a(du,dv,_φh,meas...),l(dv,_φh,meas...))
     adjoint_K, adjoint_b = assemble_matrix_and_vector(adjoint_assem,data)
     adjoint_x = get_free_dof_values(zero(V))
     
@@ -160,19 +160,19 @@ function AffineFEStateMap(
     return AffineFEStateMap(F,a,l,res,caches,adjoint_caches)
 end
 
-function (ϕ_to_u::AffineFEStateMap{S} where S<:SingleStateFunctional)(_ϕh)
-    a=ϕ_to_u.a
-    l=ϕ_to_u.l
-    U,V,_ = ϕ_to_u.F.spaces
-    ns,K,b,x = ϕ_to_u.caches
-    meas = ϕ_to_u.F.F.dΩ
-    trial_assem,_ = ϕ_to_u.F.assemblers
-    uh,_ = ϕ_to_u.F.F.state
+function (φ_to_u::AffineFEStateMap{S} where S<:SingleStateFunctional)(_φh)
+    a=φ_to_u.a
+    l=φ_to_u.l
+    U,V,_ = φ_to_u.F.spaces
+    ns,K,b,x = φ_to_u.caches
+    meas = φ_to_u.F.F.dΩ
+    trial_assem,_ = φ_to_u.F.assemblers
+    uh,_ = φ_to_u.F.F.state
     
     ## Reassemble and solve
     dv = get_fe_basis(V)
     du = get_trial_fe_basis(U)
-    data = collect_cell_matrix_and_vector(U,V,a(du,dv,_ϕh,meas...),l(dv,_ϕh,meas...))
+    data = collect_cell_matrix_and_vector(U,V,a(du,dv,_φh,meas...),l(dv,_φh,meas...))
     assemble_matrix_and_vector!(K,b,trial_assem,data)
     numerical_setup!(ns,K)
     solve!(x,ns,b)
@@ -181,33 +181,33 @@ function (ϕ_to_u::AffineFEStateMap{S} where S<:SingleStateFunctional)(_ϕh)
     uh
 end
 
-function ChainRulesCore.rrule(ϕ_to_u::AffineFEStateMap{S} where S<:SingleStateFunctional,_ϕh)
-    a=ϕ_to_u.a
-    res=ϕ_to_u.res
-    U,V,_ = ϕ_to_u.F.spaces
-    meas = ϕ_to_u.F.F.dΩ
+function ChainRulesCore.rrule(φ_to_u::AffineFEStateMap{S} where S<:SingleStateFunctional,_φh)
+    a=φ_to_u.a
+    res=φ_to_u.res
+    U,V,_ = φ_to_u.F.spaces
+    meas = φ_to_u.F.F.dΩ
     
     ## Forward problem
-    _uh = ϕ_to_u(_ϕh)
+    _uh = φ_to_u(_φh)
     
     ## Adjoint operator
-    _,adjoint_K,adjoint_b,_,adjoint_assem = ϕ_to_u.adjoint_caches
+    _,adjoint_K,adjoint_b,_,adjoint_assem = φ_to_u.adjoint_caches
     dv = get_fe_basis(V)
     du = get_trial_fe_basis(U)
-    adjoint_data = collect_cell_matrix(V,U,a(dv,du,_ϕh,meas...))
+    adjoint_data = collect_cell_matrix(V,U,a(dv,du,_φh,meas...))
     assemble_matrix!(adjoint_K,adjoint_assem,adjoint_data)
     adjoint_op = AffineFEOperator(V,U,adjoint_K,adjoint_b)
-    function ϕ_to_u_pullback(du)
-        dϕ = Adjoint(_ϕh,_uh,du,adjoint_op,res,ϕ_to_u)     
-        ( NoTangent(),dϕ)
+    function φ_to_u_pullback(du)
+        dφ = Adjoint(_φh,_uh,du,adjoint_op,res,φ_to_u)     
+        ( NoTangent(),dφ)
     end
-    # get_free_dof_values(_uh), ϕ_to_u_pullback
-    _uh, ϕ_to_u_pullback
+    # get_free_dof_values(_uh), φ_to_u_pullback
+    _uh, φ_to_u_pullback
 end
 
-function Adjoint(_ϕh,_uh,du,adjoint_op,res,F::AffineFEStateMap{S} where S<:SingleStateFunctional)
+function Adjoint(_φh,_uh,du,adjoint_op,res,F::AffineFEStateMap{S} where S<:SingleStateFunctional)
     V = adjoint_op.trial
-    _,_,V_ϕ = F.F.spaces
+    _,_,V_φ = F.F.spaces
     adjoint_ns,_,λ,_ = F.adjoint_caches
     
     ## Adjoint Solve
@@ -217,14 +217,14 @@ function Adjoint(_ϕh,_uh,du,adjoint_op,res,F::AffineFEStateMap{S} where S<:Sing
     λh = FEFunction(V,λ)
     
     ## Compute grad
-    _,_,dϕdu_vec = F.F.caches
+    _,_,dφdu_vec = F.F.caches
     _,aux_assem = F.F.assemblers
-    res_functional = Functional(res,F.F.F.dΩ,_uh,λh,_ϕh)
-    dϕ = ∇(res_functional,_ϕh,3)
-    dϕdu_vecdata = collect_cell_vector(V_ϕ,dϕ)
-    assemble_vector!(dϕdu_vec,aux_assem,dϕdu_vecdata)
-    dϕdu_vec .*= -1;
-    dϕdu_vec
+    res_functional = Functional(res,F.F.F.dΩ,_uh,λh,_φh)
+    dφ = ∇(res_functional,_φh,3)
+    dφdu_vecdata = collect_cell_vector(V_φ,dφ)
+    assemble_vector!(dφdu_vec,aux_assem,dφdu_vecdata)
+    dφdu_vec .*= -1;
+    dφdu_vec
 end
 
 ####################################################################
@@ -233,7 +233,7 @@ function AffineFEStateMap(J::T,C::Vector{T},args...;ls,adjoint_ls) where T<:Abst
     @abstractmethod
 end
 
-function compute_shape_derivative!(ϕh,state_map::AffineFEStateMap)
+function compute_shape_derivative!(φh,state_map::AffineFEStateMap)
     @abstractmethod
 end
 
@@ -266,7 +266,7 @@ function AffineFEStateMap(J::T,C::Vector{T},args...;ls=LUSolver(),
     return J_smap,C_smap
 end
 
-function compute_shape_derivative!(_ϕh,state_map::AffineFEStateMap{S}) where S<:SingleStateFunctional
+function compute_shape_derivative!(_φh,state_map::AffineFEStateMap{S}) where S<:SingleStateFunctional
     ssfunc,smap = state_map.F,state_map
     _,_,V_φ = ssfunc.spaces
     _,aux_assem = ssfunc.assemblers
@@ -277,14 +277,14 @@ function compute_shape_derivative!(_ϕh,state_map::AffineFEStateMap{S}) where S<
         #   shape derivative. I think we can compute new u and objective outside and then
         #   run this without getting u and j below.
         #
-        # E.g., we can call ssfunc(state...) to compute j and smap(ϕh) to update uh.
+        # E.g., we can call ssfunc(state...) to compute j and smap(φh) to update uh.
 
-        u, u_pullback = rrule(smap,_ϕh); # Compute fwd problem
-        j, j_pullback = rrule(ssfunc,u,_ϕh); # Compute functional
-        _, du, dϕ₍ⱼ₎  = j_pullback(1); # Compute derivatives of J wrt to u and φ
-        _, dϕ₍ᵤ₎      = u_pullback(du); # Compute adjoint for derivatives of ϕ wrt to u 
-        dϕ            = dϕ₍ᵤ₎ + dϕ₍ⱼ₎
-        copy!(get_free_dof_values(dFh),dϕ)
+        u, u_pullback = rrule(smap,_φh); # Compute fwd problem
+        j, j_pullback = rrule(ssfunc,u,_φh); # Compute functional
+        _, du, dφ₍ⱼ₎  = j_pullback(1); # Compute derivatives of J wrt to u and φ
+        _, dφ₍ᵤ₎      = u_pullback(du); # Compute adjoint for derivatives of φ wrt to u 
+        dφ            = dφ₍ᵤ₎ + dφ₍ⱼ₎
+        copy!(get_free_dof_values(dFh),dφ)
         consistent!(get_free_dof_values(dFh)) |> fetch
     else
         meas = ssfunc.F.dΩ

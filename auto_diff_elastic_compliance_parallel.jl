@@ -272,7 +272,9 @@ function test(;run_as_serial::Bool=true)
         return dφ,nothing
     end
 end
+
 PartitionedArrays.consistent!(::Vector{M}) where M = nothing # <- is this OK Jordi?
+
 _out_serial,_diff = test(run_as_serial=true);
 
 _out,_ = test(run_as_serial=false);
