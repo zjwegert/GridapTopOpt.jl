@@ -4,77 +4,11 @@ using GridapPETSc
 using GridapPETSc: PetscScalar, PetscInt, PETSC,  @check_error_code
 using PartitionedArrays
 using SparseMatricesCSR
-
 using ChainRulesCore
-# using Zygote # <- I don't think we actually need Zygote as chainrules done manually.
+
 include("src/ChainRules.jl")
-
-# Heaviside function
-function H_η(t;η)
-    M = typeof(η*t)
-    if t<-η
-        return zero(M)
-    elseif abs(t)<=η
-        return M(1/2*(1+t/η+1/pi*sin(pi*t/η)))
-    elseif t>η
-        return one(M)
-    end
-end
-
-function DH_η(t::M;η::M) where M<:AbstractFloat
-    if t<-η
-        return zero(M)
-    elseif abs(t)<=η
-        return M(1/2/η*(1+cos(pi*t/η)))
-    elseif t>η
-        return zero(M)
-    end
-end
-
-# Material interpolation
-Base.@kwdef struct SmoothErsatzMaterialInterpolation{M<:AbstractFloat}
-    η::M # Smoothing radius
-    ϵₘ::M = 10^-3 # Void material multiplier
-    H = x -> H_η(x,η=η)
-    DH = x -> DH_η(x,η=η)
-    I = φ -> (1 - H(φ)) + ϵₘ*H(φ)
-    ρ = φ -> 1 - H(φ)
-end
-
-function isotropic_2d(E::M,ν::M) where M<:AbstractFloat
-    λ = E*ν/((1+ν)*(1-ν)); μ = E/(2*(1+ν))
-    C = [λ+2μ  λ     0
-         λ    λ+2μ   0
-         0     0     μ];
-    SymFourthOrderTensorValue(
-        C[1,1], C[3,1], C[2,1],
-        C[1,3], C[3,3], C[2,3],
-        C[1,2], C[3,2], C[2,2])
-end
-
-function update_labels!(e::Int,model,f_Γ::F,::T,name::String) where {
-        M<:AbstractFloat,F<:Function,T<:NTuple{2,M}}
-    cell_to_entity = map(local_views(model)) do model
-        labels = get_face_labeling(model)
-        cell_to_entity = labels.d_to_dface_to_entity[end]
-        entity = maximum(cell_to_entity) + e
-        # Vertices
-        vtx_coords = model.grid_topology.vertex_coordinates
-        vtxs_Γ = findall(isone,f_Γ.(vtx_coords))
-        vtx_edge_connectivity = Array(Geometry.get_faces(model.grid_topology,0,1)[vtxs_Γ])
-        # Edges
-        edge_entries = [findall(x->any(x .∈  vtx_edge_connectivity[1:end.!=j]),
-            vtx_edge_connectivity[j]) for j = 1:length(vtx_edge_connectivity)]
-        edge_Γ = unique(reduce(vcat,getindex.(vtx_edge_connectivity,edge_entries),init=[]))
-        labels.d_to_dface_to_entity[1][vtxs_Γ] .= entity
-        labels.d_to_dface_to_entity[2][edge_Γ] .= entity
-        add_tag!(labels,name,[entity])
-        cell_to_entity
-    end
-    cell_gids=get_cell_gids(model)
-    cache=GridapDistributed.fetch_vector_ghost_values_cache(cell_to_entity,partition(cell_gids))
-    GridapDistributed.fetch_vector_ghost_values!(cell_to_entity,cache)
-end
+include("src/Utilities.jl")
+include("src/MaterialInterpolation.jl")
 
 ######################################################
 ## FE Setup
@@ -123,13 +57,8 @@ function main(mesh_partition,distribute)
     I = interp.I;
     DH = interp.DH
 
-    function a(u,v,φ,dΩ,dΓ_N)
-        _φh = φ_to_φₕ(φ,V_φ)
-        ∫((I ∘ _φh)*(C ⊙ ε(u) ⊙ ε(v)))dΩ
-    end
-    a(φ,dΩ,dΓ_N) = (u,v) -> a(u,v,φ,dΩ,dΓ_N)
+    a(u,v,φ,dΩ,dΓ_N) = ∫((I ∘ φ)*(C ⊙ ε(u) ⊙ ε(v)))dΩ
     l(v,φh,dΩ,dΓ_N) = ∫(v ⋅ g)dΓ_N
-    l(φ,dΩ,dΓ_N) = v -> l(v,φ,dΩ,dΓ_N)
     res(u,v,φ,dΩ,dΓ_N) = a(u,v,φ,dΩ,dΓ_N) - l(v,φ,dΩ,dΓ_N)
 
     ## Functionals J and DJ
@@ -139,7 +68,7 @@ function main(mesh_partition,distribute)
     J_func = Functional(J,[dΩ,dΓ_N],uh,φh)
     J_func_analytic = Functional(J,[dΩ,dΓ_N],uh,φh;DF=DJ)
     # FE state map
-    J_smap, C_smaps = AffineFEStateMap(J_func,[J_func_analytic],U,V,V_φ,a,l,res;ls = LUSolver())
+    J_smap, C_smaps = AffineFEStateMap(J_func,[J_func_analytic],U,V,U_reg,a,l,res;ls = LUSolver())
     # Solve
     J_smap(φh)
     
@@ -160,10 +89,10 @@ function main(mesh_partition,distribute)
     Hilb_assem=SparseMatrixAssembler(Tm,Tv,U_reg,V_reg)
     hilb_K = assemble_matrix(A,Hilb_assem,U_reg,V_reg)
     ## Autodiff result
-    op = AffineFEOperator(U_reg,V_reg,hilb_K,-get_free_dof_values(interpolate_everywhere(dFh,U_reg)))
+    op = AffineFEOperator(U_reg,V_reg,hilb_K,-get_free_dof_values(dFh))#interpolate_everywhere(dFh,U_reg)))
     dFh_Ω = solve(op)
     ## Analytic result
-    op = AffineFEOperator(U_reg,V_reg,hilb_K,-get_free_dof_values(interpolate_everywhere(dFh_analytic,U_reg)))
+    op = AffineFEOperator(U_reg,V_reg,hilb_K,-get_free_dof_values(dFh_analytic))#interpolate_everywhere(dFh_analytic,U_reg)))
     dFh_analytic_Ω = solve(op)
 
     hilb_abs_error = abs(dFh_Ω-dFh_analytic_Ω)
@@ -214,9 +143,7 @@ function test(;run_as_serial::Bool=true)
 
     # Weak forms
     a(u,v,φ,dΩ) = ∫((φ)*(u⋅v))dΩ
-    a(φ,dΩ) = (u,v) -> a(u,v,φ,dΩ)
     l(v,φh,dΩ) = ∫(v ⋅ VectorValue(1,0))dΩ
-    l(φ,dΩ) = v -> l(v,φ,dΩ)
     res(u,v,φ,dΩ) = a(u,v,φ,dΩ) - l(v,φ,dΩ)
 
     φh = interpolate(x->1,V_φ);
