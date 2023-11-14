@@ -25,8 +25,7 @@ end
 
 # First order stencil
 
-mutable struct FirstOrderStencil{D,T} <: Stencil
-  γ :: T
+struct FirstOrderStencil{D,T} <: Stencil
   function FirstOrderStencil(D::Integer,γ::T) where T
     new{D,T}(γ)
   end
@@ -128,8 +127,7 @@ function advect!(::FirstOrderStencil{3,T},φ,vel,Δt,Δx,caches) where T
   return φ
 end
 
-function compute_Δt(s::FirstOrderStencil{D,T},φ,vel) where {D,T}
-  γ = s.γ
+function compute_Δt(s::FirstOrderStencil{D,T},γ,φ,vel) where {D,T}
   v_norm = maximum(abs,vel)
   return γ * min(Δ...) / (eps(T)^2 + v_norm)
 end
@@ -138,7 +136,6 @@ end
 
 struct DistributedStencil
   stencil         :: Stencil
-  reinit_stencil  :: Stencil
   model
   max_steps
   reinit_max_steps
@@ -148,7 +145,6 @@ struct DistributedStencil
 end
 
 function Stencil(stencil::Stencil,
-                 reinit_stencil::Stencil,
                  model::DistributedDiscreteModel,
                  max_steps::Int,
                  reinit_max_steps::Int,
@@ -158,26 +154,23 @@ function Stencil(stencil::Stencil,
     return desc.partition .+ 1, desc.sizes
   end
   Δ = PartitionedArrays.getany(local_Δ)
-  return DistributedStencil(stencil,reinit_stencil,model,
-    max_steps,reinit_max_steps,tol,Δ,local_sizes)
+  return DistributedStencil(stencil,model,max_steps,reinit_max_steps,tol,Δ,local_sizes)
 end
 
 function allocate_caches(s::DistributedStencil,φ::PVector,vel::PVector)
   local_caches = map(local_views(φ),local_views(vel)) do φ,vel
-    s_cache = allocate_caches(s.stencil,φ,vel)
-    rs_cache = allocate_caches(s.reinit_stencil,φ,vel)
-    (s_cache,rs_cache)
-  end |> tuple_of_arrays
+    allocate_caches(s.stencil,φ,vel)
+  end
   φ_tmp   = similar(φ)
   vel_tmp = similar(vel)
-  return φ_tmp, vel_tmp, local_caches[1], local_caches[2]
+  return φ_tmp, vel_tmp, local_caches
 end
 
-function advect!(s::DistributedStencil,φ::PVector,vel::PVector,caches)
-  _, _, local_caches, _ = caches
+function advect!(s::DistributedStencil,φ::PVector,vel::PVector,γ,caches)
+  _, _, local_caches = caches
 
   ## CFL Condition (requires γ≤1.0)
-  Δt = compute_Δt(s.stencil,φ,vel)
+  Δt = compute_Δt(s.stencil,γ,φ,vel)
   for _ ∈ Base.OneTo(s.max_steps)
     # Apply operations across partitions
     map(local_views(φ),local_views(),local_views(vel),local_caches,s.local_sizes) do φ,vel,caches,S
@@ -191,14 +184,14 @@ function advect!(s::DistributedStencil,φ::PVector,vel::PVector,caches)
   return φ
 end
 
-function reinit!(s::DistributedStencil,φ::PVector,vel::PVector,caches)
-  φ_tmp, vel_tmp, _, local_caches = caches
+function reinit!(s::DistributedStencil,φ::PVector,vel::PVector,γ,caches)
+  φ_tmp, vel_tmp, local_caches = caches
 
   # Compute approx sign function S
   vel_tmp .= @. φ / sqrt(φ*φ + prod(Δ))
 
   ## CFL Condition (requires γ≤0.5)
-  Δt = compute_Δt(s.stencil,φ,1.0) # As inform(vel_tmp) = 1.0
+  Δt = compute_Δt(s.stencil,γ,φ,1.0) # As inform(vel_tmp) = 1.0
 
   # Apply operations across partitions
   step = 1; err = maximum(abs,φ); fill!(φ_tmp,0.0)
