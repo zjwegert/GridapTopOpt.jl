@@ -170,6 +170,10 @@ function AffineFEStateMap(
     return AffineFEStateMap(F,a,l,res,caches,adjoint_caches)
 end
 
+get_states(m::AffineFEStateMap) = m.F.F.state
+
+evaluate_functional(m::AffineFEStateMap) = m.F.F()
+
 function (φ_to_u::AffineFEStateMap{S} where S<:SingleStateFunctional)(_φh::GridapDistributed.DistributedCellField)
     uh = _eval_φ_to_u(φ_to_u,_φh)
     consistent!(get_free_dof_values(uh)) |> fetch
@@ -294,6 +298,10 @@ end
 
 function compute_shape_derivative!(_φh::FEFunction,state_map::AffineFEStateMap{S}) where S<:SingleStateFunctional
     _compute_shape_derivative!(_φh,state_map)
+end
+
+function compute_shape_derivative!(_φh,state_maps::Vector{AffineFEStateMap})
+    map(state_map -> compute_shape_derivative!(_φh,state_map),state_maps)
 end
 
 function _compute_shape_derivative!(_φh,state_map::AffineFEStateMap{S}) where S<:SingleStateFunctional

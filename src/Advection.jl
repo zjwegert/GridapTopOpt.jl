@@ -149,7 +149,7 @@ end
 function AdvectionStencil(stencil::Stencil,
                           model::DistributedDiscreteModel,
                           space::DistributedFESpace,
-                          max_steps::Int,max_steps_reinit::Int,tol::T) where T
+                          max_steps::Int,tol::T; max_steps_reinit::Int = 500) where T
   order = get_order(first(Gridap.CellData.get_data(get_fe_basis(V))))
   local_sizes, local_Δ, perm = map(local_views(model),local_views(space)) do model, space
     desc = get_cartesian_descriptor(model)
@@ -254,7 +254,7 @@ function advect!(s::DistributedAdvectionStencil{O},φ::PVector,vel::PVector,γ,c
   return φ
 end
 
-function reinit!(s::DistributedAdvectionStencil,φ::PVector,γ,caches)
+function reinit!(s::DistributedAdvectionStencil{O},φ::PVector,γ,caches) where O
   φ_tmp, vel_tmp, perm_caches, local_caches = caches
   _φ = (O >= 2) ? permute!(perm_caches[1],φ,s.perm) : φ
 
