@@ -149,10 +149,8 @@ function main(mesh_partition,distribute)
     ## Shape derivative
     # Autodiff
     dFh = compute_shape_derivative!(φh,J_smap)
-    uh,φh = J_func.state # <- due to weird bug
     # Analytic
     dFh_analytic = compute_shape_derivative!(φh,C_smaps[1])
-    uh,φh = J_func.state # <- due to weird bug
 
     abs_error = abs(dFh-dFh_analytic)
     rel_error = (abs(dFh-dFh_analytic))/abs(dFh_analytic)
@@ -216,10 +214,7 @@ function test(;run_as_serial::Bool=true)
     dΩ = Measure(Ω,2)
 
     # Weak forms
-    function a(u,v,φ,dΩ)
-        φh = φ_to_φₕ(φ,V_φ)
-        ∫((φh)*(u⋅v))dΩ
-    end
+    a(u,v,φ,dΩ) = ∫((φ)*(u⋅v))dΩ
     a(φ,dΩ) = (u,v) -> a(u,v,φ,dΩ)
     l(v,φh,dΩ) = ∫(v ⋅ VectorValue(1,0))dΩ
     l(φ,dΩ) = v -> l(v,φ,dΩ)
@@ -239,13 +234,10 @@ function test(;run_as_serial::Bool=true)
     # println("Objective value = $(J_smap.F.F())")
 
     ## Shape derivative
-    # @show typeof(φh)
     dFh = compute_shape_derivative!(φh,J_smap)
-    # @show typeof(φh) # <- The type changes! Unclear why. Jordi?
     dφ = get_free_dof_values(dFh)
 
     ### Connor's implementation:
-    uh,φh = J.state
     φ = get_free_dof_values(φh)
     if run_as_serial
         function _a(u,v,φ) 
@@ -273,10 +265,8 @@ function test(;run_as_serial::Bool=true)
     end
 end
 
-PartitionedArrays.consistent!(::Vector{M}) where M = nothing # <- is this OK Jordi?
-
 _out_serial,_diff = test(run_as_serial=true);
 
 _out,_ = test(run_as_serial=false);
 
-@show norm(_out_serial-_out.vector_partition.items[1],Inf) 
+@show norm(_out_serial-_out.vector_partition.items[1],Inf)

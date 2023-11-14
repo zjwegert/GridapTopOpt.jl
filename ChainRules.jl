@@ -579,4 +579,16 @@ function ChainRulesCore.rrule(ϕ_to_Vol::UnstructuredVolumeMap,ϕ)
   Vol0, ϕ_to_Vol_pullback
 end
 
-
+## Helpers
+function φ_to_φₕ(φ::AbstractArray,Q)
+	φ = FEFunction(Q,φ)
+end
+function φ_to_φₕ(φ::FEFunction,Q)
+	φ
+end
+function φ_to_φₕ(φ::CellField,Q)
+	φ
+end
+function φ_to_φₕ(φ::GridapDistributed.DistributedCellField,Q)
+	φ
+end
