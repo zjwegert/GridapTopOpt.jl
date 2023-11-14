@@ -103,9 +103,6 @@ function main(mesh_partition,distribute)
     V = TestFESpace(model,reffe;conformity=:H1,dirichlet_tags=["Gamma_D"],
         dirichlet_masks=[(true,true)],vector_type=Vector{PetscScalar})
     U = TrialFESpace(V,[VectorValue(0.0,0.0)])
-    Tm=SparseMatrixCSR{0,PetscScalar,PetscInt}
-    Tv=Vector{PetscScalar}
-    assem=SparseMatrixAssembler(Tm,Tv,U,V)
     # Space for shape sensitivities
     reffe_scalar = ReferenceFE(lagrangian,Float64,order)
     # FE space for LSF 
@@ -158,6 +155,8 @@ function main(mesh_partition,distribute)
     ## Hilb ext reg
     α = 4*maximum(eΔ)
     A(u,v) = α^2*∫(∇(u) ⊙ ∇(v))dΩ + ∫(u ⋅ v)dΩ;
+    Tm=SparseMatrixCSR{0,PetscScalar,PetscInt}
+    Tv=Vector{PetscScalar}
     Hilb_assem=SparseMatrixAssembler(Tm,Tv,U_reg,V_reg)
     hilb_K = assemble_matrix(A,Hilb_assem,U_reg,V_reg)
     ## Autodiff result

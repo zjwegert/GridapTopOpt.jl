@@ -21,7 +21,7 @@ struct Functional{N} <: AbstractFunctional
     F
     DF
     dΩ::Vector
-    state::NTuple{N} # <- can we remove this and define states somewhere else?
+    state::Tuple
     function Functional(F,dΩ::Vector,args...;DF=nothing)
         N = length(args)
         new{N}(F,DF,dΩ,args)
@@ -34,7 +34,22 @@ Functional(F,dΩ::GridapDistributed.DistributedMeasure,args...;DF=nothing) = Fun
 (F::Functional)() = sum(F.F(F.state...,F.dΩ...))
 (F::Functional)(args...) = sum(F.F(args...,F.dΩ...))
 
-function Gridap.gradient(F::Functional{N},uh::GridapDistributed.DistributedCellField,K::Int) where N
+function Gridap.gradient(F::Functional{N},uh::FEFunction,K::Int) where N
+    @assert 0<K<=N
+    fields = map(i->i==K ? uh : F.state[i],1:N)
+    _f = u -> F.F(fields[1:K-1]...,u,fields[K+1:end]...,F.dΩ...)
+    return Gridap.Fields.gradient(_f,fields[K])
+end
+
+function Gridap.gradient(F::Functional,uh::GridapDistributed.DistributedCellField,K::Int)
+    _gradient(F,uh,K)
+end
+
+function Gridap.gradient(F::Functional,uh::GridapDistributed.DistributedMultiFieldFEFunction,K::Int)
+    _gradient(F,uh,K)
+end
+
+function _gradient(F::Functional{N},uh,K::Int) where N
     @assert 0<K<=N
     fields = map(i->i==K ? uh : F.state[i],1:N)
     local_fields = map(local_views,fields) |> GridapDistributed.to_parray_of_arrays
@@ -44,13 +59,6 @@ function Gridap.gradient(F::Functional{N},uh::GridapDistributed.DistributedCellF
         return Gridap.Fields.gradient(_f,lf[K]) # <- A lot of allocations from Gridap AD
     end
     return GridapDistributed.DistributedDomainContribution(contribs)
-end
-
-function Gridap.gradient(F::Functional{N},uh::FEFunction,K::Int) where N
-    @assert 0<K<=N
-    fields = map(i->i==K ? uh : F.state[i],1:N)
-    _f = u -> F.F(fields[1:K-1]...,u,fields[K+1:end]...,F.dΩ...)
-    return Gridap.Fields.gradient(_f,fields[K])
 end
 
 ####################################################################
