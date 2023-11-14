@@ -1,3 +1,5 @@
+using ChainRulesCore
+
 abstract type AbstractFunctional end
 
 """
@@ -144,7 +146,7 @@ function AffineFEStateMap(
     ## K,b,x
     _,_φh = F.F.state;
     meas = F.F.dΩ
-    op = AffineFEOperator(a(_φh,meas...),l(_φh,meas...),U,V,trial_assem)
+    op = AffineFEOperator((u,v) -> a(u,v,_φh,meas...),v -> l(v,_φh,meas...),U,V,trial_assem)
     K = get_matrix(op); b = get_vector(op); 
     x = get_free_dof_values(zero(U))
     
