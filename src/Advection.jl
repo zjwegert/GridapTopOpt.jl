@@ -1,34 +1,33 @@
 
 using Gridap.Helpers
 using GridapDistributed: DistributedDiscreteModel
-using PartitionedArrays: getany
+using PartitionedArrays: getany, tuple_of_arrays
 
-# API definition for AdvectionStencil
+# API definition for Stencil
 
-abstract type AdvectionStencil end
+abstract type Stencil end
 
-function allocate_caches(::AdvectionStencil,φ,vel)
+function allocate_caches(::Stencil,φ,vel)
   nothing # By default, no caches are required.
 end
 
-function reinit!(::AdvectionStencil,φ_new,φ_old,vel,Δt,Δx,caches)
+function reinit!(::Stencil,φ_new,φ_old,vel,Δt,Δx,caches)
   @abstractmethod
 end
 
-function advect!(::AdvectionStencil,φ,vel,Δt,Δx,caches)
+function advect!(::Stencil,φ,vel,Δt,Δx,caches)
   @abstractmethod
 end
 
-function compute_Δt(::AdvectionStencil,φ,vel)
+function compute_Δt(::Stencil,φ,vel)
   @abstractmethod
 end
 
 # First order stencil
 
-struct FirstOrderStencil{D,T} <: AdvectionStencil
-  γ :: T
-  function FirstOrderStencil(D::Integer,γ::T) where T
-    new{D,T}(γ)
+struct FirstOrderStencil{D,T} <: Stencil
+  function FirstOrderStencil(D::Integer,::Type{T}) where T<:Real
+    new{D,T}()
   end
 end
 
@@ -128,8 +127,7 @@ function advect!(::FirstOrderStencil{3,T},φ,vel,Δt,Δx,caches) where T
   return φ
 end
 
-function compute_Δt(s::FirstOrderStencil{D,T},φ,vel) where {D,T}
-  γ = s.γ
+function compute_Δt(s::FirstOrderStencil{D,T},γ,φ,vel) where {D,T}
   v_norm = maximum(abs,vel)
   return γ * min(Δ...) / (eps(T)^2 + v_norm)
 end
@@ -137,20 +135,21 @@ end
 # Distributed advection stencil
 
 struct DistributedAdvectionStencil{O}
-  stencil   :: AdvectionStencil
+  stencil   :: Stencil
   model     :: DistributedDiscreteModel
   space     :: DistributedFESpace
   perm      :: Vector
-  max_steps :: Int
-  tol       :: Real
+  max_steps
+  max_steps_reinit 
+  tol
   Δ
   local_sizes
 end
 
-function AdvectionStencil(stencil::AdvectionStencil,
+function AdvectionStencil(stencil::Stencil,
                           model::DistributedDiscreteModel,
                           space::DistributedFESpace,
-                          max_steps::Int,tol::T) where T
+                          max_steps::Int,max_steps_reinit::Int,tol::T) where T
   order = get_order(first(Gridap.CellData.get_data(get_fe_basis(V))))
   local_sizes, local_Δ, perm = map(local_views(model),local_views(space)) do model, space
     desc = get_cartesian_descriptor(model)
@@ -158,7 +157,8 @@ function AdvectionStencil(stencil::AdvectionStencil,
     return desc.partition .+ 1, desc.sizes, dof_permutation
   end |> PartitionedArrays.tuple_of_arrays
   Δ = PartitionedArrays.getany(local_Δ)
-  return DistributedAdvectionStencil{order}(stencil,model,space,perm,max_steps,tol,Δ,local_sizes)
+  return DistributedAdvectionStencil{order}(
+    stencil,model,space,perm,max_steps,max_steps_reinit,tol,Δ,local_sizes)
 end
 
 Gridap.ReferenceFEs.get_order(f::Gridap.Fields.LinearCombinationFieldVector) = get_order(f.fields)
@@ -232,14 +232,14 @@ function permute_inv!(x_out::PVector,x_in::PVector,perm)
   return x_out
 end
 
-function advect!(s::DistributedAdvectionStencil{O},φ::PVector,vel::PVector,caches) where O
+function advect!(s::DistributedAdvectionStencil{O},φ::PVector,vel::PVector,γ,caches) where O
   _, _, perm_caches, local_caches = caches
   
   _φ   = (O >= 2) ? permute!(perm_caches[1],φ,s.perm) : φ
   _vel = (O >= 2) ? permute!(perm_caches[2],vel,s.perm) : vel
 
   ## CFL Condition (requires γ≤1.0)
-  Δt = compute_Δt(s.stencil,φ,vel)
+  Δt = compute_Δt(s.stencil,γ,φ,vel)
   for _ ∈ Base.OneTo(s.max_steps)
     # Apply operations across partitions
     map(local_views(_φ),local_views(_vel),local_caches,s.local_sizes) do _φ,_vel,caches,S
@@ -254,7 +254,7 @@ function advect!(s::DistributedAdvectionStencil{O},φ::PVector,vel::PVector,cach
   return φ
 end
 
-function reinit!(s::DistributedAdvectionStencil,φ::PVector,caches)
+function reinit!(s::DistributedAdvectionStencil,φ::PVector,γ,caches)
   φ_tmp, vel_tmp, perm_caches, local_caches = caches
   _φ = (O >= 2) ? permute!(perm_caches[1],φ,s.perm) : φ
 
@@ -262,7 +262,7 @@ function reinit!(s::DistributedAdvectionStencil,φ::PVector,caches)
   vel_tmp .= @. _φ / sqrt(_φ*_φ + prod(Δ))
 
   ## CFL Condition (requires γ≤0.5)
-  Δt = compute_Δt(s.stencil,_φ,1.0) # As inform(vel_tmp) = 1.0
+  Δt = compute_Δt(s.stencil,γ,_φ,1.0) # As inform(vel_tmp) = 1.0
 
   # Apply operations across partitions
   step = 1; err = maximum(abs,φ); fill!(φ_tmp,0.0)

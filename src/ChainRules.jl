@@ -21,7 +21,7 @@ struct Functional{N} <: AbstractFunctional
     F
     DF
     dΩ::Vector
-    state::NTuple{N} # <- can we remove this and define states somewhere else?
+    state::Tuple
     function Functional(F,dΩ::Vector,args...;DF=nothing)
         N = length(args)
         new{N}(F,DF,dΩ,args)
@@ -34,7 +34,22 @@ Functional(F,dΩ::GridapDistributed.DistributedMeasure,args...;DF=nothing) = Fun
 (F::Functional)() = sum(F.F(F.state...,F.dΩ...))
 (F::Functional)(args...) = sum(F.F(args...,F.dΩ...))
 
-function Gridap.gradient(F::Functional{N},uh::GridapDistributed.DistributedCellField,K::Int) where N
+function Gridap.gradient(F::Functional{N},uh::FEFunction,K::Int) where N
+    @assert 0<K<=N
+    fields = map(i->i==K ? uh : F.state[i],1:N)
+    _f = u -> F.F(fields[1:K-1]...,u,fields[K+1:end]...,F.dΩ...)
+    return Gridap.Fields.gradient(_f,fields[K])
+end
+
+function Gridap.gradient(F::Functional,uh::GridapDistributed.DistributedCellField,K::Int)
+    _gradient(F,uh,K)
+end
+
+function Gridap.gradient(F::Functional,uh::GridapDistributed.DistributedMultiFieldFEFunction,K::Int)
+    _gradient(F,uh,K)
+end
+
+function _gradient(F::Functional{N},uh,K::Int) where N
     @assert 0<K<=N
     fields = map(i->i==K ? uh : F.state[i],1:N)
     local_fields = map(local_views,fields) |> GridapDistributed.to_parray_of_arrays
@@ -44,13 +59,6 @@ function Gridap.gradient(F::Functional{N},uh::GridapDistributed.DistributedCellF
         return Gridap.Fields.gradient(_f,lf[K]) # <- A lot of allocations from Gridap AD
     end
     return GridapDistributed.DistributedDomainContribution(contribs)
-end
-
-function Gridap.gradient(F::Functional{N},uh::FEFunction,K::Int) where N
-    @assert 0<K<=N
-    fields = map(i->i==K ? uh : F.state[i],1:N)
-    _f = u -> F.F(fields[1:K-1]...,u,fields[K+1:end]...,F.dΩ...)
-    return Gridap.Fields.gradient(_f,fields[K])
 end
 
 ####################################################################
@@ -160,7 +168,17 @@ function AffineFEStateMap(
     return AffineFEStateMap(F,a,l,res,caches,adjoint_caches)
 end
 
-function (φ_to_u::AffineFEStateMap{S} where S<:SingleStateFunctional)(_φh)
+function (φ_to_u::AffineFEStateMap{S} where S<:SingleStateFunctional)(_φh::GridapDistributed.DistributedCellField)
+    uh = _eval_φ_to_u(φ_to_u,_φh)
+    consistent!(get_free_dof_values(uh)) |> fetch
+    uh
+end
+
+function (φ_to_u::AffineFEStateMap{S} where S<:SingleStateFunctional)(_φh::FEFunction)
+    _eval_φ_to_u(φ_to_u,_φh)
+end
+
+function _eval_φ_to_u(φ_to_u::AffineFEStateMap{S},_φh) where S<:SingleStateFunctional
     a=φ_to_u.a
     l=φ_to_u.l
     U,V,_ = φ_to_u.F.spaces
@@ -177,7 +195,6 @@ function (φ_to_u::AffineFEStateMap{S} where S<:SingleStateFunctional)(_φh)
     numerical_setup!(ns,K)
     solve!(x,ns,b)
     copy!(get_free_dof_values(uh),x)
-    consistent!(get_free_dof_values(uh)) |> fetch
     uh
 end
 
@@ -266,7 +283,18 @@ function AffineFEStateMap(J::T,C::Vector{T},args...;ls=LUSolver(),
     return J_smap,C_smap
 end
 
-function compute_shape_derivative!(_φh,state_map::AffineFEStateMap{S}) where S<:SingleStateFunctional
+function compute_shape_derivative!(_φh::GridapDistributed.DistributedCellField,
+        state_map::AffineFEStateMap{S}) where S<:SingleStateFunctional
+    dFh = _compute_shape_derivative!(_φh,state_map)
+    consistent!(get_free_dof_values(dFh)) |> fetch
+    dFh
+end
+
+function compute_shape_derivative!(_φh::FEFunction,state_map::AffineFEStateMap{S}) where S<:SingleStateFunctional
+    _compute_shape_derivative!(_φh,state_map)
+end
+
+function _compute_shape_derivative!(_φh,state_map::AffineFEStateMap{S}) where S<:SingleStateFunctional
     ssfunc,smap = state_map.F,state_map
     _,_,V_φ = ssfunc.spaces
     _,aux_assem = ssfunc.assemblers
@@ -285,28 +313,26 @@ function compute_shape_derivative!(_φh,state_map::AffineFEStateMap{S}) where S<
         _, dφ₍ᵤ₎      = u_pullback(du); # Compute adjoint for derivatives of φ wrt to u 
         dφ            = dφ₍ᵤ₎ + dφ₍ⱼ₎
         copy!(get_free_dof_values(dFh),dφ)
-        consistent!(get_free_dof_values(dFh)) |> fetch
     else
         meas = ssfunc.F.dΩ
         state = ssfunc.F.state
         _dF = (q) -> ssfunc.F.DF(q,state...,meas...)
         dF_vec = get_free_dof_values(dFh);
         assemble_vector!(_dF,dF_vec,aux_assem,V_φ)
-        consistent!(dF_vec) |> fetch
     end
     return dFh
 end
 
-## Helpers
-function φ_to_φₕ(φ::AbstractArray,Q)
-	φ = FEFunction(Q,φ)
-end
-function φ_to_φₕ(φ::FEFunction,Q)
-	φ
-end
-function φ_to_φₕ(φ::CellField,Q)
-	φ
-end
-function φ_to_φₕ(φ::GridapDistributed.DistributedCellField,Q)
-	φ
-end
+# ## Helpers
+# function φ_to_φₕ(φ::AbstractArray,Q)
+# 	φ = FEFunction(Q,φ)
+# end
+# function φ_to_φₕ(φ::FEFunction,Q)
+# 	φ
+# end
+# function φ_to_φₕ(φ::CellField,Q)
+# 	φ
+# end
+# function φ_to_φₕ(φ::GridapDistributed.DistributedCellField,Q)
+# 	φ
+# end
