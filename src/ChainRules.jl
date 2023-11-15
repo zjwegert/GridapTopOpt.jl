@@ -1,137 +1,15 @@
 using ChainRulesCore
+using Gridap.Algebra: LinearSolver
 
-# abstract type AbstractFunctional end
+"""
+    IntegrandWithMeasure
 
-# """
-#     Functional
-
-#     A functional over a measure dΩ that enables derivatives in each state.
-
-#     - F: (states...,[measures...]) -> ∫(f(states...))dΩ1 + ∫(g(states...))dΩ2 ...
-#     - dΩ: A measure, can be a lower dimensional measure as well (e.g., boundary measure dΓ).
-#     - state: Tuple of length N of states. These must be of type FEFunction or DistributedCellField.
-
-#     Optional:
-#     - DF: a function defining the shape derivative of F. This function takes a test function q plus the 
-#         same arguments as F. If DF is nothing, automatic differentation is used to determine the shape derivative.
-
-#         E.g., for `F = (u,φ,dΩ) -> ∫(H ∘ φ)dΩ`, DF = (q,u,φ,dΩ) -> ∫(1*q*(DH ∘ φh)*(norm ∘ ∇(φh)))dΩ
-#         where `DH(φh)*|∇(φh)|dΩ ≈ dΓ`, `H` is the smoothed Heaviside function, and `dH` is the
-#         smoothed delta function.        
-# """
-# struct Functional{N} <: AbstractFunctional
-#     F
-#     DF
-#     dΩ::Vector
-#     state::Tuple  # <- another name
-#     function Functional(F,dΩ::Vector,args...;DF=nothing)
-#         N = length(args)
-#         new{N}(F,DF,dΩ,args)
-#     end
-# end
-
-# Functional(F,dΩ::Measure,args...;DF=nothing) = Functional(F,[dΩ],args...;DF=DF)
-# Functional(F,dΩ::GridapDistributed.DistributedMeasure,args...;DF=nothing) = Functional(F,[dΩ],args...;DF=DF)
-
-# (F::Functional)() = sum(F.F(F.state...,F.dΩ...))
-# (F::Functional)(args...) = sum(F.F(args...,F.dΩ...))
-
-# function Gridap.gradient(F::Functional{N},uh::FEFunction,K::Int) where N
-#     @assert 0<K<=N
-#     fields = map(i->i==K ? uh : F.state[i],1:N)
-#     _f = u -> F.F(fields[1:K-1]...,u,fields[K+1:end]...,F.dΩ...)
-#     return Gridap.Fields.gradient(_f,fields[K])
-# end
-
-# function Gridap.gradient(F::Functional,uh::GridapDistributed.DistributedCellField,K::Int)
-#     _gradient(F,uh,K)
-# end
-
-# function Gridap.gradient(F::Functional,uh::GridapDistributed.DistributedMultiFieldFEFunction,K::Int)
-#     _gradient(F,uh,K)
-# end
-
-# function _gradient(F::Functional{N},uh,K::Int) where N
-#     @assert 0<K<=N
-#     fields = map(i->i==K ? uh : F.state[i],1:N)
-#     local_fields = map(local_views,fields) |> GridapDistributed.to_parray_of_arrays
-#     local_measures = map(local_views,F.dΩ) |> GridapDistributed.to_parray_of_arrays
-#     contribs = map(local_measures,local_fields) do dΩ,lf
-#         _f = u -> F.F(lf[1:K-1]...,u,lf[K+1:end]...,dΩ...)
-#         return Gridap.Fields.gradient(_f,lf[K]) # <- A lot of allocations from Gridap AD
-#     end
-#     return GridapDistributed.DistributedDomainContribution(contribs)
-# end
-
-# abstract type AbstractStateFunctional end
-
-# """
-#     SingleStateFunctional
-
-#     Assume that we have a Functional of the following form:
-#         F: (u,φ,[dΩ,dΓ]) ↦ ∫_Ω f(u(φ),φ) dΩ + ∫_Γ g(u(φ),φ) dΓ,
-#     where u is a state field and φ is auxilary. The signature MUST match the weak form.
-
-#     The number of states refers to number of solutions to PDEs (e.g., u above).
-#     We assume that there is only one additional auxilary field φ for purpose of AD.
-# """
-# struct SingleStateFunctional{A,B<:Tuple,C<:Tuple,D<:Tuple} <: AbstractStateFunctional
-#     F           ::Functional{2}
-#     dFh         ::A
-#     spaces      ::B
-#     assemblers  ::C
-#     caches      ::D
-# end
-
-# function SingleStateFunctional(F::Functional{2},
-#         U,
-#         V,
-#         V_φ)
-#     Tm=SparseMatrixCSR{0,PetscScalar,PetscInt}
-#     Tv=Vector{PetscScalar}
-#     trial_assem=SparseMatrixAssembler(Tm,Tv,U,V)
-#     aux_assem=SparseMatrixAssembler(Tm,Tv,V_φ,V_φ)
-#     dF_vec = zero(V_φ)
-#     djdu_vec = zero_free_values(U)
-#     djdφ_vec = zero_free_values(V_φ)
-#     dφdu_vec = zero_free_values(V_φ)
-#     assemblers = (trial_assem,aux_assem)
-#     spaces = (U,V,V_φ)
-#     caches = (djdu_vec,djdφ_vec,dφdu_vec)
-#     SingleStateFunctional(F,dF_vec,spaces,assemblers,caches)
-# end
-
-# (u_to_j::SingleStateFunctional)(_uh,_φh) = u_to_j.F(_uh,_φh)
-
-# function ChainRulesCore.rrule(u_to_j::SingleStateFunctional,_uh,_φh)
-#     F=u_to_j.F
-#     U,_,V_φ = u_to_j.spaces
-#     trial_assem,aux_assem = u_to_j.assemblers
-#     djdu_vec,djdφ_vec,_ = u_to_j.caches
-#     function u_to_j_pullback(dj)
-#         djdu = ∇(F,_uh,1)
-#         djdu_vecdata = collect_cell_vector(U,djdu)
-#         assemble_vector!(djdu_vec,trial_assem,djdu_vecdata)
-#         djdφ = ∇(F,_φh,2)
-#         djdφ_vecdata = collect_cell_vector(V_φ,djdφ)
-#         assemble_vector!(djdφ_vec,aux_assem,djdφ_vecdata)
-#         djdu_vec .*= dj
-#         djdφ_vec .*= dj
-#         (  NoTangent(), djdu_vec, djdφ_vec )
-#     end
-#     u_to_j(_uh,_φh), u_to_j_pullback
-# end
-
-########################################################################################
-########################################################################################
-
+    Enables partial differentation of an integrand F via Gridap.gradient.
+"""
 struct IntegrandWithMeasure{A,B<:Tuple}
     F  :: A
     dΩ :: B
 end
-
-IntegrandWithMeasure(F,dΩ::Measure) = IntegrandWithMeasure(F,(dΩ,))
-IntegrandWithMeasure(F,dΩ::GridapDistributed.DistributedMeasure) = IntegrandWithMeasure(F,(dΩ,))
 
 (F::IntegrandWithMeasure)(args...) = F.F(args...,F.dΩ...)
 
@@ -154,6 +32,19 @@ function Gridap.gradient(F::IntegrandWithMeasure,uh::Vector,K::Int)
     return GridapDistributed.DistributedDomainContribution(contribs)
 end
 
+"""
+    StateParamIntegrandWithMeasure
+
+    Assume that we have a Functional of the following form:
+        F: (u,φ,[dΩ₁,dΩ₂,...]) ↦ ∫_Ω₁ f(u(φ),φ) dΩ₁ + ∫_Ω₂ g(u(φ),φ) dΩ₂ + ...,
+    where u is a state field and φ is auxilary. 
+    
+    Assumptions:
+     - The arguments to F matchs the weak form.
+     - The argument u is the solution to an FE problem. This can be a single field or multifield.
+     - There is a single auxilary field. Again, this can possibly be a MultiFieldFEFunction.
+        E.g., multiple level set functions.
+"""
 struct StateParamIntegrandWithMeasure{A<:IntegrandWithMeasure,B<:Tuple,C<:Tuple,D<:Tuple}
     F       :: A
     spaces  :: B
@@ -163,9 +54,9 @@ end
 
 function StateParamIntegrandWithMeasure(F::IntegrandWithMeasure,
         U,
-        V_φ;
-        assem_U=SparseMatrixAssembler(U,U),
-        assem_φ=SparseMatrixAssembler(V_φ,V_φ))
+        V_φ, #;
+        assem_U, # =SparseMatrixAssembler(U,U),
+        assem_φ) # =SparseMatrixAssembler(V_φ,V_φ))
 
     dΩ = F.dΩ
     φ₀ = zero(V_φ); u₀ = zero(U)
@@ -186,6 +77,7 @@ function rrule(u_to_j::StateParamIntegrandWithMeasure,uh,φh)
     djdu_vec,djdφ_vec = u_to_j.caches
     fields = [uh,φh];
     function u_to_j_pullback(dj)
+        ## Compute ∂F/∂uh(uh) and ∂F/∂φh(φh)
         djdu = ∇(F,fields,1)
         djdu_vecdata = collect_cell_vector(U,djdu)
         assemble_vector!(djdu_vec,assem_U,djdu_vecdata)
@@ -199,21 +91,135 @@ function rrule(u_to_j::StateParamIntegrandWithMeasure,uh,φh)
     u_to_j(_uh,_φh), u_to_j_pullback
 end
 
-struct PDEConstrainedFunctionals
+struct AffineFEStateMap{A,B,C,D<:Tuple,E<:Tuple,F<:Tuple,G<:Tuple,H<:Tuple}
+    a               ::A
+    l               ::B
+    res             ::C
+    dΩ              ::D
+    spaces          ::E
+    cache           ::F
+    fwd_caches      ::G
+    adjoint_caches  ::H
+end
+
+function AffineFEStateMap(
+        a,
+        l,
+        res,
+        dΩ::Tuple,
+        spaces::Tuple,
+        assems::Tuple,
+        ls::Gridap.Algebra.LinearSolver,
+        adjoint_ls::Gridap.Algebra.LinearSolver)
+    
+    U,V,V_φ = spaces
+    assem_U,assem_adjoint,assem_φ = assems
+
+    ## dφdu cache
+    φ₀ = zero(V_φ); u₀ = zero(U)
+    dφdu_vec = assemble_vector(v->l(u₀,v,dΩ...),assem_φ,V_φ)
+
+    ## K,b,x
+    op = AffineFEOperator((u,v) -> a(u,v,φ₀,dΩ...),v -> l(v,φ₀,dΩ...),U,V,assem_U)
+    K = get_matrix(op); b = get_vector(op); 
+    x = get_free_dof_values(zero(U))
+    
+    ## Adjoint K,b,x
+    adjoint_K = assemble_matrix((u,v) -> a(v,u,φ₀,dΩ...),assem_adjoint,V,U)
+    adjoint_x = get_free_dof_values(zero(V))
+
+    ## Numerical setups
+    ns = numerical_setup(symbolic_setup(ls,K),K)
+    adjoint_ns = numerical_setup(symbolic_setup(adjoint_ls,adjoint_K),adjoint_K)
+    
+    ## Caches and adjoint caches
+    caches = (dφdu_vec,assem_φ)
+    fwd_caches = (ns,K,b,x,assem_U)
+    adjoint_caches = (adjoint_ns,adjoint_K,adjoint_x,assem_adjoint)
+    return AffineFEStateMap(a,l,res,dΩ,spaces,caches,fwd_caches,adjoint_caches)
+end
+
+function (φ_to_u::AffineFEStateMap)(φh)
+    a=φ_to_u.a
+    l=φ_to_u.l
+    dΩ = φ_to_u.dΩ
+    U,V,_ = φ_to_u.spaces
+    ns,K,b,x,assem_U = φ_to_u.fwd_caches
+    
+    ## Reassemble and solve
+    assemble_matrix_and_vector!(a(du,dv,φh,dΩ...),l(dv,φh,dΩ...),K,b,assem_U,U,V)
+    numerical_setup!(ns,K)
+    solve!(x,ns,b)
+    x
+end
+
+function ChainRulesCore.rrule(φ_to_u::AffineFEStateMap,φh)
+    a=φ_to_u.a
+    res = F.res
+    dΩ = φ_to_u.dΩ
+    U,V,V_φ = φ_to_u.spaces
+    dφdu_vec,assem_φ = F.caches
+    adjoint_ns,adjoint_K,λ,assem_adjoint = φ_to_u.adjoint_caches
+    
+    ## Forward problem
+    u = φ_to_u(φh)
+
+    ## Adjoint operator
+    assemble_matrix!((u,v) -> a(v,u,φ₀,dΩ...),adjoint_K,assem_adjoint,V,U)
+    function φ_to_u_pullback(du)
+        ## Adjoint Solve
+        numerical_setup!(adjoint_ns,adjoint_K)
+        solve!(λ,adjoint_ns,du)
+        λh = FEFunction(V,λ)
+        
+        ## Compute grad
+        uh = FEFunction(U,u)
+        res_functional = IntegrandWithMeasure(res,dΩ)
+        dφdu_contrib = ∇(res_functional,[uh,λh,φh],3)
+        dφdu_vecdata = collect_cell_vector(V_φ,dφdu_contrib)
+        assemble_vector!(dφdu_vec,assem_φ,dφdu_vecdata)
+        dφdu_vec .*= -1;
+        ( NoTangent(),dφdu_vec)
+    end
+    u, φ_to_u_pullback
+end
+
+"""
+    PDEConstrainedFunctionals
+"""
+struct PDEConstrainedFunctionals{A,B}
     J :: StateParamIntegrandWithMeasure
     C :: Vector{StateParamIntegrandWithMeasure}
-    dJ
-    dC  # [dC1,nothing,...,dCn]
-    asm :: AffineStateMap
+    dJ :: A
+    dC :: Vector{B}
+    state_map :: AffineStateMap
 end
 
 function PDEConstrainedFunctionals(
-    J :: Function,
-    C :: Vector{Function},
-    asm :: AffineStateMap; 
-    dJ = nothing,
-    dC = nothing)
+        J :: Function,
+        C :: Vector{Function},
+        a,l,res,
+        U,V,V_φ,
+        dΩ...;
+        assem_U = SparseMatrixAssembler(U,V),
+        assem_adjoint = SparseMatrixAssembler(V,U),
+        assem_φ = SparseMatrixAssembler(V_φ,V_φ),
+        ls::LinearSolver = LUSolver(),
+        adjoint_ls::LinearSolver = LUSolver(),
+        dJ = nothing,
+        dC = fill(nothing,length(C)))
 
+    # Create StateParamIntegrandWithMeasures
+    spiwm(f) = StateParamIntegrandWithMeasure(IntegrandWithMeasure(f,dΩ),U,V_φ,assem_U,assem_φ)
+    J_spiwm = spiwm(J)
+    C_spiwm = map(spiwm,C)
+ 
+    # Create AffineFEStateMap
+    spaces = (U,V,V_φ)
+    assems = assem_U,assem_adjoint,assem_φ
+    state_map = AffineFEStateMap(a,l,res,dΩ,spaces,assems,ls,adjoint_ls)
+
+    PDEConstrainedFunctionals(J_spiwm,C_spiwm,dJ,dC,state_map)
 end
 
 function evaluate(pcf,φ)
@@ -239,111 +245,6 @@ function evaluate_both(pcf,φ)
     u = asm(φ)
     evaluate(pcf,φ,u)
     evaluate_derivatives(pcf,φ,u)
-end
-
-####################################################################
-struct AffineFEStateMap{A,B,C,D,E<:Tuple,F<:Tuple,G<:Tuple,H<:Tuple}
-    a               ::A
-    l               ::B
-    res             ::C
-    dΩ              ::D
-    spaces          ::E
-    cache           ::F
-    fwd_caches      ::G
-    adjoint_caches  ::H
-end
-
-function AffineFEStateMap(
-        a,
-        l,
-        res,
-        dΩ::Tuple,
-        spaces::Tuple,
-        assems::Tuple,
-        ls::Gridap.Algebra.LinearSolver,
-        adjoint_ls::Gridap.Algebra.LinearSolver)
-    
-    U,V,V_φ = spaces
-    assem_U,assem_φ = assems
-
-    ## dφdu cache
-    φ₀ = zero(V_φ); u₀ = zero(U)
-    dφdu_vec = assemble_vector(v->l(u₀,v,dΩ...),assem_φ,V_φ)
-
-    ## K,b,x
-    op = AffineFEOperator((u,v) -> a(u,v,φ₀,dΩ...),v -> l(v,φ₀,dΩ...),U,V,assem_U)
-    K = get_matrix(op); b = get_vector(op); 
-    x = get_free_dof_values(zero(U))
-    
-    ## Adjoint K,b,x
-    Tm=SparseMatrixCSR{0,PetscScalar,PetscInt}
-    Tv=Vector{PetscScalar}
-    adjoint_assem=SparseMatrixAssembler(Tm,Tv,V,U)
-    adjoint_K = assemble_matrix((u,v) -> a(v,u,φ₀,dΩ...),adjoint_assem,V,U)
-    adjoint_x = get_free_dof_values(zero(V))
-
-    ## Numerical setups
-    ns = numerical_setup(symbolic_setup(ls,K),K)
-    adjoint_ns = numerical_setup(symbolic_setup(adjoint_ls,adjoint_K),adjoint_K)
-    
-    ## Caches and adjoint caches
-    caches = (dφdu_vec,assem_φ)
-    fwd_caches = (ns,K,b,x,assem_U)
-    adjoint_caches = (adjoint_ns,adjoint_K,adjoint_x,adjoint_assem)
-    return AffineFEStateMap(a,l,res,dΩ,spaces,caches,fwd_caches,adjoint_caches)
-end
-
-function (φ_to_u::AffineFEStateMap)(φh)
-    a=φ_to_u.a
-    l=φ_to_u.l
-    dΩ = φ_to_u.dΩ
-    U,V,_ = φ_to_u.spaces
-    ns,K,b,x,assem_U = φ_to_u.caches
-    
-    ## Reassemble and solve
-    assemble_matrix_and_vector!(a(du,dv,φh,dΩ...),l(dv,φh,dΩ...),K,b,assem_U,U,V)
-    numerical_setup!(ns,K)
-    solve!(x,ns,b)
-    x
-end
-
-function ChainRulesCore.rrule(φ_to_u::AffineFEStateMap,φh)
-    a=φ_to_u.a
-    dΩ = φ_to_u.dΩ
-    U,V,_ = φ_to_u.spaces
-    
-    ## Forward problem
-    u = φ_to_u(φh)
-    
-    ## Adjoint operator
-    _,adjoint_K,_,adjoint_assem = φ_to_u.adjoint_caches
-    assemble_matrix!((u,v) -> a(v,u,φ₀,dΩ...),adjoint_K,adjoint_assem,V,U)
-    function φ_to_u_pullback(du)
-        dφdu_vec = Adjoint(φh,u,du,φ_to_u)
-        ( NoTangent(),dφdu_vec)
-    end
-    u, φ_to_u_pullback
-end
-
-function Adjoint(φh,u,du,F::AffineFEStateMap)
-    U,V,V_φ = F.spaces
-    adjoint_ns,adjoint_K,λ,_ = F.adjoint_caches
-    res = F.res
-
-    ## Adjoint Solve
-    numerical_setup!(adjoint_ns,adjoint_K)
-    solve!(λ,adjoint_ns,du)
-    λh = FEFunction(V,λ)
-    
-    ## Compute grad
-    dφdu_vec = F.dφdu_vec
-    uh = FEFunction(U,u)
-    res_functional = IntegrandWithMeasure(res,dΩ)
-    dφdu_contrib = ∇(res_functional,[uh,λh,φh],3)
-    dφdu_vecdata = collect_cell_vector(V_φ,dφdu_contrib)
-    assemble_vector!(dφdu_vec,assem_φ,dφdu_vecdata)
-    dφdu_vec .*= -1;
-    dφdu_vec
 end
 
 ####################################################################
@@ -428,17 +329,3 @@ function _compute_shape_derivative!(_φh,state_map::AffineFEStateMap{S}) where S
     end
     return dFh
 end
-
-# ## Helpers
-# function φ_to_φₕ(φ::AbstractArray,Q)
-# 	φ = FEFunction(Q,φ)
-# end
-# function φ_to_φₕ(φ::FEFunction,Q)
-# 	φ
-# end
-# function φ_to_φₕ(φ::CellField,Q)
-# 	φ
-# end
-# function φ_to_φₕ(φ::GridapDistributed.DistributedCellField,Q)
-# 	φ
-# end
