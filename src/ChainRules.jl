@@ -63,7 +63,106 @@ function _gradient(F::Functional{N},uh,K::Int) where N
     return GridapDistributed.DistributedDomainContribution(contribs)
 end
 
+
+######################
+
+struct IntegrandWithMeasure{A,B}
+    F  :: A
+    dΩ :: B
+end
+
+(F::IntegrandWithMeasure)(args...) = F.F(args...,F.dΩ...)
+
+Gridap.gradient(F::IntegrandWithMeasure,uh) = Gridap.gradient(F,[uh],1)
+
+function Gridap.gradient(F::IntegrandWithMeasure,uh::Vector{<:FEFunction},K::Int)
+    @check 0 < K <= length(uh)
+    _f(uk) = F.F(uh[1:K-1]...,uk,uh[K+1:end]...,F.dΩ...)
+    return Gridap.gradient(_f,uh[K])
+end
+
+function Gridap.gradient(F::IntegrandWithMeasure,uh::Vector,K::Int)
+    @check 0 < K <= length(uh)
+    local_fields = map(local_views,uh) |> GridapDistributed.to_parray_of_arrays
+    local_measures = map(local_views,F.dΩ) |> GridapDistributed.to_parray_of_arrays
+    contribs = map(local_measures,local_fields) do dΩ,lf
+        _f = u -> F.F(lf[1:K-1]...,u,lf[K+1:end]...,dΩ...)
+        return Gridap.Fields.gradient(_f,lf[K])
+    end
+    return GridapDistributed.DistributedDomainContribution(contribs)
+end
+
 ####################################################################
+
+struct StateParamIntegrandWithMeasure
+    F :: IntegrandWithMeasure
+    V_u
+    V_φ
+    assem
+    caches
+end
+
+(u_to_j::StateParamIntegrandWithMeasure)(uh,φh) = u_to_j.F(uh,φh)
+
+function rrule(u_to_j::StateParamIntegrandWithMeasure,uh,φh)
+    F=u_to_j.F
+    U,_,V_φ = u_to_j.spaces
+    trial_assem,aux_assem = u_to_j.assemblers
+    djdu_vec,djdφ_vec,_ = u_to_j.caches
+    function u_to_j_pullback(dj)
+        djdu = ∇(F,_uh,1)
+        djdu_vecdata = collect_cell_vector(U,djdu)
+        assemble_vector!(djdu_vec,trial_assem,djdu_vecdata)
+        djdφ = ∇(F,_φh,2)
+        djdφ_vecdata = collect_cell_vector(V_φ,djdφ)
+        assemble_vector!(djdφ_vec,aux_assem,djdφ_vecdata)
+        djdu_vec .*= dj
+        djdφ_vec .*= dj
+        (  NoTangent(), djdu_vec, djdφ_vec )
+    end
+    u_to_j(_uh,_φh), u_to_j_pullback
+end
+
+struct PDEConstrainedFunctional
+    J :: IntegrandWithMeasure
+    C :: Vector{IntegrandWithMeasure}
+    asm :: AffineStateMap
+end
+
+function PDEConstrainedFunctional(
+    J :: Function,
+    C :: Vector{Function},
+    asm :: AffineStateMap; 
+    dJ = nothing,
+    dC = nothing)
+
+end
+
+function evaluate(pcf,φ)
+    u = asm(φ)
+    evaluate(pcf,φ,u)
+end
+
+function evaluate(pcf,φ,u)
+    [J(u,φ), map(Ci(u,φ),1:length(Ci))]
+end
+
+function evaluate_derivatives(pcf,φ)
+    u = asm(φ)
+    evaluate_derivatives(pcf,φ,u)
+end
+
+function evaluate_derivatives(pcf,φ,u)
+    dJ = rrule(J,u,φ)
+    dC = rrule(C,u,φ)
+end
+
+function evaluate_both(pcf,φ)
+    u = asm(φ)
+    evaluate(pcf,φ,u)
+    evaluate_derivatives(pcf,φ,u)
+end
+
 abstract type AbstractStateFunctional end
 
 """
