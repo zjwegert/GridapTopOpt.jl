@@ -91,7 +91,25 @@ function rrule(u_to_j::StateParamIntegrandWithMeasure,uh,φh)
     u_to_j(_uh,_φh), u_to_j_pullback
 end
 
-struct AffineFEStateMap{A,B,C,D<:Tuple,E<:Tuple,F<:Tuple,G<:Tuple,H<:Tuple}
+abstract type AbstractFEStateMap end
+
+# Return tuple of measures dΩ
+get_measure(::AbstractFEStateMap) = @abstractmethod;
+
+# Return spaces
+get_trial_space(::AbstractFEStateMap) = @abstractmethod;
+get_test_space(::AbstractFEStateMap) = @abstractmethod;
+get_aux_space(::AbstractFEStateMap) = @abstractmethod;
+
+# Return assemblers
+get_state_assemblers(::AbstractFEStateMap) = @abstractmethod
+get_aux_assemblers(::AbstractFEStateMap) = @abstractmethod
+
+# Autodiff methods
+(::AbstractFEStateMap)(arg) = @abstractmethod
+ChainRulesCore.rrule(::AbstractFEStateMap,arg) = @abstractmethod
+
+struct AffineFEStateMap{A,B,C,D<:Tuple,E<:Tuple,F<:Tuple,G<:Tuple,H<:Tuple} <: AbstractFEStateMap
     a               ::A
     l               ::B
     res             ::C
@@ -100,44 +118,54 @@ struct AffineFEStateMap{A,B,C,D<:Tuple,E<:Tuple,F<:Tuple,G<:Tuple,H<:Tuple}
     cache           ::F
     fwd_caches      ::G
     adjoint_caches  ::H
+
+    function AffineFEStateMap(
+            a,l,res,
+            U,V,V_φ,
+            dΩ...;
+            assem_U = SparseMatrixAssembler(U,V),
+            assem_adjoint = SparseMatrixAssembler(V,U),
+            assem_φ = SparseMatrixAssembler(V_φ,V_φ),
+            ls::LinearSolver = LUSolver(),
+            adjoint_ls::LinearSolver = LUSolver())
+        
+        spaces = (U,V,V_φ)
+        ## dφdu cache
+        φ₀ = zero(V_φ); u₀ = zero(U)
+        dφdu_vec = assemble_vector(v->l(u₀,v,dΩ...),assem_φ,V_φ)
+
+        ## K,b,x
+        op = AffineFEOperator((u,v) -> a(u,v,φ₀,dΩ...),v -> l(v,φ₀,dΩ...),U,V,assem_U)
+        K = get_matrix(op); b = get_vector(op); 
+        x = get_free_dof_values(zero(U))
+        
+        ## Adjoint K,b,x
+        adjoint_K = assemble_matrix((u,v) -> a(v,u,φ₀,dΩ...),assem_adjoint,V,U)
+        adjoint_x = get_free_dof_values(zero(V))
+
+        ## Numerical setups
+        ns = numerical_setup(symbolic_setup(ls,K),K)
+        adjoint_ns = numerical_setup(symbolic_setup(adjoint_ls,adjoint_K),adjoint_K)
+        
+        ## Caches and adjoint caches
+        caches = (dφdu_vec,assem_φ)
+        fwd_caches = (ns,K,b,x,assem_U)
+        adjoint_caches = (adjoint_ns,adjoint_K,adjoint_x,assem_adjoint)
+        return new(a,l,res,dΩ,spaces,caches,fwd_caches,adjoint_caches)
+    end
 end
 
-function AffineFEStateMap(
-        a,
-        l,
-        res,
-        dΩ::Tuple,
-        spaces::Tuple,
-        assems::Tuple,
-        ls::Gridap.Algebra.LinearSolver,
-        adjoint_ls::Gridap.Algebra.LinearSolver)
-    
-    U,V,V_φ = spaces
-    assem_U,assem_adjoint,assem_φ = assems
+# Return tuple of measures dΩ
+get_measure(m::AffineFEStateMap) = m.dΩ;
 
-    ## dφdu cache
-    φ₀ = zero(V_φ); u₀ = zero(U)
-    dφdu_vec = assemble_vector(v->l(u₀,v,dΩ...),assem_φ,V_φ)
+# Return spaces
+get_trial_space(m::AffineFEStateMap) = m.spaces[1];
+get_test_space(m::AffineFEStateMap) = m.spaces[2];
+get_aux_space(m::AffineFEStateMap) = m.spaces[3];
 
-    ## K,b,x
-    op = AffineFEOperator((u,v) -> a(u,v,φ₀,dΩ...),v -> l(v,φ₀,dΩ...),U,V,assem_U)
-    K = get_matrix(op); b = get_vector(op); 
-    x = get_free_dof_values(zero(U))
-    
-    ## Adjoint K,b,x
-    adjoint_K = assemble_matrix((u,v) -> a(v,u,φ₀,dΩ...),assem_adjoint,V,U)
-    adjoint_x = get_free_dof_values(zero(V))
-
-    ## Numerical setups
-    ns = numerical_setup(symbolic_setup(ls,K),K)
-    adjoint_ns = numerical_setup(symbolic_setup(adjoint_ls,adjoint_K),adjoint_K)
-    
-    ## Caches and adjoint caches
-    caches = (dφdu_vec,assem_φ)
-    fwd_caches = (ns,K,b,x,assem_U)
-    adjoint_caches = (adjoint_ns,adjoint_K,adjoint_x,assem_adjoint)
-    return AffineFEStateMap(a,l,res,dΩ,spaces,caches,fwd_caches,adjoint_caches)
-end
+# Return assemblers
+get_state_assemblers(m::AffineFEStateMap) = last(m.fwd_caches)
+get_aux_assemblers(m::AffineFEStateMap) = last(m.caches)
 
 function (φ_to_u::AffineFEStateMap)(φh)
     a=φ_to_u.a
@@ -187,64 +215,64 @@ end
 """
     PDEConstrainedFunctionals
 """
-struct PDEConstrainedFunctionals{A,B}
+struct PDEConstrainedFunctionals{A,B,C<:AbstractFEStateMap}
     J :: StateParamIntegrandWithMeasure
     C :: Vector{StateParamIntegrandWithMeasure}
     dJ :: A
     dC :: Vector{B}
-    state_map :: AffineStateMap
+    state_map :: C
 end
 
 function PDEConstrainedFunctionals(
         J :: Function,
         C :: Vector{Function},
-        a,l,res,
-        U,V,V_φ,
-        dΩ...;
-        assem_U = SparseMatrixAssembler(U,V),
-        assem_adjoint = SparseMatrixAssembler(V,U),
-        assem_φ = SparseMatrixAssembler(V_φ,V_φ),
-        ls::LinearSolver = LUSolver(),
-        adjoint_ls::LinearSolver = LUSolver(),
+        state_map :: AbstractFEStateMap,
         dJ = nothing,
         dC = fill(nothing,length(C)))
+
+    dΩ = get_measure(state_map)
+    U = get_trial_space(state_map)
+    V_φ = get_aux_space(state_map)
+    assem_U = get_state_assemblers(state_map)
+    assem_φ = get_aux_assemblers(state_map)
 
     # Create StateParamIntegrandWithMeasures
     spiwm(f) = StateParamIntegrandWithMeasure(IntegrandWithMeasure(f,dΩ),U,V_φ,assem_U,assem_φ)
     J_spiwm = spiwm(J)
     C_spiwm = map(spiwm,C)
- 
-    # Create AffineFEStateMap
-    spaces = (U,V,V_φ)
-    assems = assem_U,assem_adjoint,assem_φ
-    state_map = AffineFEStateMap(a,l,res,dΩ,spaces,assems,ls,adjoint_ls)
 
-    PDEConstrainedFunctionals(J_spiwm,C_spiwm,dJ,dC,state_map)
+    return PDEConstrainedFunctionals(J_spiwm,C_spiwm,dJ,dC,state_map)
 end
+
+# function evaluate!(pcf::PDEConstrainedFunctionals,u,φ)
+#     J = pcf.J; C = pcf.C
+#     copy!(u,asm(φ)) ## Need to think about what u is!
+#     return J(u,φ), map(C(u,φ),1:length(C))
+# end
 
 function evaluate(pcf,φ)
     u = asm(φ)
     evaluate(pcf,φ,u)
 end
 
-function evaluate(pcf,φ,u)
+function evaluate(pcf,u,φ)
     [J(u,φ), map(Ci(u,φ),1:length(Ci))]
 end
 
 function evaluate_derivatives(pcf,φ)
     u = asm(φ)
-    evaluate_derivatives(pcf,φ,u)
+    evaluate_derivatives(pcf,u,φ)
 end
 
-function evaluate_derivatives(pcf,φ,u)
+function evaluate_derivatives(pcf,u,φ)
     dJ = rrule(J,u,φ)
     dC = rrule(C,u,φ)
 end
 
 function evaluate_both(pcf,φ)
     u = asm(φ)
-    evaluate(pcf,φ,u)
-    evaluate_derivatives(pcf,φ,u)
+    evaluate(pcf,u,φ)
+    evaluate_derivatives(pcf,u,φ)
 end
 
 ####################################################################
