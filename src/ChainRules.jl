@@ -1,3 +1,5 @@
+using ChainRulesCore
+
 abstract type AbstractFunctional end
 
 """
@@ -21,7 +23,7 @@ struct Functional{N} <: AbstractFunctional
     F
     DF
     dΩ::Vector
-    state::Tuple
+    state::Tuple  # <- another name
     function Functional(F,dΩ::Vector,args...;DF=nothing)
         N = length(args)
         new{N}(F,DF,dΩ,args)
@@ -144,7 +146,7 @@ function AffineFEStateMap(
     ## K,b,x
     _,_φh = F.F.state;
     meas = F.F.dΩ
-    op = AffineFEOperator(a(_φh,meas...),l(_φh,meas...),U,V,trial_assem)
+    op = AffineFEOperator((u,v) -> a(u,v,_φh,meas...),v -> l(v,_φh,meas...),U,V,trial_assem)
     K = get_matrix(op); b = get_vector(op); 
     x = get_free_dof_values(zero(U))
     
@@ -167,6 +169,10 @@ function AffineFEStateMap(
     adjoint_caches = (adjoint_ns,adjoint_K,adjoint_b,adjoint_x,adjoint_assem)
     return AffineFEStateMap(F,a,l,res,caches,adjoint_caches)
 end
+
+get_states(m::AffineFEStateMap) = m.F.F.state
+
+evaluate_functional(m::AffineFEStateMap) = m.F.F()
 
 function (φ_to_u::AffineFEStateMap{S} where S<:SingleStateFunctional)(_φh::GridapDistributed.DistributedCellField)
     uh = _eval_φ_to_u(φ_to_u,_φh)
@@ -292,6 +298,10 @@ end
 
 function compute_shape_derivative!(_φh::FEFunction,state_map::AffineFEStateMap{S}) where S<:SingleStateFunctional
     _compute_shape_derivative!(_φh,state_map)
+end
+
+function compute_shape_derivative!(_φh,state_maps::Vector{AffineFEStateMap})
+    map(state_map -> compute_shape_derivative!(_φh,state_map),state_maps)
 end
 
 function _compute_shape_derivative!(_φh,state_map::AffineFEStateMap{S}) where S<:SingleStateFunctional
