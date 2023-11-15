@@ -1,61 +1,83 @@
 using Gridap.ReferenceFEs
+using Gridap.Geometry: get_faces
+using GridapDistributed: DistributedDiscreteModel
+using PartitionedArrays: getany
 
-# Update label given function f_Γ. e should be the count of added tags.
-function update_labels!(e::Int,model::D,f_Γ::F,::T,name::String) where {
-        M<:AbstractFloat,F<:Function,T<:NTuple{2,M},D<:DistributedDiscreteModel}
+## Get element size Δ
+function get_Δ(model::CartesianDiscreteModel)
+    desc = get_cartesian_descriptor(model)
+    desc.sizes
+end
+
+function get_Δ(model::DistributedDiscreteModel)
+    local_Δ = map(local_views(model)) do model
+        desc = get_cartesian_descriptor(model)
+        desc.sizes
+    end
+    getany(local_Δ)
+end
+
+## Create label given function f_Γ. e is a count of added tags.
+function update_labels!(e::Int,model::CartesianDiscreteModel,f_Γ::Function,name::String)
+    mask = mark_nodes(f_Γ,model)
+    _update_labels_locally!(e,model,mask,name)
+    nothing
+end
+
+function update_labels!(e::Int,model::DistributedDiscreteModel,f_Γ::Function,name::String)
     mask = mark_nodes(f_Γ,model)
     cell_to_entity = map(local_views(model),local_views(mask)) do model,mask
-        labels = get_face_labeling(model)
-        cell_to_entity = labels.d_to_dface_to_entity[end]
-        entity = maximum(cell_to_entity) + e
-        # Vertices
-        vtxs_Γ = findall(mask)
-        vtx_edge_connectivity = Array(Geometry.get_faces(model.grid_topology,0,1)[vtxs_Γ])
-        # Edges
-        edge_entries = [findall(x->any(x .∈  vtx_edge_connectivity[1:end.!=j]),
-            vtx_edge_connectivity[j]) for j = 1:length(vtx_edge_connectivity)]
-        edge_Γ = unique(reduce(vcat,getindex.(vtx_edge_connectivity,edge_entries),init=[]))
-        labels.d_to_dface_to_entity[1][vtxs_Γ] .= entity
-        labels.d_to_dface_to_entity[2][edge_Γ] .= entity
-        add_tag!(labels,name,[entity])
-        cell_to_entity
+        _update_labels_locally!(e,model,mask,name)
     end
     cell_gids=get_cell_gids(model)
     cache=GridapDistributed.fetch_vector_ghost_values_cache(cell_to_entity,partition(cell_gids))
     GridapDistributed.fetch_vector_ghost_values!(cell_to_entity,cache)
+    nothing
 end
 
-function update_labels!(e::Int,model::D,f_Γ::F,::T,name::String) where {
-        M<:AbstractFloat,F<:Function,T<:NTuple{3,M},D<:DistributedDiscreteModel}
-    mask = mark_nodes(f_Γ,model)
-    cell_to_entity = map(local_views(model)) do model
-        labels = get_face_labeling(model)
-        cell_to_entity = labels.d_to_dface_to_entity[end]
-        entity = maximum(cell_to_entity) + e
-        # Vertices
-        vtxs_Γ = findall(mask)
-        vtx_edge_connectivity = Array(Geometry.get_faces(model.grid_topology,0,1)[vtxs_Γ])
-        vtx_face_connectivity = Array(Geometry.get_faces(model.grid_topology,0,2)[vtxs_Γ])
-        # Edges
-        edge_entries = [findall(x->any(x .∈  vtx_edge_connectivity[1:end.!=j]),
-            vtx_edge_connectivity[j]) for j = 1:length(vtx_edge_connectivity)]
-        edge_Γ = unique(reduce(vcat,getindex.(vtx_edge_connectivity,edge_entries),init=[]))
-        # Faces
-        face_entries = [findall(x->count(x .∈  vtx_face_connectivity[1:end.!=j])>2,
-            vtx_face_connectivity[j]) for j = 1:length(vtx_face_connectivity)]
-        face_Γ = unique(reduce(vcat,getindex.(vtx_face_connectivity,face_entries),init=[]))
-        labels.d_to_dface_to_entity[1][vtxs_Γ] .= entity
-        labels.d_to_dface_to_entity[2][edge_Γ] .= entity
-        labels.d_to_dface_to_entity[3][face_Γ] .= entity
-        add_tag!(labels,name,[entity])
-        cell_to_entity
-    end
-    cell_gids=get_cell_gids(model)
-    cache=GridapDistributed.fetch_vector_ghost_values_cache(cell_to_entity,partition(cell_gids))
-    GridapDistributed.fetch_vector_ghost_values!(cell_to_entity,cache)
+function _update_labels_locally!(e,model::CartesianDiscreteModel{2},mask,name)
+    topo   = get_grid_topology(model)
+    labels = get_face_labeling(model)
+    cell_to_entity = labels.d_to_dface_to_entity[end]
+    entity = maximum(cell_to_entity) + e
+    # Vertices
+    vtxs_Γ = findall(mask)
+    vtx_edge_connectivity = Array(get_faces(topo,0,1)[vtxs_Γ])
+    # Edges
+    edge_entries = [findall(x->any(x .∈  vtx_edge_connectivity[1:end.!=j]),
+        vtx_edge_connectivity[j]) for j = 1:length(vtx_edge_connectivity)]
+    edge_Γ = unique(reduce(vcat,getindex.(vtx_edge_connectivity,edge_entries),init=[]))
+    labels.d_to_dface_to_entity[1][vtxs_Γ] .= entity
+    labels.d_to_dface_to_entity[2][edge_Γ] .= entity
+    add_tag!(labels,name,[entity])
+    cell_to_entity
 end
 
-function mark_nodes(f,model)
+function _update_labels_locally!(e,model::CartesianDiscreteModel{3},mask,name)
+    topo   = get_grid_topology(model)
+    labels = get_face_labeling(model)
+    cell_to_entity = labels.d_to_dface_to_entity[end]
+    entity = maximum(cell_to_entity) + e
+    # Vertices
+    vtxs_Γ = findall(mask)
+    vtx_edge_connectivity = Array(Geometry.get_faces(topo,0,1)[vtxs_Γ])
+    vtx_face_connectivity = Array(Geometry.get_faces(topo,0,2)[vtxs_Γ])
+    # Edges
+    edge_entries = [findall(x->any(x .∈  vtx_edge_connectivity[1:end.!=j]),
+        vtx_edge_connectivity[j]) for j = 1:length(vtx_edge_connectivity)]
+    edge_Γ = unique(reduce(vcat,getindex.(vtx_edge_connectivity,edge_entries),init=[]))
+    # Faces
+    face_entries = [findall(x->count(x .∈  vtx_face_connectivity[1:end.!=j])>2,
+        vtx_face_connectivity[j]) for j = 1:length(vtx_face_connectivity)]
+    face_Γ = unique(reduce(vcat,getindex.(vtx_face_connectivity,face_entries),init=[]))
+    labels.d_to_dface_to_entity[1][vtxs_Γ] .= entity
+    labels.d_to_dface_to_entity[2][edge_Γ] .= entity
+    labels.d_to_dface_to_entity[3][face_Γ] .= entity
+    add_tag!(labels,name,[entity])
+    cell_to_entity
+end
+
+function mark_nodes(f,model::DistributedDiscreteModel)
     local_masks = map(local_views(model)) do model
       topo   = get_grid_topology(model)
       coords = get_vertex_coordinates(topo)
@@ -66,6 +88,13 @@ function mark_nodes(f,model)
     mask = PVector(local_masks,partition(gids))
     assemble!(|,mask) |> fetch  # Ghosts -> Owned with `or` applied
     consistent!(mask) |> fetch  # Owned  -> Ghost
+    return mask
+end
+
+function mark_nodes(f,model::CartesianDiscreteModel)
+    topo   = get_grid_topology(model)
+    coords = get_vertex_coordinates(topo)
+    mask = map(f,coords)
     return mask
 end
 

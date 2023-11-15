@@ -9,20 +9,20 @@ function main(mesh_partition,distribute)
     tol = 10^-2
     max_iters = 1000;
     D = 1;
-    interp = SmoothErsatzMaterialInterpolation()
-    H,I,ρ = interp.H,interp.I,interp.ρ
+    η_coeff = 2;
     output_path = "./Results/main_testing"
 
     ## FE Setup
     model = CartesianDiscreteModel(ranks,mesh_partition,dom,el_size);
+    Δ = get_Δ(model)
     f_Γ_D(x) = (x[1] ≈ 0.0 && (x[2] <= ymax*prop_Γ_D + eps() || 
         x[2] >= ymax-ymax*prop_Γ_D - eps()) && (x[3] <= zmax*prop_Γ_D + eps() ||
         x[3] >= zmax-zmax*prop_Γ_D - eps())) ? true : false;
     f_Γ_N(x) = (x[1] ≈ xmax && ymax/2-ymax*prop_Γ_N/4 - eps() <= x[2] <= 
         ymax/2+ymax*prop_Γ_N/4 + eps() && zmax/2-zmax*prop_Γ_N/4 - eps() <= x[3]
         <= zmax/2+zmax*prop_Γ_N/4 + eps()) ? true : false;
-    update_labels!(1,model,f_Γ_D,coord_max,"Gamma_D")
-    update_labels!(2,model,f_Γ_N,coord_max,"Gamma_N")
+    update_labels!(1,model,f_Γ_D,"Gamma_D")
+    update_labels!(2,model,f_Γ_N,"Gamma_N")
 
     ## Triangulations and measures
     Ω = Triangulation(model)
@@ -40,7 +40,10 @@ function main(mesh_partition,distribute)
     φh = interpolate(x->-sqrt((x[1]-0.5)^2+(x[2]-0.5)^2)+0.25,V_φ);
     φ = get_free_dof_values(φh)
 
-    ## Weak form
+    ## Interpolation and weak form
+    interp = SmoothErsatzMaterialInterpolation(η = η_coeff*maximum(Δ))
+    H,I,ρ = interp.H,interp.I,interp.ρ
+
     a(u,v,ϕ,dΩ,dΓ_N) = ∫((I ∘ _ϕh)*D*∇(u)⋅∇(v))dΩ
     l(v,ϕ,dΩ,dΓ_N) = ∫(v*g)dΓ_N
     res(u,v,ϕ,dΩ,dΓ_N) = a(u,v,ϕ,dΩ,dΓ_N) - l(v,ϕ,dΩ,dΓ_N)
@@ -60,9 +63,7 @@ function main(mesh_partition,distribute)
     U_reg,_ = vel_ext.spaces
 
     ## Finite difference solver and level set function
-    stencil = DistributedStencil(FirstOrderStencil(D,Float64),model,max_steps,tol)
-    vel = get_free_dof_values(zero(V_φ));
-    stencil_caches = allocate_caches(stencil,φ,vel)
+    stencil = AdvectionStencil(FirstOrderStencil(D,Float64),model,V_φ,max_steps,tol)
     reinit!(stencil,φ,γ_reinit,stencil_caches)
 
     ## Setup solver and FE operators
@@ -80,8 +81,8 @@ function main(mesh_partition,distribute)
             all(@.(abs(Li-history[it-5:it-1,1])) .< 1/5/maximum(el_size)*L_new) &&
             all(abs(Ci) < 0.0001))
     end
-
-    for (it,Ji,Ci,Li,λ,Λ,uhi,φhi,dLhi) in takewhile(conv_cond,optimiser)
+                    # Write getters and remove from λ
+    for (it,Ji,Ci,Li) in takewhile(conv_cond,optimiser)
         if i_am_main(ranks) 
             println("it: ",it," | J: ",round(Ji;digits=5),
                               " | ","C: ",round(Ci;digits=5),

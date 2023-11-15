@@ -23,7 +23,7 @@ struct Functional{N} <: AbstractFunctional
     F
     DF
     dΩ::Vector
-    state::Tuple
+    state::Tuple  # <- another name
     function Functional(F,dΩ::Vector,args...;DF=nothing)
         N = length(args)
         new{N}(F,DF,dΩ,args)
