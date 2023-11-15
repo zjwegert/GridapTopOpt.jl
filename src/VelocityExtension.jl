@@ -30,7 +30,7 @@ function VelocityExtension(model,
     assem = SparseMatrixAssembler(Tm,Tv,U_reg,V_reg)
     K  = assemble_matrix((U,V) -> biform(U,V,dΩ),Hilb_assem,U_reg,V_reg)
     ns = numerical_setup(symbolic_setup(ls,K),K)
-    x  = pfill(PetscScalar(0.0),partition(axes(K,2)))
+    x  = allocate_col_vector(K)
 
     spaces = (U_reg,V_reg); caches = (ns,x)
     return VelocityExtension(model,spaces,interp,assem,dΩ,caches)
