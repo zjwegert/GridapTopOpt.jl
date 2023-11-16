@@ -69,14 +69,14 @@ function StateParamIntegrandWithMeasure(F::IntegrandWithMeasure,
     StateParamIntegrandWithMeasure(F,spaces,assems,caches)
 end
 
-function (u_to_j::StateParamIntegrandWithMeasure)(u<:T,φ<:T) where T<:AbstractArray
+function (u_to_j::StateParamIntegrandWithMeasure)(u::T,φ::T) where T<:AbstractArray
     U,V_φ = u_to_j.spaces
     uh = FEFunction(U,u)
     φh = FEFunction(V_φ,φ)
     return u_to_j.F(uh,φh)
 end
 
-function rrule(u_to_j::StateParamIntegrandWithMeasure,u<:T,φ<:T) where T<:AbstractArray
+function rrule(u_to_j::StateParamIntegrandWithMeasure,u::T,φ::T) where T<:AbstractArray
     F=u_to_j.F
     U,V_φ = u_to_j.spaces
     assem_U,assem_φ = u_to_j.assem
@@ -169,7 +169,7 @@ get_aux_space(m::AffineFEStateMap) = m.spaces[3];
 get_state_assembler(m::AffineFEStateMap) = last(m.fwd_caches)
 get_aux_assembler(m::AffineFEStateMap) = last(m.caches)
 
-function (φ_to_u::AffineFEStateMap)(φ<:AbstractVector)
+function (φ_to_u::AffineFEStateMap)(φ::T) where T <: AbstractVector
     a=φ_to_u.a
     l=φ_to_u.l
     dΩ = φ_to_u.dΩ
@@ -184,7 +184,7 @@ function (φ_to_u::AffineFEStateMap)(φ<:AbstractVector)
     x
 end
 
-function ChainRulesCore.rrule(φ_to_u::AffineFEStateMap,φ<:AbstractVector)
+function ChainRulesCore.rrule(φ_to_u::AffineFEStateMap,φ::T) where T <: AbstractVector
     a=φ_to_u.a
     res = F.res
     dΩ = φ_to_u.dΩ
@@ -259,23 +259,23 @@ end
 
 get_state(m::PDEConstrainedFunctionals) = get_state(m.state_map)
 
-function evaluate_functionals!(pcf::PDEConstrainedFunctionals,φ<:AbstractVector)
+function evaluate_functionals!(pcf::PDEConstrainedFunctionals,φ::T) where T <: AbstractVector
     u = pcf.state_map(φ)
     J = pcf.J; C = pcf.C
     [J(u,φ), map(C(u,φ),1:length(C))]
     return J(u,φ), map(C(u,φ),1:length(C))
 end
 
-function evaluate_derivatives!(pcf::PDEConstrainedFunctionals,φ<:AbstractVector)
+function evaluate_derivatives!(pcf::PDEConstrainedFunctionals,φ::T) where T <: AbstractVector
     _,_,dJ,dC = _evaluate_derivatives(pcf,φ)
     return dJ,dC
 end
 
-function evaluate!(pcf::PDEConstrainedFunctionals,φ<:AbstractVector)
+function evaluate!(pcf::PDEConstrainedFunctionals,φ::T) where T <: AbstractVector
     _evaluate_derivatives(pcf,φ)
 end
 
-function _evaluate_derivatives(pcf::PDEConstrainedFunctionals,φ<:AbstractVector)
+function _evaluate_derivatives(pcf::PDEConstrainedFunctionals,φ::T) where T <: AbstractVector
     J = pcf.J; C = pcf.C
     dJ = pcf.dJ; dC = pcf.dC
     analytic_dJ = pcf.dJ; analytic_dC = pcf.dC
