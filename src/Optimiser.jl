@@ -46,11 +46,17 @@ function initialise!(m::AugmentedLagrangian{M},J_init::M) where M
     return λ,Λ
 end
 
-function update!(m::AugmentedLagrangian,iter,C_new)
+function update!(m::AugmentedLagrangian{M},iter,C_new::Vector{M}) where M
     λ = m.λ; Λ = m.Λ;
-    λ -= Λ*C_new;
+    λ .-= Λ*C_new;
     iszero(iter % m.update_mod) ? Λ .*= m.ζ : 0;
     return λ,Λ
+end
+
+# Stopping criterion
+function conv_cond(m::AugmentedLagrangian,state)
+    return it > 10 && (all(@.(abs(Li-history[it-5:it-1,1])) .< 1/5/maximum(el_size)*L_new) &&
+        all(abs(Ci) < 0.0001)) ? nothing : state; 
 end
 
 # 0th iteration

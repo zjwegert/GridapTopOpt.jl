@@ -25,8 +25,8 @@ function main(mesh_partition,distribute)
     f_Γ_D(x) = (x[1] ≈ 0.0) ? true : false;
     f_Γ_N(x) = (x[1] ≈ xmax && ymax/2-ymax*prop_Γ_N/4 - eps() <= x[2] <= 
         ymax/2+ymax*prop_Γ_N/4 + eps()) ? true : false;
-    update_labels!(1,model,f_Γ_D,coord_max,"Gamma_D")
-    update_labels!(2,model,f_Γ_N,coord_max,"Gamma_N")
+    update_labels!(1,model,f_Γ_D,"Gamma_D")
+    update_labels!(2,model,f_Γ_N,"Gamma_N")
     ## Triangulations and measures
     Ω = Triangulation(model)
     Γ_N = BoundaryTriangulation(model,tags="Gamma_N")
@@ -51,32 +51,32 @@ function main(mesh_partition,distribute)
     C = isotropic_2d(1.,0.3)
     g = VectorValue(0.,-1.0)
     φh = interpolate(x->-sqrt((x[1]-0.5)^2+(x[2]-0.5)^2)+0.25,V_φ)
-    uh = zero(U)
 
     ## Weak form
     I = interp.I;
     DH = interp.DH
 
     a(u,v,φ,dΩ,dΓ_N) = ∫((I ∘ φ)*(C ⊙ ε(u) ⊙ ε(v)))dΩ
-    l(v,φh,dΩ,dΓ_N) = ∫(v ⋅ g)dΓ_N
+    l(v,φh,dΩ,dΓ_N) = ∫(v ⋅ g + φh*0.0)dΓ_N
     res(u,v,φ,dΩ,dΓ_N) = a(u,v,φ,dΩ,dΓ_N) - l(v,φ,dΩ,dΓ_N)
 
     ## Functionals J and DJ
     J = (u,φ,dΩ,dΓ_N) -> a(u,u,φ,dΩ,dΓ_N)
     DJ = (q,u,φ,dΩ,dΓ_N) -> ∫((C ⊙ ε(u) ⊙ ε(u))*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ;
-    # Functional types
-    J_func = Functional(J,[dΩ,dΓ_N],uh,φh)
-    J_func_analytic = Functional(J,[dΩ,dΓ_N],uh,φh;DF=DJ)
-    # FE state map
-    J_smap, C_smaps = AffineFEStateMap(J_func,[J_func_analytic],U,V,U_reg,a,l,res;ls = LUSolver())
-    # Solve
-    J_smap(φh)
+    state_map = AffineFEStateMap(a,l,res,U,V,V_φ,φh,dΩ,dΓ_N)
+    pcfs = PDEConstrainedFunctionals(J,Function[J],state_map,analytic_dC=[DJ])
+
+    φ = get_free_dof_values(φh)
+    j,c,dJ,dC = Gridap.evaluate!(pcfs,φ)
+    uh = get_state(pcfs)
+
+    println("J = $j | C = $c")
     
     ## Shape derivative
     # Autodiff
-    dFh = compute_shape_derivative!(φh,J_smap)
+    dFh = interpolate(FEFunction(V_φ,dJ),U_reg)
     # Analytic
-    dFh_analytic = compute_shape_derivative!(φh,C_smaps[1])
+    dFh_analytic = interpolate(FEFunction(V_φ,first(dC)),U_reg)
 
     abs_error = abs(dFh-dFh_analytic)
     rel_error = (abs(dFh-dFh_analytic))/abs(dFh_analytic)
@@ -114,9 +114,9 @@ function main(mesh_partition,distribute)
     ])
 end
 
-with_debug() do distribute
-    main((3,3),distribute)
-end;
+# with_debug() do distribute
+#     main((3,3),distribute)
+# end;
 
 ####################
 #   Debug Testing  #
@@ -133,50 +133,48 @@ function test(;run_as_serial::Bool=true)
     else
         CartesianDiscreteModel(ranks,(1,1),(0,1,0,1),(2,2))
     end
-    
-    V = FESpace(model,ReferenceFE(lagrangian,VectorValue{2,Float64},1),dirichlet_tags=["tag_5"])
-    U = TrialFESpace(V,VectorValue(0,0))
-    V_φ = FESpace(model,ReferenceFE(lagrangian,Float64,1))
 
     Ω = Triangulation(model)
     dΩ = Measure(Ω,2)
-
-    # Weak forms
-    a(u,v,φ,dΩ) = ∫((φ)*(u⋅v))dΩ
-    l(v,φh,dΩ) = ∫(v ⋅ VectorValue(1,0))dΩ
+    V_φ = FESpace(model,ReferenceFE(lagrangian,Float64,1))
+    φh = interpolate(x->1,V_φ);
+    φ = get_free_dof_values(φh)
+    
+    # FE Problem
+    V = FESpace(model,ReferenceFE(lagrangian,Float64,1),dirichlet_tags=["boundary"])
+    U = TrialFESpace(V,2)
+    a(u,v,φ,dΩ) = ∫( φ*∇(v)⋅∇(u) )*dΩ
+    l(v,φ,dΩ) = ∫(φ*v)*dΩ
     res(u,v,φ,dΩ) = a(u,v,φ,dΩ) - l(v,φ,dΩ)
 
-    φh = interpolate(x->1,V_φ);
-    uh = zero(U);
+    J = (u,φ,dΩ) -> ∫(1+(u⋅u)*(u⋅u)+sqrt ∘ φ)dΩ
+    state_map = AffineFEStateMap(a,l,res,U,V,V_φ,φh,dΩ)
+    pcfs = PDEConstrainedFunctionals(J,state_map)
 
-    _J = (u,φ,dΩ) -> ∫(1+(u⋅u)*(u⋅u)+φ)dΩ
-    J = Functional(_J,dΩ,uh,φh)
-    J_smap, C_smaps = AffineFEStateMap(J,typeof(J)[],U,V,V_φ,a,l,res;ls = LUSolver())
-    J_smap(φh) # <- compute uh in place
-    J_smap.F.F() # <- compute objective
 
-    ## Printing
-    # @show get_free_dof_values(uh)
-    # println("Objective value = $(J_smap.F.F())")
+    j,c,dJ,dC = Gridap.evaluate!(pcfs,φ)
 
-    ## Shape derivative
-    dFh = compute_shape_derivative!(φh,J_smap)
-    dφ = get_free_dof_values(dFh)
+    # println("J = $j | C = $c")
 
     ### Connor's implementation:
-    φ = get_free_dof_values(φh)
     if run_as_serial
         function _a(u,v,φ) 
-            φh = φ_to_φₕ(φ,V_φ)
-            ∫((φh)*(u⋅v))dΩ
+            __φh = φ_to_φₕ(φ,V_φ)
+            a(u,v,__φh,dΩ)
+        end
+        function _l(v,φ) 
+            __φh = φ_to_φₕ(φ,V_φ)
+            l(v,__φh,dΩ)
         end
         _a(φ) = (u,v) -> _a(u,v,φ)
-        _l(v,φh) = ∫(v ⋅ VectorValue(1,0))dΩ
         _l(φ) = v -> _l(v,φ)
-        _res(u,v,φ,V_φ) = _a(u,v,φ) - _l(v,φ)
+        _res(u,v,φ) = _a(u,v,φ) - _l(v,φ)
+
+        # _op = AffineFEOperator(_a(φ),_l(φ),U,V)
+        # @show _op.op.vector
 
         _φ_to_u = _AffineFEStateMap(_a,_l,_res,V_φ,U,V)
-        _u_to_j =  LossFunction((u,φ) -> _J(u,φ,dΩ),V_φ,U)
+        _u_to_j =  LossFunction((u,φ) -> J(u,φ,dΩ),V_φ,U)
 
         _u, _u_pullback   = rrule(_φ_to_u,φ)
         _j, _j_pullback   = rrule(_u_to_j,_u,φ)
@@ -184,15 +182,18 @@ function test(;run_as_serial::Bool=true)
         _,  _dφ₍ᵤ₎        = _u_pullback(_du)
             dφ_connor     = _dφ₍ᵤ₎ + _dφ₍ⱼ₎
 
-        dφ_connor - dφ
-        return dφ,dφ_connor - dφ
+        # @show _u
+        # @show _du
+        # @show _dφ₍ᵤ₎
+
+        return dJ,dφ_connor - dJ
     else 
-        return dφ,nothing
+        return dJ,nothing
     end
 end
 
 _out_serial,_diff = test(run_as_serial=true);
 
-_out,_ = test(run_as_serial=false);
+# _out,_ = test(run_as_serial=false);
 
-@show norm(_out_serial-_out.vector_partition.items[1],Inf)
+# @show norm(_out_serial-_out.vector_partition.items[1],Inf)

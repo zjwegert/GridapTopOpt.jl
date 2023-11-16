@@ -22,7 +22,7 @@ function main(mesh_partition,distribute)
     ## Define Γ_N and Γ_D
     xmax,ymax = coord_max
     f_Γ_D(x) = iszero(x)
-    update_labels!(1,model,f_Γ_D,coord_max,"origin")
+    update_labels!(1,model,f_Γ_D,"origin")
     ## Triangulations and measures
     Ω = Triangulation(model)
     dΩ = Measure(Ω,2order)
@@ -71,18 +71,17 @@ function main(mesh_partition,distribute)
     K_mod = (u,φ,dΩ) -> ∫((I ∘ φ)*_K(u,εᴹ))dΩ;
     DK_mod = (q,u,φ,dΩ) -> ∫(-_v_K(u,εᴹ)*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ;
 
-    K_mod_func = Functional(K_mod,dΩ,uh,φh);
-    K_mod_func_analytic = Functional(K_mod,dΩ,uh,φh;DF=DK_mod);
-    K_mod_smap, C_smaps = AffineFEStateMap(K_mod_func,[K_mod_func_analytic],U,V,U_reg,a,l,res;ls = LUSolver());
+    state_map = AffineFEStateMap(a,l,res,U,V,V_φ,φh,dΩ)
+    pcfs = PDEConstrainedFunctionals(K_mod,[K_mod],state_map,analytic_dC=[DK_mod])
 
-    K_mod_smap(φh)
-    K_mod_smap.F.F()
-    C_smaps[1].F.F()
+    φ = get_free_dof_values(φh)
+    j,c,dJ,dC = Gridap.evaluate!(pcfs,φ)
+    uh = get_state(pcfs)
 
-    dFh = compute_shape_derivative!(φh,K_mod_smap)
+    dFh = interpolate(FEFunction(V_φ,dJ),U_reg)
     dF = get_free_dof_values(dFh) 
 
-    dFh_analytic = compute_shape_derivative!(φh,C_smaps[1])
+    dFh_analytic = interpolate(FEFunction(V_φ,first(dC)),U_reg)
     dF_analytic = get_free_dof_values(dFh_analytic)
 
     pre_hilb_abs_error = maximum(abs,dF-dF_analytic)
