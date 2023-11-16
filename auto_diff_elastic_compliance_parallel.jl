@@ -114,9 +114,9 @@ function main(mesh_partition,distribute)
     ])
 end
 
-# with_debug() do distribute
-#     main((3,3),distribute)
-# end;
+with_debug() do distribute
+    main((3,3),distribute)
+end;
 
 ####################
 #   Debug Testing  #
@@ -154,7 +154,7 @@ function test(;run_as_serial::Bool=true)
 
     j,c,dJ,dC = Gridap.evaluate!(pcfs,φ)
 
-    # println("J = $j | C = $c")
+    println("J = $j | C = $c")
 
     ### Connor's implementation:
     if run_as_serial
@@ -170,9 +170,6 @@ function test(;run_as_serial::Bool=true)
         _l(φ) = v -> _l(v,φ)
         _res(u,v,φ) = _a(u,v,φ) - _l(v,φ)
 
-        # _op = AffineFEOperator(_a(φ),_l(φ),U,V)
-        # @show _op.op.vector
-
         _φ_to_u = _AffineFEStateMap(_a,_l,_res,V_φ,U,V)
         _u_to_j =  LossFunction((u,φ) -> J(u,φ,dΩ),V_φ,U)
 
@@ -182,10 +179,6 @@ function test(;run_as_serial::Bool=true)
         _,  _dφ₍ᵤ₎        = _u_pullback(_du)
             dφ_connor     = _dφ₍ᵤ₎ + _dφ₍ⱼ₎
 
-        # @show _u
-        # @show _du
-        # @show _dφ₍ᵤ₎
-
         return dJ,dφ_connor - dJ
     else 
         return dJ,nothing
@@ -194,6 +187,30 @@ end
 
 _out_serial,_diff = test(run_as_serial=true);
 
-# _out,_ = test(run_as_serial=false);
+_out,_ = test(run_as_serial=false);
 
-# @show norm(_out_serial-_out.vector_partition.items[1],Inf)
+@show norm(_out_serial-_out.vector_partition.items[1],Inf)
+
+"""
+assemble_matrix_and_vector!:
+
+	Line 310 Assemblers.jl: assemble_matrix_and_vector!(f::Function,b::Function,M::AbstractMatrix,r::AbstractVector,a::Assembler,U::FESpace,V::FESpace)
+
+	-> Calls Line 453 Assemblers.jl: data = collect_cell_matrix_and_vector(trial::FESpace,test::FESpace,biform::DomainContribution,liform::DomainContribution)
+
+	-> Line 85 SparseMatrixAssembler.jl: assemble_matrix_and_vector!(A,b,a::SparseMatrixAssembler, data) -> assemble_matrix_and_vector_add!...
+
+AffineFEOperator:
+
+	Line 23 AffineFEOperator.jl: AffineFEOperator(weakform::Function,trial::FESpace,test::FESpace,assem::Assembler)
+	
+	-> Line 464 Assemblers.jl: data = collect_cell_matrix_and_vector(trial::FESpace,test::FESpace,biform::DomainContribution,liform::DomainContribution,uhd::FEFunction)
+	
+	-> Line 244 Assemblers.jl: assemble_matrix_and_vector(a::Assembler,data)
+	
+	->-> Line 73 SparseMatrixAssembler.jl: A,b = allocate_matrix_and_vector(a,data)
+	
+	->-> Line 85 SparseMatrixAssembler.jl: assemble_matrix_and_vector!(A,b,a::SparseMatrixAssembler, data) -> assemble_matrix_and_vector_add!...
+	
+Why does assemble_matrix_and_vector! at the top not take uhd???
+"""

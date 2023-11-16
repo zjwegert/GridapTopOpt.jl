@@ -151,8 +151,8 @@ struct AffineFEStateMap{A,B,C,D<:Tuple,E<:Tuple,F<:Tuple,G<:Tuple,H<:Tuple} <: A
         
         spaces = (U,V,V_φ)
         ## dφdu cache
-        u₀ = zero(U)
-        dφdu_vec = assemble_vector(v->res(u₀,u₀,v,dΩ...),assem_φ,V_φ)
+        uhd = zero(U)
+        dφdu_vec = assemble_vector(v->res(uhd,uhd,v,dΩ...),assem_φ,V_φ)
 
         ## K,b,x
         op = AffineFEOperator((u,v) -> a(u,v,φh,dΩ...),v -> l(v,φh,dΩ...),U,V,assem_U)
@@ -169,7 +169,7 @@ struct AffineFEStateMap{A,B,C,D<:Tuple,E<:Tuple,F<:Tuple,G<:Tuple,H<:Tuple} <: A
         
         ## Caches and adjoint caches
         caches = (dφdu_vec,assem_φ)
-        fwd_caches = (ns,K,b,x,assem_U)
+        fwd_caches = (ns,K,b,x,uhd,assem_U)
         adjoint_caches = (adjoint_ns,adjoint_K,adjoint_x,assem_adjoint)
         return new{A,B,C,typeof(dΩ),typeof(spaces),typeof(caches),typeof(fwd_caches),
             typeof(adjoint_caches)}(a,l,res,dΩ,spaces,caches,fwd_caches,adjoint_caches)
@@ -190,16 +190,20 @@ function (φ_to_u::AffineFEStateMap)(φ::T) where T <: AbstractVector
     l=φ_to_u.l
     dΩ = φ_to_u.dΩ
     U,V,V_φ = φ_to_u.spaces
-    ns,K,b,x,assem_U = φ_to_u.fwd_caches
+    ns,K,b,x,uhd,assem_U = φ_to_u.fwd_caches
     φh = FEFunction(V_φ,φ)
 
     ## Reassemble and solve
-    println("Before                                    : $(Matrix(K)) , $b")
-    assemble_matrix_and_vector!((u,v)->a(u,v,φh,dΩ...),v->l(v,φh,dΩ...),K,b,assem_U,U,V)
-    _op = AffineFEOperator((u,v)->a(u,v,φh,dΩ...),v->l(v,φh,dΩ...),U,V)
-    println("Assemble with AffineFEOperator constructor: $(Matrix(_op.op.matrix)) , $(_op.op.vector)")
-    println("After                                     : $(Matrix(K)) , $b")
-    error("Stop here")
+    # println("Before                                    : $(Matrix(K)) , $b")
+    du = get_trial_fe_basis(U)
+    dv = get_fe_basis(V);
+    data = collect_cell_matrix_and_vector(U,V,a(du,dv,φh,dΩ...),l(dv,φh,dΩ...),uhd)
+    assemble_matrix_and_vector!(K,b,assem_U,data)
+    # assemble_matrix_and_vector!((u,v)->a(u,v,φh,dΩ...),v->l(v,φh,dΩ...),K,b,assem_U,U,V)
+    # _op = AffineFEOperator((u,v)->a(u,v,φh,dΩ...),v->l(v,φh,dΩ...),U,V)
+    # println("Assemble with AffineFEOperator constructor: $(Matrix(_op.op.matrix)) , $(_op.op.vector)")
+    # println("After                                     : $(Matrix(K)) , $b")
+    # error("Stop here")
     numerical_setup!(ns,K)
     solve!(x,ns,b)
     x
