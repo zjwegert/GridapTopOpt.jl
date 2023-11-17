@@ -10,7 +10,7 @@ function Adjoint(ϕ,u,du,op,res,Q)#,solver)
   V = op.test
   λₕ = FEFunction(V,Aᵀ\du)#,solver)
   ϕh = FEFunction(Q,ϕ)
-  dϕ() = Gridap.FESpaces.gradient(ϕh -> res(u,λₕ,ϕh,Q),ϕh)
+  dϕ() = Gridap.FESpaces.gradient(ϕh -> res(u,λₕ,ϕh),ϕh)
   dϕ = -assemble_vector(dϕ(),Q)
 end
 

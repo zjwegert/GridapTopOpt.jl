@@ -3,6 +3,7 @@ function main(mesh_partition,distribute)
     order = 1;
     dom = (0,1,0,1,0,1);
     el_size = (50,50,50);
+    vf = 0.5;
     γ = 0.1;
     γ_reinit = 0.5;
     max_steps = 10
@@ -36,7 +37,6 @@ function main(mesh_partition,distribute)
     V_φ = TestFESpace(model,reffe)
 
     ## Create FE functions
-    uh = zero(U);
     φh = interpolate(x->-sqrt((x[1]-0.5)^2+(x[2]-0.5)^2)+0.25,V_φ);
     φ = get_free_dof_values(φh)
 
@@ -44,17 +44,15 @@ function main(mesh_partition,distribute)
     interp = SmoothErsatzMaterialInterpolation(η = η_coeff*maximum(Δ))
     H,I,ρ = interp.H,interp.I,interp.ρ
 
-    a(u,v,ϕ,dΩ,dΓ_N) = ∫((I ∘ _ϕh)*D*∇(u)⋅∇(v))dΩ
-    l(v,ϕ,dΩ,dΓ_N) = ∫(v*g)dΓ_N
-    res(u,v,ϕ,dΩ,dΓ_N) = a(u,v,ϕ,dΩ,dΓ_N) - l(v,ϕ,dΩ,dΓ_N)
+    a(u,v,φ,dΩ,dΓ_N) = ∫((I ∘ φ)*D*∇(u)⋅∇(v))dΩ
+    l(v,φ,dΩ,dΓ_N) = ∫(v*g)dΓ_N
+    res(u,v,φ,dΩ,dΓ_N) = a(u,v,φ,dΩ,dΓ_N) - l(v,φ,dΩ,dΓ_N)
 
     ## Optimisation functionals
-    J = (u,ϕ,dΩ,dΓ_N) -> ∫((I ∘ ϕ)*D*∇(u)⋅∇(u))dΩ
-    dJ = (q,u,ϕ,dΩ,dΓ_N) -> ∫(-D*∇(u)⋅∇(u)*q*(DH ∘ ϕ)*(norm ∘ ∇(ϕ)))dΩ;
-    Vol = (u,ϕ,dΩ,dΓ_N) -> ∫(((ρ ∘ ϕ) - 0.5)/vol_D)dΩ;
-    dVol = (q,u,ϕ,dΩ,dΓ_N) -> ∫(1/vol_D*q*(DH ∘ ϕ)*(norm ∘ ∇(ϕ)))dΩ
-    J_func = Functional(J,dΩ,uh,φh;dF = dJ)
-    Vol_func = Functional(Vol,dΩ,uh,φh;dF = dVol)
+    J = (u,φ,dΩ,dΓ_N) -> ∫((I ∘ φ)*D*∇(u)⋅∇(u))dΩ
+    dJ = (q,u,φ,dΩ,dΓ_N) -> ∫(-D*∇(u)⋅∇(u)*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ;
+    Vol = (u,φ,dΩ,dΓ_N) -> ∫(((ρ ∘ φ) - vf)/vol_D)dΩ;
+    dVol = (q,u,φ,dΩ,dΓ_N) -> ∫(1/vol_D*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
 
     ## Hilbertian extension-regularisation problems
     a_hilb = (p,q,dΩ)->∫(α^2*∇(p)⋅∇(q) + p*q)dΩ;
@@ -76,13 +74,9 @@ function main(mesh_partition,distribute)
 
     ## Stopping criterion
     history = zeros(max_iters,length(C_smaps)+2);
-    function conv_cond(it,Ji,Ci,Li,λ,Λ,uhi,φhi,dLhi)
-        return ~(it > 10 && 
-            all(@.(abs(Li-history[it-5:it-1,1])) .< 1/5/maximum(el_size)*L_new) &&
-            all(abs(Ci) < 0.0001))
-    end
+
                     # Write getters and remove from λ
-    for (it,Ji,Ci,Li) in takewhile(conv_cond,optimiser)
+    for (it,Ji,Ci,Li) in optimiser
         if i_am_main(ranks) 
             println("it: ",it," | J: ",round(Ji;digits=5),
                               " | ","C: ",round(Ci;digits=5),
