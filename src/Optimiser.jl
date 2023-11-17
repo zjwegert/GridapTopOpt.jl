@@ -19,21 +19,13 @@ struct AugmentedLagrangian{M} <: AbstractOptimiser where M <: AbstractFloat
     update_mod::Int
     last_iter_cache
     function AugmentedLagrangian(
-            J_smap,
-            C_smaps,
-            stencil,
-            stencil_caches,
-            vel_ext,
-            V_φ,
-            vel,
-            γ,
-            γ_reinit;
+            pcfs,stencil,vel_ext,interp,γ,γ_reinit;
             λ=zeros(PetscScalar,length(C_smaps)+1),
             Λ=zeros(PetscScalar,length(C_smaps)+1),
             ζ = 1.2,
             vft = 0.5,
             update_mod::Int = 5)
-        cache = (J_smap,C_smaps,stencil,stencil_caches,vel_ext,V_φ,vel,γ,γ_reinit)
+        cache = (pcfs,stencil,vel_ext,interp,γ,γ_reinit)
         new(λ,Λ,ζ,vft,update_mod,cache)
     end
 end

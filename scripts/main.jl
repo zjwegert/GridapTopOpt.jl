@@ -35,6 +35,8 @@ function main(mesh_partition,distribute)
     V = TestFESpace(model,reffe;dirichlet_tags=["Gamma_D"],dirichlet_masks=[true])
     U = TrialFESpace(V,[0.0])
     V_φ = TestFESpace(model,reffe)
+    V_reg = TestFESpace(model,reffe_scalar;dirichlet_tags=["Gamma_N"])
+    U_reg = TrialFESpace(V_reg,0)
 
     ## Create FE functions
     φh = interpolate(x->-sqrt((x[1]-0.5)^2+(x[2]-0.5)^2)+0.25,V_φ);
@@ -54,23 +56,20 @@ function main(mesh_partition,distribute)
     Vol = (u,φ,dΩ,dΓ_N) -> ∫(((ρ ∘ φ) - vf)/vol_D)dΩ;
     dVol = (q,u,φ,dΩ,dΓ_N) -> ∫(1/vol_D*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
 
-    ## Hilbertian extension-regularisation problems
-    a_hilb = (p,q,dΩ)->∫(α^2*∇(p)⋅∇(q) + p*q)dΩ;
-    hilb_solver = LUSolver()
-    vel_ext = VelocityExtension(model,interp,a_hilb,order;dirichlet_tags=["Gamma_N"],ls=hilb_solver)
-    U_reg,_ = vel_ext.spaces
-
     ## Finite difference solver and level set function
     stencil = AdvectionStencil(FirstOrderStencil(D,Float64),model,V_φ,max_steps,tol)
-    reinit!(stencil,φ,γ_reinit,stencil_caches)
+    reinit!(stencil,φ,γ_reinit)
 
     ## Setup solver and FE operators
-    solver = LUSolver()
-    J_smap, C_smaps = AffineFEStateMap(J_func,[Vol_func],U,V,U_reg,a,l,res;ls = solver);
+    state_map = AffineFEStateMap(a,l,res,U,V,V_φ,U_reg,φh,dΩ,dΓ_N)
+    pcfs = PDEConstrainedFunctionals(J,[Vol],state_map,analytic_dC=[dVol])
+
+    ## Hilbertian extension-regularisation problems
+    a_hilb = (p,q,dΩ)->∫(α^2*∇(p)⋅∇(q) + p*q)dΩ;
+    vel_ext = VelocityExtension(a_hilb,U_reg,V_reg,dΩ)
     
     ## Optimiser
-    optimiser = AugmentedLagrangian(J_smap,C_smaps,
-        stencil,stencil_caches,vel_ext,V_φ,vel,γ,γ_reinit);
+    optimiser = AugmentedLagrangian(pcfs,stencil,vel_ext,interp,γ,γ_reinit);
 
     ## Stopping criterion
     history = zeros(max_iters,length(C_smaps)+2);
