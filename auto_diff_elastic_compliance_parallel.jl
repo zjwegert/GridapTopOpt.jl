@@ -42,9 +42,8 @@ function main(mesh_partition,distribute)
     # FE space for LSF 
     V_φ = TestFESpace(model,reffe_scalar;conformity=:H1)
     # FE Space for shape derivatives
-    V_reg = TestFESpace(model,reffe_scalar;conformity=:H1,
-            dirichlet_tags=["Gamma_N"],dirichlet_masks=[true])
-    U_reg = TrialFESpace(V_reg,[0.0])
+    V_reg = TestFESpace(model,reffe_scalar;dirichlet_tags=["Gamma_N"])
+    U_reg = TrialFESpace(V_reg,0.0)
     ######################################################
     eΔ = (xmax,ymax)./el_size;
     interp = SmoothErsatzMaterialInterpolation(η = 2*maximum(eΔ))
@@ -57,13 +56,13 @@ function main(mesh_partition,distribute)
     DH = interp.DH
 
     a(u,v,φ,dΩ,dΓ_N) = ∫((I ∘ φ)*(C ⊙ ε(u) ⊙ ε(v)))dΩ
-    l(v,φh,dΩ,dΓ_N) = ∫(v ⋅ g + φh*0.0)dΓ_N
+    l(v,φh,dΩ,dΓ_N) = ∫(v ⋅ g)dΓ_N
     res(u,v,φ,dΩ,dΓ_N) = a(u,v,φ,dΩ,dΓ_N) - l(v,φ,dΩ,dΓ_N)
 
     ## Functionals J and DJ
     J = (u,φ,dΩ,dΓ_N) -> a(u,u,φ,dΩ,dΓ_N)
     DJ = (q,u,φ,dΩ,dΓ_N) -> ∫((C ⊙ ε(u) ⊙ ε(u))*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ;
-    state_map = AffineFEStateMap(a,l,res,U,V,V_φ,φh,dΩ,dΓ_N)
+    state_map = AffineFEStateMap(a,l,res,U,V,V_φ,U_reg,φh,dΩ,dΓ_N)
     pcfs = PDEConstrainedFunctionals(J,Function[J],state_map,analytic_dC=[DJ])
 
     φ = get_free_dof_values(φh)
@@ -74,12 +73,12 @@ function main(mesh_partition,distribute)
     
     ## Shape derivative
     # Autodiff
-    dFh = interpolate(FEFunction(V_φ,dJ),U_reg)
+    dF = dJ
     # Analytic
-    dFh_analytic = interpolate(FEFunction(V_φ,first(dC)),U_reg)
+    dF_analytic = first(dC)
 
-    abs_error = abs(dFh-dFh_analytic)
-    rel_error = (abs(dFh-dFh_analytic))/abs(dFh_analytic)
+    abs_error = maximum(abs,dF-dF_analytic)
+    rel_error = (abs_error)/maximum(abs,dF_analytic)
 
     ## Hilb ext reg
     α = 4*maximum(eΔ)
@@ -89,34 +88,30 @@ function main(mesh_partition,distribute)
     Hilb_assem=SparseMatrixAssembler(Tm,Tv,U_reg,V_reg)
     hilb_K = assemble_matrix(A,Hilb_assem,U_reg,V_reg)
     ## Autodiff result
-    op = AffineFEOperator(U_reg,V_reg,hilb_K,-get_free_dof_values(dFh))#interpolate_everywhere(dFh,U_reg)))
-    dFh_Ω = solve(op)
+    op = AffineFEOperator(U_reg,V_reg,hilb_K,-dF)
+    dF_Ω = get_free_dof_values(solve(op))
     ## Analytic result
-    op = AffineFEOperator(U_reg,V_reg,hilb_K,-get_free_dof_values(dFh_analytic))#interpolate_everywhere(dFh_analytic,U_reg)))
-    dFh_analytic_Ω = solve(op)
+    op = AffineFEOperator(U_reg,V_reg,hilb_K,-dF_analytic)
+    dF_analytic_Ω = get_free_dof_values(solve(op))
 
-    hilb_abs_error = abs(dFh_Ω-dFh_analytic_Ω)
-    hilb_rel_error = (abs(dFh_Ω-dFh_analytic_Ω))/abs(dFh_analytic_Ω)
-
-    path = "./Results/AutoDiffTesting_Parallel";
-    writevtk(Ω,path,cellfields=["phi"=>φh,
-        "H(phi)"=>(interp.H ∘ φh),
-        "|nabla(phi))|"=>(norm ∘ ∇(φh)),
-        "uh"=>uh,
-        "J′_abs_error"=>abs_error,
-        "J′_rel_error"=>rel_error,
-        "J′_analytic"=>dFh_analytic,
-        "J′_autodiff"=>dFh,
-        "hilb_abs_error"=>hilb_abs_error,
-        "hilb_rel_error"=>hilb_rel_error,
-        "v_J_Ω"=>dFh_analytic_Ω,
-        "dJφh_Ω"=>dFh_Ω
-    ])
+    hilb_abs_error = maximum(abs,dF_Ω-dF_analytic_Ω)
+    hilb_rel_error = (hilb_abs_error)/maximum(abs,dF_analytic_Ω)
+    # path = "./Results/AutoDiffTesting_Parallel";
+    # writevtk(Ω,path,cellfields=["phi"=>φh,
+    #     "H(phi)"=>(interp.H ∘ φh),
+    #     "|nabla(phi))|"=>(norm ∘ ∇(φh)),
+    #     "uh"=>uh,
+    #     "J′_analytic"=>FEFunction(U_reg,dF_analytic),
+    #     "J′_autodiff"=>FEFunction(U_reg,dF),
+    #     "v_J_Ω"=>FEFunction(U_reg,dF_analytic_Ω),
+    #     "dJφh_Ω"=>FEFunction(U_reg,dF_Ω)
+    # ])
+    abs_error,rel_error,hilb_abs_error,hilb_rel_error
 end
 
-with_debug() do distribute
+out = with_debug() do distribute
     main((3,3),distribute)
-end;
+end
 
 ####################
 #   Debug Testing  #
@@ -137,6 +132,8 @@ function test(;run_as_serial::Bool=true)
     Ω = Triangulation(model)
     dΩ = Measure(Ω,2)
     V_φ = FESpace(model,ReferenceFE(lagrangian,Float64,1))
+    V_reg = FESpace(model,ReferenceFE(lagrangian,Float64,1),dirichlet_tags=["tag_1"])
+    U_reg = TrialFESpace(V_reg,1)
     φh = interpolate(x->1,V_φ);
     φ = get_free_dof_values(φh)
     
@@ -144,11 +141,11 @@ function test(;run_as_serial::Bool=true)
     V = FESpace(model,ReferenceFE(lagrangian,Float64,1),dirichlet_tags=["boundary"])
     U = TrialFESpace(V,2)
     a(u,v,φ,dΩ) = ∫( φ*∇(v)⋅∇(u) )*dΩ
-    l(v,φ,dΩ) = ∫(φ*v)*dΩ
+    l(v,φ,dΩ) = ∫(v)*dΩ
     res(u,v,φ,dΩ) = a(u,v,φ,dΩ) - l(v,φ,dΩ)
 
     J = (u,φ,dΩ) -> ∫(1+(u⋅u)*(u⋅u)+sqrt ∘ φ)dΩ
-    state_map = AffineFEStateMap(a,l,res,U,V,V_φ,φh,dΩ)
+    state_map = AffineFEStateMap(a,l,res,U,V,V_φ,U_reg,φh,dΩ)
     pcfs = PDEConstrainedFunctionals(J,state_map)
 
 
@@ -178,8 +175,11 @@ function test(;run_as_serial::Bool=true)
         _,  _du, _dφ₍ⱼ₎   = _j_pullback(1) # dj = 1
         _,  _dφ₍ᵤ₎        = _u_pullback(_du)
             dφ_connor     = _dφ₍ᵤ₎ + _dφ₍ⱼ₎
+        if ~(V_φ === U_reg)
+            dφ_connor = get_free_dof_values(interpolate(FEFunction(V_φ,dφ_connor),U_reg))
+        end
 
-        return dJ,dφ_connor - dJ
+        return dJ,dJ-dφ_connor
     else 
         return dJ,nothing
     end

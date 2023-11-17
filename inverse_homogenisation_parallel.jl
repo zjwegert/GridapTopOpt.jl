@@ -43,9 +43,7 @@ function main(mesh_partition,distribute)
     eΔ = (xmax,ymax)./el_size;
     interp = SmoothErsatzMaterialInterpolation(η = 2*maximum(eΔ))
     C = isotropic_2d(1.,0.3)
-    g = VectorValue(0.,-1.0)
     φh = interpolate(x->-sqrt((x[1]-0.5)^2+(x[2]-0.5)^2)+0.25,V_φ)
-    uh = zero(U)
 
     ## Weak form
     I = interp.I;
@@ -60,7 +58,7 @@ function main(mesh_partition,distribute)
                                     (I ∘ φ)*(C ⊙ ε(u3) ⊙ ε(v3)))dΩ
     l((v1,v2,v3),φ,dΩ) = ∫(-(I ∘ φ)*(C ⊙ εᴹ[1] ⊙ ε(v1)) - 
                             (I ∘ φ)*(C ⊙ εᴹ[2] ⊙ ε(v2)) -
-                            (I ∘ φ)*(C ⊙ εᴹ[2] ⊙ ε(v3)))dΩ;
+                            (I ∘ φ)*(C ⊙ εᴹ[3] ⊙ ε(v3)))dΩ;
 
     res(u,v,φ,dΩ) = a(u,v,φ,dΩ) - l(v,φ,dΩ)
 
@@ -71,7 +69,7 @@ function main(mesh_partition,distribute)
     K_mod = (u,φ,dΩ) -> ∫((I ∘ φ)*_K(u,εᴹ))dΩ;
     DK_mod = (q,u,φ,dΩ) -> ∫(-_v_K(u,εᴹ)*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ;
 
-    state_map = AffineFEStateMap(a,l,res,U,V,V_φ,φh,dΩ)
+    state_map = AffineFEStateMap(a,l,res,U,V,V_φ,U_reg,φh,dΩ)
     pcfs = PDEConstrainedFunctionals(K_mod,[K_mod],state_map,analytic_dC=[DK_mod])
 
     φ = get_free_dof_values(φh)
@@ -129,12 +127,12 @@ function main(mesh_partition,distribute)
         "dJφh_Ω"=>dFh_Ω
     ])
 
-    (pre_hilb_abs_error,pre_hilb_rel_error),(post_hilb_abs_error,post_hilb_rel_error)
+    return pre_hilb_abs_error,pre_hilb_rel_error,post_hilb_abs_error,post_hilb_rel_error
 end
 
 out = with_debug() do distribute
     main((3,3),distribute)
-end;
+end
 
 ####################
 #  Serial Testing  #

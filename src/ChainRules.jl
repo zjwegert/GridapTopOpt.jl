@@ -54,7 +54,7 @@ end
 """
     StateParamIntegrandWithMeasure
 
-    Assume that we have a Functional of the following form:
+    Assume that we have a IntegrandWithMeasure of the following form:
         F: (u,φ,[dΩ₁,dΩ₂,...]) ↦ ∫_Ω₁ f(u(φ),φ) dΩ₁ + ∫_Ω₂ g(u(φ),φ) dΩ₂ + ...,
     where u is a state field and φ is auxilary. 
     
@@ -74,21 +74,23 @@ end
 function StateParamIntegrandWithMeasure(F::IntegrandWithMeasure,
         U,
         V_φ,
+        U_reg,
         assem_U,
-        assem_φ)
+        assem_deriv)
 
-    dΩ = F.dΩ
     φ₀ = zero(V_φ); u₀ = zero(U)
-    djdu_vec = assemble_vector(v->F.F(v,φ₀,dΩ...),assem_U,U)
-    djdφ_vec = assemble_vector(v->F.F(u₀,v,dΩ...),assem_φ,V_φ)
-    assems = (assem_U,assem_φ)
-    spaces = (U,V_φ)
+    djdu_vecdata = collect_cell_vector(U,∇(F,[u₀,φ₀],1))
+    djdφ_vecdata = collect_cell_vector(U_reg,∇(F,[u₀,φ₀],2))
+    djdu_vec = allocate_vector(assem_U,djdu_vecdata)
+    djdφ_vec = allocate_vector(assem_deriv,djdφ_vecdata)
+    assems = (assem_U,assem_deriv)
+    spaces = (U,V_φ,U_reg)
     caches = (djdu_vec,djdφ_vec)
     StateParamIntegrandWithMeasure(F,spaces,assems,caches)
 end
 
 function (u_to_j::StateParamIntegrandWithMeasure)(u::T,φ::T) where T<:AbstractArray
-    U,V_φ = u_to_j.spaces
+    U,V_φ,_ = u_to_j.spaces
     uh = FEFunction(U,u)
     φh = FEFunction(V_φ,φ)
     return u_to_j.F(uh,φh)
@@ -96,8 +98,8 @@ end
 
 function ChainRulesCore.rrule(u_to_j::StateParamIntegrandWithMeasure,u::T,φ::T) where T<:AbstractArray
     F=u_to_j.F
-    U,V_φ = u_to_j.spaces
-    assem_U,assem_φ = u_to_j.assem
+    U,V_φ,U_reg = u_to_j.spaces
+    assem_U,assem_deriv = u_to_j.assem
     djdu_vec,djdφ_vec = u_to_j.caches
     uh = FEFunction(U,u)
     φh = FEFunction(V_φ,φ)
@@ -108,8 +110,8 @@ function ChainRulesCore.rrule(u_to_j::StateParamIntegrandWithMeasure,u::T,φ::T)
         djdu_vecdata = collect_cell_vector(U,djdu)
         assemble_vector!(djdu_vec,assem_U,djdu_vecdata)
         djdφ = ∇(F,fields,2)
-        djdφ_vecdata = collect_cell_vector(V_φ,djdφ)
-        assemble_vector!(djdφ_vec,assem_φ,djdφ_vecdata)
+        djdφ_vecdata = collect_cell_vector(U_reg,djdφ)
+        assemble_vector!(djdφ_vec,assem_deriv,djdφ_vecdata)
         djdu_vec .*= dj
         djdφ_vec .*= dj
         (  NoTangent(), djdu_vec, djdφ_vec )
@@ -117,6 +119,9 @@ function ChainRulesCore.rrule(u_to_j::StateParamIntegrandWithMeasure,u::T,φ::T)
     u_to_j(u,φ), u_to_j_pullback
 end
 
+"""
+    AbstractFEStateMap
+"""
 abstract type AbstractFEStateMap end
 
 # Getters
@@ -125,10 +130,13 @@ get_measure(::AbstractFEStateMap) = @abstractmethod;
 get_trial_space(::AbstractFEStateMap) = @abstractmethod;
 get_test_space(::AbstractFEStateMap) = @abstractmethod;
 get_aux_space(::AbstractFEStateMap) = @abstractmethod;
+get_deriv_space(::AbstractFEStateMap) = @abstractmethod;
 get_state_assembler(::AbstractFEStateMap) = @abstractmethod
-get_aux_assembler(::AbstractFEStateMap) = @abstractmethod
+get_deriv_assembler(::AbstractFEStateMap) = @abstractmethod
 
-
+"""
+    AffineFEStateMap
+"""
 struct AffineFEStateMap{A,B,C,D<:Tuple,E<:Tuple,F<:Tuple,G<:Tuple,H<:Tuple} <: AbstractFEStateMap
     a               ::A
     l               ::B
@@ -141,18 +149,19 @@ struct AffineFEStateMap{A,B,C,D<:Tuple,E<:Tuple,F<:Tuple,G<:Tuple,H<:Tuple} <: A
 
     function AffineFEStateMap(
             a::A,l::B,res::C,
-            U,V,V_φ,φh,
+            U,V,V_φ,U_reg,φh,
             dΩ...;
             assem_U = SparseMatrixAssembler(U,V),
             assem_adjoint = SparseMatrixAssembler(V,U),
-            assem_φ = SparseMatrixAssembler(V_φ,V_φ),
+            assem_deriv = SparseMatrixAssembler(U_reg,U_reg),
             ls::LinearSolver = LUSolver(),
             adjoint_ls::LinearSolver = LUSolver()) where {A,B,C}
         
-        spaces = (U,V,V_φ)
+        spaces = (U,V,V_φ,U_reg)
         ## dφdu cache
         uhd = zero(U)
-        dφdu_vec = assemble_vector(v->res(uhd,uhd,v,dΩ...),assem_φ,V_φ)
+        vecdata = collect_cell_vector(U_reg,∇(IntegrandWithMeasure(res,dΩ),[uhd,uhd,φh],3))
+        dφdu_vec = allocate_vector(assem_deriv,vecdata)
 
         ## K,b,x
         op = AffineFEOperator((u,v) -> a(u,v,φh,dΩ...),v -> l(v,φh,dΩ...),U,V,assem_U)
@@ -168,11 +177,11 @@ struct AffineFEStateMap{A,B,C,D<:Tuple,E<:Tuple,F<:Tuple,G<:Tuple,H<:Tuple} <: A
         adjoint_ns = numerical_setup(symbolic_setup(adjoint_ls,adjoint_K),adjoint_K)
         
         ## Caches and adjoint caches
-        caches = (dφdu_vec,assem_φ)
+        cache = (dφdu_vec,assem_deriv)
         fwd_caches = (ns,K,b,x,uhd,assem_U)
         adjoint_caches = (adjoint_ns,adjoint_K,adjoint_x,assem_adjoint)
-        return new{A,B,C,typeof(dΩ),typeof(spaces),typeof(caches),typeof(fwd_caches),
-            typeof(adjoint_caches)}(a,l,res,dΩ,spaces,caches,fwd_caches,adjoint_caches)
+        return new{A,B,C,typeof(dΩ),typeof(spaces),typeof(cache),typeof(fwd_caches),
+            typeof(adjoint_caches)}(a,l,res,dΩ,spaces,cache,fwd_caches,adjoint_caches)
     end
 end
 
@@ -182,14 +191,15 @@ get_measure(m::AffineFEStateMap) = m.dΩ;
 get_trial_space(m::AffineFEStateMap) = m.spaces[1];
 get_test_space(m::AffineFEStateMap) = m.spaces[2];
 get_aux_space(m::AffineFEStateMap) = m.spaces[3];
+get_deriv_space(m::AffineFEStateMap) = m.spaces[4];
 get_state_assembler(m::AffineFEStateMap) = last(m.fwd_caches)
-get_aux_assembler(m::AffineFEStateMap) = last(m.cache)
+get_deriv_assembler(m::AffineFEStateMap) = last(m.cache)
 
 function (φ_to_u::AffineFEStateMap)(φ::T) where T <: AbstractVector
     a=φ_to_u.a
     l=φ_to_u.l
     dΩ = φ_to_u.dΩ
-    U,V,V_φ = φ_to_u.spaces
+    U,V,V_φ,U_reg = φ_to_u.spaces
     ns,K,b,x,uhd,assem_U = φ_to_u.fwd_caches
     φh = FEFunction(V_φ,φ)
 
@@ -213,8 +223,8 @@ function ChainRulesCore.rrule(φ_to_u::AffineFEStateMap,φ::T) where T <: Abstra
     a=φ_to_u.a
     res = φ_to_u.res
     dΩ = φ_to_u.dΩ
-    U,V,V_φ = φ_to_u.spaces
-    dφdu_vec,assem_φ = φ_to_u.cache
+    U,V,V_φ,U_reg = φ_to_u.spaces
+    dφdu_vec,assem_deriv = φ_to_u.cache
     adjoint_ns,adjoint_K,λ,assem_adjoint = φ_to_u.adjoint_caches
     
     ## Forward problem
@@ -233,8 +243,8 @@ function ChainRulesCore.rrule(φ_to_u::AffineFEStateMap,φ::T) where T <: Abstra
         uh = FEFunction(U,u)
         res_functional = IntegrandWithMeasure(res,dΩ)
         dφdu_contrib = ∇(res_functional,[uh,λh,φh],3)
-        dφdu_vecdata = collect_cell_vector(V_φ,dφdu_contrib)
-        assemble_vector!(dφdu_vec,assem_φ,dφdu_vecdata)
+        dφdu_vecdata = collect_cell_vector(U_reg,dφdu_contrib) 
+        assemble_vector!(dφdu_vec,assem_deriv,dφdu_vecdata)
         dφdu_vec .*= -1;
         ( NoTangent(),dφdu_vec)
     end
@@ -270,18 +280,19 @@ function PDEConstrainedFunctionals(
     dΩ = get_measure(state_map)
     U = get_trial_space(state_map)
     V_φ = get_aux_space(state_map)
+    U_reg = get_deriv_space(state_map)
     assem_U = get_state_assembler(state_map)
-    assem_φ = get_aux_assembler(state_map)
+    assem_deriv = get_deriv_assembler(state_map)
 
     # Create StateParamIntegrandWithMeasures
     spiwm(f) = StateParamIntegrandWithMeasure(
-        IntegrandWithMeasure(f,dΩ),U,V_φ,assem_U,assem_φ)
+        IntegrandWithMeasure(f,dΩ),U,V_φ,U_reg,assem_U,assem_deriv)
     J_spiwm = spiwm(J)
     C_spiwm = isempty(C) ? StateParamIntegrandWithMeasure[] : map(spiwm,C);
 
     # Preallocate
-    u₀ = zero(U)
-    dJ = assemble_vector(v->J(u₀,v,dΩ...),assem_φ,V_φ)
+    _,djdφ_vec = J_spiwm.caches
+    dJ = similar(djdφ_vec)
     dC = map(_->similar(dJ),C)
 
     return PDEConstrainedFunctionals(
@@ -316,7 +327,8 @@ function _evaluate_derivatives(pcf::PDEConstrainedFunctionals,φ::T) where T <: 
     analytic_dC = pcf.analytic_dC
     U = get_trial_space(pcf.state_map)
     V_φ = get_aux_space(pcf.state_map)
-    aux_assem = get_aux_assembler(pcf.state_map)
+    U_reg = get_deriv_space(pcf.state_map)
+    deriv_assem = get_deriv_assembler(pcf.state_map)
     dΩ = get_measure(pcf.state_map)
 
     ## Foward problem
@@ -337,7 +349,7 @@ function _evaluate_derivatives(pcf::PDEConstrainedFunctionals,φ::T) where T <: 
         uh = FEFunction(U,u)
         φh = FEFunction(V_φ,φ)
         _dF = (q) -> dF_analytic(q,uh,φh,dΩ...)
-        assemble_vector!(_dF,dF,aux_assem,V_φ)
+        assemble_vector!(_dF,dF,deriv_assem,U_reg)
         return j_val
     end
     j = ∇!(J,dJ,analytic_dJ)
