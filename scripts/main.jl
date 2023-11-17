@@ -52,7 +52,7 @@ function main(mesh_partition,distribute)
 
     ## Optimisation functionals
     J = (u,φ,dΩ,dΓ_N) -> ∫((I ∘ φ)*D*∇(u)⋅∇(u))dΩ
-    dJ = (q,u,φ,dΩ,dΓ_N) -> ∫(-D*∇(u)⋅∇(u)*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ;
+    # dJ = (q,u,φ,dΩ,dΓ_N) -> ∫(-D*∇(u)⋅∇(u)*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ;
     Vol = (u,φ,dΩ,dΓ_N) -> ∫(((ρ ∘ φ) - vf)/vol_D)dΩ;
     dVol = (q,u,φ,dΩ,dΓ_N) -> ∫(1/vol_D*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
 
@@ -71,15 +71,11 @@ function main(mesh_partition,distribute)
     ## Optimiser
     optimiser = AugmentedLagrangian(φ,pcfs,stencil,vel_ext,interp,γ,γ_reinit,max_iters);
 
-                    # Write getters and remove from λ
-    for (it,Ji,Ci,Li) in optimiser
-        if i_am_main(ranks) 
-            println("it: ",it," | J: ",round(Ji;digits=5),
-                              " | ","C: ",round(Ci;digits=5),
-                              " | ","L: ",round(Li;digits=5))
-            println("λ = ",λ," Λ = ",Λ)
-            writedlm("$path/history.csv",history[1:it,:])
-        end
+    for history in optimiser
+        it,Ji,Ci,Li = last(history)
+        print_history(ranks,it,Ji,Ci,Li) # <- dispatch on model for ranks?
+        writedlm("$path/history.csv",history[1:it,:])
+        
         # if isone(it) || iszero(it % 30) 
         writevtk(Ω,output_path*"/struc_$it",cellfields=["phi"=>φhi,"H(phi)"=>(H ∘ φhi),
             "|nabla(phi))|"=>(norm ∘ ∇(φhi)),"uh"=>uhi,"dLh"=>dLhi])

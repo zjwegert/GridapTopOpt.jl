@@ -126,3 +126,19 @@ function isotropic_3d(E::M,ν::M) where M<:AbstractFloat
         C[1,4], C[6,4], C[5,4], C[2,4], C[4,4], C[3,4],
         C[1,3], C[6,3], C[5,3], C[2,3], C[4,3], C[3,3])
 end
+
+# Logging
+function print_history(ranks,it,args...)
+    if i_am_main(ranks)
+        str = "it: $it"
+        for pair in args
+            val = round.(pair.second;digits=5)
+            str*="| $(pair.first): $val"
+        end
+        println(str)
+    end
+end
+
+function write_vtk(it,path,Ω)
+
+end
