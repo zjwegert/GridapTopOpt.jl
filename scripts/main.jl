@@ -69,10 +69,7 @@ function main(mesh_partition,distribute)
     vel_ext = VelocityExtension(a_hilb,U_reg,V_reg,dΩ)
     
     ## Optimiser
-    optimiser = AugmentedLagrangian(pcfs,stencil,vel_ext,interp,γ,γ_reinit);
-
-    ## Stopping criterion
-    history = zeros(max_iters,length(C_smaps)+2);
+    optimiser = AugmentedLagrangian(φ,pcfs,stencil,vel_ext,interp,γ,γ_reinit,max_iters);
 
                     # Write getters and remove from λ
     for (it,Ji,Ci,Li) in optimiser

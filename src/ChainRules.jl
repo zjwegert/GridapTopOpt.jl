@@ -254,49 +254,43 @@ end
 """
     PDEConstrainedFunctionals
 """
-struct PDEConstrainedFunctionals{A<:StateParamIntegrandWithMeasure,
-        B<:StateParamIntegrandWithMeasure,
-        C<:AbstractArray,
-        D<:AbstractArray,
-        E<:Union{Function,Nothing},
-        F<:Union{Function,Nothing},
-        G<:AbstractFEStateMap}
-    J :: A
-    C :: Vector{B}
-    dJ :: C
-    dC :: Vector{D}
-    analytic_dJ :: E
-    analytic_dC :: Vector{F}
-    state_map :: G
-end
+struct PDEConstrainedFunctionals{N,A<:AbstractFEStateMap}
+    J
+    C
+    dJ
+    dC
+    analytic_dJ
+    analytic_dC
+    state_map :: A
 
-function PDEConstrainedFunctionals(
-        J :: Function,
-        C :: Vector{<:Function},
-        state_map :: AbstractFEStateMap;
-        analytic_dJ = nothing,
-        analytic_dC = fill(nothing,length(C)))
+    function PDEConstrainedFunctionals(
+            J :: Function,
+            C :: Vector{<:Function},
+            state_map :: T;
+            analytic_dJ = nothing,
+            analytic_dC = fill(nothing,length(C))) where T<:AbstractFEStateMap
 
-    dΩ = get_measure(state_map)
-    U = get_trial_space(state_map)
-    V_φ = get_aux_space(state_map)
-    U_reg = get_deriv_space(state_map)
-    assem_U = get_state_assembler(state_map)
-    assem_deriv = get_deriv_assembler(state_map)
+        dΩ = get_measure(state_map)
+        U = get_trial_space(state_map)
+        V_φ = get_aux_space(state_map)
+        U_reg = get_deriv_space(state_map)
+        assem_U = get_state_assembler(state_map)
+        assem_deriv = get_deriv_assembler(state_map)
 
-    # Create StateParamIntegrandWithMeasures
-    spiwm(f) = StateParamIntegrandWithMeasure(
-        IntegrandWithMeasure(f,dΩ),U,V_φ,U_reg,assem_U,assem_deriv)
-    J_spiwm = spiwm(J)
-    C_spiwm = isempty(C) ? StateParamIntegrandWithMeasure[] : map(spiwm,C);
+        # Create StateParamIntegrandWithMeasures
+        spiwm(f) = StateParamIntegrandWithMeasure(
+            IntegrandWithMeasure(f,dΩ),U,V_φ,U_reg,assem_U,assem_deriv)
+        J_spiwm = spiwm(J)
+        C_spiwm = isempty(C) ? StateParamIntegrandWithMeasure[] : map(spiwm,C);
 
-    # Preallocate
-    _,djdφ_vec = J_spiwm.caches
-    dJ = similar(djdφ_vec)
-    dC = map(_->similar(dJ),C)
+        # Preallocate
+        _,djdφ_vec = J_spiwm.caches
+        dJ = similar(djdφ_vec)
+        dC = map(_->similar(dJ),C)
 
-    return PDEConstrainedFunctionals(
-        J_spiwm,C_spiwm,dJ,dC,analytic_dJ,analytic_dC,state_map)
+        return new{length(C),T}(
+            J_spiwm,C_spiwm,dJ,dC,analytic_dJ,analytic_dC,state_map)
+    end
 end
 
 PDEConstrainedFunctionals(J::Function,state_map::AbstractFEStateMap;analytic_dJ=nothing) = 
