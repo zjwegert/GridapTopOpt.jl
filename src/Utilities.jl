@@ -126,6 +126,17 @@ function isotropic_3d(E::M,ν::M) where M<:AbstractFloat
 end
 
 # Logging
+function make_dir(pvec::PVector,path)
+    if i_am_main(pvec)
+        make_dir([],path)
+    end
+end
+
+function make_dir(::Vector,path)
+    !isdir(path) ? mkdir(path) : rm(path,recursive=true);
+    !isdir(path) ? mkdir(path) : 0;
+end
+
 function print_history(pvec::PVector,it,entries::Vector{<:Pair})
     if i_am_main(pvec)
         print_history([],it,entries)
@@ -136,12 +147,12 @@ function print_history(::Vector,it,entries::Vector{<:Pair})
     str = "it: $it"
     for pair in entries
         val = round.(pair.second;digits=5)
-        str*="| $(pair.first): $val"
+        str*=" | $(pair.first): $val"
     end
     println(str)
 end
 
-function write_vtk(Ω,path,entries::Vector{<:Pair};iter_mod=10)
+function write_vtk(Ω,path,it,entries::Vector{<:Pair};iter_mod=10)
     if isone(it) || iszero(it % iter_mod) 
         writevtk(Ω,path,cellfields=entries)
     end
