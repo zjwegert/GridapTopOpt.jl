@@ -1,7 +1,5 @@
-using Gridap.ReferenceFEs
-using Gridap.Geometry: get_faces
-using GridapDistributed: DistributedDiscreteModel
-using PartitionedArrays: getany
+## Initial LSF
+gen_lsf(ξ,a) = x::VectorValue -> -1/4*prod(cos.(get_array(ξ*pi*x))) - a/4
 
 ## Get element size Δ
 function get_Δ(model::CartesianDiscreteModel)
@@ -125,4 +123,24 @@ function isotropic_3d(E::M,ν::M) where M<:AbstractFloat
         C[1,2], C[6,2], C[5,2], C[2,2], C[4,2], C[3,2],
         C[1,4], C[6,4], C[5,4], C[2,4], C[4,4], C[3,4],
         C[1,3], C[6,3], C[5,3], C[2,3], C[4,3], C[3,3])
+end
+
+# Logging
+function print_history(pvec::PVector,it,args...)
+    if i_am_main(pvec)
+        print_history([],it,args...)
+    end
+end
+
+function print_history(::Vector,it,args...)
+    str = "it: $it"
+    for pair in args
+        val = round.(pair.second;digits=5)
+        str*="| $(pair.first): $val"
+    end
+    println(str)
+end
+
+function write_vtk(it,path,Ω)
+    @notimplemented # TODO
 end

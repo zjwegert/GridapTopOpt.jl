@@ -10,35 +10,87 @@ function Base.iterate(::T,state) where T <: AbstractOptimiser
     @notimplemented
 end
 
+# Getters
+get_optimiser_history(::AbstractOptimiser) = @notimplemented
+get_level_set(::AbstractOptimiser) = @notimplemented
+
 ## Augmented Lagrangian optimiser
-struct AugmentedLagrangian{M} <: AbstractOptimiser where M <: AbstractFloat
-    λ::Vector{M}
-    Λ::Vector{M}
-    ζ::M
-    vft::M
-    update_mod::Int
-    last_iter_cache
-    function AugmentedLagrangian(
-            pcfs,stencil,vel_ext,interp,γ,γ_reinit;
-            λ=zeros(PetscScalar,length(C_smaps)+1),
-            Λ=zeros(PetscScalar,length(C_smaps)+1),
-            ζ = 1.2,
-            vft = 0.5,
-            update_mod::Int = 5)
-        cache = (pcfs,stencil,vel_ext,interp,γ,γ_reinit)
-        new(λ,Λ,ζ,vft,update_mod,cache)
+mutable struct AugmentedLagrangianHistory
+    # I'm not the biggest fan of this but it solves the problem of not
+    #  having the explicit iteration count stored in a useful way.
+    #  It also means we return a single item in iterator loop.
+    it      :: Int
+    const J :: Vector
+    const C :: Matrix
+    const L :: Vector
+    function AugmentedLagrangianHistory(max_iters::Int,nconsts::Int)
+        J = zeros(max_iters);
+        C = zeros(max_iters,nconsts)
+        L = zero(J)
+        new(0,J,C,L)
     end
 end
 
-# Method parameters
-function initialise!(m::AugmentedLagrangian{M},J_init::M) where M
+# Convienence 
+Base.last(m::AugmentedLagrangianHistory) = (m.it,m.J[m.it],m.C[m.it,:],m.L[m.it])
+
+function write_history(m::AugmentedLagrangianHistory,path)
+    J = m.J; C = m.C; L = m.L
+    data = zip(J,C,L)
+    writedlm("$path/history.csv",data)
+end
+
+function update!(m::AugmentedLagrangianHistory,J,C,L)
+    m.it += 1
+    m.J[m.it] = J 
+    length(C)>0 ? m.C[m.it] = C : nothing 
+    m.L[m.it] = L
+    return nothing
+end
+
+struct AugmentedLagrangian <: AbstractOptimiser
+    λ               :: Vector
+    Λ               :: Vector
+    ζ               :: Real
+    vft             :: Real
+    update_mod      :: Int
+    history         :: AugmentedLagrangianHistory
+    conv_criterion  :: Function
+    cache
+    function AugmentedLagrangian(
+            φ::AbstractVector,
+            pcfs::PDEConstrainedFunctionals{N},
+            stencil,vel_ext,interp,γ,γ_reinit;
+            λ::Vector=zeros(N),
+            Λ::Vector=zeros(N),
+            ζ = 1.2,
+            vft = 0.5,
+            update_mod::Int = 5,
+            max_iters::Int = 1000,
+            conv_criterion::Function = conv_cond) where {N}
+
+        V_φ = get_aux_space(pcfs.state_map)
+        history = AugmentedLagrangianHistory(max_iters,N)
+        vel = get_free_dof_values(interpolate(0,V_φ))
+        cache = (φ,pcfs,stencil,vel_ext,interp,vel,γ,γ_reinit)
+        new(λ,Λ,ζ,vft,update_mod,history,conv_criterion,cache)
+    end
+end
+
+get_optimiser_history(m::AugmentedLagrangian) = m.history
+get_level_set(m::AugmentedLagrangian) = first(m.cache)
+
+# Initialise AGM parameters
+function initialise!(m::AugmentedLagrangian,J_init::Real,C_init::Vector)
+    λ = m.λ; Λ = m.Λ;
     vft = m.vft;
-    m.λ .= 0.1*J_init/vft;
-    m.Λ .= @. abs(0.01*m.λ/vft)
+    λ .= 0.1*J_init/vft;
+    Λ .= @. abs(0.01*m.λ/vft)
     return λ,Λ
 end
 
-function update!(m::AugmentedLagrangian{M},iter,C_new::Vector{M}) where M
+# Update AGM parameters
+function update!(m::AugmentedLagrangian,iter::Int,C_new::Vector)
     λ = m.λ; Λ = m.Λ;
     λ .-= Λ*C_new;
     iszero(iter % m.update_mod) ? Λ .*= m.ζ : 0;
@@ -47,70 +99,59 @@ end
 
 # Stopping criterion
 function conv_cond(m::AugmentedLagrangian,state)
-    return it > 10 && (all(@.(abs(Li-history[it-5:it-1,1])) .< 1/5/maximum(el_size)*L_new) &&
-        all(abs(Ci) < 0.0001)) ? nothing : state; 
+    history = m.history
+    it,_,Ci,Li,_,_ = state
+
+    return it > 10 && (all(@.(abs(Li-history.L[it-5:it-1])) .< 1/5/maximum(el_size)*Li) &&
+        all(@. abs(Ci) < 0.0001)) ? nothing : state; 
 end
 
 # 0th iteration
 function Base.iterate(m::AugmentedLagrangian)
-    J_smap,C_smaps,stencil,stencil_caches,vel_ext,V_φ,vel,γ,γ_reinit = m.cache
-    ## Compute FE problems
-    uh,φh = get_states(J_smap)
-    J_smap(φh)
+    φ,pcfs,_,vel_ext,_,_,_,_ = m.cache
+    ## Compute FE problem and shape derivatives
+    J_init,C_init,dJ,dC = Gridap.evaluate!(pcfs,φ)
 
     ## Compute initial values
-    J_init = evaluate_functional(J_smap)
-    C_init = evaluate_functional.(C_smaps)
-    λ,Λ = initialise!(m,J_init)
-    L_init = J_init + sum(@. -λ*C_init + Λ/2*C_init^2)
-    
-    ## Compute shape derivatives
-    U_reg, _ = vel_ext.spaces
-    dJh = compute_shape_derivative!(φh,J_smap)
-    dCh = compute_shape_derivative!(φh,C_smaps)
-    # project!(vel_ext,dJh)
-    # project!(vel_ext,dCh)
+    λ,Λ = initialise!(m,J_init,C_init)
+    L_init = J_init
+    length(C_init)>0 ? L_init += sum(@.(-λ*C_init + Λ/2*C_init^2)) : nothing
+    update!(m.history,J_init,C_init,L_init)
 
-    dJ = get_free_dof_values(dJh)
-    dC = get_free_dof_values.(dCh)
-    dL = dJ + sum(-λ[i]*dC[i] + Λ[i]*C_init[i]*dC[i] for i ∈ eachindex(λ))
-    dLh = FEFunction(U_reg,dL)
+    ## Compute dL and projectzero(dJ)
+    dL = dJ
+    length(C_init)>0 ? dL += sum(-λ[i]*dC[i] + Λ[i]*C_init[i]*dC[i] for i ∈ eachindex(λ)) : nothing
     # Because project! takes a linear form on the RHS this should
     #   be the same as projecting each shape derivative then computing dL
-    project!(vel_ext,dLh)
+    project!(vel_ext,dL)
 
-    return 0,J_init,C_init,L_init,λ,Λ,uh,φh,dLh
+    return m.history,dL
 end
 
 # ith iteration
-function Base.iterate(m::AugmentedLagrangian,state)
-    it,_,_,_,_,_,uh,φh,dLh = state
-    J_smap,C_smaps,stencil,stencil_caches,vel_ext,V_φ,vel,γ,γ_reinit = m.cache
-    φ = get_free_dof_values(φh)
+function Base.iterate(m::AugmentedLagrangian,dL)
+    φ,pcfs,stencil,vel_ext,_,vel,γ,γ_reinit = m.cache
+    conv_criterion = m.conv_criterion
     ## Advect & Reinitialise
-    interpolate!(dLh,vel,V_φ)
-    advect!(stencil,φ,vel,γ,stencil_caches)
-    reinit!(stencil,φ,γ_reinit,stencil_caches)   
+    interpolate!(FEFunction(U_reg,dL),vel,V_φ)
+    advect!(stencil,φ,vel,γ)
+    reinit!(stencil,φ,γ_reinit)   
 
-    ## Calculate objective and constraints
-    J_smap(φh)
-    J_new = evaluate_functional(J_smap)
-    C_new = evaluate_functional.(C_smaps)
+    ## Calculate objective, constraints, and shape derivatives
+    J_new,C_new,dJ,dC = Gridap.evaluate!(pcfs,φ)
     L_new = J_new + sum(@. -λ*C_new + Λ/2*C_new^2)
-
-    ## Compute shape derivatives
-    U_reg, _ = vel_ext.spaces
-    dJh = compute_shape_derivative!(φh,J_smap)
-    dCh = compute_shape_derivative!(φh,C_smaps)
     
     ## Augmented Lagrangian method
     λ,Λ = update!(m,it,C_new)
-    dJ = get_free_dof_values(dJh)
-    dC = get_free_dof_values.(dCh)
     dL = dJ + sum(-λ[i]*dC[i] + Λ[i]*C_new[i]*dC[i] for i ∈ eachindex(λ))
-    copy!(get_free_dof_values(dLh),dL)
-    consistent!(get_free_dof_values(dLh)) |> fetch
-    project!(vel_ext,dLh)
+    project!(vel_ext,dL)
 
-    return it+1,J_new,C_new,L_new,λ,Λ,uh,φh,dLh
+    ## History
+    update!(m.history,J_new,C_new,L_new)
+
+    if conv_criterion(m)
+        return nothing
+    else
+        return m.history,dL
+    end
 end
