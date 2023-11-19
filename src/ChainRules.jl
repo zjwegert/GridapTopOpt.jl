@@ -1,7 +1,3 @@
-using ChainRulesCore
-using Gridap.Algebra: LinearSolver
-using GridapDistributed: DistributedDomainContribution, to_parray_of_arrays
-
 """
     IntegrandWithMeasure
 

@@ -1,5 +1,4 @@
-
-struct ElasticitySolver{A,B} <: Gridap.Algebra.LinearSolver
+struct ElasticitySolver{A,B} <: LinearSolver
   trian ::A
   space ::B
   rtol  ::PetscScalar
@@ -14,7 +13,7 @@ struct ElasticitySolver{A,B} <: Gridap.Algebra.LinearSolver
   end
 end
 
-struct ElasticitySymbolicSetup{A} <: Gridap.Algebra.SymbolicSetup
+struct ElasticitySymbolicSetup{A} <: SymbolicSetup
   solver::A
 end
 

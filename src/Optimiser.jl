@@ -15,19 +15,19 @@ get_optimiser_history(::AbstractOptimiser) = @notimplemented
 get_level_set(::AbstractOptimiser) = @notimplemented
 
 ## Augmented Lagrangian optimiser
-mutable struct AugmentedLagrangianHistory{T}
+mutable struct AugmentedLagrangianHistory
     # I'm not the biggest fan of this but it solves the problem of not
     #  having the explicit iteration count stored in a useful way.
     #  It also means we return a single item in iterator loop.
     it      :: Int
-    const J :: Vector{T}
-    const C :: Matrix{T}
-    const L :: Vector{T}
-    function AugmentedLagrangianHistory(T::Type,max_iters::Int,nconsts::Int)
-        J = zeros(T,max_iters);
-        C = zeros(T,max_iters,nconsts)
-        L = similar(J)
-        new{T}(0,J,C,L)
+    const J :: Vector
+    const C :: Matrix
+    const L :: Vector
+    function AugmentedLagrangianHistory(max_iters::Int,nconsts::Int)
+        J = zeros(max_iters);
+        C = zeros(max_iters,nconsts)
+        L = zero(J)
+        new(0,J,C,L)
     end
 end
 
@@ -43,36 +43,37 @@ end
 function update!(m::AugmentedLagrangianHistory,J,C,L)
     m.it += 1
     m.J[m.it] = J 
-    m.C[m.it] = C
+    length(C)>0 ? m.C[m.it] = C : nothing 
     m.L[m.it] = L
     return nothing
 end
 
-struct AugmentedLagrangian{M} <: AbstractOptimiser
-    λ               :: Vector{M}
-    Λ               :: Vector{M}
-    ζ               :: M
-    vft             :: M
+struct AugmentedLagrangian <: AbstractOptimiser
+    λ               :: Vector
+    Λ               :: Vector
+    ζ               :: Real
+    vft             :: Real
     update_mod      :: Int
-    history         :: AugmentedLagrangianHistory{M}
+    history         :: AugmentedLagrangianHistory
     conv_criterion  :: Function
     cache
     function AugmentedLagrangian(
             φ::AbstractVector,
             pcfs::PDEConstrainedFunctionals{N},
             stencil,vel_ext,interp,γ,γ_reinit;
-            λ::Vector{M}=zeros(M,N),
-            Λ::Vector{M}=zeros(M,N),
-            ζ::M = 1.2,
-            vft::M = 0.5,
+            λ::Vector=zeros(N),
+            Λ::Vector=zeros(N),
+            ζ = 1.2,
+            vft = 0.5,
             update_mod::Int = 5,
             max_iters::Int = 1000,
-            conv_criterion::Function = conv_cond) where {N,M<:AbstractFloat}
+            conv_criterion::Function = conv_cond) where {N}
 
-        history = AugmentedLagrangianHistory(M,max_iters,N)
+        V_φ = get_aux_space(pcfs.state_map)
+        history = AugmentedLagrangianHistory(max_iters,N)
         vel = get_free_dof_values(interpolate(0,V_φ))
         cache = (φ,pcfs,stencil,vel_ext,interp,vel,γ,γ_reinit)
-        new{M}(λ,Λ,ζ,vft,update_mod,history,conv_criterion,cache)
+        new(λ,Λ,ζ,vft,update_mod,history,conv_criterion,cache)
     end
 end
 
@@ -80,15 +81,16 @@ get_optimiser_history(m::AugmentedLagrangian) = m.history
 get_level_set(m::AugmentedLagrangian) = first(m.cache)
 
 # Initialise AGM parameters
-function initialise!(m::AugmentedLagrangian{M},J_init::M,C_init::Vector{M}) where M
+function initialise!(m::AugmentedLagrangian,J_init::Real,C_init::Vector)
+    λ = m.λ; Λ = m.Λ;
     vft = m.vft;
-    m.λ .= 0.1*J_init/vft;
-    m.Λ .= @. abs(0.01*m.λ/vft)
+    λ .= 0.1*J_init/vft;
+    Λ .= @. abs(0.01*m.λ/vft)
     return λ,Λ
 end
 
 # Update AGM parameters
-function update!(m::AugmentedLagrangian{M},iter,C_new::Vector{M}) where M
+function update!(m::AugmentedLagrangian,iter::Int,C_new::Vector)
     λ = m.λ; Λ = m.Λ;
     λ .-= Λ*C_new;
     iszero(iter % m.update_mod) ? Λ .*= m.ζ : 0;
@@ -112,11 +114,13 @@ function Base.iterate(m::AugmentedLagrangian)
 
     ## Compute initial values
     λ,Λ = initialise!(m,J_init,C_init)
-    L_init = J_init + sum(@. -λ*C_init + Λ/2*C_init^2)
+    L_init = J_init
+    length(C_init)>0 ? L_init += sum(@.(-λ*C_init + Λ/2*C_init^2)) : nothing
     update!(m.history,J_init,C_init,L_init)
 
-    ## Compute dL and project
-    dL = dJ + sum(-λ[i]*dC[i] + Λ[i]*C_init[i]*dC[i] for i ∈ eachindex(λ))
+    ## Compute dL and projectzero(dJ)
+    dL = dJ
+    length(C_init)>0 ? dL += sum(-λ[i]*dC[i] + Λ[i]*C_init[i]*dC[i] for i ∈ eachindex(λ)) : nothing
     # Because project! takes a linear form on the RHS this should
     #   be the same as projecting each shape derivative then computing dL
     project!(vel_ext,dL)

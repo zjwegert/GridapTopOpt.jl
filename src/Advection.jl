@@ -1,8 +1,3 @@
-
-using Gridap.Helpers
-using GridapDistributed: DistributedDiscreteModel, FESpaceDiscreteModel
-using PartitionedArrays: getany, tuple_of_arrays
-
 # API definition for Stencil
 
 abstract type Stencil end
@@ -131,7 +126,7 @@ function advect!(::FirstOrderStencil{3,T},φ,vel,Δt,Δx,isperiodic,caches) wher
   return φ
 end
 
-function compute_Δt(s::FirstOrderStencil{D,T},γ,φ,vel) where {D,T}
+function compute_Δt(::FirstOrderStencil{D,T},Δ,γ,φ,vel) where {D,T}
   v_norm = maximum(abs,vel)
   return γ * min(Δ...) / (eps(T)^2 + v_norm)
 end
@@ -141,7 +136,7 @@ struct AdvectionStencil{O}
   stencil   :: Stencil
   model
   space
-  perm      :: Vector
+  perm
   max_steps
   max_steps_reinit
   tol
@@ -151,7 +146,10 @@ end
 function AdvectionStencil(stencil::Stencil,
                           model::CartesianDiscreteModel,
                           space::FESpace,
-                          Δ::Tuple,max_steps::Int,tol::T; max_steps_reinit::Int = 500) where T
+                          Δ::Tuple,
+                          max_steps::Int,
+                          tol::T; 
+                          max_steps_reinit::Int = 500) where T
   ## Get DoF description and permutation
   order = get_order(first(Gridap.CellData.get_data(get_fe_basis(space))))
   desc = get_cartesian_descriptor(model)
@@ -162,7 +160,7 @@ function AdvectionStencil(stencil::Stencil,
   ## Cache
   _φ = get_free_dof_values(zero(space));
   vel = get_free_dof_values(zero(space));
-  _cache = allocate_caches(stencil,_φ,vel,order)
+  _cache = allocate_caches(stencil,_φ,vel,order,ndof)
   cache = (isperiodic,Δ,ndof,_cache...)
 
   return AdvectionStencil{order}(
@@ -179,8 +177,9 @@ function AdvectionStencil(stencil::Stencil,
     order = get_order(first(Gridap.CellData.get_data(get_fe_basis(space))))
     desc = get_cartesian_descriptor(model)
     dof_permutation = create_dof_permutation(model,space,order)
+    ndof = order .* desc.partition .+ 1
     isperiodic = desc.isperiodic
-    return order, isperiodic, order .* desc.partition .+ 1, dof_permutation
+    return order, isperiodic, ndof, dof_permutation
   end |> PartitionedArrays.tuple_of_arrays
   order = getany(order)
   isperiodic = getany(local_isperiodic)
@@ -188,7 +187,7 @@ function AdvectionStencil(stencil::Stencil,
   ## Cache
   _φ = get_free_dof_values(zero(space));
   vel = get_free_dof_values(zero(space));
-  _cache = allocate_caches(stencil,_φ,vel,order)
+  _cache = allocate_caches(stencil,_φ,vel,order,local_ndofs)
   cache = (isperiodic,Δ,local_ndofs,_cache...)
 
   return AdvectionStencil{order}(
@@ -212,13 +211,12 @@ function create_dof_permutation(model::CartesianDiscreteModel{Dc},
   @check prod(ndofs) == num_free_dofs(space)
 
   new_dof_ids  = LinearIndices(ndofs)
-  #o2n_dof_map = fill(-1,num_free_dofs(V))
-  n2o_dof_map = fill(-1,num_free_dofs(V))
+  n2o_dof_map = fill(-1,num_free_dofs(space))
 
-  terms = get_terms(poly, fill(order,Dc))
-  cell_dof_ids = get_cell_dof_ids(V)
+  terms = get_terms(first(get_polytopes(model)), fill(order,Dc))
+  cell_dof_ids = get_cell_dof_ids(space)
   cache_cell_dof_ids = array_cache(cell_dof_ids)
-  for (iC,cell) in enumerate(CartesianIndices(nc))
+  for (iC,cell) in enumerate(CartesianIndices(ncells))
     first_new_dof  = order .* (Tuple(cell) .- 1) .+ 1
     new_dofs_range = map(i -> i:i+order,first_new_dof)
     new_dofs = view(new_dof_ids,new_dofs_range...)
@@ -234,17 +232,17 @@ function create_dof_permutation(model::CartesianDiscreteModel{Dc},
   return n2o_dof_map
 end
 
-function allocate_caches(s::Stencil,φ::Vector,vel::Vector,order)
-  stencil_caches = allocate_caches(s.stencil,φ,vel)
+function allocate_caches(s::Stencil,φ::Vector,vel::Vector,order,ndofs)
+  stencil_caches = allocate_caches(s,reshape(φ,ndofs),vel)
   φ_tmp   = similar(φ)
   vel_tmp = similar(vel)
   perm_caches = (order >= 2) ? (similar(φ), similar(vel)) : nothing
   return φ_tmp, vel_tmp, perm_caches, stencil_caches
 end
 
-function allocate_caches(s::Stencil,φ::PVector,vel::PVector,order)
-  local_stencil_caches = map(local_views(φ),local_views(vel)) do φ,vel
-    allocate_caches(s.stencil,φ,vel)
+function allocate_caches(s::Stencil,φ::PVector,vel::PVector,order,local_ndofs)
+  local_stencil_caches = map(local_views(φ),local_views(vel),local_views(local_ndofs)) do φ,vel,ndofs
+    allocate_caches(s,reshape(φ,ndofs),vel)
   end
   φ_tmp   = similar(φ)
   vel_tmp = similar(vel)
@@ -281,7 +279,7 @@ function advect!(s::AdvectionStencil{O},φ::PVector,vel::PVector,γ) where O
   _vel = (O >= 2) ? permute!(perm_caches[2],vel,s.perm) : vel
 
   ## CFL Condition (requires γ≤1.0)
-  Δt = compute_Δt(s.stencil,γ,φ,vel)
+  Δt = compute_Δt(s.stencil,Δ,γ,φ,vel)
   for _ ∈ Base.OneTo(s.max_steps)
     # Apply operations across partitions
     map(local_views(_φ),local_views(_vel),local_stencil_caches,local_ndof) do _φ,_vel,stencil_caches,S
@@ -303,7 +301,7 @@ function advect!(s::AdvectionStencil{O},φ::Vector,vel::Vector,γ) where O
   _vel = (O >= 2) ? permute!(perm_caches[2],vel,s.perm) : vel
 
   ## CFL Condition (requires γ≤1.0)
-  Δt = compute_Δt(s.stencil,γ,φ,vel)
+  Δt = compute_Δt(s.stencil,Δ,γ,φ,vel)
   for _ ∈ Base.OneTo(s.max_steps)
     φ_mat   = reshape(_φ,ndof)
     vel_mat = reshape(_vel,ndof)
@@ -319,17 +317,18 @@ function reinit!(s::AdvectionStencil{O},φ::PVector,γ) where O
   _φ = (O >= 2) ? permute!(perm_caches[1],φ,s.perm) : φ
 
   # Compute approx sign function S
-  vel_tmp .= @. _φ / sqrt(_φ*_φ + prod(Δ))
+  pΔ = prod(Δ)
+  vel_tmp = @. _φ / sqrt(_φ*_φ + pΔ)
 
   ## CFL Condition (requires γ≤0.5)
-  Δt = compute_Δt(s.stencil,γ,_φ,1.0) # As inform(vel_tmp) = 1.0
+  Δt = compute_Δt(s.stencil,Δ,γ,_φ,1.0) # As inform(vel_tmp) = 1.0
 
   # Apply operations across partitions
   step = 1; err = maximum(abs,φ); fill!(φ_tmp,0.0)
   while (err > s.tol) && (step <= s.max_steps_reinit) 
     # Step of 1st order upwind reinitialisation equation
     map(local_views(φ_tmp),local_views(_φ),local_views(vel_tmp),local_stencil_caches,local_ndof) do φ_tmp,_φ,vel_tmp,stencil_caches,S
-      φ_tmp_mat   = reshape(_φ,S)
+      φ_tmp_mat   = reshape(φ_tmp,S)
       φ_mat       = reshape(_φ,S)
       vel_tmp_mat = reshape(vel_tmp,S)
       reinit!(s.stencil,φ_tmp_mat,φ_mat,vel_tmp_mat,Δt,Δ,isperiodic,stencil_caches)
@@ -354,16 +353,17 @@ function reinit!(s::AdvectionStencil{O},φ::Vector,γ) where O
   _φ = (O >= 2) ? permute!(perm_caches[1],φ,s.perm) : φ
 
   # Compute approx sign function S
-  vel_tmp .= @. _φ / sqrt(_φ*_φ + prod(Δ))
+  pΔ = prod(Δ)
+  vel_tmp .= @. _φ / sqrt(_φ*_φ + pΔ)
 
   ## CFL Condition (requires γ≤0.5)
-  Δt = compute_Δt(s.stencil,γ,_φ,1.0)
+  Δt = compute_Δt(s.stencil,Δ,γ,_φ,1.0)
 
   # Apply operations across partitions
   step = 1; err = maximum(abs,φ); fill!(φ_tmp,0.0)
   while (err > s.tol) && (step <= s.max_steps_reinit) 
     # Step of 1st order upwind reinitialisation equation
-    φ_tmp_mat   = reshape(_φ,ndof)
+    φ_tmp_mat   = reshape(φ_tmp,ndof)
     φ_mat       = reshape(_φ,ndof)
     vel_tmp_mat = reshape(vel_tmp,ndof)
     reinit!(s.stencil,φ_tmp_mat,φ_mat,vel_tmp_mat,Δt,Δ,isperiodic,stencil_cache)
