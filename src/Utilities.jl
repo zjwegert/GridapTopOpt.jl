@@ -126,21 +126,23 @@ function isotropic_3d(E::M,ν::M) where M<:AbstractFloat
 end
 
 # Logging
-function print_history(pvec::PVector,it,args...)
+function print_history(pvec::PVector,it,entries::Vector{<:Pair})
     if i_am_main(pvec)
-        print_history([],it,args...)
+        print_history([],it,entries)
     end
 end
 
-function print_history(::Vector,it,args...)
+function print_history(::Vector,it,entries::Vector{<:Pair})
     str = "it: $it"
-    for pair in args
+    for pair in entries
         val = round.(pair.second;digits=5)
         str*="| $(pair.first): $val"
     end
     println(str)
 end
 
-function write_vtk(it,path,Ω)
-    @notimplemented # TODO
+function write_vtk(Ω,path,entries::Vector{<:Pair};iter_mod=10)
+    if isone(it) || iszero(it % iter_mod) 
+        writevtk(Ω,path,cellfields=entries)
+    end
 end

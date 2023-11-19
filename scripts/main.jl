@@ -87,15 +87,13 @@ function main()#mesh_partition,distribute)
     ## Optimiser
     optimiser = AugmentedLagrangian(φ,pcfs,stencil,vel_ext,interp,γ,γ_reinit);
     Base.iterate(optimiser)
-    # for history in optimiser
-    #     it,Ji,Ci,Li = last(history)
-    #     print_history(φ,it,Ji,Ci,Li)
-    #     write_history(optimiser,path)
-    #     if isone(it) || iszero(it % 30) 
-    #         writevtk(Ω,path*"/struc_$it",cellfields=["phi"=>φhi,"H(phi)"=>(H ∘ φhi),
-    #             "|nabla(phi))|"=>(norm ∘ ∇(φhi)),"uh"=>uhi,"dLh"=>dLhi])
-    #     end
-    # end
+    for history in optimiser
+        it,Ji,Ci,Li = last(history)
+        print_history(φ,it,["J"=>Ji,"C"=>Ci,"L"=>Li])
+        write_history(optimiser,path)
+        # φhi...
+        write_vtk(Ω,path*"/struc_$it",["phi"=>φhi,"H(phi)"=>(H ∘ φhi),"|nabla(phi))|"=>(norm ∘ ∇(φhi)),"uh"=>uhi])
+    end
 end
 
 # out = with_debug() do distribute
