@@ -149,7 +149,7 @@ function AdvectionStencil(stencil::Stencil,
                           Δ::Tuple,
                           max_steps::Int,
                           tol::T; 
-                          max_steps_reinit::Int = 500) where T
+                          max_steps_reinit::Int = 2000) where T
   ## Get DoF description and permutation
   order = get_order(first(Gridap.CellData.get_data(get_fe_basis(space))))
   desc = get_cartesian_descriptor(model)

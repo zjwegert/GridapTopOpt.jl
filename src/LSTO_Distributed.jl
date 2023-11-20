@@ -11,6 +11,7 @@ using GridapPETSc
 using PartitionedArrays
 using SparseMatricesCSR
 using ChainRulesCore
+using DelimitedFiles
 
 import Gridap.Algebra: LinearSolver, SymbolicSetup
 import Gridap.Geometry: get_faces
@@ -39,6 +40,7 @@ export get_Δ
 export update_labels!
 export isotropic_2d
 export isotropic_3d
+export make_dir
 export print_history
 export write_vtk
 

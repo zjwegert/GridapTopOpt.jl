@@ -55,7 +55,7 @@ end
     where u is a state field and φ is auxilary. 
     
     Assumptions:
-     - The arguments to F matchs the weak form.
+     - The arguments to F match the weak form.
      - The argument u is the solution to an FE problem. This can be a single field or multifield.
      - There is a single auxilary field. Again, this can possibly be a MultiFieldFEFunction.
         E.g., multiple level set functions.
@@ -340,6 +340,7 @@ function _evaluate_derivatives(pcf::PDEConstrainedFunctionals,φ::T) where T <: 
         φh = FEFunction(V_φ,φ)
         _dF = (q) -> dF_analytic(q,uh,φh,dΩ...)
         assemble_vector!(_dF,dF,deriv_assem,U_reg)
+        dF .*= -1
         return j_val
     end
     j = ∇!(J,dJ,analytic_dJ)
