@@ -60,6 +60,7 @@ struct AugmentedLagrangian <: AbstractOptimiser
     ζ               :: Real
     vft             :: Real
     update_mod      :: Int
+    max_iters       :: Int
     history         :: AugmentedLagrangianHistory
     conv_criterion  :: Function
     cache
@@ -79,7 +80,7 @@ struct AugmentedLagrangian <: AbstractOptimiser
         history = AugmentedLagrangianHistory(max_iters,N)
         vel = get_free_dof_values(interpolate(0,V_φ))
         cache = (φ,pcfs,stencil,vel_ext,interp,vel,el_size,γ,γ_reinit)
-        new(λ,Λ,ζ,vft,update_mod,history,conv_criterion,cache)
+        new(λ,Λ,ζ,vft,update_mod,max_iters,history,conv_criterion,cache)
     end
 end
 
@@ -162,7 +163,7 @@ function Base.iterate(m::AugmentedLagrangian,dL)
     ## History
     update!(history,J_new,C_new,L_new)
 
-    if conv_criterion(m)
+    if conv_criterion(m) || history.it >= m.max_iters - 1
         return nothing
     else
         return history,dL
