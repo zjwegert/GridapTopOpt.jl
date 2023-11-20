@@ -1,7 +1,7 @@
 using Gridap, GridapDistributed, GridapPETSc, PartitionedArrays, LSTO_Distributed
 
 """
-    (Serial) Minimum thermal compliance with Lagrangian method in 2D.
+    (MPI) Minimum thermal compliance with Lagrangian method in 2D.
 
     Optimisation problem:
         Min J(Ω) = ∫ D*∇(u)⋅∇(u) + ξ dΩ
@@ -9,25 +9,27 @@ using Gridap, GridapDistributed, GridapPETSc, PartitionedArrays, LSTO_Distribute
       s.t., ⎡u∈V=H¹(Ω;u(Γ_D)=0),
             ⎣∫ D*∇(u)⋅∇(v) dΩ = ∫ v dΓ_N, ∀v∈V.
 """ 
-function main()
+function main(mesh_partition,distribute)
+    ranks = distribute(LinearIndices((prod(mesh_partition),)))
+
     ## Parameters
     order = 1;
     xmax=ymax=1.0
     prop_Γ_N = 0.4;
     prop_Γ_D = 0.2
     dom = (0,xmax,0,ymax);
-    el_size = (200,200);
+    el_size = (100,100);
     γ = 0.1;
     γ_reinit = 0.5;
     max_steps = floor(Int,minimum(el_size)/10)
-    tol = 1/(order^2*10)*prod(inv,minimum(el_size)) # <- We can do better than this I think
+    tol = 1/(order^2*10)*prod(inv,minimum(el_size))
     D = 1;
     η_coeff = 2;
     α_coeff = 4;
-    path = "./Results/main"
+    path = "./Results/MPI_main"
 
     ## FE Setup
-    model = CartesianDiscreteModel(dom,el_size);
+    model = CartesianDiscreteModel(ranks,mesh_partition,dom,el_size);
     Δ = get_Δ(model)
     f_Γ_D(x) = (x[1] ≈ 0.0 && (x[2] <= ymax*prop_Γ_D + eps() || 
         x[2] >= ymax-ymax*prop_Γ_D - eps())) ? true : false;
@@ -63,7 +65,7 @@ function main()
     res(u,v,φ,dΩ,dΓ_N) = a(u,v,φ,dΩ,dΓ_N) - l(v,φ,dΩ,dΓ_N)
 
     ## Optimisation functionals
-    ξ = 0.2;
+    ξ = 0.3;
     J = (u,φ,dΩ,dΓ_N) -> ∫((I ∘ φ)*D*∇(u)⋅∇(u) + ξ*(ρ ∘ φ))dΩ
     dJ = (q,u,φ,dΩ,dΓ_N) -> ∫((ξ-D*∇(u)⋅∇(u))*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ;
 
@@ -98,4 +100,6 @@ function main()
     write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh)),"uh"=>uhi];iter_mod=1)
 end
 
-main();
+with_mpi() do distribute
+    main((1,2),distribute)
+end;

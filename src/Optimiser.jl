@@ -34,20 +34,22 @@ end
 # Convienence 
 Base.last(m::AugmentedLagrangianHistory) = (m.it,m.J[m.it],m.C[m.it,:],m.L[m.it])
 
-function write_history(m::AugmentedLagrangianHistory,path)
+function write_history(model,m::AugmentedLagrangianHistory,path)
     it = m.it; J = m.J; C = m.C; L = m.L
-    if length(C) > 0
-        data = @views zip(J[1:it],eachslice(C[1:it,:],dims=2)...,L[1:it])
-    else
-        data = @views zip(J[1:it],L[1:it])
+    if i_am_main(model) 
+        if length(C) > 0
+            data = @views zip(J[1:it],eachslice(C[1:it,:],dims=2)...,L[1:it])
+        else
+            data = @views zip(J[1:it],L[1:it])
+        end
+        writedlm(path,data)
     end
-    writedlm(path,data)
 end
 
 function update!(m::AugmentedLagrangianHistory,J,C,L)
     m.it += 1
     m.J[m.it] = J 
-    length(C)>0 ? m.C[m.it] = C : nothing 
+    length(C)>0 ? m.C[m.it,:] .= C : nothing 
     m.L[m.it] = L
     return nothing
 end
@@ -88,7 +90,7 @@ get_level_set(m::AugmentedLagrangian) = FEFunction(get_aux_space(m.cache[2]),fir
 function initialise!(m::AugmentedLagrangian,J_init::Real,C_init::Vector)
     λ = m.λ; Λ = m.Λ;
     vft = m.vft;
-    λ .= 0.1*J_init/vft;
+    λ .= -0.1*abs(J_init)/vft;
     Λ .= @. abs(0.01*m.λ/vft)
     return λ,Λ
 end
@@ -102,12 +104,12 @@ function update!(m::AugmentedLagrangian,iter::Int,C_new::Vector)
 end
 
 # Stopping criterion
-function conv_cond(m::AugmentedLagrangian)
+function conv_cond(m::AugmentedLagrangian;coef=1/5)
     _,_,_,_,_,_,el_size,_,_ = m.cache
     history = m.history
     it,Ji,Ci,Li = last(history)
 
-    return it > 10 && (all(@.(abs(Li-history.L[it-5:it-1])) .< 1/5/maximum(el_size)*Li) &&
+    return it > 10 && (all(@.(abs(Li-history.L[it-6:it-1])) .< coef/maximum(el_size)*Li) &&
         all(@. abs(Ci) < 0.0001))
 end
 
@@ -149,7 +151,7 @@ function Base.iterate(m::AugmentedLagrangian,dL)
     ## Calculate objective, constraints, and shape derivatives
     J_new,C_new,dJ,dC = Gridap.evaluate!(pcfs,φ)
     L_new = J_new
-    length(C_new)>0 ? L_new += sum(@. -λ*C_new + Λ/2*C_new^2) : nothing
+    length(C_new)>0 ? L_new += sum(@. -m.λ*C_new + m.Λ/2*C_new^2) : nothing
     
     ## Augmented Lagrangian method
     λ,Λ = update!(m,history.it,C_new)
