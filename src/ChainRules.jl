@@ -198,18 +198,12 @@ function (φ_to_u::AffineFEStateMap)(φ::T) where T <: AbstractVector
     U,V,V_φ,U_reg = φ_to_u.spaces
     ns,K,b,x,uhd,assem_U = φ_to_u.fwd_caches
     φh = FEFunction(V_φ,φ)
-
-    ## Reassemble and solve
-    # println("Before                                    : $(Matrix(K)) , $b")
+    
+    ## Assemble and solve
     du = get_trial_fe_basis(U)
     dv = get_fe_basis(V);
     data = collect_cell_matrix_and_vector(U,V,a(du,dv,φh,dΩ...),l(dv,φh,dΩ...),uhd)
     assemble_matrix_and_vector!(K,b,assem_U,data)
-    # assemble_matrix_and_vector!((u,v)->a(u,v,φh,dΩ...),v->l(v,φh,dΩ...),K,b,assem_U,U,V)
-    # _op = AffineFEOperator((u,v)->a(u,v,φh,dΩ...),v->l(v,φh,dΩ...),U,V)
-    # println("Assemble with AffineFEOperator constructor: $(Matrix(_op.op.matrix)) , $(_op.op.vector)")
-    # println("After                                     : $(Matrix(K)) , $b")
-    # error("Stop here")
     numerical_setup!(ns,K)
     solve!(x,ns,b)
     x

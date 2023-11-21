@@ -83,19 +83,18 @@ function main(mesh_partition,distribute)
     vel_ext = VelocityExtension(a_hilb,U_reg,V_reg,dΩ)
     
     ## Optimiser
-    make_dir(ranks,path)
-    # _conv_cond = t->LSTO_Distributed.conv_cond(t;coef=1/50);
-    optimiser = AugmentedLagrangian(φ,pcfs,stencil,vel_ext,interp,el_size,γ,γ_reinit;max_iters=2)#,conv_criterion=_conv_cond);
+    make_dir(path;ranks=ranks)
+    _conv_cond = t->LSTO_Distributed.conv_cond(t;coef=1/50);
+    optimiser = AugmentedLagrangian(φ,pcfs,stencil,vel_ext,interp,el_size,γ,γ_reinit,conv_criterion=_conv_cond);
     for history in optimiser
         it,Ji,_,_ = last(history)
-        print_history(ranks,it,["J"=>Ji])
-        write_history(ranks,history,path*"/history.csv")
-        uhi = get_state(pcfs)
-        write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh)),"uh"=>uhi])
+        print_history(it,["J"=>Ji];ranks=ranks)
+        write_history(history,path*"/history.csv";ranks=ranks)
+        write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh))])
     end
     it,Ji,_,_ = last(optimiser.history)
-    print_history(ranks,it,["J"=>Ji])
-    write_history(ranks,optimiser.history,path*"/history.csv")
+    print_history(it,["J"=>Ji];ranks=ranks)
+    write_history(optimiser.history,path*"/history.csv";ranks=ranks)
     uhi = get_state(pcfs)
     write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh)),"uh"=>uhi];iter_mod=1)
 end

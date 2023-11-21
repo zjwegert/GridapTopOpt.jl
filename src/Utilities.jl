@@ -1,5 +1,5 @@
 ## Initial LSF
-gen_lsf(ξ,a) = x::VectorValue -> -1/4*prod(cos.(get_array(ξ*pi*x))) - a/4
+gen_lsf(ξ,a;b=0) = x::VectorValue -> -1/4*prod(cos.(get_array(@.(ξ*pi*(x-b))))) - a/4
 
 ## Get element size Δ
 function get_Δ(model::CartesianDiscreteModel)
@@ -126,15 +126,15 @@ function isotropic_3d(E::M,ν::M) where M<:AbstractFloat
 end
 
 # Logging
-function make_dir(model,path)
-    if i_am_main(model)
+function make_dir(path;ranks=nothing)
+    if i_am_main(ranks)
         !isdir(path) ? mkdir(path) : rm(path,recursive=true);
         !isdir(path) ? mkdir(path) : 0;
     end
 end
 
-function print_history(model,it,entries::Vector{<:Pair})
-    if i_am_main(model)
+function print_history(it,entries::Vector{<:Pair};ranks=nothing)
+    if i_am_main(ranks)
         str = "it: $it"
         for pair in entries
             val = round.(pair.second;digits=5)
