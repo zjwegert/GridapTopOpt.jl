@@ -1,5 +1,32 @@
 # LSTO_Distributed
 
+## To-do for paper:
+
+- [ ] Benchmark and scaling tests
+- [ ] Implement optimisation problems and test:
+
+  |          **Problem type**         | **2D**  | **3D**  | **Serial** | **MPI** |
+  |:---------------------------------:|---------|---------|:----------:|---------|
+  | Minimum thermal compliance        | &#9745; | &#9744; | &#9745;    | &#9745; |
+  | Minimum elastic compliance        | &#9745; | &#9744; | &#9745;    | &#9744; |
+  | Inverter mechanism                | &#9745; | &#9744; | &#9745;    | &#9744; |
+  | Elastic inverse homogenisation    | &#9745; | &#9744; | &#9745;    | &#9744; |
+  | Minimum NL thermal compliance (?) | &#9744; | &#9744; | &#9744;    | &#9744; |
+
+- [ ] Testing automatic differentation
+  * &#9744; Test inverter mechanism problem with analytic adjoint. 
+  * &#9744; Compare to ray integrals for multi-material ([Paper](https://doi.org/10.1051/cocv/2013076)) and additive manufacturing ([Paper](https://doi.org/10.1051/m2an/2019056)) problems.
+- [ ] Implement HPM ([Paper](https://doi.org/10.1007/s00158-023-03663-0))
+ 
+## Wishlist:
+- [ ] Implement NonlinearFEStateSpace
+- [ ] Additive manufacturing constraints
+
+## Known bugs
+- [ ] Higher order FEs breaks `Advection.jl` in parallel
+- [ ] `create_dof_permutation` doesn't work for periodic models.
+
+# Deprecated:
 ## Setup:
 
 1. Download and activate repo in Julia using `]` followed by `activate .`.

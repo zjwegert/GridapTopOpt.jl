@@ -171,7 +171,7 @@ function Base.iterate(m::AugmentedLagrangian,dL)
   ## History
   update!(history,J_new,C_new,L_new)
 
-  if conv_criterion(m) || it >= m.max_iters
+  if conv_criterion(m) || it + 1 >= m.max_iters
     return nothing
   else
     return history,dL
