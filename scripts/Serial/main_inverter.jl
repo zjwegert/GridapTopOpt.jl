@@ -2,6 +2,8 @@ using Gridap, GridapDistributed, GridapPETSc, PartitionedArrays, LSTO_Distribute
 
 """
   (Serial) Inverter mechanism with Lagrangian method in 2D.
+  
+  Ref: http://doi.org/10.1007/s00158-018-1950-2
 
   Optimisation problem:
       Min J(Ω) = ∫ ηᵢₙ * uₓ dΓᵢₙ + ∫ ηₒᵤₜ * uₓ dΓₒᵤₜ + ∫ ξ dΩ
