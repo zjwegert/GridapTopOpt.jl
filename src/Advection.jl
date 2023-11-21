@@ -153,9 +153,9 @@ function AdvectionStencil(stencil::Stencil,
   ## Get DoF description and permutation
   order = get_order(first(Gridap.CellData.get_data(get_fe_basis(space))))
   desc = get_cartesian_descriptor(model)
-  perm = create_dof_permutation(model,space,order)
-  ndof = order .* desc.partition .+ 1
   isperiodic = desc.isperiodic
+  ndof = order .* desc.partition .+ 1 .* (.~isperiodic)
+  perm = any(isperiodic) ? nothing : create_dof_permutation(model,space,order)
   
   ## Cache
   _φ = get_free_dof_values(zero(space));
@@ -172,17 +172,21 @@ function AdvectionStencil(stencil::Stencil,
                           space::DistributedFESpace,
                           Δ::Tuple,max_steps::Int,tol::T; max_steps_reinit::Int = 500) where T
   ## Get DoF description and permutation
-  order, local_isperiodic, local_ndofs, perm = map(local_views(model),
+  isperiodic = getany(map(x->get_cartesian_descriptor(x).isperiodic,local_views(model)))
+
+#  order, local_isperiodic, local_ndofs, perm = map(local_views(model),
+  order, local_ndofs, perm = map(local_views(model),
       local_views(space)) do model, space
     order = get_order(first(Gridap.CellData.get_data(get_fe_basis(space))))
     desc = get_cartesian_descriptor(model)
-    dof_permutation = create_dof_permutation(model,space,order)
+    dof_permutation = any(isperiodic) ? nothing : create_dof_permutation(model,space,order)
     ndof = order .* desc.partition .+ 1
-    isperiodic = desc.isperiodic
-    return order, isperiodic, ndof, dof_permutation
+    # isperiodic = desc.isperiodic
+    # return order, isperiodic, ndof, dof_permutation
+    return order, ndof, dof_permutation
   end |> PartitionedArrays.tuple_of_arrays
   order = getany(order)
-  isperiodic = getany(local_isperiodic)
+  # isperiodic = getany(local_isperiodic)
 
   ## Cache
   _φ = get_free_dof_values(zero(space));
