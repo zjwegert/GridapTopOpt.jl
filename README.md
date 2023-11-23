@@ -15,12 +15,13 @@
 
 - [ ] Testing automatic differentation
   * &#9744; Test inverter mechanism problem with analytic adjoint. 
-  * &#9744; Compare to ray integrals for multi-material ([Paper](https://doi.org/10.1051/cocv/2013076)) and additive manufacturing ([Paper](https://doi.org/10.1051/m2an/2019056)) problems.
+  * &#9745; Compare to ray integrals for multi-material ([Paper](https://doi.org/10.1051/cocv/2013076)) and additive manufacturing ([Paper](https://doi.org/10.1051/m2an/2019056)) problems. Edit: We cannot use AD for these. Related to discussion below.
 - [ ] Implement HPM ([Paper](https://doi.org/10.1007/s00158-023-03663-0))
- 
-## Wishlist:
 - [ ] Implement NonlinearFEStateSpace
-- [ ] Additive manufacturing constraints
+
+## Future work (not this paper)
+- [ ] Implement CutFEM in serial using GridapEmbedded.
+- [ ] Extend to parallel (I'm sure this will be a massive undertaking)
 
 ## Known bugs
 - [ ] Higher order FEs breaks `Advection.jl` in parallel
