@@ -26,6 +26,31 @@
 - [ ] Higher order FEs breaks `Advection.jl` in parallel
 - [ ] `create_dof_permutation` doesn't work for periodic models.
 
+## Some notes on auto differentiation
+
+The shape derivative of $J^\prime(\Omega)$ can be defined as the Frechet derivative under a mapping $\tilde\Omega = (\boldsymbol{I}+\boldsymbol{\theta})(\Omega)$ at 0 with
+
+$$J(\tilde{\Omega})=J(\Omega)+J^\prime(\Omega)(\boldsymbol{\theta})+o(\lVert\boldsymbol{\theta}\rVert).$$
+
+Consider some illistrative examples. First suppose that $J_1(\Omega)=\int_\Omega f(\boldsymbol{x})\~\mathrm{d}\boldsymbol{x}$, then
+
+$$J_1(\tilde{\Omega})=\int_{\tilde{\Omega}}f(\tilde{\boldsymbol{x}})\~\mathrm{d}\boldsymbol{x}=\int_{\Omega}f(\boldsymbol{x}+\boldsymbol{\theta})\left\lvert\frac{\partial\boldsymbol{\tilde{x}}}{\partial\boldsymbol{x}}\right\rvert\~\mathrm{d}\boldsymbol{x}=...=J(\Omega)+\int_{\partial\Omega}f(\boldsymbol{x})\~\boldsymbol{\theta}\cdot\boldsymbol{n}\~\mathrm{d}s+...$$
+
+So, for this simple case $J_1^\prime(\Omega)(\boldsymbol{\theta})=\int_{\partial\Omega}f(\boldsymbol{x})\~\boldsymbol{\theta}\cdot\boldsymbol{n}\~\mathrm{d}s\~\~(\star)$. For a surface integral $J(\Omega)=\int_\Omega f(\boldsymbol{x})\~\mathrm{d}\boldsymbol{x}$, one finds in a similar way $J^\prime(\Omega)(\boldsymbol{\theta})=\int_{\partial\Omega}(f\nabla\cdot\boldsymbol{n}+\nabla f\cdot\boldsymbol{n})\~\boldsymbol{\theta}\cdot\boldsymbol{n}\~\mathrm{d}s$.
+<br /><br />
+Now, consider a signed distance function $\varphi$ for our domain $\Omega\subset D$. In a fixed computational regime, we can rewrite the first functional above as $J_\Omega(\varphi)=\int_D H(\varphi)f(\boldsymbol{x})\~\mathrm{d}\boldsymbol{x}$ where $H$ is a smooth heaviside function. Considering the directional derivative of $J_\Omega$ under a variation $\tilde{\varphi}=\varphi+sv$ gives
+
+$$\mathrm{d}J_\Omega(\varphi)(v)=\frac{\mathrm{d}}{\mathrm{d}s} J_\Omega(\varphi+sv){\large{|}_{s=0}}=\int_D \frac{\mathrm{d}}{\mathrm{d}s}_0 H(\varphi+sv)f(\boldsymbol{x})\~\mathrm{d}\boldsymbol{x}=\int_D vH^\prime(\varphi)f(\boldsymbol{x})\~\mathrm{d}\boldsymbol{x}$$
+
+The final result of course does not yet match $(\star)$. In our smoothed setting under which we relax integrals to be over all of $D$ we have that $\mathrm{d}s = H'(\varphi)\lvert\nabla\varphi\rvert\~\mathrm{d}\boldsymbol{x}$. In addition suppose we take $\boldsymbol{\theta}=v\boldsymbol{n}$. Then $(\star)$ can be rewritten as
+$$J_1^\prime(\Omega)(v\boldsymbol{n})=\int_{D}vf(\boldsymbol{x})H'(\varphi)\lvert\nabla\varphi\rvert\~\mathrm{d}s$$
+
+As $\varphi$ is a signed distance function we have $\lvert\nabla\varphi\rvert=1$ for $D\setminus\Sigma$ where $\Sigma$ is the skeleton of $\Omega$ and $\Omega^\complement$. Furthermore, $H'(\varphi)$ provides support only within a band of $\partial\Omega$. Therefore, we should have that almost everywhere
+
+$${\huge{|}} J_1^\prime(\Omega)(v\boldsymbol{n}) - \mathrm{d}J_\Omega(\varphi)(v){\huge{|}}\rightarrow0.$$
+
+<br /><br /><br /><br /><br /><br /><br /><br /><br />
+---------------------------------------------------------------------------------------------------
 # Deprecated:
 ## Setup:
 
