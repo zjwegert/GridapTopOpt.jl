@@ -90,7 +90,10 @@ $$
 \end{aligned}
 $$
 
-where $\boldsymbol{v},\boldsymbol{q}\in H^1(\Omega)^d$.
+where $\boldsymbol{v},\boldsymbol{q}\in H^1(\Omega)^d$. Requiring stationarity of the Lagrangian and taking a partial derivative of $\mathcal{L}$ with respect to $\boldsymbol{q}$ in the direction $\phi\in H^1(\Omega)^d$ gives
+
+$$\frac{\partial\mathcal{L}}{\partial\boldsymbol{q}}(\boldsymbol{\phi})=$$
+
 
 ### A rule of thumb
 
