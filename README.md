@@ -63,19 +63,34 @@ On the other hand, relaxing the shape derivative of $J_2$ in the same way as abo
 $$J_2^\prime(\Omega)(-v\boldsymbol{n})=\int_{D}-\left(f\nabla\cdot\frac{\nabla\varphi}{\lvert\nabla\varphi\rvert}+\nabla f\cdot\frac{\nabla\varphi}{\lvert\nabla\varphi\rvert}\right)vH'(\varphi)\lvert\nabla\varphi\rvert\~\mathrm{d}\boldsymbol{x}.$$
 
 ### Adding PDE constraints
-Consider $\Omega\subset D$ with $J(\Omega,u)=\int_\Omega j(u)\~\mathrm{d}\boldsymbol{x}+\int_\Gamma l(u)\~\mathrm{d}\Gamma$ where $u$ satisfies
+Consider $\Omega\subset D$ with $J(\Omega,\boldsymbol{u})=\int_\Omega j(\boldsymbol{u})\~\mathrm{d}\boldsymbol{x}+\int_\Gamma l(\boldsymbol{u})\~\mathrm{d}\Gamma$ where $\boldsymbol{u}$ satisfies
 
 $$
 \begin{aligned}
--\mathrm{div}(C\varepsilon(\boldsymbol{u})) &= f\text{ on }\Omega, \\
+-\mathrm{div}(\boldsymbol{C\varepsilon}(\boldsymbol{u})) &= f\text{ on }\Omega, \\
 u &= 0\text{ on }\Gamma_D,\\
-C\varepsilon(\boldsymbol{u})\boldsymbol{n} &= 0\text{ on }\Gamma_0,\\
-C\varepsilon(\boldsymbol{u})\boldsymbol{n} &= g\text{ on }\Gamma_N,\\
-C\varepsilon(\boldsymbol{u})\boldsymbol{n} &= w(u)\text{ on }\Gamma_R.\\
+\boldsymbol{C\varepsilon}(\boldsymbol{u})\boldsymbol{n} &= \boldsymbol{0}\text{ on }\Gamma_0,\\
+\boldsymbol{C\varepsilon}(\boldsymbol{u})\boldsymbol{n} &= \boldsymbol{g}\text{ on }\Gamma_N,\\
+\boldsymbol{C\varepsilon}(\boldsymbol{u})\boldsymbol{n} &= \boldsymbol{w}(\boldsymbol{u})\text{ on }\Gamma_R.\\
 \end{aligned}
 $$
 
-In the above $\varepsilon$ is the strain tensor, $C$ is the stiffness tensor, $\Gamma_0 = \partial\Omega\setminus(\Gamma\cup\Gamma_D\cup\Gamma_N\cup\Gamma_R)$, and that $\Gamma$ is disjoint from the other partitions of $\partial\Omega$ for simplicity.
+In the above $\boldsymbol{\varepsilon}$ is the strain tensor, $\boldsymbol{C}$ is the stiffness tensor, $\Gamma_0 = \partial\Omega\setminus(\Gamma\cup\Gamma_D\cup\Gamma_N\cup\Gamma_R)$, and that $\Gamma$ is disjoint from the other partitions of $\partial\Omega$ for simplicity.
+
+#### Shape derivative
+Let us first consider the shape derivative of $J$. Disregarding embedding inside the computational domain $D$, the above strong form can be written in weak form as: *Find* $\boldsymbol{u}\in H^1_{\Gamma_D}(\Omega)^d$ *such that*
+$$\int_{\Omega} \boldsymbol{C\varepsilon}(\boldsymbol{u})\boldsymbol{\varepsilon}(\boldsymbol{v})\~\mathrm{d}\Omega+\int_{\Gamma_R}\boldsymbol{w}(\boldsymbol{u})\cdot\boldsymbol{v}\~\mathrm{d}\Gamma=\int_\Omega \boldsymbol{f}\cdot\boldsymbol{v}\~\mathrm{d}\Omega+\int_{\Gamma_N}\boldsymbol{g}\cdot\boldsymbol{v}\~\mathrm{d}\Gamma,\~\forall \boldsymbol{v}\in H^1_{\Gamma_D}(\Omega)^d.$$
+
+Following Céa's formal adjoint method we introduce the following Lagrangian
+
+$$
+\begin{aligned}
+\mathcal{L}(\Omega,\boldsymbol{v},\boldsymbol{q})=\int_\Omega j(u)\~\mathrm{d}\boldsymbol{x}&+\int_\Gamma l(u)\~\mathrm{d}\Gamma+\int_{\Omega} \boldsymbol{C\varepsilon}(\boldsymbol{v})\boldsymbol{\varepsilon}(\boldsymbol{q})\~\mathrm{d}\Omega+\int_{\Gamma_R}\boldsymbol{w}(\boldsymbol{v})\cdot\boldsymbol{q}\~\mathrm{d}\Gamma-\int_\Omega \boldsymbol{f}\cdot\boldsymbol{q}\~\mathrm{d}\Omega\\
+&-\int_{\Gamma_N}\boldsymbol{g}\cdot\boldsymbol{q}\~\mathrm{d}\Gamma-\int_{\Gamma_D}\boldsymbol{q}\cdot\boldsymbol{C\varepsilon}(\boldsymbol{v})\boldsymbol{n}+\boldsymbol{v}\cdot\boldsymbol{C\varepsilon}(\boldsymbol{q})\boldsymbol{n}\\
+\end{aligned}
+$$
+
+where $\boldsymbol{v},\boldsymbol{q}\in H^1(\Omega)^d$.
 
 ### A rule of thumb
 
