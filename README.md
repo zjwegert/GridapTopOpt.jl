@@ -40,21 +40,22 @@ $$J_1(\tilde{\Omega})=\int_{\tilde{\Omega}}f(\tilde{\boldsymbol{x}})\~\mathrm{d}
 
 So, for this simple case $$J_1^\prime(\Omega)(\boldsymbol{\theta})=\int_{\partial\Omega}f(\boldsymbol{x})\~\boldsymbol{\theta}\cdot\boldsymbol{n}\~\mathrm{d}s\~\~(\star).$$ For a surface integral $J_2(\Omega)=\int_{\partial\Omega} f(\boldsymbol{x})\~\mathrm{d}s$, one finds in a similar way $$J_2^\prime(\Omega)(\boldsymbol{\theta})=\int_{\partial\Omega}(f\nabla\cdot\boldsymbol{n}+\nabla f\cdot\boldsymbol{n})\~\boldsymbol{\theta}\cdot\boldsymbol{n}\~\mathrm{d}s.$$
 
-Suppose that we attribute a signed distance function $\varphi:D\rightarrow\mathbb{R}$ to our domain $\Omega\subset D$ with $\bar{\Omega}=\lbrace \boldsymbol{x}:\varphi(\boldsymbol{x})\leq0\rbrace$ and $\Omega^\complement=\lbrace \boldsymbol{x}:\varphi(\boldsymbol{x})>0\rbrace$. We can then define a smooth characteristic function $\chi:D\rightarrow[\varepsilon,1]$ as $\chi(\boldsymbol{x})=1-H(\varphi(\boldsymbol{x}))+\varepsilon H(\varphi(\boldsymbol{x}))$ where $H$ is a smoothed Heaviside function and $\varepsilon\ll1$ allows for an ersatz material approximation but of course can be taken as zero depending on the computational regime. We can now rewrite $J_1$ over the computational domain $D$ as $J_{1\Omega}(\varphi)=\int_D \chi(\varphi)f(\boldsymbol{x})\~\mathrm{d}\boldsymbol{x}$. Considering the directional derivative of $J_{1\Omega}$ under a variation $\tilde{\varphi}=\varphi+sv$ gives
+Suppose that we attribute a signed distance function $\varphi:D\rightarrow\mathbb{R}$ to our domain $\Omega\subset D$ with $\bar{\Omega}=\lbrace \boldsymbol{x}:\varphi(\boldsymbol{x})\leq0\rbrace$ and $\Omega^\complement=\lbrace \boldsymbol{x}:\varphi(\boldsymbol{x})>0\rbrace$. We can then define a smooth characteristic function $\chi_\epsilon:D\rightarrow[\epsilon,1]$ as $\chi_\epsilon(\boldsymbol{x})=1-H(\varphi(\boldsymbol{x}))+\epsilon H(\varphi(\boldsymbol{x}))$ where $H$ is a smoothed Heaviside function and $\epsilon\ll1$ allows for an ersatz material approximation but of course can be taken as zero depending on the computational regime. We can now rewrite $J_1$ over the computational domain $D$ as $J_{1\Omega}(\varphi)=\int_D \chi_\epsilon(\varphi)f(\boldsymbol{x})\~\mathrm{d}\boldsymbol{x}$. Considering the directional derivative of $J_{1\Omega}$ under a variation $\tilde{\varphi}=\varphi+sv$ gives
 
-$$J_{1\Omega}^\prime(\varphi)(v)=\frac{\mathrm{d}}{\mathrm{d}s} J_{1\Omega}(\varphi+sv){\large{|}_{s=0}}=\int_D \frac{\mathrm{d}}{\mathrm{d}s}_0 \chi(\varphi+sv)f(\boldsymbol{x})\~\mathrm{d}\boldsymbol{x}=\int_D v\chi^\prime(\varphi)f(\boldsymbol{x})\~\mathrm{d}\boldsymbol{x}$$
+$$J_{1\Omega}^\prime(\varphi)(v)=\frac{\mathrm{d}}{\mathrm{d}s} J_{1\Omega}(\varphi+sv)\rvert_{s=0}=\int_D v\chi_\epsilon^\prime(\varphi)f(\boldsymbol{x})\~\mathrm{d}\boldsymbol{x}$$
+
 or
 
-$$J_{1\Omega}^\prime(\varphi)(v)=\int_D (\varepsilon-1)vH^\prime(\varphi)f(\boldsymbol{x})\~\mathrm{d}\boldsymbol{x}$$
+$$J_{1\Omega}^\prime(\varphi)(v)=\int_D (\epsilon-1)vH^\prime(\varphi)f(\boldsymbol{x})\~\mathrm{d}\boldsymbol{x}$$
 
 The final result of course does not yet match $(\star)$. Over a fixed computational domain we may relax integrals to be over all of $D$ via $\mathrm{d}s = H'(\varphi)\lvert\nabla\varphi\rvert\~\mathrm{d}\boldsymbol{x}$. In addition suppose we take $\boldsymbol{\theta}=-v\boldsymbol{n}$. Then $(\star)$ can be rewritten as
 $$J_1^\prime(\Omega)(v\boldsymbol{n})=-\int_{D}vf(\boldsymbol{x})H'(\varphi)\lvert\nabla\varphi\rvert\~\mathrm{d}s$$
 
 As $\varphi$ is a signed distance function we have $\lvert\nabla\varphi\rvert=1$ for $D\setminus\Sigma$ where $\Sigma$ is the skeleton of $\Omega$ and $\Omega^\complement$. Furthermore, $H'(\varphi)$ provides support only within a band of $\partial\Omega$. Therefore, we have that almost everywhere
 
-$${\huge{|}} J_1^\prime(\Omega)(v\boldsymbol{n}) - J_{1\Omega}^\prime(\varphi)(v){\huge{|}}=O(\varepsilon),$$
+$${\huge{|}} J_1^\prime(\Omega)(v\boldsymbol{n}) - J_{1\Omega}^\prime(\varphi)(v){\huge{|}}=O(\epsilon),$$
 
-with equaility as $\varepsilon\rightarrow0$.
+with equaility as $\epsilon\rightarrow0$.
 
 This is not the case when we consider applying the same process to a surface integral such as $J_2(\Omega)$. In this case, we can never recover $\nabla f$ under a variation of $\varphi$. For argument sake we can take $J_{2\Omega}(\varphi)=\int_D f(\boldsymbol{x})H'(\varphi)\lvert\nabla\varphi\rvert\~\mathrm{d}\boldsymbol{x}$. Then a variation in $\varphi$ gives
 $$J_{2\Omega}^\prime(\varphi)(v)=\int_D f(\boldsymbol{x})\left(H^{\prime\prime}(\varphi)\lvert\nabla\varphi\rvert v + H^\prime(\varphi)\frac{\nabla v\cdot\nabla \varphi}{\lvert\nabla\varphi\rvert}\right)\~\mathrm{d}\boldsymbol{x}.$$
@@ -62,6 +63,19 @@ On the other hand, relaxing the shape derivative of $J_2$ in the same way as abo
 $$J_2^\prime(\Omega)(-v\boldsymbol{n})=\int_{D}-\left(f\nabla\cdot\frac{\nabla\varphi}{\lvert\nabla\varphi\rvert}+\nabla f\cdot\frac{\nabla\varphi}{\lvert\nabla\varphi\rvert}\right)vH'(\varphi)\lvert\nabla\varphi\rvert\~\mathrm{d}\boldsymbol{x}.$$
 
 ### Adding PDE constraints
+Consider $\Omega\subset D$ with $J(\Omega,u)=\int_\Omega j(u)\~\mathrm{d}\boldsymbol{x}+\int_\Gamma l(u)\~\mathrm{d}\Gamma$ where $u$ satisfies
+
+$$
+\begin{aligned}
+-\mathrm{div}(C\varepsilon(\boldsymbol{u})) &= f\text{ on }\Omega, \\
+u &= 0\text{ on }\Gamma_D,\\
+C\varepsilon(\boldsymbol{u})\boldsymbol{n} &= 0\text{ on }\Gamma_0,\\
+C\varepsilon(\boldsymbol{u})\boldsymbol{n} &= g\text{ on }\Gamma_N,\\
+C\varepsilon(\boldsymbol{u})\boldsymbol{n} &= w(u)\text{ on }\Gamma_R.\\
+\end{aligned}
+$$
+
+In the above $\varepsilon$ is the strain tensor, $C$ is the stiffness tensor, $\Gamma_0 = \partial\Omega\setminus(\Gamma\cup\Gamma_D\cup\Gamma_N\cup\Gamma_R)$, and that $\Gamma$ is disjoint from the other partitions of $\partial\Omega$ for simplicity.
 
 ### A rule of thumb
 
