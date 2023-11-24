@@ -34,7 +34,7 @@ The shape derivative of $J^\prime(\Omega)$ can be defined as the Frechet derivat
 
 $$J(\tilde{\Omega})=J(\Omega)+J^\prime(\Omega)(\boldsymbol{\theta})+o(\lVert\boldsymbol{\theta}\rVert).$$
 
-Consider some illistrative examples. First suppose that $J_1(\Omega)=\int_\Omega f(\boldsymbol{x})\~\mathrm{d}\boldsymbol{x}$, then
+Consider some illustrative examples. First suppose that $J_1(\Omega)=\int_\Omega f(\boldsymbol{x})\~\mathrm{d}\boldsymbol{x}$, then
 
 $$J_1(\tilde{\Omega})=\int_{\tilde{\Omega}}f(\tilde{\boldsymbol{x}})\~\mathrm{d}\boldsymbol{x}=\int_{\Omega}f(\boldsymbol{x}+\boldsymbol{\theta})\left\lvert\frac{\partial\boldsymbol{\tilde{x}}}{\partial\boldsymbol{x}}\right\rvert\~\mathrm{d}\boldsymbol{x}=...=J(\Omega)+\int_{\partial\Omega}f(\boldsymbol{x})\~\boldsymbol{\theta}\cdot\boldsymbol{n}\~\mathrm{d}s+...$$
 
