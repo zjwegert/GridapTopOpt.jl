@@ -63,7 +63,7 @@ On the other hand, relaxing the shape derivative of $J_2$ in the same way as abo
 $$J_2^\prime(\Omega)(-v\boldsymbol{n})=\int_{D}-\left(f\nabla\cdot\frac{\nabla\varphi}{\lvert\nabla\varphi\rvert}+\nabla f\cdot\frac{\nabla\varphi}{\lvert\nabla\varphi\rvert}\right)vH'(\varphi)\lvert\nabla\varphi\rvert\~\mathrm{d}\boldsymbol{x}.$$
 
 ### Adding PDE constraints
-Consider $\Omega\subset D$ with $J(\Omega,\boldsymbol{u})=\int_\Omega j(\boldsymbol{u})\~\mathrm{d}\boldsymbol{x}+\int_{\Gamma_N} l_1(\boldsymbol{u})\~\mathrm{d}s+\int_{\Gamma_R} l_2(\boldsymbol{u})\~\mathrm{d}s$ where $\boldsymbol{u}$ satisfies
+Consider $\Omega\subset D$ with $J(\Omega)=\int_\Omega j(\boldsymbol{u})\~\mathrm{d}\boldsymbol{x}+\int_{\Gamma_N} l_1(\boldsymbol{u})\~\mathrm{d}s+\int_{\Gamma_R} l_2(\boldsymbol{u})\~\mathrm{d}s$ where $\boldsymbol{u}$ satisfies
 
 $$
 \begin{aligned}
@@ -137,6 +137,23 @@ $$
 
 As required. Note that in the above, we have used that $\boldsymbol{\theta}\cdot\boldsymbol{n}=0$ on $\Gamma_N$, $\Gamma_R$, and $\Gamma_D$.
 
+
+#### Derivative in $\varphi$
+Let us now return to derivatives of $J$ with respect to $\varphi$ over the whole computational domain. As previously, suppose that we rewrite $J$ as 
+
+$$J_{\Omega}(\varphi)=\int_D \chi_\epsilon(\varphi)j(\boldsymbol{u})\~\mathrm{d}\boldsymbol{x}+\int_{\Gamma_N} l_1(\boldsymbol{u})\~\mathrm{d}s+\int_{\Gamma_R} l_2(\boldsymbol{u})\~\mathrm{d}s$$
+
+where $\boldsymbol{u}$ satisfies the state equations as previously with relaxation over the whole computational domain $D$:
+
+$$
+\begin{aligned}
+-\mathrm{div}(\chi_\epsilon(\varphi)\boldsymbol{C\varepsilon}(\boldsymbol{u})) &= f\text{ on }\Omega, \\
+\boldsymbol{u} &= \boldsymbol{0}\text{ on }\Gamma_D,\\
+\chi_\epsilon(\varphi)\boldsymbol{C\varepsilon}(\boldsymbol{u})\boldsymbol{n} &= \boldsymbol{0}\text{ on }\Gamma_0,\\
+\chi_\epsilon(\varphi)\boldsymbol{C\varepsilon}(\boldsymbol{u})\boldsymbol{n} &= \boldsymbol{g}\text{ on }\Gamma_N,\\
+\chi_\epsilon(\varphi)\boldsymbol{C\varepsilon}(\boldsymbol{u})\boldsymbol{n} &= -\boldsymbol{w}(\boldsymbol{u})\text{ on }\Gamma_R.\\
+\end{aligned}
+$$
 
 ### A rule of thumb
 
