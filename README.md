@@ -147,7 +147,7 @@ where $\boldsymbol{u}$ satisfies the state equations as previously with relaxati
 
 $$
 \begin{aligned}
--\mathrm{div}(\chi_\epsilon(\varphi)\boldsymbol{C\varepsilon}(\boldsymbol{u})) &= f\text{ on }\Omega, \\
+-\mathrm{div}(\chi_\epsilon(\varphi)\boldsymbol{C\varepsilon}(\boldsymbol{u})) &= f\text{ on }D, \\
 \boldsymbol{u} &= \boldsymbol{0}\text{ on }\Gamma_D,\\
 \chi_\epsilon(\varphi)\boldsymbol{C\varepsilon}(\boldsymbol{u})\boldsymbol{n} &= \boldsymbol{0}\text{ on }\Gamma_0,\\
 \chi_\epsilon(\varphi)\boldsymbol{C\varepsilon}(\boldsymbol{u})\boldsymbol{n} &= \boldsymbol{g}\text{ on }\Gamma_N,\\
