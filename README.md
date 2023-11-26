@@ -63,41 +63,84 @@ On the other hand, relaxing the shape derivative of $J_2$ in the same way as abo
 $$J_2^\prime(\Omega)(-v\boldsymbol{n})=\int_{D}-\left(f\nabla\cdot\frac{\nabla\varphi}{\lvert\nabla\varphi\rvert}+\nabla f\cdot\frac{\nabla\varphi}{\lvert\nabla\varphi\rvert}\right)vH'(\varphi)\lvert\nabla\varphi\rvert\~\mathrm{d}\boldsymbol{x}.$$
 
 ### Adding PDE constraints
-Consider $\Omega\subset D$ with $J(\Omega,\boldsymbol{u})=\int_\Omega j(\boldsymbol{u})\~\mathrm{d}\boldsymbol{x}+\int_\Gamma l(\boldsymbol{u})\~\mathrm{d}\Gamma$ where $\boldsymbol{u}$ satisfies
+Consider $\Omega\subset D$ with $J(\Omega,\boldsymbol{u})=\int_\Omega j(\boldsymbol{u})\~\mathrm{d}\boldsymbol{x}+\int_{\Gamma_N} l_1(\boldsymbol{u})\~\mathrm{d}s+\int_{\Gamma_R} l_2(\boldsymbol{u})\~\mathrm{d}s$ where $\boldsymbol{u}$ satisfies
 
 $$
 \begin{aligned}
 -\mathrm{div}(\boldsymbol{C\varepsilon}(\boldsymbol{u})) &= f\text{ on }\Omega, \\
-u &= 0\text{ on }\Gamma_D,\\
+\boldsymbol{u} &= \boldsymbol{0}\text{ on }\Gamma_D,\\
 \boldsymbol{C\varepsilon}(\boldsymbol{u})\boldsymbol{n} &= \boldsymbol{0}\text{ on }\Gamma_0,\\
 \boldsymbol{C\varepsilon}(\boldsymbol{u})\boldsymbol{n} &= \boldsymbol{g}\text{ on }\Gamma_N,\\
-\boldsymbol{C\varepsilon}(\boldsymbol{u})\boldsymbol{n} &= \boldsymbol{w}(\boldsymbol{u})\text{ on }\Gamma_R.\\
+\boldsymbol{C\varepsilon}(\boldsymbol{u})\boldsymbol{n} &= -\boldsymbol{w}(\boldsymbol{u})\text{ on }\Gamma_R.\\
 \end{aligned}
 $$
 
-In the above $\boldsymbol{\varepsilon}$ is the strain tensor, $\boldsymbol{C}$ is the stiffness tensor, $\Gamma_0 = \partial\Omega\setminus(\Gamma\cup\Gamma_D\cup\Gamma_N\cup\Gamma_R)$, and that $\Gamma$ is disjoint from the other partitions of $\partial\Omega$ for simplicity.
+In the above $\boldsymbol{\varepsilon}$ is the strain tensor, $\boldsymbol{C}$ is the stiffness tensor, $\Gamma_0 = \partial\Omega\setminus(\Gamma_D\cup\Gamma_N\cup\Gamma_R)$, and $\Gamma_D$, $\Gamma_N$, $\Gamma_R$ are required to be fixed.
 
 #### Shape derivative
 Let us first consider the shape derivative of $J$. Disregarding embedding inside the computational domain $D$, the above strong form can be written in weak form as: *Find* $\boldsymbol{u}\in H^1_{\Gamma_D}(\Omega)^d$ *such that*
-$$\int_{\Omega} \boldsymbol{C\varepsilon}(\boldsymbol{u})\boldsymbol{\varepsilon}(\boldsymbol{v})\~\mathrm{d}\Omega+\int_{\Gamma_R}\boldsymbol{w}(\boldsymbol{u})\cdot\boldsymbol{v}\~\mathrm{d}\Gamma=\int_\Omega \boldsymbol{f}\cdot\boldsymbol{v}\~\mathrm{d}\Omega+\int_{\Gamma_N}\boldsymbol{g}\cdot\boldsymbol{v}\~\mathrm{d}\Gamma,\~\forall \boldsymbol{v}\in H^1_{\Gamma_D}(\Omega)^d.$$
+$$\int_{\Omega} \boldsymbol{C\varepsilon}(\boldsymbol{u})\boldsymbol{\varepsilon}(\boldsymbol{v})\~\mathrm{d}\boldsymbol{x}+\int_{\Gamma_R}\boldsymbol{w}(\boldsymbol{u})\cdot\boldsymbol{v}\~\mathrm{d}s=\int_\Omega \boldsymbol{f}\cdot\boldsymbol{v}\~\mathrm{d}\boldsymbol{x}+\int_{\Gamma_N}\boldsymbol{g}\cdot\boldsymbol{v}\~\mathrm{d}s,\~\forall \boldsymbol{v}\in H^1_{\Gamma_D}(\Omega)^d.$$
 
 Following Céa's formal adjoint method we introduce the following Lagrangian
 
 $$
 \begin{aligned}
-\mathcal{L}(\Omega,\boldsymbol{v},\boldsymbol{q})=\int_\Omega j(u)\~\mathrm{d}\boldsymbol{x}&+\int_\Gamma l(u)\~\mathrm{d}\Gamma+\int_{\Omega} \boldsymbol{C\varepsilon}(\boldsymbol{v})\boldsymbol{\varepsilon}(\boldsymbol{q})\~\mathrm{d}\Omega+\int_{\Gamma_R}\boldsymbol{w}(\boldsymbol{v})\cdot\boldsymbol{q}\~\mathrm{d}\Gamma-\int_\Omega \boldsymbol{f}\cdot\boldsymbol{q}\~\mathrm{d}\Omega\\
-&-\int_{\Gamma_N}\boldsymbol{g}\cdot\boldsymbol{q}\~\mathrm{d}\Gamma-\int_{\Gamma_D}\boldsymbol{q}\cdot\boldsymbol{C\varepsilon}(\boldsymbol{v})\boldsymbol{n}+\boldsymbol{v}\cdot\boldsymbol{C\varepsilon}(\boldsymbol{q})\boldsymbol{n}\\
+\mathcal{L}(\Omega,\boldsymbol{v},\boldsymbol{q})=&\int_\Omega j(\boldsymbol{v})\~\mathrm{d}\boldsymbol{x}+\int_{\Gamma_N} l_1(\boldsymbol{v})\~\mathrm{d}s+\int_{\Gamma_R} l_2(\boldsymbol{v})\~\mathrm{d}s+\int_{\Omega} \boldsymbol{C\varepsilon}(\boldsymbol{v})\boldsymbol{\varepsilon}(\boldsymbol{q})\~\mathrm{d}\boldsymbol{x}\\
+&+\int_{\Gamma_R}\boldsymbol{w}(\boldsymbol{v})\cdot\boldsymbol{q}\~\mathrm{d}s-\int_\Omega \boldsymbol{f}\cdot\boldsymbol{q}\~\mathrm{d}\boldsymbol{x}-\int_{\Gamma_N}\boldsymbol{g}\cdot\boldsymbol{q}\~\mathrm{d}s\\
+&-\int_{\Gamma_D}\boldsymbol{q}\cdot\boldsymbol{C\varepsilon}(\boldsymbol{v})\boldsymbol{n}+\boldsymbol{v}\cdot\boldsymbol{C\varepsilon}(\boldsymbol{q})\boldsymbol{n}\~\mathrm{d}s\\
 \end{aligned}
 $$
 
-where $\boldsymbol{v},\boldsymbol{q}\in H^1(\Omega)^d$. Requiring stationarity of the Lagrangian and taking a partial derivative of $\mathcal{L}$ with respect to $\boldsymbol{q}$ in the direction $\phi\in H^1(\Omega)^d$ gives
+where $\boldsymbol{v},\boldsymbol{q}\in H^1(\Omega)^d$. Requiring stationarity of the Lagrangian and taking a partial derivative of $\mathcal{L}$ with respect to $\boldsymbol{q}$ in the direction $\boldsymbol{\phi}\in H^1(\Omega)^d$ gives
 
-$$\frac{\partial\mathcal{L}}{\partial\boldsymbol{q}}(\boldsymbol{\phi})=$$
+$$
+\begin{aligned}
+0=\frac{\partial\mathcal{L}}{\partial\boldsymbol{q}}(\boldsymbol{\phi})&=\int_{\Omega} \boldsymbol{C\varepsilon}(\boldsymbol{v})\boldsymbol{\varepsilon}(\boldsymbol{\phi})\~\mathrm{d}\boldsymbol{x}+\int_{\Gamma_R}\boldsymbol{w}(\boldsymbol{v})\cdot\boldsymbol{\phi}\~\mathrm{d}s-\int_\Omega \boldsymbol{f}\cdot\boldsymbol{\phi}\~\mathrm{d}\boldsymbol{x}-\int_{\Gamma_N}\boldsymbol{g}\cdot\boldsymbol{\phi}\~\mathrm{d}s\\
+&\quad-\int_{\Gamma_D}\boldsymbol{\phi}\cdot\boldsymbol{C\varepsilon}(\boldsymbol{v})\boldsymbol{n}+\boldsymbol{v}\cdot\boldsymbol{C\varepsilon}(\boldsymbol{\phi})\boldsymbol{n}\~\mathrm{d}s\\
+&=\int_\Omega\boldsymbol{\phi}\cdot(-\mathrm{div}(\boldsymbol{C\varepsilon}(\boldsymbol{u}))-\boldsymbol{f})\~\mathrm{d}\boldsymbol{x}+\int_{\Gamma_R}\boldsymbol{\phi}\cdot(\boldsymbol{C\varepsilon}(\boldsymbol{v})\boldsymbol{n}+\boldsymbol{w}(\boldsymbol{v}))\~\mathrm{d}s\\
+&\quad+\int_{\Gamma_N}\boldsymbol{\phi}\cdot(\boldsymbol{C\varepsilon}(\boldsymbol{v})\boldsymbol{n}-\boldsymbol{g})\~\mathrm{d}s-\int_{\Gamma_D}\boldsymbol{v}\cdot\boldsymbol{C\varepsilon}(\boldsymbol{\phi})\boldsymbol{n}\~\mathrm{d}s+\int_{\Gamma_0}\boldsymbol{\phi}\cdot\boldsymbol{C\varepsilon}(\boldsymbol{v})\boldsymbol{n}\~\mathrm{d}s
+\end{aligned}
+$$
+
+after applying integration by parts. Under a suitable variations of $\boldsymbol{\phi}$, the state equation and boundary conditions are generated as required. In other words, $\boldsymbol{v}$ is given by the solution $\boldsymbol{u}$ to the equations of state. We can derive the adjoint equation by again requiring stationarity of the Lagrangian and taking a partial derivative of $\mathcal{L}$ with respect to $\boldsymbol{v}$ in the direction $\boldsymbol{\phi}\in H^1(\Omega)^d$. This gives
+
+$$
+\begin{aligned}
+0=\frac{\partial\mathcal{L}}{\partial\boldsymbol{v}}(\boldsymbol{\phi})&=\int_\Omega \boldsymbol{\phi}\cdot j^\prime(\boldsymbol{v})\~\mathrm{d}\boldsymbol{x}+\int_{\Gamma_N} \boldsymbol{\phi}\cdot l_1^\prime(\boldsymbol{v})\~\mathrm{d}s+\int_{\Gamma_R} \boldsymbol{\phi}\cdot l_2^\prime(\boldsymbol{v})\~\mathrm{d}s+\int_{\Omega} \boldsymbol{C\varepsilon}(\boldsymbol{\phi})\boldsymbol{\varepsilon}(\boldsymbol{q})\~\mathrm{d}\boldsymbol{x}\\
+&\quad+\int_{\Gamma_R}\boldsymbol{\phi}\cdot J_{\boldsymbol{w}}(\boldsymbol{v})\cdot\boldsymbol{q}\~\mathrm{d}s-\int_{\Gamma_D}\boldsymbol{q}\cdot\boldsymbol{C\varepsilon}(\boldsymbol{\phi})\boldsymbol{n}+\boldsymbol{\phi}\cdot\boldsymbol{C\varepsilon}(\boldsymbol{q})\boldsymbol{n}\~\mathrm{d}s\\
+&=\int_{\Omega} \boldsymbol{\phi}\cdot(-\mathrm{div}(\boldsymbol{C\varepsilon}(\boldsymbol{q}))-j^\prime(\boldsymbol{v}))\~\mathrm{d}\boldsymbol{x}+\int_{\Gamma_N} \boldsymbol{\phi}\cdot (\boldsymbol{C\varepsilon}(\boldsymbol{q})\boldsymbol{n}+l_1^\prime(\boldsymbol{v}))\~\mathrm{d}s\\
+&\quad+\int_{\Gamma_R} \boldsymbol{\phi}\cdot (\boldsymbol{C\varepsilon}(\boldsymbol{q})\boldsymbol{n}+J_{\boldsymbol{w}}(\boldsymbol{v})\cdot\boldsymbol{q}+l_2^\prime(\boldsymbol{v}))\~\mathrm{d}s-\int_{\Gamma_D}\boldsymbol{q}\cdot\boldsymbol{C\varepsilon}(\boldsymbol{\phi})\boldsymbol{n}\~\mathrm{d}s\\
+&\quad+\int_{\Gamma_0}\boldsymbol{\phi}\cdot\boldsymbol{C\varepsilon}(\boldsymbol{q})\boldsymbol{n}\~\mathrm{d}s
+\end{aligned}
+$$
+
+where integration by parts has been applied. The adjoint equations are then generated under suitable variations of $\boldsymbol{\phi}$, while the previous result $\boldsymbol{v}=\boldsymbol{u}$ implies that we can identify a unique $\boldsymbol{q}=\boldsymbol{\lambda}$ that satisfies stationaity. In particular,
+
+$$
+\begin{aligned}
+-\mathrm{div}(\boldsymbol{C\varepsilon}(\boldsymbol{\lambda})) &= j^\prime(\boldsymbol{u})\text{ on }\Omega, \\
+\boldsymbol{\lambda} &= \boldsymbol{0}\text{ on }\Gamma_D,\\
+\boldsymbol{C\varepsilon}(\boldsymbol{\lambda})\boldsymbol{n} &= \boldsymbol{0} \text{ on }\Gamma_0,\\
+\boldsymbol{C\varepsilon}(\boldsymbol{\lambda})\boldsymbol{n} &= l_1^\prime(\boldsymbol{u})\text{ on }\Gamma_N,\\
+\boldsymbol{C\varepsilon}(\boldsymbol{\lambda})\boldsymbol{n} &= J_{\boldsymbol{w}}(\boldsymbol{u})\cdot\boldsymbol{\lambda}+l_2^\prime(\boldsymbol{u}) \text{ on }\Gamma_R.\\
+\end{aligned}
+$$
+
+The shape derivative of $J(\Omega)=\mathcal{L}(\Omega,\boldsymbol{u},\boldsymbol{p})$ then follows by application of the chainrule along with the shape derivative results for $J_1$ and $J_2$ above:
+
+$$
+\begin{aligned}
+J^\prime(\Omega)(\boldsymbol{\theta})&=\frac{\partial\mathcal{L}}{\partial\Omega}(\Omega,\boldsymbol{u},\boldsymbol{p})(\boldsymbol{\theta})+\cancel{\frac{\partial\mathcal{L}}{\partial\Omega}(\Omega,\boldsymbol{u},\boldsymbol{\lambda})}(\boldsymbol{u}^\prime(\boldsymbol{\theta}))+\cancel{\frac{\partial\mathcal{L}}{\partial\boldsymbol{q}}(\Omega,\boldsymbol{u},\boldsymbol{\lambda})}(\boldsymbol{\lambda}^\prime(\boldsymbol{\theta}))\\
+&=\int_{\Gamma_0} (\boldsymbol{C\varepsilon}(\boldsymbol{u})\boldsymbol{\varepsilon}(\boldsymbol{\lambda})+j(\boldsymbol{u}) -\boldsymbol{f}\cdot\boldsymbol{\lambda})\~\boldsymbol{\theta}\cdot\boldsymbol{n}\~\mathrm{d}s.
+\end{aligned}
+$$
+
+As required. Note that in the above, we have used that $\boldsymbol{\theta}\cdot\boldsymbol{n}=0$ on $\Gamma_N$, $\Gamma_R$, and $\Gamma_D$.
 
 
 ### A rule of thumb
 
-### What is not captured by a Gateaux derivative of $J$ at $\varphi$ in the direction $v$?
+### What is not captured by a Gateaux derivative at $\varphi$?
 
 <br /><br /><br /><br /><br /><br /><br /><br /><br />
 ---------------------------------------------------------------------------------------------------
