@@ -335,7 +335,7 @@ function _evaluate_derivatives(pcf::PDEConstrainedFunctionals,φ::T) where T <: 
     φh = FEFunction(V_φ,φ)
     _dF = (q) -> dF_analytic(q,uh,φh,dΩ...)
     assemble_vector!(_dF,dF,deriv_assem,U_reg)
-    dF .*= -1
+    dF .*= -1 # <- Take θ=-vn
     return j_val
   end
   j = ∇!(J,dJ,analytic_dJ)
