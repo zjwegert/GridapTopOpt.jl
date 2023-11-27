@@ -49,7 +49,7 @@ function main()
   φ = get_free_dof_values(φh)
 
   ## Interpolation and weak form
-  interp = SmoothErsatzMaterialInterpolation(η = 2*maximum(Δ))
+  interp = SmoothErsatzMaterialInterpolation(η = 2*maximum(Δ),ϵₘ=0.0)
   I,H,DH,ρ = interp.I,interp.H,interp.DH,interp.ρ
 
   a(u,v,φ,dΩ,dΓ_N) = ∫((I ∘ φ)*(C ⊙ ε(u) ⊙ ε(v)))dΩ
@@ -61,13 +61,13 @@ function main()
   reinit!(stencil,φ,γ_reinit)
 
   uh = interpolate(x->x[1],V_φ)
-  f = φ->∫((DH ∘ φ)*(norm ∘ φ)*uh)dΩ;
-  # f = φ->∫((H ∘ φ)*uh)dΩ; # <- this corresponds to J_1Ω
+  # f = φ->∫((DH ∘ φ)*(norm ∘ φ)*uh)dΩ;
+  f = φ->∫((I ∘ φ)*uh)dΩ; # <- this corresponds to J_1Ω
   df = gradient(f,φh)
   dfh = FEFunction(V_φ, assemble_vector(df,V_φ))
 
-  df_analytic = q->∫(q*(∇(uh)⋅∇(φh)+laplacian(φh)*uh)*(DH ∘ φh)*(norm ∘ φh))dΩ
-  # df_analytic = q->∫(uh*q*(DH ∘ φh))dΩ#*(norm ∘ ∇(φh)))dΩ # <- assume |∇φ| = 1
+  # df_analytic = q->∫(q*(∇(uh)⋅∇(φh)+laplacian(φh)*uh)*(DH ∘ φh)*(norm ∘ φh))dΩ
+  df_analytic = q->∫(uh*q*(DH ∘ φh))dΩ#*(norm ∘ ∇(φh)))dΩ # <- assume |∇φ| = 1
   df_analytic_h = FEFunction(V_φ, assemble_vector(df_analytic,V_φ))
 
   make_dir(path)
