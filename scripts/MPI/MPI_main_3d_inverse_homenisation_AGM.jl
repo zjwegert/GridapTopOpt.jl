@@ -15,14 +15,14 @@ function main(mesh_partition,distribute)
 
   ## Parameters
   order = 1;
-  xmax,ymax=(1.0,1.0,1.0)
+  xmax,ymax,zmax=(1.0,1.0,1.0)
   dom = (0,xmax,0,ymax,0,zmax);
-  el_size = (50,50,50);
+  el_size = (64,64,64);
   γ = 0.05;
   γ_reinit = 0.5;
   max_steps = floor(Int,minimum(el_size)/3)
   tol = 1/(order^2*10)*prod(inv,minimum(el_size))
-  C = isotropic_2d(1.,0.3);
+  C = isotropic_3d(1.,0.3);
   η_coeff = 2;
   α_coeff = 4;
   path = "./Results/MPI_main_3d_inverse_homenisation_AGM"
@@ -49,7 +49,7 @@ function main(mesh_partition,distribute)
   U_reg = TrialFESpace(V_reg)
 
   ## Create FE functions
-  lsf_fn = x -> cos(2π*x[1]) + cos(2π*y[2]) + cos(2π*z[3])
+  lsf_fn = x -> cos(2π*x[1]) + cos(2π*x[2]) + cos(2π*x[3])
   φh = interpolate(lsf_fn,V_φ);
   φ = get_free_dof_values(φh)
 
@@ -89,7 +89,7 @@ function main(mesh_partition,distribute)
   ## Setup solver and FE operators
   Tm=SparseMatrixCSR{0,PetscScalar,PetscInt}
   Tv=Vector{PetscScalar}
-  solver = ElasticitySolver(Ω,U);
+  solver = MUMPSSolver()#ElasticitySolver(Ω,U);
 
   state_map = AffineFEStateMap(a,l,res,U,V,V_φ,U_reg,φh,dΩ;
     assem_U = SparseMatrixAssembler(Tm,Tv,U,V),
@@ -123,8 +123,9 @@ function main(mesh_partition,distribute)
   write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh))];iter_mod=1)
 end
 
+# RUN: mpiexecjl --project=. -n 64 julia ./scripts/MPI/MPI_main_inverse_homenisation_AGM.jl
 with_mpi() do distribute
-  mesh_partition = (3,3,3)
+  mesh_partition = (4,4,4)
   hilb_solver_options = "-pc_type gamg -ksp_type cg -ksp_error_if_not_converged true 
     -ksp_converged_reason -ksp_rtol 1.0e-12"
   

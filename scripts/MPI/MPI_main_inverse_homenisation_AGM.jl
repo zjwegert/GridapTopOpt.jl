@@ -1,6 +1,5 @@
-using Gridap, GridapDistributed, GridapPETSc, PartitionedArrays, LSTO_Distributed, SparseMatricesCSR
-
-using Gridap.MultiField
+using Gridap, Gridap.MultiField, GridapDistributed, GridapPETSc, 
+  PartitionedArrays, LSTO_Distributed, SparseMatricesCSR
 
 """
   (MPI) Maximum bulk modulus inverse homogenisation with augmented Lagrangian method in 2D.
@@ -86,7 +85,7 @@ function main(mesh_partition,distribute)
   ## Setup solver and FE operators
   Tm=SparseMatrixCSR{0,PetscScalar,PetscInt}
   Tv=Vector{PetscScalar}
-  solver = ElasticitySolver(Ω,V);
+  solver = ElasticitySolver(Ω,V); # MUMPSSolver()
   
   state_map = AffineFEStateMap(a,l,res,U,V,V_φ,U_reg,φh,dΩ;
     assem_U = SparseMatrixAssembler(Tm,Tv,U,V),
@@ -120,8 +119,9 @@ function main(mesh_partition,distribute)
   write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh))];iter_mod=1)
 end
 
+# RUN: mpiexecjl --project=. -n 9 julia ./scripts/MPI/MPI_main_inverse_homenisation_AGM.jl
 with_mpi() do distribute
-  mesh_partition = (2,2)
+  mesh_partition = (3,3)
   hilb_solver_options = "-pc_type gamg -ksp_type cg -ksp_error_if_not_converged true 
     -ksp_converged_reason -ksp_rtol 1.0e-12"
   
