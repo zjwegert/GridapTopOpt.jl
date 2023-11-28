@@ -27,6 +27,7 @@
 - [ ] Higher order FEs breaks `Advection.jl` in parallel.
 - [ ] `create_dof_permutation` doesn't work for periodic models.
 - [ ] There appears to be a memory leak in `write_vtk`.
+- [ ] `MultiFieldFESpace` breaks `ElasticitySolver`
 
 ## Some notes on auto differentiation
 
