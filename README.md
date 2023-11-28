@@ -92,7 +92,7 @@ $$
 \end{aligned}
 $$
 
-where $\boldsymbol{v},\boldsymbol{q}\in H^1(\Omega)^d$. Requiring stationarity of the Lagrangian and taking a partial derivative of $\mathcal{L}$ with respect to $\boldsymbol{q}$ in the direction $\boldsymbol{\phi}\in H^1(\Omega)^d$ gives
+where $\boldsymbol{v},\boldsymbol{q}\in H^1(\mathbb{R}^d)^d$. Requiring stationarity of the Lagrangian and taking a partial derivative of $\mathcal{L}$ with respect to $\boldsymbol{q}$ in the direction $\boldsymbol{\phi}\in H^1(\mathbb{R}^d)^d$ gives
 
 $$
 \begin{aligned}
@@ -103,7 +103,7 @@ $$
 \end{aligned}
 $$
 
-after applying integration by parts. Under a suitable variations of $\boldsymbol{\phi}$, the state equation and boundary conditions are generated as required. In other words, $\boldsymbol{v}$ is given by the solution $\boldsymbol{u}$ to the equations of state. We can derive the adjoint equation by again requiring stationarity of the Lagrangian and taking a partial derivative of $\mathcal{L}$ with respect to $\boldsymbol{v}$ in the direction $\boldsymbol{\phi}\in H^1(\Omega)^d$. This gives
+after applying integration by parts. Under a suitable variations of $\boldsymbol{\phi}$, the state equation and boundary conditions are generated as required. In other words, $\boldsymbol{v}$ is given by the solution $\boldsymbol{u}$ to the equations of state. We can derive the adjoint equation by again requiring stationarity of the Lagrangian and taking a partial derivative of $\mathcal{L}$ with respect to $\boldsymbol{v}$ in the direction $\boldsymbol{\phi}\in H^1(\mathbb{R}^d)^d$. This gives
 
 $$
 \begin{aligned}
