@@ -217,7 +217,7 @@ where we have used that $v=0$ on $\Gamma_D$ as previously. As previously taking 
 $${\huge{|}} J^\prime(\Omega)(v\boldsymbol{n}) - \hat{\mathcal{J}}^\prime(\varphi)(v){\huge{|}}=O(\epsilon).$$
 
 ### What is not captured by a Gateaux derivative at $\varphi$?
-Owing to the fact that we do not fully capture a variation of the doamin in $\varphi$, the Gateaux derivative of certain types of functionals will not match the shape derivative. For example the shape derivative of $J_2$ and the Gateaux derivative of $J_{2\Omega}$ fail to match even in the relaxed setting. <br /><br />
+Owing to the fact that we do not fully capture a variation of the doamin in $\varphi$, the Gateaux derivative of certain types of functionals will not match the shape derivative. For example the shape derivative of $J_2$ and the Gateaux derivative of $J_{2\Omega}$ fail to match even in the relaxed setting. Regardless of this, accurate resolution of $J_2$ is difficult owing to the appearance of mean curvature. This problem is further exacebated when a discretisation of the boundary is not available. <br /><br />
 
 In addition, functionals of the signed distance function posed over the whole bounding domain $D$ admit a special structure under shape differentiation ([Paper](https://doi.org/10.1051/m2an/2019056)). Such cases are not captured by a Gateaux derivative at $\varphi$ under relaxation. It is unclear whether these cases will be captured by considering a Gateaux derivative of the mapping
 
