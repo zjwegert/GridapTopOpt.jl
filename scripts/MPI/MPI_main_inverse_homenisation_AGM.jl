@@ -104,19 +104,19 @@ function main(mesh_partition,distribute)
     ls=PETScLinearSolver())
   
   ## Optimiser
-  make_dir(path)
+  make_dir(path;ranks=ranks)
   optimiser = AugmentedLagrangian(φ,pcfs,stencil,vel_ext,interp,el_size,γ,γ_reinit);
   for history in optimiser
     it,Ji,Ci,Li = last(history)
     λi = optimiser.λ; Λi = optimiser.Λ
-    print_history(it,["J"=>Ji,"C"=>Ci,"L"=>Li,"λ"=>λi,"Λ"=>Λi])
-    write_history(history,path*"/history.csv")
+    print_history(it,["J"=>Ji,"C"=>Ci,"L"=>Li,"λ"=>λi,"Λ"=>Λi];ranks=ranks)
+    write_history(history,path*"/history.csv";ranks=ranks)
     write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh))])
   end
   it,Ji,Ci,Li = last(optimiser.history)
   λi = optimiser.λ; Λi = optimiser.Λ
-  print_history(it,["J"=>Ji,"C"=>Ci,"L"=>Li,"λ"=>λi,"Λ"=>Λi])
-  write_history(optimiser.history,path*"/history.csv")
+  print_history(it,["J"=>Ji,"C"=>Ci,"L"=>Li,"λ"=>λi,"Λ"=>Λi];ranks=ranks)
+  write_history(optimiser.history,path*"/history.csv";ranks=ranks)
   write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh))];iter_mod=1)
 end
 
