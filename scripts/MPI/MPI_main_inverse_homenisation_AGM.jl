@@ -1,7 +1,9 @@
-using Gridap, GridapDistributed, GridapPETSc, PartitionedArrays, LSTO_Distributed
+using Gridap, GridapDistributed, GridapPETSc, PartitionedArrays, LSTO_Distributed, SparseMatricesCSR
+
+using Gridap.MultiField
 
 """
-  (Serial) Maximum bulk modulus inverse homogenisation with augmented Lagrangian method in 2D.
+  (MPI) Maximum bulk modulus inverse homogenisation with augmented Lagrangian method in 2D.
 
   Optimisation problem:
       Min J(Ω) = -κ(Ω)
@@ -10,7 +12,9 @@ using Gridap, GridapDistributed, GridapPETSc, PartitionedArrays, LSTO_Distribute
           ⎡For unique εᴹᵢ, find uᵢ∈V=H¹ₚₑᵣ(Ω)ᵈ, 
           ⎣∫ ∑ᵢ C ⊙ ε(uᵢ) ⊙ ε(vᵢ) dΩ = ∫ -∑ᵢ C ⊙ ε⁰ᵢ ⊙ ε(vᵢ) dΩ, ∀v∈V.
 """ 
-function main()
+function main(mesh_partition,distribute)
+  ranks = distribute(LinearIndices((prod(mesh_partition),)))
+
   ## Parameters
   order = 1;
   xmax,ymax=(1.0,1.0)
@@ -23,10 +27,10 @@ function main()
   C = isotropic_2d(1.,0.3);
   η_coeff = 2;
   α_coeff = 4;
-  path = "./Results/main_inverse_homogenisation_AGM"
+  path = "./Results/MPI_main_inverse_homenisation_AGM"
 
   ## FE Setup
-  model = CartesianDiscreteModel(dom,el_size,isperiodic=(true,true));
+  model = CartesianDiscreteModel(ranks,mesh_partition,dom,el_size,isperiodic=(true,true));
   Δ = get_Δ(model)
   f_Γ_D(x) = iszero(x)
   update_labels!(1,model,f_Γ_D,"origin")
@@ -41,8 +45,10 @@ function main()
   reffe_scalar = ReferenceFE(lagrangian,Float64,order)
   _V = TestFESpace(model,reffe;dirichlet_tags=["origin"])
   _U = TrialFESpace(_V,VectorValue(0.0,0.0))
-  U = MultiFieldFESpace([_U,_U,_U]);
-  V = MultiFieldFESpace([_V,_V,_V]);
+  
+  # mfs = BlockMultiFieldStyle()
+  U = MultiFieldFESpace([_U,_U,_U])#;style=mfs);
+  V = MultiFieldFESpace([_V,_V,_V])#;style=mfs);
   V_reg = V_φ = TestFESpace(model,reffe_scalar)
   U_reg = TrialFESpace(V_reg)
 
@@ -78,13 +84,24 @@ function main()
   reinit!(stencil,φ,γ_reinit)
 
   ## Setup solver and FE operators
-  state_map = AffineFEStateMap(a,l,res,U,V,V_φ,U_reg,φh,dΩ)
+  Tm=SparseMatrixCSR{0,PetscScalar,PetscInt}
+  Tv=Vector{PetscScalar}
+  solver = ElasticitySolver(Ω,V);
+  
+  state_map = AffineFEStateMap(a,l,res,U,V,V_φ,U_reg,φh,dΩ;
+    assem_U = SparseMatrixAssembler(Tm,Tv,U,V),
+    assem_adjoint = SparseMatrixAssembler(Tm,Tv,V,U),
+    assem_deriv = SparseMatrixAssembler(Tm,Tv,U_reg,U_reg),
+    ls=solver,
+    adjoint_ls=solver)
   pcfs = PDEConstrainedFunctionals(J,[Vol],state_map;analytic_dJ=dJ,analytic_dC=[dVol])
 
   ## Hilbertian extension-regularisation problems
   α = α_coeff*maximum(Δ)
   a_hilb = (p,q,dΩ)->∫(α^2*∇(p)⋅∇(q) + p*q)dΩ;
-  vel_ext = VelocityExtension(a_hilb,U_reg,V_reg,dΩ)
+  vel_ext = VelocityExtension(a_hilb,U_reg,V_reg,dΩ,
+    assem=SparseMatrixAssembler(Tm,Tv,U_reg,V_reg),
+    ls=PETScLinearSolver())
   
   ## Optimiser
   make_dir(path)
@@ -103,4 +120,12 @@ function main()
   write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh))];iter_mod=1)
 end
 
-main();
+with_mpi() do distribute
+  mesh_partition = (2,2)
+  hilb_solver_options = "-pc_type gamg -ksp_type cg -ksp_error_if_not_converged true 
+    -ksp_converged_reason -ksp_rtol 1.0e-12"
+  
+  GridapPETSc.with(args=split(hilb_solver_options)) do
+    main(mesh_partition,distribute)
+  end
+end;
