@@ -18,7 +18,7 @@
   * &#9745; Test inverter mechanism problem with analytic adjoint. Edit: See discussion below.
   * &#9745; Compare to ray integrals for multi-material ([Paper](https://doi.org/10.1051/cocv/2013076)) and additive manufacturing ([Paper](https://doi.org/10.1051/m2an/2019056)) problems. Edit: We cannot use AD for these. Related to discussion below.
 - [ ] Implement HPM ([Paper](https://doi.org/10.1007/s00158-023-03663-0))
-- [x] Implement `NonlinearFEStateSpace` - still need to do further testing on AD.
+- [x] Implement `NonlinearFEStateMap` - still need to do further testing on AD.
 
 ## Future work (not this paper)
 - [ ] Implement CutFEM in serial using GridapEmbedded.
@@ -29,6 +29,7 @@
 - [ ] `create_dof_permutation` doesn't work for periodic models.
 - [ ] There appears to be a memory leak in `write_vtk`.
 - [ ] `MultiFieldFESpace` breaks `ElasticitySolver`
+- [ ] `NonlinearFEStateMap` breaks in parallel due need for transpose of jacobian. This likely means there is also a bug in `AffineFEStateMap` when dealing with non-symmetric weak forms.
 
 ## Some notes on auto differentiation
 
