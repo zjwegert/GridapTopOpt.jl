@@ -23,6 +23,7 @@ import PartitionedArrays: getany, tuple_of_arrays
 include("ChainRules.jl")
 export PDEConstrainedFunctionals
 export AffineFEStateMap
+export NonlinearFEStateMap
 export get_state
 export evaluate_functionals!
 export evaluate_derivatives!

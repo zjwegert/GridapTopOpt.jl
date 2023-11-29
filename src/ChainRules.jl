@@ -243,6 +243,126 @@ function ChainRulesCore.rrule(φ_to_u::AffineFEStateMap,φ::T) where T <: Abstra
 end
 
 """
+  NonlinearFEStateMap
+"""
+struct NonlinearFEStateMap{A,B<:Tuple,C<:Tuple,D<:Tuple,E<:Tuple,F<:Tuple} <: LSTO_Distributed.AbstractFEStateMap
+  res             ::A
+  dΩ              ::B
+  spaces          ::C
+  cache           ::D
+  fwd_caches      ::E
+  adjoint_caches  ::F
+
+  function NonlinearFEStateMap(
+      res::A,U,V,V_φ,U_reg,φh,dΩ...;
+      assem_U = SparseMatrixAssembler(U,V),
+      assem_adjoint = SparseMatrixAssembler(V,U),
+      assem_deriv = SparseMatrixAssembler(U_reg,U_reg),
+      nls::NLSolver = NLSolver(),
+      adjoint_ls::LinearSolver = LUSolver()) where {A}
+    
+    spaces = (U,V,V_φ,U_reg)
+    ## dφdu cache
+    uhd = zero(U)
+    vecdata = collect_cell_vector(U_reg,∇(IntegrandWithMeasure(res,dΩ),[uhd,uhd,φh],3))
+    dφdu_vec = allocate_vector(assem_deriv,vecdata)
+
+    ## Nonlinear FE operator and solution vector x
+    op = FEOperator((u,v) -> res(u,v,φh,dΩ...),U,V,assem_U)
+    op_cache = CachedFEOperator(op)
+    x = zero(U)#get_free_dof_values(zero(U));
+
+    ## Adjoint K,x
+    adjoint_K = assemble_matrix((u,v) -> op.jac(uhd,v,u),assem_adjoint,V,U)
+    adjoint_x = get_free_dof_values(zero(V))
+
+    ## Numerical setups
+    nls_cache = NLCache(nothing)
+    adjoint_ns = numerical_setup(symbolic_setup(adjoint_ls,adjoint_K),adjoint_K)
+    
+    ## Caches and adjoint caches
+    cache = (dφdu_vec,assem_deriv)
+    fwd_caches = (nls,nls_cache,x,op_cache,assem_U)
+    adjoint_caches = (adjoint_ns,adjoint_K,adjoint_x,assem_adjoint)
+    return new{A,typeof(dΩ),typeof(spaces),typeof(cache),typeof(fwd_caches),
+      typeof(adjoint_caches)}(res,dΩ,spaces,cache,fwd_caches,adjoint_caches)
+  end
+end
+
+# Helpers and getters
+mutable struct NLCache
+  cache
+end
+
+mutable struct CachedFEOperator
+  op
+end
+
+get_state(m::NonlinearFEStateMap) = m.fwd_caches[3]
+get_measure(m::NonlinearFEStateMap) = m.dΩ;
+get_trial_space(m::NonlinearFEStateMap) = m.spaces[1];
+get_test_space(m::NonlinearFEStateMap) = m.spaces[2];
+get_aux_space(m::NonlinearFEStateMap) = m.spaces[3];
+get_deriv_space(m::NonlinearFEStateMap) = m.spaces[4];
+get_state_assembler(m::NonlinearFEStateMap) = last(m.fwd_caches)
+get_deriv_assembler(m::NonlinearFEStateMap) = last(m.cache)
+
+function (φ_to_u::NonlinearFEStateMap)(φ::T) where T <: AbstractVector
+  res=φ_to_u.res
+  dΩ = φ_to_u.dΩ
+  U,V,V_φ,U_reg = φ_to_u.spaces
+  nls,nls_cache,x,op,assem_U = φ_to_u.fwd_caches
+  nl_cache = nls_cache.cache
+ 
+  ## Update residual and jacobian, and solve
+  φh = FEFunction(V_φ,φ)
+  op.op = FEOperator((u,v) -> res(u,v,φh,dΩ...),U,V,assem_U) 
+  x,cache = solve!(x,nls,op.op,nl_cache)
+  # Update cache for next call
+  nls_cache.cache = cache 
+  get_free_dof_values(x)
+end
+
+function ChainRulesCore.rrule(φ_to_u::NonlinearFEStateMap,φ::T) where T <: AbstractVector
+  @assert T<:Vector "Nonlinear FEs are currently not supported in parallel, please run in serial mode."
+  res = φ_to_u.res
+  dΩ = φ_to_u.dΩ
+  U,V,V_φ,U_reg = φ_to_u.spaces
+  dφdu_vec,assem_deriv = φ_to_u.cache
+  _,_,_,op,_ = φ_to_u.fwd_caches
+  adjoint_ns,adjoint_K,λ,assem_adjoint = φ_to_u.adjoint_caches
+  
+  ## Forward problem
+  u = φ_to_u(φ)
+
+  ## Adjoint operator
+  uh = FEFunction(U,u)
+  φh = FEFunction(V_φ,φ)
+  assemble_matrix!((u,v) -> op.op.jac(uh,v,u),adjoint_K,assem_adjoint,V,U)
+  function φ_to_u_pullback(du)
+    ## Adjoint Solve
+    #### NOTE: This breaks in parallel, need assembler to output matrix adjoint.
+    numerical_setup!(adjoint_ns,adjoint(adjoint_K))
+    # DEBUG
+    # K = jacobian(op.op,FEFunction(U,uh))
+    # println("**Debug** |adjoint_K - K| = ", norm(adjoint_K - K,Inf)) # This should be > 0
+    # println("**Debug** |adjoint(adjoint_K) - K| = ", norm(adjoint(adjoint_K) - K,Inf)) # This should be zero
+    solve!(λ,adjoint_ns,du)
+    λh = FEFunction(V,λ)
+    
+    ## Compute grad
+    uh = FEFunction(U,u)
+    res_functional = IntegrandWithMeasure(res,dΩ)
+    dφdu_contrib = ∇(res_functional,[uh,λh,φh],3)
+    dφdu_vecdata = collect_cell_vector(U_reg,dφdu_contrib) 
+    assemble_vector!(dφdu_vec,assem_deriv,dφdu_vecdata)
+    dφdu_vec .*= -1;
+    ( NoTangent(),dφdu_vec)
+  end
+  u, φ_to_u_pullback
+end
+
+"""
   PDEConstrainedFunctionals
 """
 struct PDEConstrainedFunctionals{N,A<:AbstractFEStateMap}
