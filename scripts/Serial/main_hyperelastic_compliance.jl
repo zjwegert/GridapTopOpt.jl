@@ -14,14 +14,14 @@ function main()
   xmax,ymax=2.0,1.0
   prop_Γ_N = 0.4;
   dom = (0,xmax,0,ymax);
-  el_size = (200,100);
+  el_size = (200,200);
   γ = 0.03;
   γ_reinit = 0.5;
   max_steps = floor(Int,minimum(el_size)/10)
-  tol = 5*10^-3 # 1/(order^2*10)*prod(inv,minimum(el_size)) # <- We can do better than this I think
+  tol = 1/(order^2*10)*prod(inv,minimum(el_size)) # <- We can do better than this I think
   η_coeff = 2;
   α_coeff = 4;
-  path = "./Results/main_hyperelastic_compliance"
+  path = "./Results/main_hyperelastic_compliance_neohook_2"
 
   ## FE Setup
   model = CartesianDiscreteModel(dom,el_size);
@@ -37,6 +37,7 @@ function main()
   Γ_N = BoundaryTriangulation(model,tags="Gamma_N")
   dΩ = Measure(Ω,2order)
   dΓ_N = Measure(Γ_N,2order)
+  vol_D = sum(∫(1)dΩ)
 
   ## Spaces
   reffe = ReferenceFE(lagrangian,VectorValue{2,Float64},order)
@@ -59,35 +60,36 @@ function main()
   _E = 1000;
   ν = 0.3;
   μ, λ = _E/(2*(1 + ν)), _E*ν/((1 + ν)*(1 - 2*ν))
-  g = VectorValue(0,-3)
-  # # Deformation gradient
-  # F(∇u) = one(∇u) + ∇u'
-  # J(F) = sqrt(det(C(F)))
-  # # Derivative of green Strain
-  # dE(∇du,∇u) = 0.5*( ∇du⋅F(∇u) + (∇du⋅F(∇u))' )
-  # # Right Caughy-green deformation tensor
-  # C(F) = (F')⋅F
-  # # Constitutive law (Neo hookean)
-  # function S(∇u)
-  #   Cinv = inv(C(F(∇u)))
-  #   μ*(one(∇u)-Cinv) + λ*log(J(F(∇u)))*Cinv
-  # end
-  # # Cauchy stress tensor
-  # σ(∇u) = (1.0/J(F(∇u)))*F(∇u)⋅S(∇u)⋅(F(∇u))'
-  # res(u,v,φ,dΩ,dΓ_N) = ∫( (I ∘ φ)*((dE∘(∇(v),∇(u))) ⊙ (S∘∇(u))) )*dΩ - ∫(g⋅v)dΓ_N
-
+  g = VectorValue(0,-20)
+  # Deformation gradient
   F(∇u) = one(∇u) + ∇u'
-  E(F) = 0.5*( F' ⋅ F - one(F) )
-  Σ(∇u) = λ*tr(E(F(∇u)))*one(∇u)+2*μ*E(F(∇u))
-  T(∇u) = F(∇u) ⋅ Σ(∇u)
+  J(F) = sqrt(det(C(F)))
+  # Derivative of green Strain
+  dE(∇du,∇u) = 0.5*( ∇du⋅F(∇u) + (∇du⋅F(∇u))' )
+  # Right Caughy-green deformation tensor
+  C(F) = (F')⋅F
+  # Constitutive law (Neo hookean)
+  function S(∇u)
+    Cinv = inv(C(F(∇u)))
+    μ*(one(∇u)-Cinv) + λ*log(J(F(∇u)))*Cinv
+  end
+  # Cauchy stress tensor
+  σ(∇u) = (1.0/J(F(∇u)))*F(∇u)⋅S(∇u)⋅(F(∇u))'
+  res(u,v,φ,dΩ,dΓ_N) = ∫( (I ∘ φ)*((dE∘(∇(v),∇(u))) ⊙ (S∘∇(u))) )*dΩ - ∫(g⋅v)dΓ_N
 
-  res(u,v,φ,dΩ,dΓ_N) = ∫((I ∘ φ)*((T ∘ ∇(u)) ⊙ ∇(v)))*dΩ - ∫(g⋅v)dΓ_N
+  ## Saint ...
+  # F(∇u) = one(∇u) + ∇u'
+  # E(F) = 0.5*( F' ⋅ F - one(F) )
+  # Σ(∇u) = λ*tr(E(F(∇u)))*one(∇u)+2*μ*E(F(∇u))
+  # T(∇u) = F(∇u) ⋅ Σ(∇u)
+  # res(u,v,φ,dΩ,dΓ_N) = ∫((I ∘ φ)*((T ∘ ∇(u)) ⊙ ∇(v)))*dΩ - ∫(g⋅v)dΓ_N
 
 
   ## Optimisation functionals
-  ξ = 0.1;
-  # Obj = (u,φ,dΩ,dΓ_N) -> ∫((I ∘ φ)*((dE∘(∇(u),∇(u))) ⊙ (S∘∇(u))) + ξ*(ρ ∘ φ))dΩ
-  Obj = (u,φ,dΩ,dΓ_N) -> ∫((I ∘ φ)*((T ∘ ∇(u)) ⊙ ∇(u)) + ξ*(ρ ∘ φ))dΩ
+  # ξ = 0.03; # g = -3
+  ξ = 0.5;
+  Obj = (u,φ,dΩ,dΓ_N) -> ∫((I ∘ φ)*((dE∘(∇(u),∇(u))) ⊙ (S∘∇(u))) + ξ*(ρ ∘ φ))dΩ
+  # Obj = (u,φ,dΩ,dΓ_N) -> ∫((I ∘ φ)*((T ∘ ∇(u)) ⊙ ∇(u)) + ξ*(ρ ∘ φ))dΩ
 
   ## Finite difference solver and level set function
   stencil = AdvectionStencil(FirstOrderStencil(2,Float64),model,V_φ,Δ./order,max_steps,tol)
