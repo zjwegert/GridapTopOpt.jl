@@ -7,6 +7,9 @@ using SparseMatricesCSR
 using ChainRulesCore
 using LSTO_Distributed
 
+using GridapSolvers
+using Gridap.MultiField
+
 function PZT5A(D::Int)
   ε_0 = 8.854e-12;
   if D == 3
@@ -104,8 +107,10 @@ function main(mesh_partition,distribute)
   U = TrialFESpace(V,VectorValue(0.0,0.0,0.0))
   Q = TestFESpace(model,reffe_scalar;conformity=:H1,dirichlet_tags=["origin"])
   P = TrialFESpace(Q,0)
-  UP = MultiFieldFESpace([U,P])
-  VQ = MultiFieldFESpace([V,Q])
+
+  mfs = BlockMultiFieldStyle()
+  UP = MultiFieldFESpace([U,P];style=mfs)
+  VQ = MultiFieldFESpace([V,Q];style=mfs)
 
   C, e, κ = PZT5A(3);
   k0 = norm(C.data,Inf); 
@@ -125,11 +130,21 @@ function main(mesh_partition,distribute)
   assem = SparseMatrixAssembler(SparseMatrixCSR{0,PetscScalar,PetscInt},Vector{PetscScalar},UP,VQ)
   op = AffineFEOperator(a,l,UP,VQ,assem)
   ## Solve
-  options = "-pc_type bjacobi -ksp_type gmres -ksp_error_if_not_converged true
-    -ksp_converged_reason -ksp_rtol 1.0e-10 -ksp_monitor_short"
+  #options = "-pc_type bjacobi -ksp_type gmres -ksp_error_if_not_converged true
+  #  -ksp_converged_reason -ksp_rtol 1.0e-10 -ksp_monitor_short"
+  options = "-ksp_converged_reason -pc_type gamg -ksp_type cg "
   GridapPETSc.with(args=split(options)) do
-    ls = PETScLinearSolver()
-    xh = solve(ls,op)
+    # ls = PETScLinearSolver()
+    # xh = solve(ls,op)
+    solver_u = ElasticitySolver(Ω,V)
+    solver_ϕ = PETScLinearSolver()
+    P = BlockDiagonalPreconditioner([solver_u,solver_ϕ])
+    solver = GridapSolvers.LinearSolvers.GMRESSolver(100;Pr=P,rtol=1.e-8,verbose=i_am_main(ranks))
+    A  = get_matrix(op)
+    b  = get_vector(op)
+    ns = numerical_setup(symbolic_setup(solver,A),A)
+    x  = allocate_col_vector(A)
+    solve!(x,ns,b)
   end
 end;
 

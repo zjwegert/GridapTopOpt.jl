@@ -106,3 +106,56 @@ end
 function MUMPSSolver()
   return PETScLinearSolver(mumps_ksp_setup)
 end
+
+# Block diagonal preconditioner
+
+struct BlockDiagonalPreconditioner{N,A} <: Gridap.Algebra.LinearSolver
+  solvers :: A
+  function BlockDiagonalPreconditioner(solvers::AbstractArray{<:Gridap.Algebra.LinearSolver})
+    N = length(solvers)
+    A = typeof(solvers)
+    return new{N,A}(solvers)
+  end
+end
+
+struct BlockDiagonalPreconditionerSS{A,B} <: Gridap.Algebra.SymbolicSetup
+  solver   :: A
+  block_ss :: B
+end
+
+function Gridap.Algebra.symbolic_setup(solver::BlockDiagonalPreconditioner,mat::AbstractBlockMatrix)
+  mat_blocks = diag(blocks(mat))
+  block_ss   = map(symbolic_setup,solver.solvers,mat_blocks)
+  return BlockDiagonalPreconditionerSS(solver,block_ss)
+end
+
+struct BlockDiagonalPreconditionerNS{A,B} <: Gridap.Algebra.NumericalSetup
+  solver   :: A
+  block_ns :: B
+end
+
+function Gridap.Algebra.numerical_setup(ss::BlockDiagonalPreconditionerSS,mat::AbstractBlockMatrix)
+  solver     = ss.solver
+  mat_blocks = diag(blocks(mat))
+  block_ns   = map(numerical_setup,ss.block_ss,mat_blocks)
+  return BlockDiagonalPreconditionerNS(solver,block_ns)
+end
+
+function Gridap.Algebra.numerical_setup!(ns::BlockDiagonalPreconditionerNS,mat::AbstractBlockMatrix)
+  mat_blocks = diag(blocks(mat))
+  map(numerical_setup!,ns.block_ns,mat_blocks)
+end
+
+function Gridap.Algebra.solve!(x::AbstractBlockVector,ns::BlockDiagonalPreconditionerNS,b::AbstractBlockVector)
+  @check blocklength(x) == blocklength(b) == length(ns.block_ns)
+  for (iB,bns) in enumerate(ns.block_ns)
+    xi = x[Block(iB)]
+    bi = b[Block(iB)]
+    solve!(xi,bns,bi)
+  end
+  return x
+end
+
+function LinearAlgebra.ldiv!(x,ns::BlockDiagonalPreconditionerNS,b)
+  solve!(x,ns,b)
+end

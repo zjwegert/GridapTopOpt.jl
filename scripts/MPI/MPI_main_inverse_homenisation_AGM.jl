@@ -1,5 +1,7 @@
-using Gridap, Gridap.MultiField, GridapDistributed, GridapPETSc, 
+using Gridap, Gridap.MultiField, GridapDistributed, GridapPETSc, GridapSolvers, 
   PartitionedArrays, LSTO_Distributed, SparseMatricesCSR
+
+using LSTO_Distributed: BlockDiagonalPreconditioner
 
 """
   (MPI) Maximum bulk modulus inverse homogenisation with augmented Lagrangian method in 2D.
@@ -11,14 +13,13 @@ using Gridap, Gridap.MultiField, GridapDistributed, GridapPETSc,
           ⎡For unique εᴹᵢ, find uᵢ∈V=H¹ₚₑᵣ(Ω)ᵈ, 
           ⎣∫ ∑ᵢ C ⊙ ε(uᵢ) ⊙ ε(vᵢ) dΩ = ∫ -∑ᵢ C ⊙ ε⁰ᵢ ⊙ ε(vᵢ) dΩ, ∀v∈V.
 """ 
-function main(mesh_partition,distribute)
+function main(mesh_partition,distribute,el_size)
   ranks = distribute(LinearIndices((prod(mesh_partition),)))
 
   ## Parameters
   order = 1;
   xmax,ymax=(1.0,1.0)
   dom = (0,xmax,0,ymax);
-  el_size = (200,200);
   γ = 0.05;
   γ_reinit = 0.5;
   max_steps = floor(Int,minimum(el_size)/10)
@@ -45,9 +46,9 @@ function main(mesh_partition,distribute)
   _V = TestFESpace(model,reffe;dirichlet_tags=["origin"])
   _U = TrialFESpace(_V,VectorValue(0.0,0.0))
   
-  # mfs = BlockMultiFieldStyle()
-  U = MultiFieldFESpace([_U,_U,_U])#;style=mfs);
-  V = MultiFieldFESpace([_V,_V,_V])#;style=mfs);
+  mfs = BlockMultiFieldStyle()
+  U = MultiFieldFESpace([_U,_U,_U];style=mfs);
+  V = MultiFieldFESpace([_V,_V,_V];style=mfs);
   V_reg = V_φ = TestFESpace(model,reffe_scalar)
   U_reg = TrialFESpace(V_reg)
 
@@ -85,7 +86,8 @@ function main(mesh_partition,distribute)
   ## Setup solver and FE operators
   Tm=SparseMatrixCSR{0,PetscScalar,PetscInt}
   Tv=Vector{PetscScalar}
-  solver = ElasticitySolver(Ω,V); # MUMPSSolver()
+  P = BlockDiagonalPreconditioner(map(Vi -> ElasticitySolver(Ω,Vi),V))
+  solver = GridapSolvers.LinearSolvers.GMRESSolver(100;Pr=P,rtol=1.e-8,verbose=i_am_main(ranks))
   
   state_map = AffineFEStateMap(a,l,res,U,V,V_φ,U_reg,φh,dΩ;
     assem_U = SparseMatrixAssembler(Tm,Tv,U,V),
@@ -121,11 +123,12 @@ end
 
 # RUN: mpiexecjl --project=. -n 9 julia ./scripts/MPI/MPI_main_inverse_homenisation_AGM.jl
 with_mpi() do distribute
-  mesh_partition = (3,3)
+  mesh_partition = (2,2)
+  el_size = (50,50)
   hilb_solver_options = "-pc_type gamg -ksp_type cg -ksp_error_if_not_converged true 
     -ksp_converged_reason -ksp_rtol 1.0e-12"
   
   GridapPETSc.with(args=split(hilb_solver_options)) do
-    main(mesh_partition,distribute)
+    main(mesh_partition,distribute,el_size)
   end
 end;

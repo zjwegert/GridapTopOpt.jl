@@ -12,6 +12,8 @@ using PartitionedArrays
 using SparseMatricesCSR
 using ChainRulesCore
 using DelimitedFiles
+using BlockArrays
+using LinearAlgebra
 
 import Gridap.Algebra: LinearSolver, SymbolicSetup
 import Gridap.Geometry: get_faces
@@ -53,6 +55,7 @@ export reinit!
 
 include("Solvers.jl")
 export ElasticitySolver
+export BlockDiagonalPreconditioner
 export MUMPSSolver
 
 include("VelocityExtension.jl")
