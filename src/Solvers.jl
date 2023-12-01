@@ -21,11 +21,28 @@ function Gridap.Algebra.symbolic_setup(solver::ElasticitySolver,A::AbstractMatri
   ElasticitySymbolicSetup(solver)
 end
 
+function get_node_to_dof_glue(space::UnconstrainedFESpace{V,Nothing}) where V
+  grid = get_triangulation(space)
+  Dp = num_point_dims(grid)
+
+  z = zero(VectorValue{Dp,get_dof_value_type(space)})
+  node_to_tag = fill(Int8(0),num_nodes(grid))
+  tag_to_mask = fill(Tuple(fill(false,Dp)),0)
+
+  glue, _ = Gridap.FESpaces._generate_node_to_dof_glue_component_major(z,node_to_tag,tag_to_mask)
+  return glue
+end
+
+function get_node_to_dof_glue(space::UnconstrainedFESpace{V,Gridap.FESpaces.NodeToDofGlue}) where V
+  return space.metadata
+end
+
 function get_dof_coords(trian,space)
   coords = map(local_views(trian),local_views(space),partition(space.gids)) do trian, space, dof_indices
     node_coords = Gridap.Geometry.get_node_coordinates(trian)
-    dof_to_node = space.metadata.free_dof_to_node
-    dof_to_comp = space.metadata.free_dof_to_comp
+    glue = get_node_to_dof_glue(space)
+    dof_to_node = glue.free_dof_to_node
+    dof_to_comp = glue.free_dof_to_comp
 
     o2l_dofs = own_to_local(dof_indices)
     coords = Vector{PetscScalar}(undef,length(o2l_dofs))

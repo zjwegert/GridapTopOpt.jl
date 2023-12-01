@@ -90,6 +90,7 @@ end
 
 function main(mesh_partition,distribute)
   ranks = distribute(LinearIndices((prod(mesh_partition),)))
+
   order = 1;
   el_size = (30,30,30);
   dom = (0.,1.,0.,1.,0.,1.);
@@ -148,6 +149,6 @@ function main(mesh_partition,distribute)
   end
 end;
 
-with_debug() do distribute
-  main((1,1,1),distribute)
+with_mpi() do distribute
+  main((2,2,1),distribute)
 end;
