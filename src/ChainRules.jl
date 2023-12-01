@@ -163,11 +163,11 @@ struct AffineFEStateMap{A,B,C,D<:Tuple,E<:Tuple,F<:Tuple,G<:Tuple,H<:Tuple} <: A
     ## K,b,x
     op = AffineFEOperator((u,v) -> a(u,v,φh,dΩ...),v -> l(v,φh,dΩ...),U,V,assem_U)
     K = get_matrix(op); b = get_vector(op); 
-    x = get_free_dof_values(zero(U))
+    x = allocate_col_vector(K)
 
     ## Adjoint K,b,x
     adjoint_K = assemble_matrix((u,v) -> a(v,u,φh,dΩ...),assem_adjoint,V,U)
-    adjoint_x = get_free_dof_values(zero(V))
+    adjoint_x = allocate_col_vector(adjoint_K)
 
     ## Numerical setups
     ns = numerical_setup(symbolic_setup(ls,K),K)

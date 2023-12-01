@@ -21,11 +21,28 @@ function Gridap.Algebra.symbolic_setup(solver::ElasticitySolver,A::AbstractMatri
   ElasticitySymbolicSetup(solver)
 end
 
+function get_node_to_dof_glue(space::UnconstrainedFESpace{V,Nothing}) where V
+  grid = get_triangulation(space)
+  Dp = num_point_dims(grid)
+
+  z = zero(VectorValue{Dp,get_dof_value_type(space)})
+  node_to_tag = fill(Int8(0),num_nodes(grid))
+  tag_to_mask = fill(Tuple(fill(false,Dp)),0)
+
+  glue, _ = Gridap.FESpaces._generate_node_to_dof_glue_component_major(z,node_to_tag,tag_to_mask)
+  return glue
+end
+
+function get_node_to_dof_glue(space::UnconstrainedFESpace{V,Gridap.FESpaces.NodeToDofGlue}) where V
+  return space.metadata
+end
+
 function get_dof_coords(trian,space)
   coords = map(local_views(trian),local_views(space),partition(space.gids)) do trian, space, dof_indices
     node_coords = Gridap.Geometry.get_node_coordinates(trian)
-    dof_to_node = space.metadata.free_dof_to_node
-    dof_to_comp = space.metadata.free_dof_to_comp
+    glue = get_node_to_dof_glue(space)
+    dof_to_node = glue.free_dof_to_node
+    dof_to_comp = glue.free_dof_to_comp
 
     o2l_dofs = own_to_local(dof_indices)
     coords = Vector{PetscScalar}(undef,length(o2l_dofs))
@@ -105,4 +122,57 @@ end
 
 function MUMPSSolver()
   return PETScLinearSolver(mumps_ksp_setup)
+end
+
+# Block diagonal preconditioner
+
+struct BlockDiagonalPreconditioner{N,A} <: Gridap.Algebra.LinearSolver
+  solvers :: A
+  function BlockDiagonalPreconditioner(solvers::AbstractArray{<:Gridap.Algebra.LinearSolver})
+    N = length(solvers)
+    A = typeof(solvers)
+    return new{N,A}(solvers)
+  end
+end
+
+struct BlockDiagonalPreconditionerSS{A,B} <: Gridap.Algebra.SymbolicSetup
+  solver   :: A
+  block_ss :: B
+end
+
+function Gridap.Algebra.symbolic_setup(solver::BlockDiagonalPreconditioner,mat::AbstractBlockMatrix)
+  mat_blocks = diag(blocks(mat))
+  block_ss   = map(symbolic_setup,solver.solvers,mat_blocks)
+  return BlockDiagonalPreconditionerSS(solver,block_ss)
+end
+
+struct BlockDiagonalPreconditionerNS{A,B} <: Gridap.Algebra.NumericalSetup
+  solver   :: A
+  block_ns :: B
+end
+
+function Gridap.Algebra.numerical_setup(ss::BlockDiagonalPreconditionerSS,mat::AbstractBlockMatrix)
+  solver     = ss.solver
+  mat_blocks = diag(blocks(mat))
+  block_ns   = map(numerical_setup,ss.block_ss,mat_blocks)
+  return BlockDiagonalPreconditionerNS(solver,block_ns)
+end
+
+function Gridap.Algebra.numerical_setup!(ns::BlockDiagonalPreconditionerNS,mat::AbstractBlockMatrix)
+  mat_blocks = diag(blocks(mat))
+  map(numerical_setup!,ns.block_ns,mat_blocks)
+end
+
+function Gridap.Algebra.solve!(x::AbstractBlockVector,ns::BlockDiagonalPreconditionerNS,b::AbstractBlockVector)
+  @check blocklength(x) == blocklength(b) == length(ns.block_ns)
+  for (iB,bns) in enumerate(ns.block_ns)
+    xi = x[Block(iB)]
+    bi = b[Block(iB)]
+    solve!(xi,bns,bi)
+  end
+  return x
+end
+
+function LinearAlgebra.ldiv!(x,ns::BlockDiagonalPreconditionerNS,b)
+  solve!(x,ns,b)
 end
