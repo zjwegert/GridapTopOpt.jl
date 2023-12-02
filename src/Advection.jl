@@ -205,11 +205,12 @@ function create_dof_permutation(model::CartesianDiscreteModel{Dc},
   end
   desc = get_cartesian_descriptor(model)
   
-  ncells = desc.partition
-  ndofs  = order .* ncells .+ 1
+  periodic = desc.isperiodic
+  ncells   = desc.partition
+  ndofs    = order .* ncells .+ 1 .- periodic
   @check prod(ndofs) == num_free_dofs(space)
 
-  new_dof_ids  = LinearIndices(ndofs)
+  new_dof_ids = CircularArray(LinearIndices(ndofs))
   n2o_dof_map = fill(-1,num_free_dofs(space))
 
   terms = get_terms(first(get_polytopes(model)), fill(order,Dc))
