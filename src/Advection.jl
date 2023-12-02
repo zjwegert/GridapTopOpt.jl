@@ -160,7 +160,7 @@ function AdvectionStencil(stencil::Stencil,
   ## Cache
   _φ = get_free_dof_values(zero(space));
   vel = get_free_dof_values(zero(space));
-  _cache = allocate_caches(stencil,_φ,vel,order,ndof)
+  _cache = allocate_caches(stencil,_φ,vel,perm,order,ndof)
   cache = (isperiodic,Δ,ndof,_cache...)
 
   return AdvectionStencil{order}(
@@ -174,24 +174,19 @@ function AdvectionStencil(stencil::Stencil,
   ## Get DoF description and permutation
   isperiodic = getany(map(x->get_cartesian_descriptor(x).isperiodic,local_views(model)))
 
-#  order, local_isperiodic, local_ndofs, perm = map(local_views(model),
-  order, local_ndofs, perm = map(local_views(model),
-      local_views(space)) do model, space
+  order, local_ndofs = map(local_views(model),local_views(space)) do model, space
     order = get_order(first(Gridap.CellData.get_data(get_fe_basis(space))))
-    desc = get_cartesian_descriptor(model)
-    dof_permutation = any(isperiodic) ? nothing : create_dof_permutation(model,space,order)
+    desc  = get_cartesian_descriptor(model)
     ndof = order .* desc.partition .+ 1
-    # isperiodic = desc.isperiodic
-    # return order, isperiodic, ndof, dof_permutation
-    return order, ndof, dof_permutation
+    return order, ndof
   end |> PartitionedArrays.tuple_of_arrays
   order = getany(order)
-  # isperiodic = getany(local_isperiodic)
 
   ## Cache
+  perm = create_dof_permutation(model,space,order)
   _φ = get_free_dof_values(zero(space));
   vel = get_free_dof_values(zero(space));
-  _cache = allocate_caches(stencil,_φ,vel,order,local_ndofs)
+  _cache = allocate_caches(stencil,_φ,vel,perm,order,local_ndofs)
   cache = (isperiodic,Δ,local_ndofs,_cache...)
 
   return AdvectionStencil{order}(
@@ -236,21 +231,41 @@ function create_dof_permutation(model::CartesianDiscreteModel{Dc},
   return n2o_dof_map
 end
 
-function allocate_caches(s::Stencil,φ::Vector,vel::Vector,order,ndofs)
-  stencil_caches = allocate_caches(s,reshape(φ,ndofs),vel)
+function create_dof_permutation(model::GridapDistributed.DistributedDiscreteModel,
+                                space::GridapDistributed.DistributedFESpace,
+                                order::Integer)
+  local_perms = map(local_views(model),local_views(space)) do model, space
+    create_dof_permutation(model,space,order)
+  end
+  return local_perms
+end
+
+function PartitionedArrays.permute_indices(indices::LocalIndices,perm)
+  id = part_id(indices)
+  n_glob = global_length(indices)
+  l2g = view(local_to_global(indices),perm)
+  l2o = view(local_to_owner(indices),perm)
+  return LocalIndices(n_glob,id,l2g,l2o)
+end
+
+function allocate_caches(s::Stencil,φ::Vector,vel::Vector,perm,order,ndofs)
+  stencil_caches = allocate_caches(s,reshape(φ,ndofs),reshape(vel,ndofs))
   φ_tmp   = similar(φ)
   vel_tmp = similar(vel)
   perm_caches = (order >= 2) ? (similar(φ), similar(vel)) : nothing
   return φ_tmp, vel_tmp, perm_caches, stencil_caches
 end
 
-function allocate_caches(s::Stencil,φ::PVector,vel::PVector,order,local_ndofs)
+function allocate_caches(s::Stencil,φ::PVector,vel::PVector,perm,order,local_ndofs)
   local_stencil_caches = map(local_views(φ),local_views(vel),local_views(local_ndofs)) do φ,vel,ndofs
-    allocate_caches(s,reshape(φ,ndofs),vel)
+    allocate_caches(s,reshape(φ,ndofs),reshape(vel,ndofs))
   end
-  φ_tmp   = similar(φ)
-  vel_tmp = similar(vel)
-  perm_caches = (order >= 2) ? (similar(φ), similar(vel)) : nothing
+
+  perm_indices = map(permute_indices,partition(axes(φ,1)),perm)
+  perm_caches = (order >= 2) ? (pfill(0.0,perm_indices),pfill(0.0,perm_indices)) : nothing
+
+  φ_tmp   = (order >= 2) ? pfill(0.0,perm_indices) : similar(φ)
+  vel_tmp = (order >= 2) ? pfill(0.0,perm_indices) : similar(vel)
   return φ_tmp, vel_tmp, perm_caches, local_stencil_caches
 end
 
