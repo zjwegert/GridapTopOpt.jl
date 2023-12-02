@@ -79,7 +79,7 @@ function main(mesh_partition,distribute)
   vel_ext = VelocityExtension(a_hilb,U_reg,V_reg,dΩ)
   
   ## Optimiser
-  optimiser = AugmentedLagrangian(φ,pcfs,stencil,vel_ext,interp,γ,γ_reinit);
+  optimiser = AugmentedLagrangian(φ,pcfs,stencil,vel_ext,interp,el_size,γ,γ_reinit);
   Base.iterate(optimiser)
   writevtk(Ω,"Results/out_parallel_order=$order",cellfields=["phi"=>φh,"H(phi)"=>(H ∘ φh),
     "|nabla(phi))|"=>(norm ∘ ∇(φh))])
