@@ -14,6 +14,7 @@ using ChainRulesCore
 using DelimitedFiles
 using BlockArrays
 using LinearAlgebra
+using CircularArrays
 
 import Gridap.Algebra: LinearSolver, SymbolicSetup
 import Gridap.Geometry: get_faces

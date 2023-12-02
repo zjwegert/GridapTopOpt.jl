@@ -1,7 +1,7 @@
 using Gridap
 using Gridap.Geometry, Gridap.FESpaces, Gridap.ReferenceFEs, Gridap.Helpers
 using GridapDistributed, PartitionedArrays
-
+using CircularArrays
 
 function create_dof_permutation(model::CartesianDiscreteModel{Dc},
                                 space::UnconstrainedFESpace,
@@ -13,11 +13,12 @@ function create_dof_permutation(model::CartesianDiscreteModel{Dc},
   end
   desc = get_cartesian_descriptor(model)
   
-  ncells = desc.partition
-  ndofs  = order .* ncells .+ 1
+  periodic = desc.isperiodic
+  ncells   = desc.partition
+  ndofs    = order .* ncells .+ 1 .- periodic
   @check prod(ndofs) == num_free_dofs(space)
 
-  new_dof_ids  = LinearIndices(ndofs)
+  new_dof_ids  = CircularArray(LinearIndices(ndofs))
   n2o_dof_map = fill(-1,num_free_dofs(space))
 
   terms = get_terms(first(get_polytopes(model)), fill(order,Dc))
@@ -44,16 +45,7 @@ function create_dof_permutation(model::GridapDistributed.DistributedDiscreteMode
   local_perms = map(local_views(model),local_views(space)) do model, space
     create_dof_permutation(model,space,order)
   end
-
-  gids   = space.gids
-  n_glob = length(gids)
-  ranks  = linear_indices(local_perms)
-  perm_indices = map(ranks,partition(gids),local_perms) do r, indices, perm
-    l2g = view(local_to_global(indices),perm)
-    l2o = view(local_to_owner(indices),perm)
-    LocalIndices(n_glob,r,l2g,l2o)
-  end
-  return PRange(perm_indices)
+  return local_perms
 end
 
 D  = 2
@@ -65,7 +57,8 @@ end
 
 nc = (D==2) ? (2,2) : (2,2,2)
 domain = (D==2) ? (0,1,0,1) : (0,1,0,1,0,1)
-model  = CartesianDiscreteModel(ranks,np,domain,nc)
+#model  = CartesianDiscreteModel(ranks,np,domain,nc)
+model  = CartesianDiscreteModel(domain,(4,2),isperiodic=(true,false))
 
 order = 2
 poly  = (D==2) ? QUAD : HEX
