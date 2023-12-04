@@ -28,8 +28,8 @@
 - [x] Higher order FEs breaks `Advection.jl` in parallel.
 - [x] `create_dof_permutation` doesn't work for periodic models.
 - [x] `MultiFieldFESpace` breaks `ElasticitySolver`
-- [ ] `NonlinearFEStateMap` breaks in parallel due need for transpose of jacobian. This likely means there is also a bug in `AffineFEStateMap` when dealing with non-symmetric weak forms.
-- [ ] Inverse homogenisation problems over allocate the stiffness matrix. Only one stiffness matrix should be assembled, then we should create a larger block matrix from this. See `scripts/nonlinear_adjoint_MWE.jl`
+- [ ] `NonlinearFEStateMap` breaks in parallel due need for transpose of jacobian. This likely means there is also a bug in `AffineFEStateMap` when dealing with non-symmetric weak forms. See `scripts/nonlinear_adjoint_MWE.jl`
+- [ ] Inverse homogenisation problems over allocate the stiffness matrix. Only one stiffness matrix should be assembled, then we should create a larger block matrix from this.
 - [ ] There appears to be a memory leak in `write_vtk`.
 
 ## Some notes on auto differentiation
