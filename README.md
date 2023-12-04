@@ -8,7 +8,7 @@
   |          **Problem type**         | **2D**  | **3D**  | **Serial** | **MPI** |
   |:---------------------------------:|---------|---------|:----------:|---------|
   | Minimum thermal compliance        | &#9745; | &#9744; | &#9745;    | &#9745; |
-  | Minimum elastic compliance        | &#9745; | &#9744; | &#9745;    | &#9744; |
+  | Minimum elastic compliance        | &#9745; | &#9744; | &#9745;    | &#9745; |
   | Inverter mechanism                | &#9745; | &#9744; | &#9745;    | &#9744; |
   | Elastic inverse homogenisation    | &#9745; | &#9745; | &#9745;    | &#9745; |
   | Minimum NL thermal compliance     | &#9744; | &#9745; | &#9745;    | &#9744; |
@@ -24,12 +24,13 @@
 - [ ] Implement CutFEM in serial using GridapEmbedded.
 - [ ] Extend to parallel (I'm sure this will be a massive undertaking)
 
-## Known bugs
-- [ ] Higher order FEs breaks `Advection.jl` in parallel.
-- [ ] `create_dof_permutation` doesn't work for periodic models.
-- [ ] There appears to be a memory leak in `write_vtk`.
-- [ ] `MultiFieldFESpace` breaks `ElasticitySolver`
+## Known bugs/issues
+- [x] Higher order FEs breaks `Advection.jl` in parallel.
+- [x] `create_dof_permutation` doesn't work for periodic models.
+- [x] `MultiFieldFESpace` breaks `ElasticitySolver`
 - [ ] `NonlinearFEStateMap` breaks in parallel due need for transpose of jacobian. This likely means there is also a bug in `AffineFEStateMap` when dealing with non-symmetric weak forms.
+- [ ] Inverse homogenisation problems over allocate the stiffness matrix. Only one stiffness matrix should be assembled, then we should create a larger block matrix from this. See `scripts/nonlinear_adjoint_MWE.jl`
+- [ ] There appears to be a memory leak in `write_vtk`.
 
 ## Some notes on auto differentiation
 

@@ -10,7 +10,7 @@ using Gridap, GridapDistributed, GridapPETSc, PartitionedArrays, LSTO_Distribute
           ⎡u∈V=H¹(Ω;u(Γ_D)=0),
           ⎣∫ D*∇(u)⋅∇(v) dΩ = ∫ v dΓ_N, ∀v∈V.
 """ 
-function main_AGM()
+function main_ALM()
   ## Parameters
   order = 1;
   xmax=ymax=1.0
@@ -26,7 +26,7 @@ function main_AGM()
   vf = 0.5;
   η_coeff = 2;
   α_coeff = 4;
-  path = "./Results/main_agm"
+  path = "./Results/main_ALM"
 
   ## FE Setup
   model = CartesianDiscreteModel(dom,el_size);
@@ -102,4 +102,4 @@ function main_AGM()
   write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh)),"uh"=>uhi];iter_mod=1)
 end
 
-main_AGM()
+main_ALM()

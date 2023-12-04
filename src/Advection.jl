@@ -155,7 +155,7 @@ function AdvectionStencil(stencil::Stencil,
   desc = get_cartesian_descriptor(model)
   isperiodic = desc.isperiodic
   ndof = order .* desc.partition .+ 1 .* (.~isperiodic)
-  perm = any(isperiodic) ? nothing : create_dof_permutation(model,space,order)
+  perm = create_dof_permutation(model,space,order)
   
   ## Cache
   _φ = get_free_dof_values(zero(space));

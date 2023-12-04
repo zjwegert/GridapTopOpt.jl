@@ -89,7 +89,7 @@ end
 get_optimiser_history(m::AugmentedLagrangian) = m.history
 get_level_set(m::AugmentedLagrangian) = FEFunction(get_aux_space(m.cache[2]),first(m.cache))
 
-# Initialise AGM parameters
+# Initialise ALM parameters
 function initialise!(m::AugmentedLagrangian,J_init::Real,C_init::Vector)
   λ = m.λ; Λ = m.Λ;
   λ .= 0.0
@@ -97,7 +97,7 @@ function initialise!(m::AugmentedLagrangian,J_init::Real,C_init::Vector)
   return λ,Λ
 end
 
-# Update AGM parameters
+# Update ALM parameters
 function update!(m::AugmentedLagrangian,iter::Int,C_new::Vector)
   λ = m.λ; Λ = m.Λ; ζ = m.ζ;
   Λ_max = m.Λ_max;

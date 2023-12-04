@@ -86,14 +86,14 @@ function StateParamIntegrandWithMeasure(
   StateParamIntegrandWithMeasure(F,spaces,assems,caches)
 end
 
-function (u_to_j::StateParamIntegrandWithMeasure)(u::T,φ::T) where T<:AbstractArray
+function (u_to_j::StateParamIntegrandWithMeasure)(u::T1,φ::T2) where {T1<:AbstractArray,T2<:AbstractArray}
   U,V_φ,_ = u_to_j.spaces
   uh = FEFunction(U,u)
   φh = FEFunction(V_φ,φ)
   return u_to_j.F(uh,φh)
 end
 
-function ChainRulesCore.rrule(u_to_j::StateParamIntegrandWithMeasure,u::T,φ::T) where T<:AbstractArray
+function ChainRulesCore.rrule(u_to_j::StateParamIntegrandWithMeasure,u::T1,φ::T2) where {T1<:AbstractArray,T2<:AbstractArray}
   F=u_to_j.F
   U,V_φ,U_reg = u_to_j.spaces
   assem_U,assem_deriv = u_to_j.assem
@@ -343,10 +343,11 @@ function ChainRulesCore.rrule(φ_to_u::NonlinearFEStateMap,φ::T) where T <: Abs
     ## Adjoint Solve
     #### NOTE: This breaks in parallel, need assembler to output matrix adjoint.
     numerical_setup!(adjoint_ns,adjoint(adjoint_K))
-    # DEBUG
-    # K = jacobian(op.op,FEFunction(U,uh))
-    # println("**Debug** |adjoint_K - K| = ", norm(adjoint_K - K,Inf)) # This should be > 0
-    # println("**Debug** |adjoint(adjoint_K) - K| = ", norm(adjoint(adjoint_K) - K,Inf)) # This should be zero
+    ## DEBUG only
+    K = jacobian(op.op,uh)
+    println("**Debug** |adjoint_K - K| = ", norm(adjoint_K - K,Inf)) # This should be > 0
+    println("**Debug** |adjoint(adjoint_K) - K| = ", norm(adjoint(adjoint_K) - K,Inf)) # This should be zero
+    ##
     solve!(λ,adjoint_ns,du)
     λh = FEFunction(V,λ)
     
