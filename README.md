@@ -11,7 +11,7 @@
   | Minimum elastic compliance        | &#9745; | &#9744; | &#9745;    | &#9745; |
   | Inverter mechanism                | &#9745; | &#9744; | &#9745;    | &#9744; |
   | Elastic inverse homogenisation    | &#9745; | &#9745; | &#9745;    | &#9745; |
-  | Minimum NL thermal compliance     | &#9744; | &#9745; | &#9745;    | &#9744; |
+  | Minimum NL thermal compliance     | &#9745; | &#9744; | &#9745;    | &#9744; |
   | Minimum hyperelastic compliance   | &#9745; | &#9744; | &#9745;    | &#9744; |
 
 - [x] Testing automatic differentation
