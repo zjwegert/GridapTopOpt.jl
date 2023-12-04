@@ -6,6 +6,7 @@ using Gridap.Geometry
 using Gridap.FESpaces
 using Gridap.Helpers
 using Gridap.ReferenceFEs
+using Gridap.Algebra
 using GridapDistributed
 using GridapPETSc
 using PartitionedArrays
