@@ -12,7 +12,7 @@ function VelocityExtension(
   ## Assembly
   K  = assemble_matrix((U,V) -> biform(U,V,dΩ),assem,U_reg,V_reg)
   ns = numerical_setup(symbolic_setup(ls,K),K)
-  x  = allocate_col_vector(K)
+  x  = allocate_in_domain(K)
   cache = (ns,x)
   return VelocityExtension(cache)
 end
