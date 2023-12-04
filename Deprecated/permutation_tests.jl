@@ -58,7 +58,7 @@ end
 nc = (D==2) ? (2,2) : (2,2,2)
 domain = (D==2) ? (0,1,0,1) : (0,1,0,1,0,1)
 #model  = CartesianDiscreteModel(ranks,np,domain,nc)
-model  = CartesianDiscreteModel(domain,(4,2),isperiodic=(true,false))
+model  = CartesianDiscreteModel(domain,(4,3),isperiodic=(true,false))
 
 order = 2
 poly  = (D==2) ? QUAD : HEX
