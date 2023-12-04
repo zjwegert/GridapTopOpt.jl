@@ -17,7 +17,7 @@ function main(mesh_partition,distribute,el_size)
   ranks = distribute(LinearIndices((prod(mesh_partition),)))
 
   ## Parameters
-  order = 1;
+  order = 2;
   xmax,ymax=(1.0,1.0)
   dom = (0,xmax,0,ymax);
   γ = 0.05;
@@ -27,7 +27,7 @@ function main(mesh_partition,distribute,el_size)
   C = isotropic_2d(1.,0.3);
   η_coeff = 2;
   α_coeff = 4;
-  path = "./Results/MPI_main_inverse_homenisation_AGM"
+  path = "./Results/MPI_main_inverse_homenisation_ALM"
 
   ## FE Setup
   model = CartesianDiscreteModel(ranks,mesh_partition,dom,el_size,isperiodic=(true,true));
@@ -121,10 +121,10 @@ function main(mesh_partition,distribute,el_size)
   write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh))];iter_mod=1)
 end
 
-# RUN: mpiexecjl --project=. -n 9 julia ./scripts/MPI/MPI_main_inverse_homenisation_AGM.jl
+# RUN: mpiexecjl --project=. -n 4 julia ./scripts/MPI/MPI_main_inverse_homenisation_ALM.jl
 with_mpi() do distribute
   mesh_partition = (2,2)
-  el_size = (50,50)
+  el_size = (200,200)
   hilb_solver_options = "-pc_type gamg -ksp_type cg -ksp_error_if_not_converged true 
     -ksp_converged_reason -ksp_rtol 1.0e-12"
   

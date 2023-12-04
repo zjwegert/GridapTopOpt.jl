@@ -12,7 +12,7 @@ using Gridap, GridapDistributed, GridapPETSc, PartitionedArrays, LSTO_Distribute
 """ 
 function main()
   ## Parameters
-  order = 1;
+  order = 2;
   xmax,ymax=(1.0,1.0)
   dom = (0,xmax,0,ymax);
   el_size = (200,200);
@@ -23,7 +23,7 @@ function main()
   C = isotropic_2d(1.,0.3);
   η_coeff = 2;
   α_coeff = 4;
-  path = "./Results/main_inverse_homogenisation_AGM"
+  path = "./Results/main_inverse_homogenisation_ALM"
 
   ## FE Setup
   model = CartesianDiscreteModel(dom,el_size,isperiodic=(true,true));

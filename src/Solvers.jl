@@ -33,7 +33,7 @@ function get_node_to_dof_glue(space::UnconstrainedFESpace{V,Nothing}) where V
   return glue
 end
 
-function get_node_to_dof_glue(space::UnconstrainedFESpace{V,Gridap.FESpaces.NodeToDofGlue}) where V
+function get_node_to_dof_glue(space::UnconstrainedFESpace{V,<:Gridap.FESpaces.NodeToDofGlue}) where V
   return space.metadata
 end
 

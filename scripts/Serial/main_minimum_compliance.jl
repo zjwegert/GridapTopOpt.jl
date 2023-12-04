@@ -63,7 +63,7 @@ function main()
   res(u,v,φ,dΩ,dΓ_N) = a(u,v,φ,dΩ,dΓ_N) - l(v,φ,dΩ,dΓ_N)
 
   ## Optimisation functionals
-  ξ = 3;
+  ξ = 2;
   J = (u,φ,dΩ,dΓ_N) -> ∫((I ∘ φ)*(C ⊙ ε(u) ⊙ ε(u)) + ξ*(ρ ∘ φ))dΩ
   dJ = (q,u,φ,dΩ,dΓ_N) -> ∫((ξ - C ⊙ ε(u) ⊙ ε(u))*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ;
 

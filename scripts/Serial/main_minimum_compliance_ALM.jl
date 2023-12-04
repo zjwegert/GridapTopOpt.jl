@@ -1,26 +1,31 @@
 using Gridap, GridapDistributed, GridapPETSc, PartitionedArrays, LSTO_Distributed
 
-using LineSearches: BackTracking
-
 """
-  (Serial) Minimum hyperelastic compliance with Lagrangian method in 2D.
+  (Serial) Minimum elastic compliance with augmented Lagrangian method in 2D.
 
   Optimisation problem:
-    ...
+      Min J(Ω) = ∫ C ⊙ ε(u) ⊙ ε(v) dΩ
+        Ω
+    s.t., Vol(Ω) = Vf,
+          ⎡u∈V=H¹(Ω;u(Γ_D)=0)ᵈ, 
+          ⎣∫ C ⊙ ε(u) ⊙ ε(v) dΩ = ∫ v⋅g dΓ_N, ∀v∈V.
 """ 
 function main()
   ## Parameters
   order = 1;
-  xmax,ymax=2.0,1.0
+  xmax,ymax=(2.0,1.0)
   prop_Γ_N = 0.4;
   dom = (0,xmax,0,ymax);
   el_size = (200,200);
-  γ = 0.03;
+  γ = 0.1;
   γ_reinit = 0.5;
   max_steps = floor(Int,minimum(el_size)/10)
-  tol = 1/(order^2*10)*prod(inv,minimum(el_size)) # <- We can do better than this I think
+  tol = 1/(order^2*10)*prod(inv,minimum(el_size))
+  C = isotropic_2d(1.,0.3);
   η_coeff = 2;
   α_coeff = 4;
+  g = VectorValue(0,-1);
+  path = "./Results/main_minimum_compliance_ALM"
 
   ## FE Setup
   model = CartesianDiscreteModel(dom,el_size);
@@ -55,49 +60,23 @@ function main()
   interp = SmoothErsatzMaterialInterpolation(η = η_coeff*maximum(Δ))
   I,H,DH,ρ = interp.I,interp.H,interp.DH,interp.ρ
 
-  _E = 1000;
-  ν = 0.3;
-  μ, λ = _E/(2*(1 + ν)), _E*ν/((1 + ν)*(1 - 2*ν))
-  g = VectorValue(0,-20)
-  # Deformation gradient
-  F(∇u) = one(∇u) + ∇u'
-  J(F) = sqrt(det(C(F)))
-  # Derivative of green Strain
-  dE(∇du,∇u) = 0.5*( ∇du⋅F(∇u) + (∇du⋅F(∇u))' )
-  # Right Caughy-green deformation tensor
-  C(F) = (F')⋅F
-  # Constitutive law (Neo hookean)
-  function S(∇u)
-    Cinv = inv(C(F(∇u)))
-    μ*(one(∇u)-Cinv) + λ*log(J(F(∇u)))*Cinv
-  end
-  # Cauchy stress tensor
-  σ(∇u) = (1.0/J(F(∇u)))*F(∇u)⋅S(∇u)⋅(F(∇u))'
-  res(u,v,φ,dΩ,dΓ_N) = ∫( (I ∘ φ)*((dE∘(∇(v),∇(u))) ⊙ (S∘∇(u))) )*dΩ - ∫(g⋅v)dΓ_N
-
-  ## Saint Venant–Kirchhoff law
-  # F(∇u) = one(∇u) + ∇u'
-  # E(F) = 0.5*( F' ⋅ F - one(F) )
-  # Σ(∇u) = λ*tr(E(F(∇u)))*one(∇u)+2*μ*E(F(∇u))
-  # T(∇u) = F(∇u) ⋅ Σ(∇u)
-  # res(u,v,φ,dΩ,dΓ_N) = ∫((I ∘ φ)*((T ∘ ∇(u)) ⊙ ∇(v)))*dΩ - ∫(g⋅v)dΓ_N
-  ## Optimisation functionals
-  # ξ = 0.5;
-  # Obj = (u,φ,dΩ,dΓ_N) -> ∫((I ∘ φ)*((T ∘ ∇(u)) ⊙ ∇(u)) + ξ*(ρ ∘ φ))dΩ
+  a(u,v,φ,dΩ,dΓ_N) = ∫((I ∘ φ)*(C ⊙ ε(u) ⊙ ε(v)))dΩ
+  l(v,φ,dΩ,dΓ_N) = ∫(v⋅g)dΓ_N
+  res(u,v,φ,dΩ,dΓ_N) = a(u,v,φ,dΩ,dΓ_N) - l(v,φ,dΩ,dΓ_N)
 
   ## Optimisation functionals
-  ξ = 0.5;
-  Obj = (u,φ,dΩ,dΓ_N) -> ∫((I ∘ φ)*((dE∘(∇(u),∇(u))) ⊙ (S∘∇(u))) + ξ*(ρ ∘ φ))dΩ
-  # Obj = (u,φ,dΩ,dΓ_N) -> ∫((I ∘ φ)*((T ∘ ∇(u)) ⊙ ∇(u)) + ξ*(ρ ∘ φ))dΩ
+  J = (u,φ,dΩ,dΓ_N) -> ∫((I ∘ φ)*(C ⊙ ε(u) ⊙ ε(u)))dΩ
+  dJ = (q,u,φ,dΩ,dΓ_N) -> ∫((- C ⊙ ε(u) ⊙ ε(u))*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ;
+  Vol = (u,φ,dΩ,dΓ_N) -> ∫(((ρ ∘ φ) - 0.5)/vol_D)dΩ;
+  dVol = (q,u,φ,dΩ,dΓ_N) -> ∫(1/vol_D*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
 
   ## Finite difference solver and level set function
   stencil = AdvectionStencil(FirstOrderStencil(2,Float64),model,V_φ,Δ./order,max_steps,tol)
   reinit!(stencil,φ,γ_reinit)
 
   ## Setup solver and FE operators
-  nls = NLSolver(show_trace=true,method=:newton,linesearch=BackTracking(),iterations=50)  
-  state_map = NonlinearFEStateMap(res,U,V,V_φ,U_reg,φh,dΩ,dΓ_N;nls=FESolver(nls))
-  pcfs = PDEConstrainedFunctionals(Obj,state_map)
+  state_map = AffineFEStateMap(a,l,res,U,V,V_φ,U_reg,φh,dΩ,dΓ_N)
+  pcfs = PDEConstrainedFunctionals(J,[Vol],state_map,analytic_dJ=dJ,analytic_dC=[dVol])
 
   ## Hilbertian extension-regularisation problems
   α = α_coeff*maximum(Δ)
@@ -105,18 +84,18 @@ function main()
   vel_ext = VelocityExtension(a_hilb,U_reg,V_reg,dΩ)
   
   ## Optimiser
-  path = "./Results/main_hyperelastic_compliance_neohook_NonSymmetric_xi=$ξ"
   make_dir(path)
   optimiser = AugmentedLagrangian(φ,pcfs,stencil,vel_ext,interp,el_size,γ,γ_reinit);
   for history in optimiser
-    it,Ji,_,_ = last(history)
-    print_history(it,["J"=>Ji])
+    it,Ji,Ci,Li = last(history)
+    λi = optimiser.λ; Λi = optimiser.Λ
+    print_history(it,["J"=>Ji,"C"=>Ci,"L"=>Li,"λ"=>λi,"Λ"=>Λi])
     write_history(history,path*"/history.csv")
-    uhi = get_state(pcfs)
-    write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh)),"uh"=>uhi])
+    write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh))])
   end
-  it,Ji,_,_ = last(optimiser.history)
-  print_history(it,["J"=>Ji])
+  it,Ji,Ci,Li = last(optimiser.history)
+  λi = optimiser.λ; Λi = optimiser.Λ
+  print_history(it,["J"=>Ji,"C"=>Ci,"L"=>Li,"λ"=>λi,"Λ"=>Λi])
   write_history(optimiser.history,path*"/history.csv")
   uhi = get_state(pcfs)
   write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh)),"uh"=>uhi];iter_mod=1)

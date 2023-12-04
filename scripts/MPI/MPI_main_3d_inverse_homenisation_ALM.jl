@@ -25,7 +25,7 @@ function main(mesh_partition,distribute)
   C = isotropic_3d(1.,0.3);
   η_coeff = 2;
   α_coeff = 4;
-  path = "./Results/MPI_main_3d_inverse_homenisation_AGM"
+  path = "./Results/MPI_main_3d_inverse_homenisation_ALM"
 
   ## FE Setup
   model = CartesianDiscreteModel(ranks,mesh_partition,dom,el_size,isperiodic=(true,true,true));
@@ -89,7 +89,8 @@ function main(mesh_partition,distribute)
   ## Setup solver and FE operators
   Tm=SparseMatrixCSR{0,PetscScalar,PetscInt}
   Tv=Vector{PetscScalar}
-  solver = MUMPSSolver()#ElasticitySolver(Ω,U);
+  P = BlockDiagonalPreconditioner(map(Vi -> ElasticitySolver(Ω,Vi),V))
+  solver = GridapSolvers.LinearSolvers.GMRESSolver(100;Pr=P,rtol=1.e-8,verbose=i_am_main(ranks))
 
   state_map = AffineFEStateMap(a,l,res,U,V,V_φ,U_reg,φh,dΩ;
     assem_U = SparseMatrixAssembler(Tm,Tv,U,V),
@@ -123,7 +124,7 @@ function main(mesh_partition,distribute)
   write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh))];iter_mod=1)
 end
 
-# RUN: mpiexecjl --project=. -n 64 julia ./scripts/MPI/MPI_main_inverse_homenisation_AGM.jl
+# RUN: mpiexecjl --project=. -n 64 julia ./scripts/MPI/MPI_main_inverse_homenisation_ALM.jl
 with_mpi() do distribute
   mesh_partition = (4,4,4)
   hilb_solver_options = "-pc_type gamg -ksp_type cg -ksp_error_if_not_converged true 
