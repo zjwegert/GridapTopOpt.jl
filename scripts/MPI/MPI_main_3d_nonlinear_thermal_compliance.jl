@@ -77,23 +77,24 @@ function main(mesh_partition,distribute,el_size)
   ## Setup solver and FE operators
   Tm=SparseMatrixCSR{0,PetscScalar,PetscInt}
   Tv=Vector{PetscScalar}
-  error("Need to define a nonlinear solver for PETSc")
-  nl_solver = NonLinearPETScSolver()
-  adjoint_solver = PETScLinearSolver()
+  nl_solver = PETScNonlinearSolver()
+  lin_solver = PETScLinearSolver()
   
   state_map = NonlinearFEStateMap(res,U,V,V_φ,U_reg,φh,dΩ,dΓ_N;
     assem_U = SparseMatrixAssembler(Tm,Tv,U,V),
     assem_adjoint = SparseMatrixAssembler(Tm,Tv,V,U),
     assem_deriv = SparseMatrixAssembler(Tm,Tv,U_reg,U_reg),
     nls=nl_solver,
-    adjoint_ls=adjoint_solver)
+    adjoint_ls=lin_solver)
 
   pcfs = PDEConstrainedFunctionals(J,state_map)
 
   ## Hilbertian extension-regularisation problems
   α = α_coeff*maximum(Δ)
   a_hilb = (p,q,dΩ)->∫(α^2*∇(p)⋅∇(q) + p*q)dΩ;
-  vel_ext = VelocityExtension(a_hilb,U_reg,V_reg,dΩ)
+  vel_ext = VelocityExtension(a_hilb,U_reg,V_reg,dΩ,;
+    assem=SparseMatrixAssembler(Tm,Tv,U_reg,V_reg),
+    ls=lin_solver)
   
   ## Optimiser
   make_dir(path)
@@ -115,10 +116,12 @@ end
 with_mpi() do distribute
   mesh_partition = (2,2,2)
   el_size = (100,100,100)
-  hilb_solver_options = "-pc_type gamg -ksp_type cg -ksp_error_if_not_converged true 
-    -ksp_converged_reason -ksp_rtol 1.0e-12"
+
+  options = "-snes_type newtonls -snes_linesearch_type basic  -snes_linesearch_damping 1.0"*
+    " -snes_rtol 1.0e-14 -snes_atol 0.0 -snes_monitor -pc_type gamg -ksp_type cg"*
+    " -snes_converged_reason -ksp_converged_reason -ksp_error_if_not_converged true -ksp_rtol 1.0e-12"
   
-  GridapPETSc.with(args=split(all_solver_options)) do
+  GridapPETSc.with(args=split(options)) do
     main(mesh_partition,distribute,el_size)
   end
 end;

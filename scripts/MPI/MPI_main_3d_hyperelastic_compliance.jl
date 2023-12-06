@@ -86,23 +86,25 @@ function main(mesh_partition,distribute,el_size)
   ## Setup solver and FE operators
   Tm=SparseMatrixCSR{0,PetscScalar,PetscInt}
   Tv=Vector{PetscScalar}
+  lin_solver = ElasticitySolver(Ω,V)
   error("Need to define a nonlinear solver for PETSc")
   nl_solver = NonLinearPETScSolver()
-  adjoint_solver = PETScLinearSolver()
 
   state_map = NonlinearFEStateMap(res,U,V,V_φ,U_reg,φh,dΩ,dΓ_N;
     assem_U = SparseMatrixAssembler(Tm,Tv,U,V),
     assem_adjoint = SparseMatrixAssembler(Tm,Tv,V,U),
     assem_deriv = SparseMatrixAssembler(Tm,Tv,U_reg,U_reg),
     nls=nl_solver,
-    adjoint_ls=adjoint_solver)
+    adjoint_ls=lin_solver)
 
   pcfs = PDEConstrainedFunctionals(Obj,state_map)
 
   ## Hilbertian extension-regularisation problems
   α = α_coeff*maximum(Δ)
   a_hilb = (p,q,dΩ)->∫(α^2*∇(p)⋅∇(q) + p*q)dΩ;
-  vel_ext = VelocityExtension(a_hilb,U_reg,V_reg,dΩ)
+  vel_ext = VelocityExtension(a_hilb,U_reg,V_reg,dΩ;
+    assem=SparseMatrixAssembler(Tm,Tv,U_reg,V_reg),
+    ls=PETScLinearSolver())
   
   ## Optimiser
   path = "./Results/MPI_main_3d_hyperelastic_compliance_neohook_NonSymmetric_xi=$ξ"

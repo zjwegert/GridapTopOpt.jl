@@ -73,13 +73,24 @@ function main(mesh_partition,distribute,el_size)
   reinit!(stencil,φ,γ_reinit)
 
   ## Setup solver and FE operators
-  state_map = AffineFEStateMap(a,l,res,U,V,V_φ,U_reg,φh,dΩ,dΓ_N)
+  Tm=SparseMatrixCSR{0,PetscScalar,PetscInt}
+  Tv=Vector{PetscScalar}
+  solver = PETScLinearSolver()
+  
+  state_map = AffineFEStateMap(a,l,res,U,V,V_φ,U_reg,φh,dΩ,dΓ_N;
+    assem_U = SparseMatrixAssembler(Tm,Tv,U,V),
+    assem_adjoint = SparseMatrixAssembler(Tm,Tv,V,U),
+    assem_deriv = SparseMatrixAssembler(Tm,Tv,U_reg,U_reg),
+    ls=solver,
+    adjoint_ls=solver)
   pcfs = PDEConstrainedFunctionals(J,state_map,analytic_dJ=dJ)
 
   ## Hilbertian extension-regularisation problems
   α = α_coeff*maximum(Δ)
   a_hilb = (p,q,dΩ)->∫(α^2*∇(p)⋅∇(q) + p*q)dΩ;
-  vel_ext = VelocityExtension(a_hilb,U_reg,V_reg,dΩ)
+  vel_ext = VelocityExtension(a_hilb,U_reg,V_reg,dΩ;
+    assem=SparseMatrixAssembler(Tm,Tv,U_reg,V_reg),
+    ls=solver)
 
   ## Optimiser
   make_dir(path;ranks=ranks)

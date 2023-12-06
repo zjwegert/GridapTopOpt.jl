@@ -89,7 +89,9 @@ function main(mesh_partition,distribute,el_size)
   ## Hilbertian extension-regularisation problems
   α = α_coeff*maximum(Δ)
   a_hilb = (p,q,dΩ)->∫(α^2*∇(p)⋅∇(q) + p*q)dΩ;
-  vel_ext = VelocityExtension(a_hilb,U_reg,V_reg,dΩ)
+  vel_ext = VelocityExtension(a_hilb,U_reg,V_reg,dΩ;
+    assem=SparseMatrixAssembler(Tm,Tv,U_reg,V_reg),
+    ls=PETScLinearSolver())
 
   ## Optimiser
   make_dir(path;ranks=ranks)
