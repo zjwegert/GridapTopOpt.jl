@@ -2,12 +2,12 @@ using Gridap, Gridap.MultiField, GridapDistributed, GridapPETSc, GridapSolvers,
   PartitionedArrays, LSTO_Distributed, SparseMatricesCSR
 
 """
-  (MPI) Minimum elastic compliance with Lagrangian method in 2D.
+  (MPI) Minimum elastic compliance with Lagrangian method in 3D.
 
   Optimisation problem:
       Min J(Ω) = ∫ C ⊙ ε(u) ⊙ ε(v) + ξ dΩ
         Ω
-    s.t., ⎡u∈V=H¹(Ω;u(Γ_D)=0)ᵈ, 
+    s.t., ⎡u∈V=H¹(Ω;u(Γ_D)=0)³, 
           ⎣∫ C ⊙ ε(u) ⊙ ε(v) dΩ = ∫ v⋅g dΓ_N, ∀v∈V.
 """
 function main(mesh_partition,distribute,el_size)
@@ -15,25 +15,25 @@ function main(mesh_partition,distribute,el_size)
 
   ## Parameters
   order = 1;
-  xmax,ymax=(2.0,1.0)
+  xmax,ymax,zmax=(2.0,1.0,1.0)
   prop_Γ_N = 0.4;
-  dom = (0,xmax,0,ymax);
+  dom = (0,xmax,0,ymax,zmax);
   γ = 0.1;
   γ_reinit = 0.5;
-  max_steps = floor(Int,minimum(el_size)/10)
+  max_steps = floor(Int,minimum(el_size)/3)
   tol = 1/(order^2*10)*prod(inv,minimum(el_size))
-  C = isotropic_2d(1.,0.3);
-  g = VectorValue(0,-1);
+  C = isotropic_3d(1.,0.3);
+  g = VectorValue(0,0,-1);
   η_coeff = 2;
   α_coeff = 4;
-  path = "./Results/MPI_main_minimum_compliance"
+  path = "./Results/MPI_main_3d_minimum_compliance"
 
   ## FE Setup
   model = CartesianDiscreteModel(ranks,mesh_partition,dom,el_size);
   Δ = get_Δ(model)
   f_Γ_D(x) = (x[1] ≈ 0.0) ? true : false;
-  f_Γ_N(x) = (x[1] ≈ xmax && ymax/2-ymax*prop_Γ_N/4 - eps() <= x[2] <= 
-    ymax/2+ymax*prop_Γ_N/4 + eps()) ? true : false;
+  f_Γ_N(x) = (x[1] ≈ xmax && ymax/2-ymax*prop_Γ_N/4 - eps() <= x[2] <= ymax/2+ymax*prop_Γ_N/4 + eps() &&
+      zmax/2-zmax*prop_Γ_N/4 - eps() <= x[3] <= zmax/2+zmax*prop_Γ_N/4 + eps()) ? true : false;
   update_labels!(1,model,f_Γ_D,"Gamma_D")
   update_labels!(2,model,f_Γ_N,"Gamma_N")
 
@@ -44,10 +44,10 @@ function main(mesh_partition,distribute,el_size)
   dΓ_N = Measure(Γ_N,2order)
 
   ## Spaces
-  reffe = ReferenceFE(lagrangian,VectorValue{2,Float64},order)
+  reffe = ReferenceFE(lagrangian,VectorValue{3,Float64},order)
   reffe_scalar = ReferenceFE(lagrangian,Float64,order)
   V = TestFESpace(model,reffe;dirichlet_tags=["Gamma_D"])
-  U = TrialFESpace(V,VectorValue(0.0,0.0))
+  U = TrialFESpace(V,VectorValue(0.0,0.0,0.0))
   V_φ = TestFESpace(model,reffe_scalar)
   V_reg = TestFESpace(model,reffe_scalar;dirichlet_tags=["Gamma_N"])
   U_reg = TrialFESpace(V_reg,0)
@@ -70,7 +70,7 @@ function main(mesh_partition,distribute,el_size)
   dJ = (q,u,φ,dΩ,dΓ_N) -> ∫((ξ - C ⊙ ε(u) ⊙ ε(u))*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ;
 
   ## Finite difference solver and level set function
-  stencil = AdvectionStencil(FirstOrderStencil(2,Float64),model,V_φ,Δ./order,max_steps,tol)
+  stencil = AdvectionStencil(FirstOrderStencil(3,Float64),model,V_φ,Δ./order,max_steps,tol)
   reinit!(stencil,φ,γ_reinit)
 
   ## Setup solver and FE operators
@@ -110,15 +110,12 @@ function main(mesh_partition,distribute,el_size)
 end
 
 with_mpi() do distribute
-  mesh_partition = (2,2)
-  el_size = (200,200)
+  mesh_partition = (2,2,2)
+  el_size = (100,50,50)
   hilb_solver_options = "-pc_type gamg -ksp_type cg -ksp_error_if_not_converged true 
-    -ksp_converged_reason -ksp_rtol 1.0e-12 "
-  elasticity_options = " -elast_ksp_type cg -elast_ksp_error_if_not_converged true -elast_ksp_converged_reason -elast_ksp_rtol 1.0e-12
-                         -elast_pc_type gamg -elast_pc_gamg_agg_nsmooths 5 -elast_pc_gamg_threshold 0.1 -elast_coarse_sub_pc_type lu"
+    -ksp_converged_reason -ksp_rtol 1.0e-12"
   
-  options = hilb_solver_options*elasticity_options
-  GridapPETSc.with(args=split(options)) do
+  GridapPETSc.with(args=split(hilb_solver_options)) do
     main(mesh_partition,distribute,el_size)
   end
 end;

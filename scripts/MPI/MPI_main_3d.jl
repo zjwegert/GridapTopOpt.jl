@@ -1,39 +1,39 @@
-using Gridap, Gridap.MultiField, GridapDistributed, GridapPETSc, GridapSolvers, 
-  PartitionedArrays, LSTO_Distributed, SparseMatricesCSR
+using Gridap, GridapDistributed, GridapPETSc, PartitionedArrays, LSTO_Distributed
 
 """
-  (MPI) Minimum elastic compliance with Lagrangian method in 2D.
+  (MPI) Minimum thermal compliance with Lagrangian method in 3D.
 
   Optimisation problem:
-      Min J(Ω) = ∫ C ⊙ ε(u) ⊙ ε(v) + ξ dΩ
-        Ω
-    s.t., ⎡u∈V=H¹(Ω;u(Γ_D)=0)ᵈ, 
-          ⎣∫ C ⊙ ε(u) ⊙ ε(v) dΩ = ∫ v⋅g dΓ_N, ∀v∈V.
+      Min J(Ω) = ∫ D*∇(u)⋅∇(u) + ξ dΩ
+      Ω
+    s.t., ⎡u∈V=H¹(Ω;u(Γ_D)=0),
+          ⎣∫ D*∇(u)⋅∇(v) dΩ = ∫ v dΓ_N, ∀v∈V.
 """
 function main(mesh_partition,distribute,el_size)
   ranks = distribute(LinearIndices((prod(mesh_partition),)))
 
   ## Parameters
   order = 1;
-  xmax,ymax=(2.0,1.0)
+  xmax=ymax=zmax=1.0
   prop_Γ_N = 0.4;
-  dom = (0,xmax,0,ymax);
+  prop_Γ_D = 0.2
+  dom = (0,xmax,0,ymax,0,zmax);
   γ = 0.1;
   γ_reinit = 0.5;
-  max_steps = floor(Int,minimum(el_size)/10)
+  max_steps = floor(Int,minimum(el_size)/3)
   tol = 1/(order^2*10)*prod(inv,minimum(el_size))
-  C = isotropic_2d(1.,0.3);
-  g = VectorValue(0,-1);
+  D = 1;
   η_coeff = 2;
   α_coeff = 4;
-  path = "./Results/MPI_main_minimum_compliance"
+  path = "./Results/MPI_main_3d"
 
   ## FE Setup
   model = CartesianDiscreteModel(ranks,mesh_partition,dom,el_size);
   Δ = get_Δ(model)
-  f_Γ_D(x) = (x[1] ≈ 0.0) ? true : false;
-  f_Γ_N(x) = (x[1] ≈ xmax && ymax/2-ymax*prop_Γ_N/4 - eps() <= x[2] <= 
-    ymax/2+ymax*prop_Γ_N/4 + eps()) ? true : false;
+  f_Γ_D(x) = (x[1] ≈ 0.0 && (x[2] <= ymax*prop_Γ_D + eps() || x[2] >= ymax-ymax*prop_Γ_D - eps()) &&
+    (x[3] <= zmax*prop_Γ_D + eps() || x[3] >= zmax-zmax*prop_Γ_D - eps())) ? true : false;
+  f_Γ_N(x) = (x[1] ≈ xmax && ymax/2-ymax*prop_Γ_N/4 - eps() <= x[2] <= ymax/2+ymax*prop_Γ_N/4 + eps() &&
+    zmax/2-zmax*prop_Γ_N/4 - eps() <= x[3] <= zmax/2+zmax*prop_Γ_N/4 + eps()) ? true : false;
   update_labels!(1,model,f_Γ_D,"Gamma_D")
   update_labels!(2,model,f_Γ_N,"Gamma_N")
 
@@ -44,10 +44,9 @@ function main(mesh_partition,distribute,el_size)
   dΓ_N = Measure(Γ_N,2order)
 
   ## Spaces
-  reffe = ReferenceFE(lagrangian,VectorValue{2,Float64},order)
   reffe_scalar = ReferenceFE(lagrangian,Float64,order)
-  V = TestFESpace(model,reffe;dirichlet_tags=["Gamma_D"])
-  U = TrialFESpace(V,VectorValue(0.0,0.0))
+  V = TestFESpace(model,reffe_scalar;dirichlet_tags=["Gamma_D"])
+  U = TrialFESpace(V,0.0)
   V_φ = TestFESpace(model,reffe_scalar)
   V_reg = TestFESpace(model,reffe_scalar;dirichlet_tags=["Gamma_N"])
   U_reg = TrialFESpace(V_reg,0)
@@ -60,23 +59,23 @@ function main(mesh_partition,distribute,el_size)
   interp = SmoothErsatzMaterialInterpolation(η = η_coeff*maximum(Δ))
   I,H,DH,ρ = interp.I,interp.H,interp.DH,interp.ρ
 
-  a(u,v,φ,dΩ,dΓ_N) = ∫((I ∘ φ)*(C ⊙ ε(u) ⊙ ε(v)))dΩ
-  l(v,φ,dΩ,dΓ_N) = ∫(v⋅g)dΓ_N
+  a(u,v,φ,dΩ,dΓ_N) = ∫((I ∘ φ)*D*∇(u)⋅∇(v))dΩ
+  l(v,φ,dΩ,dΓ_N) = ∫(v)dΓ_N
   res(u,v,φ,dΩ,dΓ_N) = a(u,v,φ,dΩ,dΓ_N) - l(v,φ,dΩ,dΓ_N)
 
   ## Optimisation functionals
-  ξ = 2;
-  J = (u,φ,dΩ,dΓ_N) -> ∫((I ∘ φ)*(C ⊙ ε(u) ⊙ ε(u)) + ξ*(ρ ∘ φ))dΩ
-  dJ = (q,u,φ,dΩ,dΓ_N) -> ∫((ξ - C ⊙ ε(u) ⊙ ε(u))*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ;
+  ξ = 0.3;
+  J = (u,φ,dΩ,dΓ_N) -> ∫((I ∘ φ)*D*∇(u)⋅∇(u) + ξ*(ρ ∘ φ))dΩ
+  dJ = (q,u,φ,dΩ,dΓ_N) -> ∫((ξ-D*∇(u)⋅∇(u))*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ;
 
   ## Finite difference solver and level set function
-  stencil = AdvectionStencil(FirstOrderStencil(2,Float64),model,V_φ,Δ./order,max_steps,tol)
+  stencil = AdvectionStencil(FirstOrderStencil(3,Float64),model,V_φ,Δ./order,max_steps,tol)
   reinit!(stencil,φ,γ_reinit)
 
   ## Setup solver and FE operators
   Tm=SparseMatrixCSR{0,PetscScalar,PetscInt}
   Tv=Vector{PetscScalar}
-  solver = ElasticitySolver(Ω,V)
+  solver = PETScLinearSolver()
   
   state_map = AffineFEStateMap(a,l,res,U,V,V_φ,U_reg,φh,dΩ,dΓ_N;
     assem_U = SparseMatrixAssembler(Tm,Tv,U,V),
@@ -84,14 +83,14 @@ function main(mesh_partition,distribute,el_size)
     assem_deriv = SparseMatrixAssembler(Tm,Tv,U_reg,U_reg),
     ls=solver,
     adjoint_ls=solver)
-  pcfs = PDEConstrainedFunctionals(J,state_map;analytic_dJ=dJ)
+  pcfs = PDEConstrainedFunctionals(J,state_map,analytic_dJ=dJ)
 
   ## Hilbertian extension-regularisation problems
   α = α_coeff*maximum(Δ)
   a_hilb = (p,q,dΩ)->∫(α^2*∇(p)⋅∇(q) + p*q)dΩ;
   vel_ext = VelocityExtension(a_hilb,U_reg,V_reg,dΩ;
     assem=SparseMatrixAssembler(Tm,Tv,U_reg,V_reg),
-    ls=PETScLinearSolver())
+    ls=solver)
 
   ## Optimiser
   make_dir(path;ranks=ranks)
@@ -110,15 +109,12 @@ function main(mesh_partition,distribute,el_size)
 end
 
 with_mpi() do distribute
-  mesh_partition = (2,2)
-  el_size = (200,200)
-  hilb_solver_options = "-pc_type gamg -ksp_type cg -ksp_error_if_not_converged true 
-    -ksp_converged_reason -ksp_rtol 1.0e-12 "
-  elasticity_options = " -elast_ksp_type cg -elast_ksp_error_if_not_converged true -elast_ksp_converged_reason -elast_ksp_rtol 1.0e-12
-                         -elast_pc_type gamg -elast_pc_gamg_agg_nsmooths 5 -elast_pc_gamg_threshold 0.1 -elast_coarse_sub_pc_type lu"
+  mesh_partition = (2,2,2)
+  el_size = (100,100,100)
+  all_solver_options = "-pc_type gamg -ksp_type cg -ksp_error_if_not_converged true 
+    -ksp_converged_reason -ksp_rtol 1.0e-12"
   
-  options = hilb_solver_options*elasticity_options
-  GridapPETSc.with(args=split(options)) do
+  GridapPETSc.with(args=split(all_solver_options)) do
     main(mesh_partition,distribute,el_size)
   end
 end;

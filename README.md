@@ -7,12 +7,18 @@
 
   |          **Problem type**         | **2D**  | **3D**  | **Serial** | **MPI** |
   |:---------------------------------:|---------|---------|:----------:|---------|
-  | Minimum thermal compliance        | &#9745; | &#9744; | &#9745;    | &#9745; |
-  | Minimum elastic compliance        | &#9745; | &#9744; | &#9745;    | &#9745; |
-  | Inverter mechanism                | &#9745; | &#9744; | &#9745;    | &#9744; |
-  | Elastic inverse homogenisation    | &#9745; | &#9745; | &#9745;    | &#9745; |
-  | Minimum NL thermal compliance     | &#9745; | &#9744; | &#9745;    | &#9744; |
-  | Minimum hyperelastic compliance   | &#9745; | &#9744; | &#9745;    | &#9744; |
+  | Minimum thermal compliance        | &#9745; | &#9745;* | &#9745;    | &#9745; |
+  | Minimum elastic compliance        | &#9745; | &#9745;* | &#9745;    | &#9745; |
+  | Inverter mechanism                | &#9745; | &#9745;* | &#9745;    | &#9745;*** |
+  | Elastic inverse homogenisation    | &#9745; | &#9745;* | &#9745;    | &#9745;*** |
+  | Minimum NL thermal compliance     | &#9745; | &#9745;** | &#9745;    | &#9745;*** |
+  | Minimum hyperelastic compliance   | &#9745; | &#9745;** | &#9745;    | &#9745;*** |
+
+*: Need to test.
+
+**: * & Need a NL PETSc solver.
+
+***: 3D only.
 
 - [x] Testing automatic differentation
   * &#9745; Test inverter mechanism problem with analytic adjoint. Edit: See discussion below.
