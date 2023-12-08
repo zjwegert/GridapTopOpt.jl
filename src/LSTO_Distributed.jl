@@ -1,12 +1,8 @@
 module LSTO_Distributed
 
 using Gridap
-using Gridap.TensorValues
-using Gridap.Geometry
-using Gridap.FESpaces
-using Gridap.Helpers
-using Gridap.ReferenceFEs
-using Gridap.Algebra
+using Gridap.TensorValues, Gridap.Geometry, Gridap.FESpaces, Gridap.Helpers
+using Gridap.ReferenceFEs, Gridap.Algebra,  Gridap.CellData
 using GridapDistributed
 using GridapPETSc, GridapPETSc.PETSC
 using PartitionedArrays

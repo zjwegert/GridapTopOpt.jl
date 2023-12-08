@@ -79,7 +79,7 @@ function main(distribute,np,n,order)
     -mat_use
     "
   GridapPETSc.with(args=split(options)) do
-    solver = ElasticitySolver(Ω,V;rtol=1.e-12,maxits=500)
+    solver = ElasticitySolver(V;rtol=1.e-12,maxits=500)
     ss = symbolic_setup(solver,A)
     ns = numerical_setup(ss,A)
 

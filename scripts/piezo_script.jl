@@ -137,7 +137,7 @@ function main(mesh_partition,distribute)
   GridapPETSc.with(args=split(options)) do
     # ls = PETScLinearSolver()
     # xh = solve(ls,op)
-    solver_u = ElasticitySolver(Ω,V)
+    solver_u = ElasticitySolver(V)
     solver_ϕ = PETScLinearSolver()
     P = BlockDiagonalPreconditioner([solver_u,solver_ϕ])
     solver = GridapSolvers.LinearSolvers.GMRESSolver(100;Pr=P,rtol=1.e-8,verbose=i_am_main(ranks))

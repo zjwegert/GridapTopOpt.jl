@@ -17,7 +17,7 @@ function main(mesh_partition,distribute,el_size)
   ranks = distribute(LinearIndices((prod(mesh_partition),)))
 
   ## Parameters
-  order = 2;
+  order = 1;
   xmax,ymax=(1.0,1.0)
   dom = (0,xmax,0,ymax);
   γ = 0.05;
@@ -86,8 +86,8 @@ function main(mesh_partition,distribute,el_size)
   ## Setup solver and FE operators
   Tm=SparseMatrixCSR{0,PetscScalar,PetscInt}
   Tv=Vector{PetscScalar}
-  P = BlockDiagonalPreconditioner(map(Vi -> ElasticitySolver(Ω,Vi),V))
-  solver = GridapSolvers.LinearSolvers.GMRESSolver(100;Pr=P,rtol=1.e-8,verbose=i_am_main(ranks))
+  P = BlockDiagonalPreconditioner(map(Vi -> ElasticitySolver(Vi),V))
+  solver = GridapSolvers.LinearSolvers.CGSolver(P;rtol=1.e-8,verbose=i_am_main(ranks))
   
   state_map = AffineFEStateMap(a,l,res,U,V,V_φ,U_reg,φh,dΩ;
     assem_U = SparseMatrixAssembler(Tm,Tv,U,V),

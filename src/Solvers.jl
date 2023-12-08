@@ -1,16 +1,13 @@
 
-struct ElasticitySolver{A,B} <: LinearSolver
-  trian ::A
-  space ::B
+struct ElasticitySolver{A} <: LinearSolver
+  space ::A
   rtol  ::PetscScalar
   maxits::PetscInt
-  function ElasticitySolver(trian::DistributedTriangulation,
-                            space::DistributedFESpace;
+  function ElasticitySolver(space::FESpace;
                             rtol=1.e-12,
                             maxits=200)
-    A = typeof(trian)
-    B = typeof(space)
-    new{A,B}(trian,space,rtol,maxits)
+    A = typeof(space)
+    new{A}(space,rtol,maxits)
   end
 end
 
@@ -22,38 +19,12 @@ function Gridap.Algebra.symbolic_setup(solver::ElasticitySolver,A::AbstractMatri
   ElasticitySymbolicSetup(solver)
 end
 
-function get_node_to_dof_glue(space::UnconstrainedFESpace{V,Nothing}) where V
-  grid = get_triangulation(space)
-  Dp = num_point_dims(grid)
-
-  z = zero(VectorValue{Dp,get_dof_value_type(space)})
-  node_to_tag = fill(Int8(0),num_nodes(grid))
-  tag_to_mask = fill(Tuple(fill(false,Dp)),0)
-
-  glue, _ = Gridap.FESpaces._generate_node_to_dof_glue_component_major(z,node_to_tag,tag_to_mask)
-  return glue
-end
-
-function get_node_to_dof_glue(space::UnconstrainedFESpace{V,<:Gridap.FESpaces.NodeToDofGlue}) where V
-  return space.metadata
-end
-
-function get_dof_coords(trian,space)
-  coords = map(local_views(trian),local_views(space),partition(space.gids)) do trian, space, dof_indices
-    node_coords = Gridap.Geometry.get_node_coordinates(trian)
-    glue = get_node_to_dof_glue(space)
-    dof_to_node = glue.free_dof_to_node
-    dof_to_comp = glue.free_dof_to_comp
-
-    o2l_dofs = own_to_local(dof_indices)
-    coords = Vector{PetscScalar}(undef,length(o2l_dofs))
-    for (i,dof) in enumerate(o2l_dofs)
-      node = dof_to_node[dof]
-      comp = dof_to_comp[dof]
-      coords[i] = node_coords[node][comp]
-    end
-    return coords
+function get_dof_coordinates(space::GridapDistributed.DistributedSingleFieldFESpace)
+  coords  = map(local_views(space),partition(space.gids)) do space, dof_ids
+    local_to_own_dofs = local_to_own(dof_ids)
+    return get_dof_coordinates(space;perm=local_to_own_dofs)
   end
+
   ngdofs  = length(space.gids)
   indices = map(local_views(space.gids)) do dof_indices
     owner = part_id(dof_indices)
@@ -62,6 +33,37 @@ function get_dof_coords(trian,space)
     OwnAndGhostIndices(own_indices,ghost_indices)   
   end
   return PVector(coords,indices)
+end
+
+function get_dof_coordinates(space::FESpace;perm=Base.OneTo(num_free_dofs(space)))
+  trian = get_triangulation(space)
+  cell_dofs = get_fe_dof_basis(space)
+  cell_ids  = get_cell_dof_ids(space)
+
+  cell_ref_nodes = lazy_map(get_nodes,CellData.get_data(cell_dofs))
+  cell_dof_to_node = lazy_map(get_dof_to_node,CellData.get_data(cell_dofs))
+  cell_dof_to_comp = lazy_map(get_dof_to_comp,CellData.get_data(cell_dofs))
+
+  cmaps = get_cell_map(trian)
+  cell_phys_nodes = lazy_map(evaluate,cmaps,cell_ref_nodes)
+
+  node_coords = Vector{Float64}(undef,maximum(perm))
+  cache_nodes = array_cache(cell_phys_nodes)
+  cache_ids = array_cache(cell_ids)
+  cache_dof_to_node = array_cache(cell_dof_to_node)
+  cache_dof_to_comp = array_cache(cell_dof_to_comp)
+  for cell in 1:num_cells(trian)
+    ids = getindex!(cache_ids,cell_ids,cell)
+    nodes = getindex!(cache_nodes,cell_phys_nodes,cell)
+    dof_to_comp = getindex!(cache_dof_to_comp,cell_dof_to_comp,cell)
+    dof_to_node = getindex!(cache_dof_to_node,cell_dof_to_node,cell)
+    for (dof,c,n) in zip(ids,dof_to_comp,dof_to_node)
+      if (dof > 0) && (perm[dof] > 0)
+        node_coords[perm[dof]] = nodes[n][c]
+      end
+    end
+  end
+  return node_coords
 end
 
 function elasticity_ksp_setup(ksp,rtol,maxits)
@@ -117,8 +119,11 @@ function GridapPETSc.Finalize(ns::ElasticityNumericalSetup)
   nothing
 end
 
+_num_dims(space::FESpace) = num_cell_dims(get_triangulation(space))
+_num_dims(space::GridapDistributed.DistributedSingleFieldFESpace) = getany(map(_num_dims,local_views(space)))
+
 function Gridap.Algebra.numerical_setup(ss::ElasticitySymbolicSetup,_A::PSparseMatrix)
-  s = ss.solver; Dc = num_cell_dims(s.trian)
+  s = ss.solver
 
   # Create ns 
   A = convert(PETScMatrix,_A)
@@ -127,9 +132,8 @@ function Gridap.Algebra.numerical_setup(ss::ElasticitySymbolicSetup,_A::PSparseM
   ns = ElasticityNumericalSetup(A,X,B)
 
   # Compute  coordinates for owned dofs
-  _dof_coords = get_dof_coords(s.trian,s.space)
-  dof_coords = convert(PETScVector,_dof_coords)
-  @check_error_code GridapPETSc.PETSC.VecSetBlockSize(dof_coords.vec[],Dc)
+  dof_coords = convert(PETScVector,get_dof_coordinates(s.space))
+  @check_error_code GridapPETSc.PETSC.VecSetBlockSize(dof_coords.vec[],_num_dims(s.space))
 
   # Create matrix nullspace
   @check_error_code GridapPETSc.PETSC.MatNullSpaceCreateRigidBody(dof_coords.vec[],ns.null)

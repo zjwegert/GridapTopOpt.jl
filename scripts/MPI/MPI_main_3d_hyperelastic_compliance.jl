@@ -86,7 +86,7 @@ function main(mesh_partition,distribute,el_size)
   ## Setup solver and FE operators
   Tm=SparseMatrixCSR{0,PetscScalar,PetscInt}
   Tv=Vector{PetscScalar}
-  lin_solver = ElasticitySolver(Ω,V)
+  lin_solver = ElasticitySolver(V)
   error("Need to define a nonlinear solver for PETSc")
   nl_solver = NonLinearPETScSolver()
 
