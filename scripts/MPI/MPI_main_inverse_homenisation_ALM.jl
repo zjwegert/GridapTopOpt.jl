@@ -86,7 +86,7 @@ function main(mesh_partition,distribute,el_size)
   ## Setup solver and FE operators
   Tm=SparseMatrixCSR{0,PetscScalar,PetscInt}
   Tv=Vector{PetscScalar}
-  P = BlockDiagonalPreconditioner(map(Vi -> ElasticitySolver(Ω,Vi),V))
+  P = BlockDiagonalPreconditioner(map(Vi -> ElasticitySolver(Vi),V))
   solver = GridapSolvers.LinearSolvers.CGSolver(P;rtol=1.e-8,verbose=i_am_main(ranks))
   
   state_map = AffineFEStateMap(a,l,res,U,V,V_φ,U_reg,φh,dΩ;

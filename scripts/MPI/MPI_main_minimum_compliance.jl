@@ -14,7 +14,7 @@ function main(mesh_partition,distribute,el_size)
   ranks = distribute(LinearIndices((prod(mesh_partition),)))
 
   ## Parameters
-  order = 1;
+  order = 2;
   xmax,ymax=(2.0,1.0)
   prop_Γ_N = 0.4;
   dom = (0,xmax,0,ymax);
@@ -76,7 +76,7 @@ function main(mesh_partition,distribute,el_size)
   ## Setup solver and FE operators
   Tm=SparseMatrixCSR{0,PetscScalar,PetscInt}
   Tv=Vector{PetscScalar}
-  solver = ElasticitySolver(Ω,V)
+  solver = ElasticitySolver(V)
   
   state_map = AffineFEStateMap(a,l,res,U,V,V_φ,U_reg,φh,dΩ,dΓ_N;
     assem_U = SparseMatrixAssembler(Tm,Tv,U,V),
@@ -111,7 +111,7 @@ end
 
 with_mpi() do distribute
   mesh_partition = (2,2)
-  el_size = (200,200)
+  el_size = (100,100)
   hilb_solver_options = "-pc_type gamg -ksp_type cg -ksp_error_if_not_converged true 
     -ksp_converged_reason -ksp_rtol 1.0e-12 "
   GridapPETSc.with(args=split(hilb_solver_options)) do

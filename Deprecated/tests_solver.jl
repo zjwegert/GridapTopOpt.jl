@@ -114,7 +114,7 @@ function main(mesh_partition,distribute)
         g = VectorValue(0.,0.,-1.0)
         φh = interpolate(x->-sqrt((x[1]-0.5)^2+(x[2]-0.5)^2+(x[3]-0.5)^2)+0.25,V_φ)
 
-        solver = ElasticitySolver(Ω,solve_data.V)
+        solver = ElasticitySolver(solve_data.V)
         J,v_J,uh = elastic_compliance(φh,g,C,solve_data,interp,t,solver)
         display("Objective = $J")
         writevtk(Ω,path,cellfields=["phi"=>φh,"H(phi)"=>(interp.H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh)),"uh"=>uh])

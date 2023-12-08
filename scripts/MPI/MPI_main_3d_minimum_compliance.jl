@@ -76,7 +76,7 @@ function main(mesh_partition,distribute,el_size)
   ## Setup solver and FE operators
   Tm=SparseMatrixCSR{0,PetscScalar,PetscInt}
   Tv=Vector{PetscScalar}
-  solver = ElasticitySolver(Ω,V)
+  solver = ElasticitySolver(V)
   
   state_map = AffineFEStateMap(a,l,res,U,V,V_φ,U_reg,φh,dΩ,dΓ_N;
     assem_U = SparseMatrixAssembler(Tm,Tv,U,V),
