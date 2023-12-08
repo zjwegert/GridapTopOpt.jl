@@ -1,4 +1,4 @@
-using Gridap, Gridap.TensorValues, Gridap.Geometry, Gridap.FESpaces, Gridap.Helpers
+using Gridap, Gridap.TensorValues, Gridap.Geometry, Gridap.FESpaces, Gridap.Helpers, Gridap.Algebra
 using GridapDistributed
 using GridapPETSc
 using GridapPETSc: PetscScalar, PetscInt, PETSC,  @check_error_code
@@ -144,7 +144,7 @@ function main(mesh_partition,distribute)
     A  = get_matrix(op)
     b  = get_vector(op)
     ns = numerical_setup(symbolic_setup(solver,A),A)
-    x  = allocate_in_domain(A)
+    x  = allocate_in_domain(A); fill!(x,0.0)
     solve!(x,ns,b)
   end
 end;

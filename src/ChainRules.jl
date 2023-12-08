@@ -163,11 +163,11 @@ struct AffineFEStateMap{A,B,C,D<:Tuple,E<:Tuple,F<:Tuple,G<:Tuple,H<:Tuple} <: A
     ## K,b,x
     op = AffineFEOperator((u,v) -> a(u,v,φh,dΩ...),v -> l(v,φh,dΩ...),U,V,assem_U)
     K = get_matrix(op); b = get_vector(op); 
-    x = allocate_in_domain(K)
+    x = allocate_in_domain(K); fill!(x,zero(eltype(x)))
 
     ## Adjoint K,b,x
     adjoint_K = assemble_matrix((u,v) -> a(v,u,φh,dΩ...),assem_adjoint,V,U)
-    adjoint_x = allocate_in_domain(adjoint_K)
+    adjoint_x = allocate_in_domain(adjoint_K); fill!(adjoint_x,zero(eltype(adjoint_x)))
 
     ## Numerical setups
     ns = numerical_setup(symbolic_setup(ls,K),K)
@@ -274,7 +274,7 @@ struct NonlinearFEStateMap{A,B<:Tuple,C<:Tuple,D<:Tuple,E<:Tuple,F<:Tuple} <: LS
 
     ## Adjoint K,x
     adjoint_K = assemble_matrix((u,v) -> op.jac(uhd,v,u),assem_adjoint,V,U)
-    adjoint_x = get_free_dof_values(zero(V))
+    adjoint_x = get_free_dof_values(zero(V)); fill!(adjoint_x,zero(eltype(adjoint_x)))
 
     ## Numerical setups
     nls_cache = NLCache(nothing)
@@ -316,7 +316,7 @@ function (φ_to_u::NonlinearFEStateMap)(φ::T) where T <: AbstractVector
  
   ## Update residual and jacobian, and solve
   φh = FEFunction(V_φ,φ)
-  op.op = FEOperator((u,v) -> res(u,v,φh,dΩ...),U,V,assem_U) 
+  op.op = FEOperator((u,v) -> res(u,v,φh,dΩ...),U,V,assem_U)
   x,cache = solve!(x,nls,op.op,nl_cache)
   # Update cache for next call
   nls_cache.cache = cache 
@@ -329,7 +329,7 @@ function ChainRulesCore.rrule(φ_to_u::NonlinearFEStateMap,φ::T) where T <: Abs
   dΩ = φ_to_u.dΩ
   U,V,V_φ,U_reg = φ_to_u.spaces
   dφdu_vec,assem_deriv = φ_to_u.cache
-  _,_,_,op,_ = φ_to_u.fwd_caches
+  _,_,_,op,assem_U = φ_to_u.fwd_caches
   adjoint_ns,adjoint_K,λ,assem_adjoint = φ_to_u.adjoint_caches
   
   ## Forward problem
@@ -338,13 +338,15 @@ function ChainRulesCore.rrule(φ_to_u::NonlinearFEStateMap,φ::T) where T <: Abs
   ## Adjoint operator
   uh = FEFunction(U,u)
   φh = FEFunction(V_φ,φ)
-  assemble_matrix!((u,v) -> op.op.jac(uh,v,u),adjoint_K,assem_adjoint,V,U)
+
+  assemble_matrix!((u,v) -> op.op.jac(uh,u,v),adjoint_K,assem_adjoint,U,V)
   function φ_to_u_pullback(du)
     ## Adjoint Solve
     #### NOTE: This breaks in parallel, need assembler to output matrix adjoint.
     numerical_setup!(adjoint_ns,adjoint(adjoint_K))
     ## DEBUG only
     K = jacobian(op.op,uh)
+    println("**Debug** |adjoint(K) - K| = ", norm(adjoint(K) - K,Inf))
     println("**Debug** |adjoint_K - K| = ", norm(adjoint_K - K,Inf)) # This should be > 0
     println("**Debug** |adjoint(adjoint_K) - K| = ", norm(adjoint(adjoint_K) - K,Inf)) # This should be zero
     ##

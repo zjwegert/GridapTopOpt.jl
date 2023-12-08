@@ -12,6 +12,8 @@ import GridapDistributed.DistributedDiscreteModel
 import GridapDistributed.DistributedMeasure
 import GridapDistributed.DistributedTriangulation
 
+using LSTO_Distributed
+
 function isotropic_3d(E::M,nu::M) where M<:AbstractFloat
     λ = E*nu/((1+nu)*(1-2nu)); μ = E/(2*(1+nu))
     C =[λ+2μ   λ      λ      0      0      0
@@ -40,65 +42,8 @@ end
 
 ############################################################################################
 
-function ksp_setup(ksp)
-  rtol = PetscScalar(1.e-12)
-  atol = GridapPETSc.PETSC.PETSC_DEFAULT
-  dtol = GridapPETSc.PETSC.PETSC_DEFAULT
-  maxits = PetscInt(100)
-
-  @check_error_code GridapPETSc.PETSC.KSPView(ksp[],C_NULL)
-  @check_error_code GridapPETSc.PETSC.KSPSetType(ksp[],GridapPETSc.PETSC.KSPGMRES)
-  @check_error_code GridapPETSc.PETSC.KSPSetTolerances(ksp[], rtol, atol, dtol, maxits)
-
-  pc = Ref{GridapPETSc.PETSC.PC}()
-  @check_error_code GridapPETSc.PETSC.KSPGetPC(ksp[],pc)
-  @check_error_code GridapPETSc.PETSC.PCSetType(pc[],GridapPETSc.PETSC.PCGAMG)
-end
-
-function get_coords(trian::DistributedTriangulation{Dc},V) where Dc
-  coords = map(local_views(trian),local_views(V),partition(V.gids)) do trian, V, dof_indices
-    node_coords = Gridap.Geometry.get_node_coordinates(trian)
-    dof_to_node = V.metadata.free_dof_to_node
-    dof_to_comp = V.metadata.free_dof_to_comp
-
-    o2l_dofs = own_to_local(dof_indices)
-    coords = Vector{PetscScalar}(undef,length(o2l_dofs))
-    for (i,dof) in enumerate(o2l_dofs)
-      node = dof_to_node[dof]
-      comp = dof_to_comp[dof]
-      coords[i] = node_coords[node][comp]
-    end
-    return coords
-  end
-  return Dc, coords
-end
-
-function my_numerical_setup(ss::GridapPETSc.PETScLinearSolverSS,A::AbstractMatrix,coords,dim)
-  pcoords = convert(PETScVector,coords)
-  @check_error_code GridapPETSc.PETSC.VecSetBlockSize(pcoords.vec[],dim)
-
-  B = convert(PETScMatrix,A)
-  null = Ref{GridapPETSc.PETSC.MatNullSpace}()
-  @check_error_code GridapPETSc.PETSC.MatNullSpaceCreateRigidBody(pcoords.vec[],null)
-  @check_error_code GridapPETSc.PETSC.MatSetNearNullSpace(B.mat[],null[])
-
-  ns = GridapPETSc.PETScLinearSolverNS(A,B)
-  @check_error_code GridapPETSc.PETSC.KSPCreate(B.comm,ns.ksp)
-  @check_error_code GridapPETSc.PETSC.KSPSetOperators(ns.ksp[],ns.B.mat[],ns.B.mat[])
-  ss.solver.setup(ns.ksp)
-  @check_error_code GridapPETSc.PETSC.KSPSetUp(ns.ksp[])
-  GridapPETSc.Init(ns)
-end
-
-############################################################################################
-
-function main(distribute)
-  D = 3
-  order = 1
-  n = 30
-
-  np_x_dim = 2
-  np = Tuple([np_x_dim,fill(1,D-1)...])
+function main(distribute,np,n,order)
+  D = length(np)
   ranks = distribute(LinearIndices((prod(np),)))
 
   n_tags = (D==2) ? "tag_6" : "tag_22"
@@ -112,7 +57,7 @@ function main(distribute)
 
   poly  = (D==2) ? QUAD : HEX
   reffe = LagrangianRefFE(VectorValue{D,Float64},poly,order)
-  V = TestFESpace(model,reffe;dirichlet_tags=d_tags)
+  V = TestFESpace(model,reffe;dirichlet_tags="boundary")
   U = TrialFESpace(V)
   assem = SparseMatrixAssembler(SparseMatrixCSR{0,PetscScalar,PetscInt},Vector{PetscScalar},U,V,FullyAssembledRows())
 
@@ -125,26 +70,27 @@ function main(distribute)
 
   op   = AffineFEOperator(a,l,U,V,assem)
   A, b = get_matrix(op), get_vector(op);
-  dim, coords = get_coords(Ω,V);
-  pcoords = PVector(coords,partition(axes(A,1)))
 
   options = "
     -ksp_type gmres -ksp_rtol 1.0e-12 -ksp_max_it 200
     -pc_type gamg
     -mg_levels_ksp_type chebyshev -mg_levels_esteig_ksp_type cg
     -ksp_converged_reason -ksp_error_if_not_converged true -ksp_monitor_short
+    -mat_use
     "
   GridapPETSc.with(args=split(options)) do
-    solver = PETScLinearSolver(ksp_setup)
-    #solver = PETScLinearSolver() # From options
+    solver = ElasticitySolver(Ω,V;rtol=1.e-12,maxits=500)
     ss = symbolic_setup(solver,A)
-    ns = my_numerical_setup(ss,A,pcoords,dim)
+    ns = numerical_setup(ss,A)
 
-    x  = pfill(PetscScalar(1.0),partition(axes(A,2)))
+    x  = pfill(PetscScalar(0.0),partition(axes(A,2)))
     solve!(x,ns,b)
   end
 end
 
 with_mpi() do distribute
-  main(distribute)
+  np = (2,2)
+  n  = 100
+  order = 1
+  main(distribute,np,n,order)
 end
