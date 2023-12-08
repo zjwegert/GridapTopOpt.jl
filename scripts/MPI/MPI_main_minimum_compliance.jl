@@ -114,11 +114,7 @@ with_mpi() do distribute
   el_size = (200,200)
   hilb_solver_options = "-pc_type gamg -ksp_type cg -ksp_error_if_not_converged true 
     -ksp_converged_reason -ksp_rtol 1.0e-12 "
-  elasticity_options = " -elast_ksp_type cg -elast_ksp_error_if_not_converged true -elast_ksp_converged_reason -elast_ksp_rtol 1.0e-12
-                         -elast_pc_type gamg -elast_pc_gamg_agg_nsmooths 5 -elast_pc_gamg_threshold 0.1 -elast_coarse_sub_pc_type lu"
-  
-  options = hilb_solver_options*elasticity_options
-  GridapPETSc.with(args=split(options)) do
+  GridapPETSc.with(args=split(hilb_solver_options)) do
     main(mesh_partition,distribute,el_size)
   end
 end;
