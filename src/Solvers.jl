@@ -64,38 +64,6 @@ function get_dof_coords(trian,space)
   return PVector(coords,indices)
 end
 
-function get_dof_coords(trian,space,mat)
-  coords = map(local_views(trian),local_views(space),partition(space.gids),partition(axes(mat,2))) do trian, space, dof_indices, col_indices
-    node_coords = Gridap.Geometry.get_node_coordinates(trian)
-    glue = get_node_to_dof_glue(space)
-    dof_to_node = glue.free_dof_to_node
-    dof_to_comp = glue.free_dof_to_comp
-
-    ldof_to_lcol = GridapDistributed.find_local_to_local_map(dof_indices,col_indices)
-    lcol_to_ldof = GridapDistributed.find_local_to_local_map(col_indices,dof_indices)
-
-    o2l_dofs = own_to_local(dof_indices)
-    o2l_cols = own_to_local(col_indices)
-    #coords = Vector{PetscScalar}(undef,length(lcol_to_ldof))
-    coords = Vector{PetscScalar}(undef,length(o2l_cols))
-    for (i,col) in enumerate(o2l_cols)
-      dof  = lcol_to_ldof[col]
-      node = dof_to_node[dof]
-      comp = dof_to_comp[dof]
-      coords[i] = node_coords[node][comp]
-    end
-    return coords
-  end
-  ngdofs  = length(space.gids)
-  indices = map(local_views(space.gids),partition(axes(mat,2))) do dof_indices, col_indices
-    owner = part_id(dof_indices)
-    own_indices   = OwnIndices(ngdofs,owner,own_to_global(col_indices))
-    ghost_indices = GhostIndices(ngdofs,Int64[],Int32[]) # We only consider owned dofs
-    OwnAndGhostIndices(own_indices,ghost_indices)   
-  end
-  return PVector(coords,indices)
-end
-
 function elasticity_ksp_setup(ksp,rtol,maxits)
   rtol = PetscScalar(rtol)
   atol = GridapPETSc.PETSC.PETSC_DEFAULT
@@ -110,11 +78,6 @@ function elasticity_ksp_setup(ksp,rtol,maxits)
   @check_error_code GridapPETSc.PETSC.PCSetType(pc[],GridapPETSc.PETSC.PCGAMG)
 
   @check_error_code GridapPETSc.PETSC.KSPView(ksp[],C_NULL)
-end
-
-function elasticity_ksp_setup(ksp)
-  @check_error_code GridapPETSc.PETSC.KSPSetOptionsPrefix(ksp[],"elast_")
-  @check_error_code GridapPETSc.PETSC.KSPSetFromOptions(ksp[])
 end
 
 mutable struct ElasticityNumericalSetup <: NumericalSetup
