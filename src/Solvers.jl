@@ -6,7 +6,7 @@ struct ElasticitySolver{A,B} <: LinearSolver
   function ElasticitySolver(trian::DistributedTriangulation,
                             space::DistributedFESpace;
                             rtol=1.e-12,
-                            maxits=100)
+                            maxits=200)
     A = typeof(trian)
     B = typeof(space)
     new{A,B}(trian,space,rtol,maxits)
@@ -63,6 +63,38 @@ function get_dof_coords(trian,space)
   return PVector(coords,indices)
 end
 
+function get_dof_coords(trian,space,mat)
+  coords = map(local_views(trian),local_views(space),partition(space.gids),partition(axes(mat,2))) do trian, space, dof_indices, col_indices
+    node_coords = Gridap.Geometry.get_node_coordinates(trian)
+    glue = get_node_to_dof_glue(space)
+    dof_to_node = glue.free_dof_to_node
+    dof_to_comp = glue.free_dof_to_comp
+
+    ldof_to_lcol = GridapDistributed.find_local_to_local_map(dof_indices,col_indices)
+    lcol_to_ldof = GridapDistributed.find_local_to_local_map(col_indices,dof_indices)
+
+    o2l_dofs = own_to_local(dof_indices)
+    o2l_cols = own_to_local(col_indices)
+    #coords = Vector{PetscScalar}(undef,length(lcol_to_ldof))
+    coords = Vector{PetscScalar}(undef,length(o2l_cols))
+    for (i,col) in enumerate(o2l_cols)
+      dof  = lcol_to_ldof[col]
+      node = dof_to_node[dof]
+      comp = dof_to_comp[dof]
+      coords[i] = node_coords[node][comp]
+    end
+    return coords
+  end
+  ngdofs  = length(space.gids)
+  indices = map(local_views(space.gids),partition(axes(mat,2))) do dof_indices, col_indices
+    owner = part_id(dof_indices)
+    own_indices   = OwnIndices(ngdofs,owner,own_to_global(col_indices))
+    ghost_indices = GhostIndices(ngdofs,Int64[],Int32[]) # We only consider owned dofs
+    OwnAndGhostIndices(own_indices,ghost_indices)   
+  end
+  return PVector(coords,indices)
+end
+
 function elasticity_ksp_setup(ksp,rtol,maxits)
   rtol = PetscScalar(rtol)
   atol = GridapPETSc.PETSC.PETSC_DEFAULT
@@ -70,7 +102,7 @@ function elasticity_ksp_setup(ksp,rtol,maxits)
   maxits = PetscInt(maxits)
 
   @check_error_code GridapPETSc.PETSC.KSPView(ksp[],C_NULL)
-  @check_error_code GridapPETSc.PETSC.KSPSetType(ksp[],GridapPETSc.PETSC.KSPGMRES)
+  @check_error_code GridapPETSc.PETSC.KSPSetType(ksp[],GridapPETSc.PETSC.KSPFGMRES)
   @check_error_code GridapPETSc.PETSC.KSPSetTolerances(ksp[], rtol, atol, dtol, maxits)
 
   pc = Ref{GridapPETSc.PETSC.PC}()
@@ -78,11 +110,35 @@ function elasticity_ksp_setup(ksp,rtol,maxits)
   @check_error_code GridapPETSc.PETSC.PCSetType(pc[],GridapPETSc.PETSC.PCGAMG)
 end
 
+function elasticity_ksp_setup(ksp)
+  @check_error_code GridapPETSc.PETSC.KSPSetOptionsPrefix(ksp[],"elast_")
+  @check_error_code GridapPETSc.PETSC.KSPSetFromOptions(ksp[])
+end
+
+function elasticity_ksp_setup(ksp,rtol,maxits,coords)
+  rtol = PetscScalar(rtol)
+  atol = GridapPETSc.PETSC.PETSC_DEFAULT
+  dtol = GridapPETSc.PETSC.PETSC_DEFAULT
+  maxits = PetscInt(maxits)
+
+  @check_error_code GridapPETSc.PETSC.KSPView(ksp[],C_NULL)
+  @check_error_code GridapPETSc.PETSC.KSPSetType(ksp[],GridapPETSc.PETSC.KSPFGMRES)
+  @check_error_code GridapPETSc.PETSC.KSPSetTolerances(ksp[], rtol, atol, dtol, maxits)
+
+  pc = Ref{GridapPETSc.PETSC.PC}()
+  @check_error_code GridapPETSc.PETSC.KSPGetPC(ksp[],pc)
+  @check_error_code GridapPETSc.PETSC.PCSetType(pc[],GridapPETSc.PETSC.PCGAMG)
+
+  _coords = getany(partition(coords))
+  @check_error_code GridapPETSc.PETSC.PCSetCoordinates(pc[],2,length(coords)/2,_coords)
+end
+
 function Gridap.Algebra.numerical_setup(ss::ElasticitySymbolicSetup,A::PSparseMatrix)
   s = ss.solver; Dc = num_cell_dims(s.trian)
 
   # Compute  coordinates for owned dofs
-  dof_coords = convert(PETScVector,get_dof_coords(s.trian,s.space))
+  _dof_coords = get_dof_coords(s.trian,s.space)
+  dof_coords = convert(PETScVector,_dof_coords)
   @check_error_code GridapPETSc.PETSC.VecSetBlockSize(dof_coords.vec[],Dc)
 
   # Create matrix nullspace
@@ -90,12 +146,13 @@ function Gridap.Algebra.numerical_setup(ss::ElasticitySymbolicSetup,A::PSparseMa
   null = Ref{GridapPETSc.PETSC.MatNullSpace}()
   @check_error_code GridapPETSc.PETSC.MatNullSpaceCreateRigidBody(dof_coords.vec[],null)
   @check_error_code GridapPETSc.PETSC.MatSetNearNullSpace(B.mat[],null[])
+  @check_error_code GridapPETSc.PETSC.MatNullSpaceDestroy(null)
 
   # Setup solver and preconditioner
   ns = GridapPETSc.PETScLinearSolverNS(A,B)
   @check_error_code GridapPETSc.PETSC.KSPCreate(B.comm,ns.ksp)
   @check_error_code GridapPETSc.PETSC.KSPSetOperators(ns.ksp[],ns.B.mat[],ns.B.mat[])
-  elasticity_ksp_setup(ns.ksp,s.rtol,s.maxits)
+  elasticity_ksp_setup(ns.ksp)#,s.rtol,s.maxits)
   @check_error_code GridapPETSc.PETSC.KSPSetUp(ns.ksp[])
   GridapPETSc.Init(ns)
 end

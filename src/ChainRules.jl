@@ -206,6 +206,7 @@ function (φ_to_u::AffineFEStateMap)(φ::T) where T <: AbstractVector
   data = collect_cell_matrix_and_vector(U,V,a(du,dv,φh,dΩ...),l(dv,φh,dΩ...),uhd)
   assemble_matrix_and_vector!(K,b,assem_U,data)
   numerical_setup!(ns,K)
+  fill!(x,zero(eltype(x)))
   solve!(x,ns,b)
   x
 end
@@ -316,7 +317,8 @@ function (φ_to_u::NonlinearFEStateMap)(φ::T) where T <: AbstractVector
  
   ## Update residual and jacobian, and solve
   φh = FEFunction(V_φ,φ)
-  op.op = FEOperator((u,v) -> res(u,v,φh,dΩ...),U,V,assem_U) 
+  op.op = FEOperator((u,v) -> res(u,v,φh,dΩ...),U,V,assem_U)
+  fill!(x,zero(eltype(x)))
   x,cache = solve!(x,nls,op.op,nl_cache)
   # Update cache for next call
   nls_cache.cache = cache 
@@ -329,7 +331,7 @@ function ChainRulesCore.rrule(φ_to_u::NonlinearFEStateMap,φ::T) where T <: Abs
   dΩ = φ_to_u.dΩ
   U,V,V_φ,U_reg = φ_to_u.spaces
   dφdu_vec,assem_deriv = φ_to_u.cache
-  _,_,_,op,_ = φ_to_u.fwd_caches
+  _,_,_,op,assem_U = φ_to_u.fwd_caches
   adjoint_ns,adjoint_K,λ,assem_adjoint = φ_to_u.adjoint_caches
   
   ## Forward problem
@@ -338,16 +340,20 @@ function ChainRulesCore.rrule(φ_to_u::NonlinearFEStateMap,φ::T) where T <: Abs
   ## Adjoint operator
   uh = FEFunction(U,u)
   φh = FEFunction(V_φ,φ)
-  assemble_matrix!((u,v) -> op.op.jac(uh,v,u),adjoint_K,assem_adjoint,V,U)
+
+  op_adjoint = FEOperator((u,v) -> res(v,u,φh,dΩ...),U,V,assem_U)
+  assemble_matrix!((u,v) -> op.op.jac(uh,u,v),adjoint_K,assem_adjoint,U,V)
   function φ_to_u_pullback(du)
     ## Adjoint Solve
     #### NOTE: This breaks in parallel, need assembler to output matrix adjoint.
     numerical_setup!(adjoint_ns,adjoint(adjoint_K))
     ## DEBUG only
     K = jacobian(op.op,uh)
+    println("**Debug** |adjoint(K) - K| = ", norm(adjoint(K) - K,Inf))
     println("**Debug** |adjoint_K - K| = ", norm(adjoint_K - K,Inf)) # This should be > 0
     println("**Debug** |adjoint(adjoint_K) - K| = ", norm(adjoint(adjoint_K) - K,Inf)) # This should be zero
     ##
+    fill!(λ,zero(eltype(λ)))
     solve!(λ,adjoint_ns,du)
     λh = FEFunction(V,λ)
     
