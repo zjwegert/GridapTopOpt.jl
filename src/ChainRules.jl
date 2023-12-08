@@ -163,11 +163,11 @@ struct AffineFEStateMap{A,B,C,D<:Tuple,E<:Tuple,F<:Tuple,G<:Tuple,H<:Tuple} <: A
     ## K,b,x
     op = AffineFEOperator((u,v) -> a(u,v,φh,dΩ...),v -> l(v,φh,dΩ...),U,V,assem_U)
     K = get_matrix(op); b = get_vector(op); 
-    x = allocate_in_domain(K)
+    x = allocate_in_domain(K); fill!(x,zero(eltype(x)))
 
     ## Adjoint K,b,x
     adjoint_K = assemble_matrix((u,v) -> a(v,u,φh,dΩ...),assem_adjoint,V,U)
-    adjoint_x = allocate_in_domain(adjoint_K)
+    adjoint_x = allocate_in_domain(adjoint_K); fill!(adjoint_x,zero(eltype(adjoint_x)))
 
     ## Numerical setups
     ns = numerical_setup(symbolic_setup(ls,K),K)
@@ -206,7 +206,6 @@ function (φ_to_u::AffineFEStateMap)(φ::T) where T <: AbstractVector
   data = collect_cell_matrix_and_vector(U,V,a(du,dv,φh,dΩ...),l(dv,φh,dΩ...),uhd)
   assemble_matrix_and_vector!(K,b,assem_U,data)
   numerical_setup!(ns,K)
-  fill!(x,zero(eltype(x)))
   solve!(x,ns,b)
   x
 end
@@ -275,7 +274,7 @@ struct NonlinearFEStateMap{A,B<:Tuple,C<:Tuple,D<:Tuple,E<:Tuple,F<:Tuple} <: LS
 
     ## Adjoint K,x
     adjoint_K = assemble_matrix((u,v) -> op.jac(uhd,v,u),assem_adjoint,V,U)
-    adjoint_x = get_free_dof_values(zero(V))
+    adjoint_x = get_free_dof_values(zero(V)); fill!(adjoint_x,zero(eltype(adjoint_x)))
 
     ## Numerical setups
     nls_cache = NLCache(nothing)
@@ -318,7 +317,6 @@ function (φ_to_u::NonlinearFEStateMap)(φ::T) where T <: AbstractVector
   ## Update residual and jacobian, and solve
   φh = FEFunction(V_φ,φ)
   op.op = FEOperator((u,v) -> res(u,v,φh,dΩ...),U,V,assem_U)
-  fill!(x,zero(eltype(x)))
   x,cache = solve!(x,nls,op.op,nl_cache)
   # Update cache for next call
   nls_cache.cache = cache 
@@ -341,7 +339,6 @@ function ChainRulesCore.rrule(φ_to_u::NonlinearFEStateMap,φ::T) where T <: Abs
   uh = FEFunction(U,u)
   φh = FEFunction(V_φ,φ)
 
-  op_adjoint = FEOperator((u,v) -> res(v,u,φh,dΩ...),U,V,assem_U)
   assemble_matrix!((u,v) -> op.op.jac(uh,u,v),adjoint_K,assem_adjoint,U,V)
   function φ_to_u_pullback(du)
     ## Adjoint Solve
@@ -353,7 +350,6 @@ function ChainRulesCore.rrule(φ_to_u::NonlinearFEStateMap,φ::T) where T <: Abs
     println("**Debug** |adjoint_K - K| = ", norm(adjoint_K - K,Inf)) # This should be > 0
     println("**Debug** |adjoint(adjoint_K) - K| = ", norm(adjoint(adjoint_K) - K,Inf)) # This should be zero
     ##
-    fill!(λ,zero(eltype(λ)))
     solve!(λ,adjoint_ns,du)
     λh = FEFunction(V,λ)
     

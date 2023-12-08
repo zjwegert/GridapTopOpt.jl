@@ -8,8 +8,9 @@ using Gridap.Helpers
 using Gridap.ReferenceFEs
 using Gridap.Algebra
 using GridapDistributed
-using GridapPETSc
+using GridapPETSc, GridapPETSc.PETSC
 using PartitionedArrays
+using MPI
 using SparseMatricesCSR
 using ChainRulesCore
 using DelimitedFiles
