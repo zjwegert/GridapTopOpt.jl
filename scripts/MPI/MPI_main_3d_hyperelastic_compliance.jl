@@ -1,6 +1,5 @@
-using Gridap, GridapDistributed, GridapPETSc, PartitionedArrays, LSTO_Distributed
-
-using LineSearches: BackTracking
+using Gridap, Gridap.MultiField, GridapDistributed, GridapPETSc, GridapSolvers, 
+  PartitionedArrays, LSTO_Distributed, SparseMatricesCSR
 
 """
   (Serial) Minimum hyperelastic compliance with Lagrangian method in 2D.

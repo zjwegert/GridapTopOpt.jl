@@ -1,4 +1,5 @@
-using Gridap, GridapDistributed, GridapPETSc, PartitionedArrays, LSTO_Distributed
+using Gridap, Gridap.MultiField, GridapDistributed, GridapPETSc, GridapSolvers, 
+  PartitionedArrays, LSTO_Distributed, SparseMatricesCSR
 
 """
   (MPI) Minimum thermal compliance with Lagrangian method in 3D with nonlinear diffusivity.
@@ -67,7 +68,7 @@ function main(mesh_partition,distribute,el_size)
   res(u,v,φ,dΩ,dΓ_N) = ∫((I ∘ φ)*(D ∘ u)*∇(u)⋅∇(v))dΩ - ∫(v)dΓ_N
 
   ## Optimisation functionals
-  ξ = 0.2;
+  ξ = 0.1;
   J = (u,φ,dΩ,dΓ_N) -> ∫((I ∘ φ)*(D ∘ u)*∇(u)⋅∇(u) + ξ*(ρ ∘ φ))dΩ
 
   ## Finite difference solver and level set function
@@ -114,7 +115,7 @@ function main(mesh_partition,distribute,el_size)
 end
 
 with_mpi() do distribute
-  mesh_partition = (2,2,2)
+  mesh_partition = (3,3,2)
   el_size = (100,100,100)
 
   options = "-snes_type newtonls -snes_linesearch_type basic  -snes_linesearch_damping 1.0"*

@@ -1,4 +1,5 @@
-using Gridap, GridapDistributed, GridapPETSc, PartitionedArrays, LSTO_Distributed, SparseMatricesCSR
+using Gridap, Gridap.MultiField, GridapDistributed, GridapPETSc, GridapSolvers, 
+  PartitionedArrays, LSTO_Distributed, SparseMatricesCSR
 
 """
   (MPI) Maximum bulk modulus inverse homogenisation with augmented Lagrangian method in 3D.
@@ -125,7 +126,7 @@ end
 
 # RUN: mpiexecjl --project=. -n 64 julia ./scripts/MPI/MPI_main_inverse_homenisation_ALM.jl
 with_mpi() do distribute
-  mesh_partition = (4,4,4)
+  mesh_partition = (10,8,7)
   el_size = (100,100,100)
   hilb_solver_options = "-pc_type gamg -ksp_type cg -ksp_error_if_not_converged true 
     -ksp_converged_reason -ksp_rtol 1.0e-12"

@@ -1,4 +1,5 @@
-using Gridap, GridapDistributed, GridapPETSc, PartitionedArrays, LSTO_Distributed
+using Gridap, Gridap.MultiField, GridapDistributed, GridapPETSc, GridapSolvers, 
+  PartitionedArrays, LSTO_Distributed, SparseMatricesCSR
 
 """
   (MPI) Minimum thermal compliance with Lagrangian method in 3D.
@@ -64,7 +65,7 @@ function main(mesh_partition,distribute,el_size)
   res(u,v,φ,dΩ,dΓ_N) = a(u,v,φ,dΩ,dΓ_N) - l(v,φ,dΩ,dΓ_N)
 
   ## Optimisation functionals
-  ξ = 0.3;
+  ξ = 0.1;
   J = (u,φ,dΩ,dΓ_N) -> ∫((I ∘ φ)*D*∇(u)⋅∇(u) + ξ*(ρ ∘ φ))dΩ
   dJ = (q,u,φ,dΩ,dΓ_N) -> ∫((ξ-D*∇(u)⋅∇(u))*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ;
 
@@ -109,7 +110,7 @@ function main(mesh_partition,distribute,el_size)
 end
 
 with_mpi() do distribute
-  mesh_partition = (2,2,2)
+  mesh_partition = (3,3,2)
   el_size = (100,100,100)
   all_solver_options = "-pc_type gamg -ksp_type cg -ksp_error_if_not_converged true 
     -ksp_converged_reason -ksp_rtol 1.0e-12"

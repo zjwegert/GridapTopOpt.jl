@@ -17,7 +17,7 @@ function main(mesh_partition,distribute,el_size)
   order = 1;
   xmax,ymax,zmax=(2.0,1.0,1.0)
   prop_Γ_N = 0.4;
-  dom = (0,xmax,0,ymax,zmax);
+  dom = (0,xmax,0,ymax,0,zmax);
   γ = 0.1;
   γ_reinit = 0.5;
   max_steps = floor(Int,minimum(el_size)/3)
@@ -65,7 +65,7 @@ function main(mesh_partition,distribute,el_size)
   res(u,v,φ,dΩ,dΓ_N) = a(u,v,φ,dΩ,dΓ_N) - l(v,φ,dΩ,dΓ_N)
 
   ## Optimisation functionals
-  ξ = 2;
+  ξ = 0.25;
   J = (u,φ,dΩ,dΓ_N) -> ∫((I ∘ φ)*(C ⊙ ε(u) ⊙ ε(u)) + ξ*(ρ ∘ φ))dΩ
   dJ = (q,u,φ,dΩ,dΓ_N) -> ∫((ξ - C ⊙ ε(u) ⊙ ε(u))*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ;
 
@@ -110,7 +110,7 @@ function main(mesh_partition,distribute,el_size)
 end
 
 with_mpi() do distribute
-  mesh_partition = (2,2,2)
+  mesh_partition = (4,3,2)
   el_size = (100,50,50)
   hilb_solver_options = "-pc_type gamg -ksp_type cg -ksp_error_if_not_converged true 
     -ksp_converged_reason -ksp_rtol 1.0e-12"

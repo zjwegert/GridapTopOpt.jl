@@ -1,4 +1,4 @@
-using Gridap, GridapDistributed, GridapPETSc, PartitionedArrays, LSTO_Distributed
+using Gridap, GridapDistributed, GridapPETSc, PartitionedArrays, LSTO_Distributed, SparseMatricesCSR
 
 """
   (MPI) Inverter mechanism with augmented Lagrangian method in 3D.
@@ -21,7 +21,7 @@ function main(mesh_partition,distribute,el_size)
   γ = 0.1;
   γ_reinit = 0.5;
   max_steps = floor(Int,minimum(el_size)/3)
-  tol = 1/(order^2*10)*prod(inv,minimum(el_size))
+  tol = 1/(order^2*10)*prod(inv,minimum(el_size)) # Test with 1/5 coeff and/or higher resolution?
   C = isotropic_3d(1.0,0.3);
   η_coeff = 2;
   α_coeff = 4;
@@ -30,7 +30,7 @@ function main(mesh_partition,distribute,el_size)
   η_in = 2;
   η_out = 1;
   ks = 0.01;
-  g = VectorValue(1,0,0);
+  g = VectorValue(10,0,0);
 
   ## FE Setup
   model = CartesianDiscreteModel(ranks,mesh_partition,dom,el_size);
@@ -64,7 +64,7 @@ function main(mesh_partition,distribute,el_size)
   U_reg = TrialFESpace(V_reg,[0,0])
 
   ## Create FE functions
-  φh = interpolate(gen_lsf(4,0.2),V_φ);
+  φh = interpolate(gen_lsf(2,0.2),V_φ);
   φ = get_free_dof_values(φh)
 
   ## Interpolation and weak form
@@ -82,7 +82,7 @@ function main(mesh_partition,distribute,el_size)
   dVol = (q,u,φ,dΩ,dΓ_in,dΓ_out) -> ∫(1/vol_D*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
 
   ## Finite difference solver and level set function
-  stencil = AdvectionStencil(FirstOrderStencil(2,Float64),model,V_φ,Δ./order,max_steps,tol)
+  stencil = AdvectionStencil(FirstOrderStencil(3,Float64),model,V_φ,Δ./order,max_steps,tol)
   reinit!(stencil,φ,γ_reinit)
 
   ## Setup solver and FE operators
@@ -96,7 +96,7 @@ function main(mesh_partition,distribute,el_size)
     assem_deriv = SparseMatrixAssembler(Tm,Tv,U_reg,U_reg),
     ls=solver,
     adjoint_ls=solver)
-  pcfs = PDEConstrainedFunctionals(J,[Vol],state_map,analytic_dC=[dVol])
+  pcfs = PDEConstrainedFunctionals(J,[Vol],state_map)#,analytic_dC=[dVol]) # This breaks the code - need to discuss with Jordi/look into more.
 
   ## Hilbertian extension-regularisation problems
   α = α_coeff*maximum(Δ)
@@ -106,25 +106,25 @@ function main(mesh_partition,distribute,el_size)
     ls=PETScLinearSolver())
   
   ## Optimiser
-  make_dir(path)
+  make_dir(path;ranks=ranks)
   optimiser = AugmentedLagrangian(φ,pcfs,stencil,vel_ext,interp,el_size,γ,γ_reinit);
   for history in optimiser
     it,Ji,Ci,Li = last(history)
     λi = optimiser.λ; Λi = optimiser.Λ
-    print_history(it,["J"=>Ji,"C"=>Ci,"L"=>Li,"λ"=>λi,"Λ"=>Λi])
-    write_history(history,path*"/history.csv")
+    print_history(it,["J"=>Ji,"C"=>Ci,"L"=>Li,"λ"=>λi,"Λ"=>Λi];ranks=ranks)
+    write_history(history,path*"/history.csv";ranks=ranks)
     write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh))])
   end
   it,Ji,Ci,Li = last(optimiser.history)
   λi = optimiser.λ; Λi = optimiser.Λ
-  print_history(it,["J"=>Ji,"C"=>Ci,"L"=>Li,"λ"=>λi,"Λ"=>Λi])
-  write_history(optimiser.history,path*"/history.csv")
+  print_history(it,["J"=>Ji,"C"=>Ci,"L"=>Li,"λ"=>λi,"Λ"=>Λi];ranks=ranks)
+  write_history(optimiser.history,path*"/history.csv";ranks=ranks)
   uhi = get_state(pcfs)
   write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh)),"uh"=>uhi];iter_mod=1)
 end
 
 with_mpi() do distribute
-  mesh_partition = (4,4,4)
+  mesh_partition = (5,4,4)
   el_size = (100,100,100)
   hilb_solver_options = "-pc_type gamg -ksp_type cg -ksp_error_if_not_converged true 
     -ksp_converged_reason -ksp_rtol 1.0e-12"
