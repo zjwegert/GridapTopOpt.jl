@@ -323,6 +323,22 @@ function (φ_to_u::NonlinearFEStateMap)(φ::T) where T <: AbstractVector
   get_free_dof_values(x)
 end
 
+function transpose_contributions(b::DomainContribution)
+  c = DomainContribution()
+  for (trian,array_old) in b.dict
+    array_new = lazy_map(transpose,array_old)
+    add_contribution!(c,trian,array_new)
+  end
+  return c
+end
+
+function assemble_adjoint_matrix!(f::Function,A::AbstractMatrix,a::Assembler,U::FESpace,V::FESpace)
+  v = get_fe_basis(V)
+  u = get_trial_fe_basis(U)
+  contr = transpose_contributions(f(u,v))
+  assemble_matrix!(A,a,collect_cell_matrix(V,U,contr))
+end
+
 function ChainRulesCore.rrule(φ_to_u::NonlinearFEStateMap,φ::T) where T <: AbstractVector
   @assert T<:Vector "Nonlinear FEs are currently not supported in parallel, please run in serial mode."
   res = φ_to_u.res
@@ -339,7 +355,7 @@ function ChainRulesCore.rrule(φ_to_u::NonlinearFEStateMap,φ::T) where T <: Abs
   uh = FEFunction(U,u)
   φh = FEFunction(V_φ,φ)
 
-  assemble_matrix!((u,v) -> op.op.jac(uh,u,v),adjoint_K,assem_adjoint,U,V)
+  assemble_adjoint_matrix!((u,v) -> op.op.jac(uh,u,v),adjoint_K,assem_adjoint,U,V)
   function φ_to_u_pullback(du)
     ## Adjoint Solve
     #### NOTE: This breaks in parallel, need assembler to output matrix adjoint.
