@@ -13,6 +13,7 @@ using DelimitedFiles
 using BlockArrays
 using LinearAlgebra
 using CircularArrays
+using Printf
 
 import Gridap.Algebra: LinearSolver, SymbolicSetup
 import Gridap.Geometry: get_faces
@@ -29,12 +30,14 @@ export get_state
 export evaluate_functionals!
 export evaluate_derivatives!
 
-include("Optimiser.jl")
+include("Optimisers/Optimisers.jl")
 export AbstractOptimiser
 export get_optimiser_history
 export get_level_set
 export write_history
 export AugmentedLagrangian
+export HilbertianProjection
+export HPModifiedGramSchmidt
 
 include("Utilities.jl")
 export gen_lsf

@@ -429,8 +429,7 @@ get_state(m::PDEConstrainedFunctionals) = get_state(m.state_map)
 function evaluate_functionals!(pcf::PDEConstrainedFunctionals,φ::T) where T <: AbstractVector
   u = pcf.state_map(φ)
   J = pcf.J; C = pcf.C
-  [J(u,φ), map(C(u,φ),1:length(C))]
-  return J(u,φ), map(C(u,φ),1:length(C))
+  return J(u,φ), map(i->C[i](u,φ),1:length(C))
 end
 
 function evaluate_derivatives!(pcf::PDEConstrainedFunctionals,φ::T) where T <: AbstractVector
