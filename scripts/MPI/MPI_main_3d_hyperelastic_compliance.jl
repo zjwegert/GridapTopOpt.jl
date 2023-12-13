@@ -86,8 +86,7 @@ function main(mesh_partition,distribute,el_size)
   Tm=SparseMatrixCSR{0,PetscScalar,PetscInt}
   Tv=Vector{PetscScalar}
   lin_solver = ElasticitySolver(V)
-  error("Need to define a nonlinear solver for PETSc")
-  nl_solver = NonLinearPETScSolver()
+  nl_solver = NewtonRaphsonSolver(lin_solver,10^-14,50)
 
   state_map = NonlinearFEStateMap(res,U,V,V_φ,U_reg,φh,dΩ,dΓ_N;
     assem_U = SparseMatrixAssembler(Tm,Tv,U,V),
@@ -127,7 +126,8 @@ with_mpi() do distribute
   mesh_partition = (2,2,2)
   el_size = (100,100,100)
   hilb_solver_options = "-pc_type gamg -ksp_type cg -ksp_error_if_not_converged true 
-    -ksp_converged_reason -ksp_rtol 1.0e-12"
+    -ksp_converged_reason -ksp_rtol 1.0e-12 -mat_block_size 3
+    -mg_levels_ksp_type chebyshev -mg_levels_esteig_ksp_type cg -mg_coarse_sub_pc_type cholesky"
   
   GridapPETSc.with(args=split(hilb_solver_options)) do
     main(mesh_partition,distribute,el_size)

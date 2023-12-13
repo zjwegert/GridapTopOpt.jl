@@ -1,12 +1,20 @@
 using Gridap, GridapDistributed, GridapPETSc, PartitionedArrays, LSTO_Distributed
 
+using Gridap.CellData: DomainContribution, add_contribution!
+import Base.*
+function (*)(a::DomainContribution,b::DomainContribution)
+  c = copy(a)
+  for (trian,array) in b.dict
+    add_contribution!(c,trian,array,*)
+  end
+  c
+end
+
 """
   (Serial) Inverter mechanism with augmented Lagrangian method in 2D.
-  
-  Ref: http://doi.org/10.1007/s00158-018-1950-2
 
   Optimisation problem:
-      Min J(Ω) = ∫ ηᵢₙ * uₓ dΓᵢₙ + ∫ ηₒᵤₜ * uₓ dΓₒᵤₜ
+      Min J(Ω) = ∫ ... dΓᵢₙ + ∫ ... dΓₒᵤₜ
         Ω
     s.t., Vol(Ω) = Vf,
           ⎡u∈V=H¹(Ω;u(Γ_D)=0)ᵈ, 
@@ -15,9 +23,9 @@ using Gridap, GridapDistributed, GridapPETSc, PartitionedArrays, LSTO_Distribute
 function main()
   ## Parameters
   order = 1;
-  dom = (0,1,0,1);
-  el_size = (200,200);
-  γ = 0.1;
+  dom = (0,1,0,0.5);
+  el_size = (200,100);
+  γ = 0.05;
   γ_reinit = 0.5;
   max_steps = floor(Int,minimum(el_size)/10)
   tol = 1/(order^2*10)*prod(inv,minimum(el_size))
@@ -26,20 +34,20 @@ function main()
   α_coeff = 4;
   path = "./Results/main_inverter_mechanism"
 
-  η_in = 2;
-  η_out = 1;
   ks = 0.01;
   g = VectorValue(1,0);
 
   ## FE Setup
   model = CartesianDiscreteModel(dom,el_size);
   Δ = get_Δ(model)
-  f_Γ_in(x) = (x[1] ≈ 0.0) && 0.47 - eps() <= x[2] <= 0.53 + eps() ? true : false;
-  f_Γ_out(x) = (x[1] ≈ 1.0) && 0.43 - eps() <= x[2] <= 0.57 + eps() ? true : false;
-  f_Γ_D(x) = x[1] ≈ 0.0 && (x[2] <= 0.1 || x[2] >= 0.9)  ? true : false;
+  f_Γ_in(x) = (x[1] ≈ 0.0) && x[2] <= 0.03 + eps() ? true : false;
+  f_Γ_out(x) = (x[1] ≈ 1.0) && x[2] <= 0.07 + eps() ? true : false;
+  f_Γ_D(x) = x[1] ≈ 0.0 && x[2] >= 0.4  ? true : false;
+  f_Γ_D2(x) = x[2] ≈ 0.0 ? true : false;
   update_labels!(1,model,f_Γ_in,"Gamma_in")
   update_labels!(2,model,f_Γ_out,"Gamma_out")
   update_labels!(3,model,f_Γ_D,"Gamma_D")
+  update_labels!(4,model,f_Γ_D2,"SymLine")
 
   ## Triangulations and measures
   Ω = Triangulation(model)
@@ -53,14 +61,15 @@ function main()
   ## Spaces
   reffe = ReferenceFE(lagrangian,VectorValue{2,Float64},order)
   reffe_scalar = ReferenceFE(lagrangian,Float64,order)
-  V = TestFESpace(model,reffe;dirichlet_tags=["Gamma_D"])
-  U = TrialFESpace(V,VectorValue(0.0,0.0))
+  V = TestFESpace(model,reffe;dirichlet_tags=["Gamma_D","SymLine"],
+    dirichlet_masks=[(true,true),(false,true)])
+  U = TrialFESpace(V,[VectorValue(0.0,0.0),VectorValue(0.0,0.0)])
   V_φ = TestFESpace(model,reffe_scalar)
   V_reg = TestFESpace(model,reffe_scalar;dirichlet_tags=["Gamma_in","Gamma_out"])
   U_reg = TrialFESpace(V_reg,[0,0])
 
   ## Create FE functions
-  φh = interpolate(gen_lsf(4,0.2),V_φ);
+  φh = interpolate(gen_lsf(4,0.05),V_φ);
   φ = get_free_dof_values(φh)
 
   ## Interpolation and weak form
@@ -72,9 +81,11 @@ function main()
   res(u,v,φ,dΩ,dΓ_in,dΓ_out) = a(u,v,φ,dΩ,dΓ_in,dΓ_out) - l(v,φ,dΩ,dΓ_in,dΓ_out)
 
   ## Optimisation functionals
-  J = (u,φ,dΩ,dΓ_in,dΓ_out) -> ∫(η_in*u⋅VectorValue(1,0))dΓ_in + 
-                               ∫(η_out*u⋅VectorValue(1,0))dΓ_out
-  Vol = (u,φ,dΩ,dΓ_in,dΓ_out) -> ∫(((ρ ∘ φ) - 0.5)/vol_D)dΩ;
+  abssqr(x) = abs(x)^2
+  _j(u,dΓ_out) = ∫(abssqr ∘ (u⋅VectorValue(-1,0)-1))dΓ_out
+  _j2(u,dΓ_in) = ∫(abssqr ∘ (u⋅VectorValue(1,0)))dΓ_in
+  J = (u,φ,dΩ,dΓ_in,dΓ_out) -> 1000_j(u,dΓ_out)*_j(u,dΓ_out) + ∫(0.01(ρ ∘ φ))dΩ #+ _j2(u,dΓ_in) #∫(abssqr ∘ (u⋅VectorValue(1,0)))dΓ_in + ∫(abssqr ∘ (u⋅VectorValue(-1,0)-0.5))dΓ_out
+  Vol = (u,φ,dΩ,dΓ_in,dΓ_out) -> ∫(((ρ ∘ φ) - 0.4)/vol_D)dΩ;
   dVol = (q,u,φ,dΩ,dΓ_in,dΓ_out) -> ∫(1/vol_D*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
 
   ## Finite difference solver and level set function
@@ -83,7 +94,8 @@ function main()
 
   ## Setup solver and FE operators
   state_map = AffineFEStateMap(a,l,res,U,V,V_φ,U_reg,φh,dΩ,dΓ_in,dΓ_out)
-  pcfs = PDEConstrainedFunctionals(J,[Vol],state_map,analytic_dC=[dVol])
+  pcfs = PDEConstrainedFunctionals(J,state_map)
+  # pcfs = PDEConstrainedFunctionals(J,[Vol],state_map,analytic_dC=[dVol])
 
   ## Hilbertian extension-regularisation problems
   α = α_coeff*maximum(Δ)
@@ -92,14 +104,15 @@ function main()
   
   ## Optimiser
   make_dir(path)
-  optimiser = AugmentedLagrangian(φ,pcfs,stencil,vel_ext,interp,el_size,γ,γ_reinit);
+  _conv_cond = t->LSTO_Distributed.conv_cond(t;coef=1);
+  optimiser = AugmentedLagrangian(φ,pcfs,stencil,vel_ext,interp,el_size,γ,γ_reinit;conv_criterion=_conv_cond);
   for history in optimiser
     it,Ji,Ci,Li = last(history)
     λi = optimiser.λ; Λi = optimiser.Λ
     print_history(it,["J"=>Ji,"C"=>Ci,"L"=>Li,"λ"=>λi,"Λ"=>Λi])
     write_history(history,path*"/history.csv")
-    # uhi = get_state(pcfs)
-    # write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh)),"uh"=>uhi];iter_mod=1)
+    uhi = get_state(pcfs)
+    write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh)),"uh"=>uhi])
   end
   it,Ji,Ci,Li = last(optimiser.history)
   λi = optimiser.λ; Λi = optimiser.Λ

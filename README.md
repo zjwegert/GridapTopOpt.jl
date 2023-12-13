@@ -9,16 +9,14 @@
   |:---------------------------------:|---------|---------|:----------:|---------|
   | Minimum thermal compliance        | &#9745; | &#9745; | &#9745;    | &#9745; |
   | Minimum elastic compliance        | &#9745; | &#9745; | &#9745;    | &#9745; |
-  | Inverter mechanism                | &#9745; | &#9745;* | &#9745;    | &#9745;*** |
-  | Elastic inverse homogenisation    | &#9745; | &#9745;* | &#9745;    | &#9745;*** |
-  | Minimum NL thermal compliance     | &#9745; | &#9745;* | &#9745;    | &#9745;*** |
-  | Minimum hyperelastic compliance   | &#9745; | &#9745;** | &#9745;    | &#9745;*** |
+  | Inverter mechanism                | &#9745; | &#9745;** | &#9745;    | &#9745;* |
+  | Elastic inverse homogenisation    | &#9745; | &#9745;** | &#9745;    | &#9745;* |
+  | Minimum NL thermal compliance     | &#9745; | &#9745;** | &#9745;    | &#9745;* |
+  | Minimum hyperelastic compliance   | &#9745; | &#9745;** | &#9745;    | &#9745;* |
 
-*: Need to test.
+*: 3D only.
 
-**: * & Need to implement NL solver.
-
-***: 3D only.
+**: Need to test.
 
 - [x] Testing automatic differentation
   * &#9745; Test inverter mechanism problem with analytic adjoint. Edit: See discussion below.
@@ -34,9 +32,10 @@
 - [x] Higher order FEs breaks `Advection.jl` in parallel.
 - [x] `create_dof_permutation` doesn't work for periodic models.
 - [x] `MultiFieldFESpace` breaks `ElasticitySolver`
-- [ ] `NonlinearFEStateMap` breaks in parallel due need for transpose of jacobian. This likely means there is also a bug in `AffineFEStateMap` when dealing with non-symmetric weak forms. See `scripts/nonlinear_adjoint_MWE.jl`
+- [x] `NonlinearFEStateMap` breaks in parallel due need for transpose of jacobian. This likely means there is also a bug in `AffineFEStateMap` when dealing with non-symmetric weak forms. See `scripts/nonlinear_adjoint_MWE.jl`
 - [ ] Inverse homogenisation problems over allocate the stiffness matrix. Only one stiffness matrix should be assembled, then we should create a larger block matrix from this.
 - [ ] There appears to be a memory leak in `write_vtk`.
+- [ ] PETSc's GAMG preconditioner breaks for split Dirichlet DoFs (e.g., x constrained while y free for a single node). There is no simple fix for this. I would recommend instead using MUMPS or another preconditioner.
 
 ## Some notes on auto differentiation
 

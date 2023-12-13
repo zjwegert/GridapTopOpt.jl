@@ -148,4 +148,8 @@ function write_vtk(Ω,path,it,entries::Vector{<:Pair};iter_mod=10)
   if isone(it) || iszero(it % iter_mod) 
     writevtk(Ω,path,cellfields=entries)
   end
+
+  if iszero(it % 10*iter_mod)
+    GC.gc() # Garbage collection, due to memory leak in writevtk - TODO
+  end 
 end

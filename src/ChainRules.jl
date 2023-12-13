@@ -358,13 +358,11 @@ function ChainRulesCore.rrule(φ_to_u::NonlinearFEStateMap,φ::T) where T <: Abs
   assemble_adjoint_matrix!((u,v) -> op.op.jac(uh,u,v),adjoint_K,assem_adjoint,U,V)
   function φ_to_u_pullback(du)
     ## Adjoint Solve
-    #### NOTE: This breaks in parallel, need assembler to output matrix adjoint.
-    numerical_setup!(adjoint_ns,adjoint(adjoint_K))
+    numerical_setup!(adjoint_ns,adjoint_K)
     ## DEBUG only
-    K = jacobian(op.op,uh)
-    println("**Debug** |adjoint(K) - K| = ", norm(adjoint(K) - K,Inf))
-    println("**Debug** |adjoint_K - K| = ", norm(adjoint_K - K,Inf)) # This should be > 0
-    println("**Debug** |adjoint(adjoint_K) - K| = ", norm(adjoint(adjoint_K) - K,Inf)) # This should be zero
+    # K = jacobian(op.op,uh)
+    # println("**Debug** |adjoint_K - K| = ", norm(adjoint_K - K,Inf)) # This should be > 0
+    # println("**Debug** |adjoint(adjoint_K) - K| = ", norm(adjoint(adjoint_K) - K,Inf)) # This should be zero
     ##
     solve!(λ,adjoint_ns,du)
     λh = FEFunction(V,λ)
