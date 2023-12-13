@@ -112,8 +112,8 @@ function main()
 
   ## Hilbertian extension-regularisation problems
   α = α_coeff*maximum(Δ)
-  a_hilb = (p,q,dΩ)->∫(α^2*∇(p)⋅∇(q) + p*q)dΩ;
-  vel_ext = VelocityExtension(a_hilb,U_reg,V_reg,dΩ)
+  a_hilb(p,q) =∫(α^2*∇(p)⋅∇(q) + p*q)dΩ;
+  vel_ext = VelocityExtension(a_hilb,U_reg,V_reg)
 
   make_dir(path)
   # optimiser = AugmentedLagrangian(φ,pcfs,stencil,vel_ext,interp,el_size,γ,γ_reinit);
