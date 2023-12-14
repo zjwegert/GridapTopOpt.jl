@@ -1,23 +1,19 @@
-using Gridap, GridapDistributed, GridapPETSc, PartitionedArrays, LSTO_Distributed, SparseMatricesCSR
-
-import Base.*
-function (*)(a::DomainContribution,b::DomainContribution)
-  c = copy(a)
-  for (trian,array) in b.dict
-    add_contribution!(c,trian,array,*)
-  end
-  c
-end
+using Gridap, Gridap.MultiField, GridapDistributed, GridapPETSc, GridapSolvers, 
+  PartitionedArrays, LSTO_Distributed, SparseMatricesCSR
 
 """
-  (MPI) Inverter mechanism with augmented Lagrangian method in 3D.
+  (MPI) Inverter mechanism with Hilbertian projection method in 3D.
 
   Optimisation problem:
-      Min J(Ω) = ∫ ... dΓᵢₙ + ∫ ... dΓₒᵤₜ
+      Min J(Ω) = ηᵢₙ*∫ u⋅e₁ dΓᵢₙ
         Ω
     s.t., Vol(Ω) = Vf,
-          ⎡u∈V=H¹(Ω;u(Γ_D)=0)³, 
+            C(Ω) = 0, 
+          ⎡u∈V=H¹(Ω;u(Γ_D)=0)ᵈ, 
           ⎣∫ C ⊙ ε(u) ⊙ ε(v) dΩ + ∫ kₛv⋅u dΓₒᵤₜ = ∫ v⋅g dΓᵢₙ , ∀v∈V.
+        
+    where C(Ω) = ∫ -u⋅e₁-δₓ dΓₒᵤₜ. We assume symmetry in the problem to aid
+     convergence.
 """ 
 function main(mesh_partition,distribute,el_size)
   ranks = distribute(LinearIndices((prod(mesh_partition),)))
@@ -32,10 +28,11 @@ function main(mesh_partition,distribute,el_size)
   C = isotropic_3d(1.0,0.3);
   η_coeff = 2;
   α_coeff = 4;
-  path = "./Results/MPI_main_3d_inverter_mechanism_with_vol_constrained"
-
+  Vf=0.4;
+  δₓ=0.75;
   ks = 0.01;
   g = VectorValue(1,0,0);
+  path = "./Results/MPI_main_3d_inverter_HPM"
 
   ## FE Setup
   model = CartesianDiscreteModel(ranks,mesh_partition,dom,el_size);
@@ -83,10 +80,11 @@ function main(mesh_partition,distribute,el_size)
   res(u,v,φ,dΩ,dΓ_in,dΓ_out) = a(u,v,φ,dΩ,dΓ_in,dΓ_out) - l(v,φ,dΩ,dΓ_in,dΓ_out)
 
   ## Optimisation functionals
-  abssqr(x) = abs(x)^2
-  J = (u,φ,dΩ,dΓ_in,dΓ_out) ->  ∫(0.01*(ρ ∘ φ))dΩ + ∫(abssqr ∘ (u⋅VectorValue(-1,0,0)-0.5))dΓ_out #∫(abssqr ∘ (u⋅VectorValue(1,0,0)))dΓ_in + 
-  Vol = (u,φ,dΩ,dΓ_in,dΓ_out) -> ∫(((ρ ∘ φ) - 0.5)/vol_D)dΩ;
+  e₁ = VectorValue(1,0,0)
+  J = (u,φ,dΩ,dΓ_in,dΓ_out) -> 10*∫(u⋅e₁)dΓ_in
+  Vol = (u,φ,dΩ,dΓ_in,dΓ_out) -> ∫(((ρ ∘ φ) - Vf)/vol_D)dΩ;
   dVol = (q,u,φ,dΩ,dΓ_in,dΓ_out) -> ∫(1/vol_D*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
+  UΓ_out = (u,φ,dΩ,dΓ_in,dΓ_out) -> ∫(u⋅-e₁-δₓ)dΓ_out
 
   ## Finite difference solver and level set function
   stencil = AdvectionStencil(FirstOrderStencil(3,Float64),model,V_φ,Δ./order,max_steps,tol)
@@ -103,7 +101,7 @@ function main(mesh_partition,distribute,el_size)
     assem_deriv = SparseMatrixAssembler(Tm,Tv,U_reg,U_reg),
     ls=solver,
     adjoint_ls=solver)
-  pcfs = PDEConstrainedFunctionals(J,state_map)
+  pcfs = PDEConstrainedFunctionals(J,[Vol,UΓ_out],state_map,analytic_dC=[dVol,nothing])
 
   ## Hilbertian extension-regularisation problems
   α = α_coeff*maximum(Δ)
@@ -114,7 +112,8 @@ function main(mesh_partition,distribute,el_size)
   
   ## Optimiser
   make_dir(path;ranks=ranks)
-  optimiser = AugmentedLagrangian(φ,pcfs,stencil,vel_ext,interp,el_size,γ,γ_reinit;max_iters = 200);
+  optimiser = HilbertianProjection(φ,pcfs,stencil,vel_ext,interp,el_size,γ,γ_reinit;
+    verbose=ranks,α_min=0.5,ls_γ_min=0.01);
   for history in optimiser
     it,Ji,Ci,Li = last(history)
     λi = optimiser.λ; Λi = optimiser.Λ

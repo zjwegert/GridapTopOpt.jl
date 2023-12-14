@@ -153,3 +153,14 @@ function write_vtk(Ω,path,it,entries::Vector{<:Pair};iter_mod=10)
     GC.gc() # Garbage collection, due to memory leak in writevtk - TODO
   end 
 end
+
+## Multiplication of DomainContributions
+using Gridap.CellData: DomainContribution, add_contribution!
+import Base.*
+function (*)(a::DomainContribution,b::DomainContribution)
+  c = copy(a)
+  for (trian,array) in b.dict
+    add_contribution!(c,trian,array,*)
+  end
+  c
+end

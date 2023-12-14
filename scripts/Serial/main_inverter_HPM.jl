@@ -1,24 +1,18 @@
 using Gridap, GridapDistributed, GridapPETSc, PartitionedArrays, LSTO_Distributed
 
-using Gridap.CellData: DomainContribution, add_contribution!
-import Base.*
-function (*)(a::DomainContribution,b::DomainContribution)
-  c = copy(a)
-  for (trian,array) in b.dict
-    add_contribution!(c,trian,array,*)
-  end
-  c
-end
-
 """
-  (Serial) Inverter mechanism with augmented Lagrangian method in 2D.
+  (Serial) Inverter mechanism with Hilbertian projection method in 2D.
 
   Optimisation problem:
-      Min J(Ω) = ∫ ... dΓᵢₙ + ∫ ... dΓₒᵤₜ
+      Min J(Ω) = ηᵢₙ*∫ u⋅e₁ dΓᵢₙ
         Ω
     s.t., Vol(Ω) = Vf,
+            C(Ω) = 0, 
           ⎡u∈V=H¹(Ω;u(Γ_D)=0)ᵈ, 
           ⎣∫ C ⊙ ε(u) ⊙ ε(v) dΩ + ∫ kₛv⋅u dΓₒᵤₜ = ∫ v⋅g dΓᵢₙ , ∀v∈V.
+        
+    where C(Ω) = ∫ -u⋅e₁-δₓ dΓₒᵤₜ. We assume symmetry in the problem to aid
+     convergence.
 """ 
 function main()
   ## Parameters
@@ -32,11 +26,12 @@ function main()
   C = isotropic_2d(1.0,0.3);
   η_coeff = 2;
   α_coeff = 4;
-  path = "./Results/main_inverter_mechanism"
-
+  Vf=0.4;
+  δₓ=0.75;
   ks = 0.01;
   g = VectorValue(1,0);
-
+  path = "./Results/main_inverter_mechanism_HPM"
+  
   ## FE Setup
   model = CartesianDiscreteModel(dom,el_size);
   Δ = get_Δ(model)
@@ -69,7 +64,8 @@ function main()
   U_reg = TrialFESpace(V_reg,[0,0])
 
   ## Create FE functions
-  φh = interpolate(gen_lsf(4,0.05),V_φ);
+  lsf_fn = x->max(gen_lsf(6,0.2)(x),-sqrt((x[1]-1)^2+(x[2]-0.5)^2)+0.2)
+  φh = interpolate(lsf_fn,V_φ);
   φ = get_free_dof_values(φh)
 
   ## Interpolation and weak form
@@ -81,12 +77,11 @@ function main()
   res(u,v,φ,dΩ,dΓ_in,dΓ_out) = a(u,v,φ,dΩ,dΓ_in,dΓ_out) - l(v,φ,dΩ,dΓ_in,dΓ_out)
 
   ## Optimisation functionals
-  abssqr(x) = abs(x)^2
-  _j(u,dΓ_out) = ∫(abssqr ∘ (u⋅VectorValue(-1,0)-1))dΓ_out
-  _j2(u,dΓ_in) = ∫(abssqr ∘ (u⋅VectorValue(1,0)))dΓ_in
-  J = (u,φ,dΩ,dΓ_in,dΓ_out) -> 1000_j(u,dΓ_out)*_j(u,dΓ_out) + ∫(0.01(ρ ∘ φ))dΩ #+ _j2(u,dΓ_in) #∫(abssqr ∘ (u⋅VectorValue(1,0)))dΓ_in + ∫(abssqr ∘ (u⋅VectorValue(-1,0)-0.5))dΓ_out
-  Vol = (u,φ,dΩ,dΓ_in,dΓ_out) -> ∫(((ρ ∘ φ) - 0.4)/vol_D)dΩ;
+  e₁ = VectorValue(1,0)
+  J = (u,φ,dΩ,dΓ_in,dΓ_out) -> 10*∫(u⋅e₁)dΓ_in
+  Vol = (u,φ,dΩ,dΓ_in,dΓ_out) -> ∫(((ρ ∘ φ) - Vf)/vol_D)dΩ;
   dVol = (q,u,φ,dΩ,dΓ_in,dΓ_out) -> ∫(1/vol_D*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
+  UΓ_out = (u,φ,dΩ,dΓ_in,dΓ_out) -> ∫(u⋅-e₁-δₓ)dΓ_out
 
   ## Finite difference solver and level set function
   stencil = AdvectionStencil(FirstOrderStencil(2,Float64),model,V_φ,Δ./order,max_steps,tol)
@@ -94,8 +89,7 @@ function main()
 
   ## Setup solver and FE operators
   state_map = AffineFEStateMap(a,l,res,U,V,V_φ,U_reg,φh,dΩ,dΓ_in,dΓ_out)
-  pcfs = PDEConstrainedFunctionals(J,state_map)
-  # pcfs = PDEConstrainedFunctionals(J,[Vol],state_map,analytic_dC=[dVol])
+  pcfs = PDEConstrainedFunctionals(J,[Vol,UΓ_out],state_map,analytic_dC=[dVol,nothing])
 
   ## Hilbertian extension-regularisation problems
   α = α_coeff*maximum(Δ)
@@ -104,19 +98,19 @@ function main()
   
   ## Optimiser
   make_dir(path)
-  _conv_cond = t->LSTO_Distributed.conv_cond(t;coef=1);
-  optimiser = AugmentedLagrangian(φ,pcfs,stencil,vel_ext,interp,el_size,γ,γ_reinit;conv_criterion=_conv_cond);
+  optimiser = HilbertianProjection(φ,pcfs,stencil,vel_ext,interp,el_size,γ,γ_reinit;
+    α_min=0.5,ls_γ_min=0.01);
   for history in optimiser
-    it,Ji,Ci,Li = last(history)
-    λi = optimiser.λ; Λi = optimiser.Λ
-    print_history(it,["J"=>Ji,"C"=>Ci,"L"=>Li,"λ"=>λi,"Λ"=>Λi])
+    it,Ji,Ci = last(history)
+    γ = optimiser.γ_cache[1]
+    print_history(it,["J"=>Ji,"C"=>Ci,"γ"=>γ])
     write_history(history,path*"/history.csv")
     uhi = get_state(pcfs)
     write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh)),"uh"=>uhi])
   end
-  it,Ji,Ci,Li = last(optimiser.history)
-  λi = optimiser.λ; Λi = optimiser.Λ
-  print_history(it,["J"=>Ji,"C"=>Ci,"L"=>Li,"λ"=>λi,"Λ"=>Λi])
+  it,Ji,Ci = last(optimiser.history)
+  γ = optimiser.γ_cache[1]
+  print_history(it,["J"=>Ji,"C"=>Ci,"γ"=>γ])
   write_history(optimiser.history,path*"/history.csv")
   uhi = get_state(pcfs)
   write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh)),"uh"=>uhi];iter_mod=1)
