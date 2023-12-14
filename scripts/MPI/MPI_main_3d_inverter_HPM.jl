@@ -115,16 +115,16 @@ function main(mesh_partition,distribute,el_size)
   optimiser = HilbertianProjection(φ,pcfs,stencil,vel_ext,interp,el_size,γ,γ_reinit;
     verbose=ranks,α_min=0.5,ls_γ_min=0.01);
   for history in optimiser
-    it,Ji,Ci,Li = last(history)
-    λi = optimiser.λ; Λi = optimiser.Λ
-    print_history(it,["J"=>Ji,"C"=>Ci,"L"=>Li,"λ"=>λi,"Λ"=>Λi];ranks=ranks)
+    it,Ji,Ci = last(history)
+    γ = optimiser.γ_cache[1]
+    print_history(it,["J"=>Ji,"C"=>Ci,"γ"=>γ];ranks=ranks)
     write_history(history,path*"/history.csv";ranks=ranks)
     uhi = get_state(pcfs)
     write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh)),"uh"=>uhi])
   end
-  it,Ji,Ci,Li = last(optimiser.history)
-  λi = optimiser.λ; Λi = optimiser.Λ
-  print_history(it,["J"=>Ji,"C"=>Ci,"L"=>Li,"λ"=>λi,"Λ"=>Λi];ranks=ranks)
+  it,Ji,Ci = last(optimiser.history)
+  γ = optimiser.γ_cache[1]
+  print_history(it,["J"=>Ji,"C"=>Ci,"γ"=>γ];ranks=ranks)
   write_history(optimiser.history,path*"/history.csv";ranks=ranks)
   uhi = get_state(pcfs)
   write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh)),"uh"=>uhi];iter_mod=1)

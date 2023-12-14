@@ -412,9 +412,8 @@ struct PDEConstrainedFunctionals{N,A<:AbstractFEStateMap}
     C_spiwm = isempty(C) ? StateParamIntegrandWithMeasure[] : map(spiwm,C);
 
     # Preallocate
-    _,djdφ_vec = J_spiwm.caches
-    dJ = similar(djdφ_vec)
-    dC = map(_->similar(dJ),C)
+    dJ = similar(J_spiwm.caches[2])
+    dC = map(Ci_spiwm->similar(Ci_spiwm.caches[2]),C_spiwm)
 
     return new{length(C),T}(
       J_spiwm,C_spiwm,dJ,dC,analytic_dJ,analytic_dC,state_map)

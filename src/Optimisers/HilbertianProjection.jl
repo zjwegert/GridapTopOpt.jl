@@ -6,7 +6,7 @@
 """
 abstract type AbstractOrthogMethod end
 (::AbstractOrthogMethod)(::AbstractArray{<:AbstractArray},::AbstractMatrix,cache) = @abstractmethod
-allocate_cache(::AbstractOrthogMethod,A::AbstractArray{<:AbstractArray}) = @abstractmethod
+allocate_cache(::AbstractOrthogMethod,A::AbstractArray{<:AbstractArray},K::AbstractMatrix) = @abstractmethod
 
 ## HilbertianProjectionHistory
 mutable struct HilbertianProjectionHistory
@@ -77,7 +77,7 @@ struct HilbertianProjection{T<:AbstractOrthogMethod} <: AbstractOptimiser
     vel = get_free_dof_values(interpolate(0,V_φ))
     dC = pcfs.dC;
     α = zeros(eltype(φ),length(dC))
-    orthog_cache = allocate_cache(orthog_method,dC)
+    orthog_cache = allocate_cache(orthog_method,dC,vel_ext.K)
     φ_tmp = zero(φ);
     cache = (φ,φ_tmp,pcfs,stencil,vel_ext,interp,vel,el_size)
     line_search_cache = (ls_max_iters,ls_δ_inc,ls_δ_dec,ls_ξ,
@@ -171,17 +171,29 @@ function Base.iterate(m::HilbertianProjection,θ)
 end
 
 ## Methods for descent direction
-function update_descent_direction!(m::HilbertianProjection,θ,dV,C,dC,K;verbose=nothing)
+function update_descent_direction!(m::HilbertianProjection,θ::PVector,dV,C,dC,K;verbose=nothing)
+  # Change ghosts of dV and dC (This will change in future as allocates TODO)
+  dV = GridapDistributed.change_ghost(dV,axes(K,2))
+  dC = GridapDistributed.change_ghost.(dC,(axes(K,2),))
+  _update_descent_direction!(m::HilbertianProjection,θ,dV,C,dC,K,verbose)
+end
+
+function update_descent_direction!(m::HilbertianProjection,θ::Vector,dV,C,dC,K;verbose=nothing)
+  _update_descent_direction!(m::HilbertianProjection,θ,dV,C,dC,K,verbose)
+end
+
+function _update_descent_direction!(m::HilbertianProjection,θ,dV,C,dC,K,verbose)
   α=m.α; λ=m.λ; α_min=m.α_min; α_max=m.α_max
   orthog_cache=m.orthog_cache; orthogonalise = m.orthog_method
+  _,_,_,_,P,_,_ = orthog_cache
   # Orthogonalisation of dC
   dC_orthog,normsq,nullity = orthogonalise(dC,K,orthog_cache);
   # Project dV
-  dV_norm = project_dV!(dV,dC_orthog,normsq,K)
+  dV_norm = project_dV!(dV,dC_orthog,normsq,K,P)
   # Calculate αᵢ
-  ∑α²,debug_code = compute_α!(α,C,dC_orthog,dC,normsq,K,λ,α_min,α_max)
+  ∑α²,debug_code = compute_α!(α,C,dC_orthog,dC,normsq,K,P,λ,α_min,α_max)
   # Print debug info (if requested)
-  verbose_print(orthogonalise,dV,dC,dC_orthog,K,λ,nullity,debug_code,verbose)
+  verbose_print(orthogonalise,dV,dC,dC_orthog,K,P,λ,nullity,debug_code,verbose)
   # Calculate direction
   idx_non_zero = (Base.OneTo(last(orthog_cache)))[.~iszero.(normsq)]
   θ .= sqrt(1-∑α²)*dV/dV_norm
@@ -191,14 +203,16 @@ end
 
 # Form projection operator for Cperp: P_C⟂(dV) = dV - ∑[(̄vᵢ ⋅ m)/|̄vᵢ|² ̄vᵢ] 
 #  where ̄vᵢ spans C and ̄vᵢ ⋅ ̄vⱼ = δᵢⱼ. Return norm of projected dV
-function project_dV!(dV,dC_orthog,normsq,K)
+function project_dV!(dV,dC_orthog,normsq,K,P)
+  mul!(P,K,dV)
   for i = 1:length(dC_orthog)
     if ~iszero(normsq[i])
-      dV .-= dot(dC_orthog[i],K,dV)/normsq[i]*dC_orthog[i] # [(̄vᵢ ⋅ m)/|̄vᵢ|² ̄vᵢ]
+      dV .-= dot(dC_orthog[i],P)/normsq[i]*dC_orthog[i] # [(̄vᵢ ⋅ m)/|̄vᵢ|² ̄vᵢ]
     end
   end
   # Check if projected dV is zero vector
-  dV_norm = sqrt(dot(dV,K,dV))
+  mul!(P,K,dV)
+  dV_norm = sqrt(dot(dV,P))
   if dV_norm ≈ zero(eltype(normsq))
     return one(eltype(normsq))
   else
@@ -207,16 +221,17 @@ function project_dV!(dV,dC_orthog,normsq,K)
 end
 
 # Compute α coefficents using αᵢ|̄vᵢ| = λCᵢ - ∑ⱼ₌₁ⁱ⁻¹[ αⱼ(̄vⱼ⋅vᵢ)/|̄vⱼ| ]
-function compute_α!(α,C,dC_orthog,dC,normsq,K,λ,α_min,α_max)
+function compute_α!(α,C,dC_orthog,dC,normsq,K,P,λ,α_min,α_max)
   copyto!(α,C);
   for i = 1:length(C)
     if iszero(normsq[i])
       α[i] = zero(eltype(α))
     else
+      mul!(P,K,dC[i])
       for j = 1:i-1
         if ~iszero(normsq[j])
           # Compute -∑ⱼ₌₁ⁱ⁻¹[ αⱼ(̄vⱼ⋅vᵢ)/|̄vⱼ| ]
-          α[i] -= α[j]*dot(dC_orthog[j],K,dC[i])/sqrt(normsq[j])
+          α[i] -= α[j]*dot(dC_orthog[j],P)/sqrt(normsq[j])
         end
       end
       α[i] /= sqrt(normsq[i]) # |̄vᵢ|
@@ -247,7 +262,7 @@ end
 struct HPModifiedGramSchmidt <: AbstractOrthogMethod end
 
 function (m::HPModifiedGramSchmidt)(A::AbstractArray{<:AbstractArray},K::AbstractMatrix)
-  cache = allocate_cache(m,A)
+  cache = allocate_cache(m,A,K)
   return m(A,K,cache)
 end
 
@@ -255,6 +270,7 @@ function (::HPModifiedGramSchmidt)(A::AbstractArray{<:AbstractArray},K::Abstract
   Z,Q,R,null_R,P,X,n = cache
   nullity = 0
   copyto!.(Z,A)
+  # consistent!.(Z) |> fetch # shouldn't need this
   mul!.(X,(K,),Z)
   for i = 1:n
     R[i,i]=dot(Z[i],X[i])
@@ -265,38 +281,44 @@ function (::HPModifiedGramSchmidt)(A::AbstractArray{<:AbstractArray},K::Abstract
       nullity += 1
     end
     R[i,i] = sqrt(R[i,i])
-    Q[i] = Z[i]/R[i,i]
+    Q[i] .= Z[i]/R[i,i]
     P .= X[i]/R[i,i]
     for j = i+1:n
-      R[i,j]= dot(P,Z[j])
-      Z[j] -= R[i,j]*Q[i]
+      R[i,j] = dot(P,Z[j])
+      Z[j] .-= R[i,j]*Q[i]
     end
-    X[i] -= sum(R[i,j]*P for j = i+1:n;init=zero(Q[1]))
+    X[i] .-= sum(R[i,j]*P for j = i+1:n;init=zero(Q[1]))
   end
   R[findall(null_R)] .= zero(eltype(R))
 
   return Z,R[diagind(R)].^2,nullity
 end
 
-function allocate_cache(::HPModifiedGramSchmidt,A::AbstractArray{<:AbstractArray})
+function allocate_cache(::HPModifiedGramSchmidt,A::AbstractArray{<:AbstractArray},K::AbstractMatrix)
   n = length(A);
-  Z = [zero(first(A)) for _ = 1:n];
-  Q = [zero(first(A)) for _ = 1:n];
+  Z = [allocate_in_domain(K) for _ = 1:n];
+  Q = [allocate_in_domain(K) for _ = 1:n];
   R = zeros(n,n)
   null_R = zeros(Bool,size(R))
-  P = zero(first(A));
-  X = [zero(first(A)) for _ = 1:n];
+  P = allocate_in_domain(K);
+  X = [allocate_in_domain(K) for _ = 1:n];
+  zero_vec = allocate_in_domain(K)
+  fill!(zero_vec,zero(eltype(K)))
   return Z,Q,R,null_R,P,X,n
 end
 
 # Verbose printing
-function verbose_print(orthog,dV,dC,dC_orthog,K,λ,nullity,debug_code,verbose)
+function verbose_print(orthog,dV,dC,dC_orthog,K,P,λ,nullity,debug_code,verbose)
   if ~isnothing(verbose)
     orth_norm = zeros(length(dC),length(dC))
-    for i = 1:length(dC),j = 1:length(dC)
-      orth_norm[i,j]=dot(dC_orthog[i],K,dC_orthog[j]);
+    for i = 1:length(dC)
+      mul!(P,K,dC_orthog[i])
+      for j = 1:length(dC)
+        orth_norm[i,j]=dot(dC_orthog[j],P);
+      end
     end
-    proj_norm = dot.((dV,),(K,),dC_orthog)
+    mul!(P,K,dV)
+    proj_norm = dot.(dC_orthog,(P,))
     if i_am_main(verbose)
       orth_norm[diagind(orth_norm)] .= 0; 
       println("  ↱----------------------------------------------------------↰")
@@ -318,6 +340,7 @@ function verbose_print(orthog,dV,dC,dC_orthog,K,λ,nullity,debug_code,verbose)
   end
 end
 
+# using SparseArrays
 # function test(n,k)
 #   λ,α_min,α_max = 0.1,0.01,1.0
 #   debug = true
@@ -329,16 +352,16 @@ end
 #   _M = sprand(Float64,k,k,0.1)
 #   K = 0.5*(_M+_M') + k*I;
 #   dV = K\rand(k)
+#   P = zero(dV)
 
 #   mgs_hp = HPModifiedGramSchmidt()
 #   dC_orthog,normsq,nullity = mgs_hp(dC,K);
   
-#   dV_norm = project_dV!(dV,dC_orthog,normsq,K)
+#   dV_norm = project_dV!(dV,dC_orthog,normsq,K,P)
 
-#   ∑α²,debug_code = compute_α!(α,C,dC_orthog,dC,normsq,K,λ,α_min,α_max)
+#   ∑α²,debug_code = compute_α!(α,C,dC_orthog,dC,normsq,K,P,λ,α_min,α_max)
 
-#   debug_print(mgs_hp,dV,dC,dC_orthog,K,λ,nullity,debug_code,debug)
-
+#   verbose_print(mgs_hp,dV,dC,dC_orthog,K,P,λ,nullity,debug_code,debug)
 # end
 
 # test(5,10);

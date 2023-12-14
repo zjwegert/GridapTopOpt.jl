@@ -19,7 +19,7 @@ import Gridap.Algebra: LinearSolver, SymbolicSetup
 import Gridap.Geometry: get_faces
 import GridapPETSc: PetscScalar, PetscInt, PETSC,  @check_error_code
 import GridapDistributed: DistributedDiscreteModel, DistributedTriangulation, 
-    DistributedFESpace,DistributedDomainContribution, to_parray_of_arrays
+    DistributedFESpace,DistributedDomainContribution, to_parray_of_arrays,allocate_in_domain
 import PartitionedArrays: getany, tuple_of_arrays
 
 include("ChainRules.jl")
