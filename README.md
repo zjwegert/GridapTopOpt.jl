@@ -35,6 +35,8 @@
 - [x] `NonlinearFEStateMap` breaks in parallel due need for transpose of jacobian. This likely means there is also a bug in `AffineFEStateMap` when dealing with non-symmetric weak forms. See `scripts/nonlinear_adjoint_MWE.jl`
 - [ ] Inverse homogenisation problems over allocate the stiffness matrix. Only one stiffness matrix should be assembled, then we should create a larger block matrix from this.
 - [ ] There appears to be a memory leak in `write_vtk`.
+
+## Other notes
 - [ ] PETSc's GAMG preconditioner breaks for split Dirichlet DoFs (e.g., x constrained while y free for a single node). There is no simple fix for this. I would recommend instead using MUMPS or another preconditioner.
 
 ## Some notes on auto differentiation

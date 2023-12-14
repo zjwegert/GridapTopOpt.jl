@@ -29,6 +29,23 @@ function Gridap.gradient(F::IntegrandWithMeasure,uh::Vector,K::Int)
   return DistributedDomainContribution(contribs)
 end
 
+function Gridap.jacobian(F::IntegrandWithMeasure,uh::Vector{<:Union{FEFunction,CellField}},K::Int)
+  @check 0 < K <= length(uh)
+  _f(uk) = F.F(uh[1:K-1]...,uk,uh[K+1:end]...,F.dΩ...)
+  return Gridap.jacobian(_f,uh[K])
+end
+
+function Gridap.jacobian(F::IntegrandWithMeasure,uh::Vector,K::Int)
+  @check 0 < K <= length(uh)
+  local_fields = map(local_views,uh) |> to_parray_of_arrays
+  local_measures = map(local_views,F.dΩ) |> to_parray_of_arrays
+  contribs = map(local_measures,local_fields) do dΩ,lf
+    _f = u -> F.F(lf[1:K-1]...,u,lf[K+1:end]...,dΩ...)
+    return Gridap.jacobian(_f,lf[K])
+  end
+  return DistributedDomainContribution(contribs)
+end
+
 function GridapDistributed.to_parray_of_arrays(a::NTuple{N,T}) where {N,T<:DebugArray}
   indices = linear_indices(first(a))
   map(indices) do i
@@ -264,11 +281,13 @@ struct NonlinearFEStateMap{A,B<:Tuple,C<:Tuple,D<:Tuple,E<:Tuple,F<:Tuple} <: LS
     spaces = (U,V,V_φ,U_reg)
     ## dφdu cache
     uhd = zero(U)
-    vecdata = collect_cell_vector(U_reg,∇(IntegrandWithMeasure(res,dΩ),[uhd,uhd,φh],3))
+    res_iwm = IntegrandWithMeasure(res,dΩ)
+    vecdata = collect_cell_vector(U_reg,∇(res_iwm,[uhd,uhd,φh],3))
     dφdu_vec = allocate_vector(assem_deriv,vecdata)
 
     ## Nonlinear FE operator and solution vector x
-    op = FEOperator((u,v) -> res(u,v,φh,dΩ...),U,V,assem_U)
+    jac(u,du,dv) = jacobian(res_iwm,[u,dv,φh],1)
+    op = FEOperator((u,v) -> res(u,v,φh,dΩ...),jac,U,V,assem_U)
     op_cache = CachedFEOperator(op)
     x = zero(U)#get_free_dof_values(zero(U));
 
@@ -307,6 +326,12 @@ get_deriv_space(m::NonlinearFEStateMap) = m.spaces[4];
 get_state_assembler(m::NonlinearFEStateMap) = last(m.fwd_caches)
 get_deriv_assembler(m::NonlinearFEStateMap) = last(m.cache)
 
+# φ is not used because op already depends on it.
+#  This is rather dangerous but currently required 
+#  if we want to cache PETScNonlinearSolver. 
+#  Basically op.op !=== nl_cache.op which is bad, and 
+#  there is no clear way to get around this
+#     Jordi?
 function (φ_to_u::NonlinearFEStateMap)(φ::T) where T <: AbstractVector
   res=φ_to_u.res
   dΩ = φ_to_u.dΩ
@@ -315,13 +340,18 @@ function (φ_to_u::NonlinearFEStateMap)(φ::T) where T <: AbstractVector
   nl_cache = nls_cache.cache
  
   ## Update residual and jacobian, and solve
-  φh = FEFunction(V_φ,φ)
-  op.op = FEOperator((u,v) -> res(u,v,φh,dΩ...),U,V,assem_U)
+  # φh = FEFunction(V_φ,φ)
+  # jac(u,du,dv) = jacobian(IntegrandWithMeasure(res,dΩ),[u,dv,φh],1)
+  # op.op = FEOperator((u,v) -> res(u,v,φh,dΩ...),jac,U,V,assem_U)
+  # Uncomment the above and run with PETScLinearSolver to see problem
   x,cache = solve!(x,nls,op.op,nl_cache)
   # Update cache for next call
   nls_cache.cache = cache 
   get_free_dof_values(x)
 end
+
+transpose_contributions(b::DistributedDomainContribution) = 
+  DistributedDomainContribution(map(transpose_contributions,local_views(b)))
 
 function transpose_contributions(b::DomainContribution)
   c = DomainContribution()
@@ -340,7 +370,6 @@ function assemble_adjoint_matrix!(f::Function,A::AbstractMatrix,a::Assembler,U::
 end
 
 function ChainRulesCore.rrule(φ_to_u::NonlinearFEStateMap,φ::T) where T <: AbstractVector
-  @assert T<:Vector "Nonlinear FEs are currently not supported in parallel, please run in serial mode."
   res = φ_to_u.res
   dΩ = φ_to_u.dΩ
   U,V,V_φ,U_reg = φ_to_u.spaces

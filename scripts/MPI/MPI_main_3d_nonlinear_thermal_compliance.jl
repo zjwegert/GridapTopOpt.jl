@@ -98,18 +98,18 @@ function main(mesh_partition,distribute,el_size)
     ls=lin_solver)
   
   ## Optimiser
-  make_dir(path)
+  make_dir(path,ranks=ranks)
   optimiser = AugmentedLagrangian(φ,pcfs,stencil,vel_ext,interp,el_size,γ,γ_reinit);
   for history in optimiser
     it,Ji,_,_ = last(history)
-    print_history(it,["J"=>Ji])
-    write_history(history,path*"/history.csv")
+    print_history(it,["J"=>Ji],ranks=ranks)
+    write_history(history,path*"/history.csv",ranks=ranks)
     uhi = get_state(pcfs)
     write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh)),"uh"=>uhi])
   end
   it,Ji,_,_ = last(optimiser.history)
-  print_history(it,["J"=>Ji])
-  write_history(optimiser.history,path*"/history.csv")
+  print_history(it,["J"=>Ji],ranks=ranks)
+  write_history(optimiser.history,path*"/history.csv",ranks=ranks)
   uhi = get_state(pcfs)
   write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh)),"uh"=>uhi];iter_mod=1)
 end
