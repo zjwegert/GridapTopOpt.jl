@@ -41,7 +41,7 @@ function main(mesh_partition,distribute,el_size)
     0.4 - eps() <= x[3] <= 0.6 + eps() ? true : false;
   f_Γ_out(x) = (x[1] ≈ 1.0) && 0.4 - eps() <= x[2] <= 0.6 + eps() && 
     0.4 - eps() <= x[3] <= 0.6 + eps() ? true : false;
-  f_Γ_D(x) = x[1] ≈ 0.0 && (x[3] <= 0.1 || x[3] >= 0.9)  ? true : false;
+  f_Γ_D(x) = x[1] ≈ 0.0  && (x[2] <= 0.1 || x[2] >= 0.9) && (x[3] <= 0.1 || x[3] >= 0.9)  ? true : false;
   update_labels!(1,model,f_Γ_in,"Gamma_in")
   update_labels!(2,model,f_Γ_out,"Gamma_out")
   update_labels!(3,model,f_Γ_D,"Gamma_D")
@@ -65,10 +65,10 @@ function main(mesh_partition,distribute,el_size)
   U_reg = TrialFESpace(V_reg,[0,0])
 
   ## Create FE functions
-  lsf_fn = x -> min(gen_lsf(4,0.2)(x),sqrt(x[1]^2+(x[2]-0.5)^2+x[3]^2)-0.3,
-    sqrt(x[1]^2+(x[2]-0.5)^2+(x[3]-1)^2)-0.3)
+  # lsf_fn = x -> min(gen_lsf(4,0.1)(x),sqrt(x[1]^2+(x[2]-0.5)^2+x[3]^2)-0.3,
+  #   sqrt(x[1]^2+(x[2]-0.5)^2+(x[3]-1)^2)-0.3)
 
-  φh = interpolate(lsf_fn,V_φ);
+  φh = interpolate(gen_lsf(4,0.1),V_φ);
   φ = get_free_dof_values(φh)
 
   ## Interpolation and weak form
@@ -113,7 +113,7 @@ function main(mesh_partition,distribute,el_size)
   ## Optimiser
   make_dir(path;ranks=ranks)
   optimiser = HilbertianProjection(φ,pcfs,stencil,vel_ext,interp,el_size,γ,γ_reinit;
-    verbose=ranks,α_min=0.5,ls_γ_min=0.01);
+    verbose=ranks,α_min=0.1,ls_γ_min=0.01);
   for history in optimiser
     it,Ji,Ci = last(history)
     γ = optimiser.γ_cache[1]
@@ -131,10 +131,10 @@ function main(mesh_partition,distribute,el_size)
 end
 
 with_mpi() do distribute
-  mesh_partition = (3,3,2)
-  el_size = (64,64,64)
-  # mesh_partition = (5,4,4)
-  # el_size = (100,100,100)
+  # mesh_partition = (3,3,2)
+  # el_size = (64,64,64)
+  mesh_partition = (5,4,4)
+  el_size = (100,100,100)
   hilb_solver_options = "-pc_type gamg -ksp_type cg -ksp_error_if_not_converged true 
     -ksp_converged_reason -ksp_rtol 1.0e-12 -mat_block_size 3
     -mg_levels_ksp_type chebyshev -mg_levels_esteig_ksp_type cg -mg_coarse_sub_pc_type cholesky"
