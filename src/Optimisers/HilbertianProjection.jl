@@ -309,9 +309,9 @@ function verbose_print(orthog,dV,dC,dC_orthog,K,λ,nullity,debug_code,verbose)
       if iszero(debug_code)
         println("      --> Constraints satisfied: ∑α² ≈ 0.")
       elseif isone(debug_code)
-        @printf("      --> ∑α² > α_max, scaling λ: %e\n",λ)
+        println("      -->            ∑α² > α_max: scaling λ")
       elseif isequal(debug_code,2)
-        @printf("      --> ∑α² < α_max, scaling λ: %e\n",λ)
+        println("      -->            ∑α² < α_max: scaling λ")
       end
       print("  ↳----------------------------------------------------------↲\n")
     end
