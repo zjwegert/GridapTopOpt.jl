@@ -27,7 +27,7 @@ function main(mesh_partition,distribute,el_size)
   tol = 1/(order^2*10)*prod(inv,minimum(el_size))
   η_coeff = 2;
   α_coeff = 4;
-  path = "./Results/MPI_main_3d_nonlinear"
+  path = "./results/MPI_main_3d_nonlinear"
 
   ## FE Setup
   model = CartesianDiscreteModel(ranks,mesh_partition,dom,el_size);

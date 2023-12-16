@@ -23,7 +23,7 @@ function main()
   C = isotropic_2d(1.,0.3);
   η_coeff = 2;
   α_coeff = 4;
-  path = "./Results/main_inverse_homogenisation_ALM"
+  path = "./results/main_inverse_homogenisation_ALM"
 
   ## FE Setup
   model = CartesianDiscreteModel(dom,el_size,isperiodic=(true,true));

@@ -26,7 +26,7 @@ function main(mesh_partition,distribute,el_size)
   D = 1;
   η_coeff = 2;
   α_coeff = 4;
-  path = "./Results/MPI_main_3d"
+  path = "./results/MPI_main_3d"
 
   ## FE Setup
   model = CartesianDiscreteModel(ranks,mesh_partition,dom,el_size);

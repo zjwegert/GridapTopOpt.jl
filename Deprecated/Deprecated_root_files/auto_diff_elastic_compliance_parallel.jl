@@ -96,7 +96,7 @@ function main(mesh_partition,distribute)
 
     hilb_abs_error = maximum(abs,dF_Ω-dF_analytic_Ω)
     hilb_rel_error = (hilb_abs_error)/maximum(abs,dF_analytic_Ω)
-    # path = "./Results/AutoDiffTesting_Parallel";
+    # path = "./results/AutoDiffTesting_Parallel";
     # writevtk(Ω,path,cellfields=["phi"=>φh,
     #     "H(phi)"=>(interp.H ∘ φh),
     #     "|nabla(phi))|"=>(norm ∘ ∇(φh)),

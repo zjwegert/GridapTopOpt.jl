@@ -107,7 +107,7 @@ function main(mesh_partition,distribute,el_size)
     ls=PETScLinearSolver())
   
   ## Optimiser
-  path = "./Results/MPI_main_3d_hyperelastic_compliance_neohook_NonSymmetric_xi=$ξ"
+  path = "./results/MPI_main_3d_hyperelastic_compliance_neohook_NonSymmetric_xi=$ξ"
   make_dir(path,ranks=ranks)
   optimiser = AugmentedLagrangian(φ,pcfs,stencil,vel_ext,interp,el_size,γ,γ_reinit);
   for history in optimiser

@@ -105,7 +105,7 @@ function main()
   vel_ext = VelocityExtension(a_hilb,U_reg,V_reg)
   
   ## Optimiser
-  path = "./Results/main_hyperelastic_compliance_neohook_NonSymmetric_xi=$ξ"
+  path = "./results/main_hyperelastic_compliance_neohook_NonSymmetric_xi=$ξ"
   make_dir(path)
   optimiser = AugmentedLagrangian(φ,pcfs,stencil,vel_ext,interp,el_size,γ,γ_reinit);
   for history in optimiser

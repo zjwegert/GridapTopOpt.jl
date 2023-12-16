@@ -18,7 +18,7 @@ function main()
   η_coeff = 2;
   α_coeff = 4;
   g = VectorValue(0,-1);
-  path = "./Results/minimum_length_scale"
+  path = "./results/minimum_length_scale"
 
   ## FE Setup
   model = CartesianDiscreteModel(dom,el_size);

@@ -26,7 +26,7 @@ function main_ALM()
   vf = 0.5;
   η_coeff = 2;
   α_coeff = 4;
-  path = "./Results/main_ALM"
+  path = "./results/main_ALM"
 
   ## FE Setup
   model = CartesianDiscreteModel(dom,el_size);

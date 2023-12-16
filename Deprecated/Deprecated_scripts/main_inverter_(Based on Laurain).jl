@@ -24,7 +24,7 @@ function main()
   C = isotropic_2d(1.0,0.3);
   η_coeff = 2;
   α_coeff = 4;
-  path = "./Results/main_inverter_mechanism"
+  path = "./results/main_inverter_mechanism"
 
   η_in = 2;
   η_out = 1;

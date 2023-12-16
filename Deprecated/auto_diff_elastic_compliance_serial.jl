@@ -197,7 +197,7 @@ v_J_Ω = solve(op)
 hilb_abs_error = abs(dϕh_Ω-v_J_Ω)
 hilb_rel_error = (abs(dϕh_Ω-v_J_Ω))/abs(v_J_Ω)
 
-path = "./Results/AutoDiffTesting";
+path = "./results/AutoDiffTesting";
 writevtk(Ω,path,cellfields=["phi"=>φh,
     "H(phi)"=>(interp.H ∘ φh),
     "|nabla(phi))|"=>(norm ∘ ∇(φh)),
