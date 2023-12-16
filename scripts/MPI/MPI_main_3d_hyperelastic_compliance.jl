@@ -1,8 +1,10 @@
 using Gridap, Gridap.MultiField, GridapDistributed, GridapPETSc, GridapSolvers, 
   PartitionedArrays, LSTO_Distributed, SparseMatricesCSR
 
+using Gridap.Algebra: NewtonRaphsonSolver
+
 """
-  (Serial) Minimum hyperelastic compliance with Lagrangian method in 2D.
+  (MPI) Minimum hyperelastic compliance with Lagrangian method in 3D.
 
   Optimisation problem:
     ...
@@ -14,11 +16,11 @@ function main(mesh_partition,distribute,el_size)
   order = 1;
   xmax,ymax,zmax=(2.0,1.0,1.0)
   prop_Γ_N = 0.4;
-  dom = (0,xmax,0,ymax,zmax);
+  dom = (0,xmax,0,ymax,0,zmax);
   γ = 0.1;
   γ_reinit = 0.5;
   max_steps = floor(Int,minimum(el_size)/3)
-  tol = 1/(order^2*10)*prod(inv,minimum(el_size))
+  tol = 1/(10order^2)*prod(inv,minimum(el_size)) # Conv with coeff 1 at 100x50x50, testing on Lyra
   η_coeff = 2;
   α_coeff = 4;
 
@@ -57,7 +59,7 @@ function main(mesh_partition,distribute,el_size)
   _E = 1000;
   ν = 0.3;
   μ, λ = _E/(2*(1 + ν)), _E*ν/((1 + ν)*(1 - 2*ν)) # Check these
-  g = VectorValue(0,0,-20)
+  g = VectorValue(0,0,-100)
   # Deformation gradient
   F(∇u) = one(∇u) + ∇u'
   J(F) = sqrt(det(C(F)))
@@ -86,7 +88,7 @@ function main(mesh_partition,distribute,el_size)
   Tm=SparseMatrixCSR{0,PetscScalar,PetscInt}
   Tv=Vector{PetscScalar}
   lin_solver = ElasticitySolver(V)
-  nl_solver = NewtonRaphsonSolver(lin_solver,10^-14,50)
+  nl_solver = NewtonRaphsonSolver(lin_solver,10^-10,50,ranks)
 
   state_map = NonlinearFEStateMap(res,U,V,V_φ,U_reg,φh,dΩ,dΓ_N;
     assem_U = SparseMatrixAssembler(Tm,Tv,U,V),
@@ -123,8 +125,8 @@ function main(mesh_partition,distribute,el_size)
 end
 
 with_mpi() do distribute
-  mesh_partition = (2,2,2)
-  el_size = (100,100,100)
+  mesh_partition = (7,5,5)
+  el_size = (200,100,100)
   hilb_solver_options = "-pc_type gamg -ksp_type cg -ksp_error_if_not_converged true 
     -ksp_converged_reason -ksp_rtol 1.0e-12 -mat_block_size 3
     -mg_levels_ksp_type chebyshev -mg_levels_esteig_ksp_type cg -mg_coarse_sub_pc_type cholesky"

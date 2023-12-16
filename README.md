@@ -11,8 +11,8 @@
   | Minimum elastic compliance        | &#9745; | &#9745; | &#9745;    | &#9745; |
   | Inverter mechanism                | &#9745; | &#9745;** | &#9745;    | &#9745;* |
   | Elastic inverse homogenisation    | &#9745; | &#9745;** | &#9745;    | &#9745; |
-  | Minimum NL thermal compliance     | &#9745; | &#9745;** | &#9745;    | &#9745;* |
-  | Minimum hyperelastic compliance   | &#9745; | &#9745;** | &#9745;    | &#9745;* |
+  | Minimum NL thermal compliance     | &#9745; | &#9745; | &#9745;    | &#9745;* |
+  | Minimum hyperelastic compliance   | &#9745; | &#9745; | &#9745;    | &#9745;* |
 
 *: 3D only.
 
@@ -37,7 +37,7 @@
 - [ ] There appears to be a memory leak in `write_vtk`.
 
 ## Other notes
-- [ ] PETSc's GAMG preconditioner breaks for split Dirichlet DoFs (e.g., x constrained while y free for a single node). There is no simple fix for this. I would recommend instead using MUMPS or another preconditioner.
+- PETSc's GAMG preconditioner breaks for split Dirichlet DoFs (e.g., x constrained while y free for a single node). There is no simple fix for this. I would recommend instead using MUMPS or another preconditioner.
 
 ## Some notes on auto differentiation
 

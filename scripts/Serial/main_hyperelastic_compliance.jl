@@ -1,6 +1,6 @@
 using Gridap, GridapDistributed, GridapPETSc, PartitionedArrays, LSTO_Distributed
 
-using LineSearches: BackTracking
+using Gridap.Algebra: NewtonRaphsonSolver
 
 """
   (Serial) Minimum hyperelastic compliance with Lagrangian method in 2D.
@@ -95,7 +95,7 @@ function main()
   reinit!(stencil,φ,γ_reinit)
 
   ## Setup solver and FE operators
-  nls = NLSolver(show_trace=true,method=:newton,linesearch=BackTracking(),iterations=50)  
+  nls = NewtonRaphsonSolver(BackslashSolver(),10^-10,50,true)  
   state_map = NonlinearFEStateMap(res,U,V,V_φ,U_reg,φh,dΩ,dΓ_N;nls=FESolver(nls))
   pcfs = PDEConstrainedFunctionals(Obj,state_map)
 
