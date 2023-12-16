@@ -30,7 +30,7 @@ function main()
   δₓ=0.75;
   ks = 0.01;
   g = VectorValue(1,0);
-  path = "./results/main_inverter_mechanism_HPM"
+  path = dirname(dirname(@__DIR__))*"/results/main_inverter_mechanism_HPM"
   
   ## FE Setup
   model = CartesianDiscreteModel(dom,el_size);

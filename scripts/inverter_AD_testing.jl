@@ -24,7 +24,7 @@ function main()
   C = isotropic_2d(1.0,0.3);
   η_coeff = 2;
   α_coeff = 4;
-  path = "./results/testing_inverter_AD"
+  path = dirname(dirname(@__DIR__))*"/results/testing_inverter_AD"
 
   η_in = 2;
   η_out = 1;

@@ -25,7 +25,7 @@ function main()
   tol = 1/(order^2*10)*prod(inv,minimum(el_size)) # <- We can do better than this I think
   η_coeff = 2;
   α_coeff = 4;
-  path = "./results/main_nonlinear"
+  path = dirname(dirname(@__DIR__))*"/results/main_nonlinear"
 
   ## FE Setup
   model = CartesianDiscreteModel(dom,el_size);

@@ -1,8 +1,6 @@
 using Gridap, Gridap.MultiField, GridapDistributed, GridapPETSc, GridapSolvers, 
   PartitionedArrays, LSTO_Distributed, SparseMatricesCSR
 
-using Gridap.Algebra: NewtonRaphsonSolver
-
 """
   (MPI) Minimum hyperelastic compliance with Lagrangian method in 3D.
 
@@ -88,7 +86,7 @@ function main(mesh_partition,distribute,el_size)
   Tm=SparseMatrixCSR{0,PetscScalar,PetscInt}
   Tv=Vector{PetscScalar}
   lin_solver = ElasticitySolver(V)
-  nl_solver = NewtonRaphsonSolver(lin_solver,10^-10,50,ranks)
+  nl_solver = NRSolver(lin_solver,10^-10,50,ranks)
 
   state_map = NonlinearFEStateMap(res,U,V,V_φ,U_reg,φh,dΩ,dΓ_N;
     assem_U = SparseMatrixAssembler(Tm,Tv,U,V),
@@ -107,7 +105,7 @@ function main(mesh_partition,distribute,el_size)
     ls=PETScLinearSolver())
   
   ## Optimiser
-  path = "./results/MPI_main_3d_hyperelastic_compliance_neohook_NonSymmetric_xi=$ξ"
+  path = dirname(dirname(@__DIR__))*"/results/MPI_main_3d_hyperelastic_compliance_neohook_NonSymmetric_xi=$ξ"
   make_dir(path,ranks=ranks)
   optimiser = AugmentedLagrangian(φ,pcfs,stencil,vel_ext,interp,el_size,γ,γ_reinit);
   for history in optimiser

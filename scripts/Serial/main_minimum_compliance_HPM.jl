@@ -25,7 +25,7 @@ function main()
   η_coeff = 2;
   α_coeff = 4;
   g = VectorValue(0,-1);
-  path = "./results/main_minimum_compliance_HPM"
+  path = dirname(dirname(@__DIR__))*"/results/main_minimum_compliance_HPM"
 
   ## FE Setup
   model = CartesianDiscreteModel(dom,el_size);

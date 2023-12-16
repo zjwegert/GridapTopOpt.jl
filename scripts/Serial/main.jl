@@ -24,7 +24,7 @@ function main()
   D = 1;
   η_coeff = 2;
   α_coeff = 4;
-  path = "./results/main"
+  path = dirname(dirname(@__DIR__))*"/results/main"
 
   ## FE Setup
   model = CartesianDiscreteModel(dom,el_size);

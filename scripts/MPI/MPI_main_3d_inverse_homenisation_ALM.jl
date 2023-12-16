@@ -25,7 +25,7 @@ function main(mesh_partition,distribute,el_size)
   C = isotropic_3d(1.,0.3);
   η_coeff = 2;
   α_coeff = 4;
-  path = "./results/MPI_main_3d_inverse_homenisation_ALM"
+  path = dirname(dirname(@__DIR__))*"/results/MPI_main_3d_inverse_homenisation_ALM"
 
   ## FE Setup
   model = CartesianDiscreteModel(ranks,mesh_partition,dom,el_size,isperiodic=(true,true,true));

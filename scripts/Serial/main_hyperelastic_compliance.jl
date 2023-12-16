@@ -1,7 +1,5 @@
 using Gridap, GridapDistributed, GridapPETSc, PartitionedArrays, LSTO_Distributed
 
-using Gridap.Algebra: NewtonRaphsonSolver
-
 """
   (Serial) Minimum hyperelastic compliance with Lagrangian method in 2D.
 
@@ -95,8 +93,7 @@ function main()
   reinit!(stencil,φ,γ_reinit)
 
   ## Setup solver and FE operators
-  nls = NewtonRaphsonSolver(BackslashSolver(),10^-10,50,true)  
-  state_map = NonlinearFEStateMap(res,U,V,V_φ,U_reg,φh,dΩ,dΓ_N;nls=FESolver(nls))
+  state_map = NonlinearFEStateMap(res,U,V,V_φ,U_reg,φh,dΩ,dΓ_N)
   pcfs = PDEConstrainedFunctionals(Obj,state_map)
 
   ## Hilbertian extension-regularisation problems
@@ -105,7 +102,7 @@ function main()
   vel_ext = VelocityExtension(a_hilb,U_reg,V_reg)
   
   ## Optimiser
-  path = "./results/main_hyperelastic_compliance_neohook_NonSymmetric_xi=$ξ"
+  path = dirname(dirname(@__DIR__))*"/results/main_hyperelastic_compliance_neohook_NonSymmetric_xi=$ξ"
   make_dir(path)
   optimiser = AugmentedLagrangian(φ,pcfs,stencil,vel_ext,interp,el_size,γ,γ_reinit);
   for history in optimiser

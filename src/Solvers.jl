@@ -239,3 +239,98 @@ end
 function LinearAlgebra.ldiv!(x,ns::BlockDiagonalPreconditionerNS,b)
   solve!(x,ns,b)
 end
+
+"""
+  NRSolver
+
+  Vanilla Newton-Raphson method modified from Gridap implementation
+"""
+struct NRSolver <: NonlinearSolver
+  ls::LinearSolver
+  tol::Float64
+  max_nliters::Int
+  debug
+end
+
+NRSolver(ls::LinearSolver,tol::Float64,max_nliters::Int) = 
+  NRSolver(ls,tol,max_nliters,nothing)
+
+struct NRCache <: GridapType
+  A::AbstractMatrix
+  b::AbstractVector
+  dx::AbstractVector
+  ns::NumericalSetup
+end
+
+function solve!(x::AbstractVector,nls::NRSolver,op::NonlinearOperator,cache::Nothing)
+  b = residual(op, x)
+  A = jacobian(op, x)
+  dx = similar(b)
+  ss = symbolic_setup(nls.ls, A)
+  ns = numerical_setup(ss,A)
+  _solve_nr!(x,A,b,dx,ns,nls,op)
+  NRCache(A,b,dx,ns)
+end
+
+function solve!(
+  x::AbstractVector,nls::NRSolver,op::NonlinearOperator,cache::NRCache)
+  b = cache.b
+  A = cache.A
+  dx = cache.dx
+  ns = cache.ns
+  residual!(b, op, x)
+  jacobian!(A, op, x)
+  numerical_setup!(ns,A)
+  _solve_nr!(x,A,b,dx,ns,nls,op)
+  cache
+end
+
+function _solve_nr!(x,A,b,dx,ns,nls,op)
+
+  # Check for convergence on the initial residual
+  isconv, conv0 = _check_convergence(nls,b)
+  debug_print(0,conv0,nls.debug)
+  if isconv; return; end
+
+  # Newton-like iterations
+  for nliter in 1:nls.max_nliters
+
+    # Solve linearized problem
+    rmul!(b,-1)
+    solve!(dx,ns,b)
+    x .+= dx
+
+    # Check convergence for the current residual
+    residual!(b, op, x)
+    isconv,conv = _check_convergence(nls, b, conv0)
+    debug_print(nliter,conv,nls.debug)
+    if isconv; return; end
+
+    if nliter == nls.max_nliters
+      @unreachable
+    end
+
+    # Assemble jacobian (fast in-place version)
+    # and prepare solver
+    jacobian!(A, op, x)
+    numerical_setup!(ns,A)
+
+  end
+
+end
+
+function _check_convergence(nls,b)
+  m0 = maximum(abs,b)
+  return m0 < nls.tol, m0
+end
+
+function _check_convergence(nls,b,m0)
+  m = maximum(abs,b)
+  return m < nls.tol * m0, m
+end
+
+function debug_print(iter,conv,debug)
+  if ~isnothing(debug) && i_am_main(debug)
+    println("  $iter NewtonRaphson Function norm ",conv)
+  end
+end

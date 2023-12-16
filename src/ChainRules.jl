@@ -275,7 +275,7 @@ struct NonlinearFEStateMap{A,B<:Tuple,C<:Tuple,D<:Tuple,E<:Tuple,F<:Tuple} <: LS
       assem_U = SparseMatrixAssembler(U,V),
       assem_adjoint = SparseMatrixAssembler(V,U),
       assem_deriv = SparseMatrixAssembler(U_reg,U_reg),
-      nls = NLSolver(),
+      nls::NonlinearSolver = NRSolver(LUSolver(),10^-10,50,true),
       adjoint_ls::LinearSolver = LUSolver()) where {A}
     
     spaces = (U,V,V_φ,U_reg)

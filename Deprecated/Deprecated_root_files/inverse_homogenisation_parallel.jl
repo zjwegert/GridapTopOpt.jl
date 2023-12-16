@@ -110,7 +110,7 @@ function main(mesh_partition,distribute)
     post_hilb_abs_error = maximum(abs,dF_Ω-dF_analytic_Ω)
     post_hilb_rel_error = maximum(abs,dF_Ω-dF_analytic_Ω)/maximum(abs,dF_analytic_Ω)
 
-    path = "./results/InvHomLE_AutoDiffTesting_Parallel";
+    path = dirname(dirname(@__DIR__))*"/results/InvHomLE_AutoDiffTesting_Parallel";
     writevtk(Ω,path,cellfields=["phi"=>φh,
         "H(phi)"=>(interp.H ∘ φh),
         "|nabla(phi))|"=>(norm ∘ ∇(φh)),

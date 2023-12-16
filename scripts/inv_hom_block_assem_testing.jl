@@ -20,7 +20,7 @@ tol = 1/(order^2*10)*prod(inv,minimum(el_size))
 C = isotropic_2d(1.,0.3);
 η_coeff = 2;
 α_coeff = 4;
-path = "./results/block_testing"
+path = dirname(dirname(@__DIR__))*"/results/block_testing"
 
 ## FE Setup
 model = CartesianDiscreteModel(ranks,(2,3),dom,el_size,isperiodic=(true,true));

@@ -15,7 +15,8 @@ using LinearAlgebra
 using CircularArrays
 using Printf
 
-import Gridap.Algebra: LinearSolver, SymbolicSetup
+import Gridap.solve!
+import Gridap.Algebra: LinearSolver, SymbolicSetup, NonlinearSolver
 import Gridap.Geometry: get_faces
 import GridapPETSc: PetscScalar, PetscInt, PETSC,  @check_error_code
 import GridapDistributed: DistributedDiscreteModel, DistributedTriangulation, 
@@ -59,6 +60,7 @@ include("Solvers.jl")
 export ElasticitySolver
 export BlockDiagonalPreconditioner
 export MUMPSSolver
+export NRSolver
 
 include("VelocityExtension.jl")
 export VelocityExtension
