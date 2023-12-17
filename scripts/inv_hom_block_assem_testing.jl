@@ -88,6 +88,7 @@ Base.length(::DistributedCellField) = 1;
 Base.length(a::DistributedMultiFieldFEBasis) = length(a.field_fe_basis);
 Base.length(a::MultiFieldCellField) = length(a.single_fields);
 Base.getindex(a::MultiFieldCellField,i::UnitRange) = a.single_fields[i]
+Base.getindex(a::DistributedMultiFieldFEBasis,i::UnitRange) = a.field_fe_basis[i]
 
 ## Assumptions
 # 1. Blocks down the diagonal are exactly the same
@@ -180,6 +181,21 @@ function _identical_diag_block_assemble!(A::AbstractMatrix,diag_block_axes::Unit
   return nothing
 end
 
+function BlockArrays.mortar(blocks::Matrix{<:PSparseMatrix})
+  rows = map(b->axes(b,1),blocks[:,1])
+  cols = map(b->axes(b,2),blocks[1,:])
+
+  function check_axes(a,r,c)
+    A = PartitionedArrays.matching_local_indices(axes(a,1),r)
+    B = PartitionedArrays.matching_local_indices(axes(a,2),c)
+    return A & B
+  end
+  # @check all(map(I -> check_axes(blocks[I],rows[I[1]],cols[I[2]]),CartesianIndices(size(blocks))))
+  # Jordi the above doesn't like when the blocks are set to be equal at later stage.
+
+  return GridapDistributed.BlockPMatrix(blocks,rows,cols)
+end
+
 #### New way
 ## Initialise op
 uhd = zero(U);
@@ -198,12 +214,41 @@ _assemble_matrix_and_vector!((u,v) -> a(u,v,φh,dΩ),v -> l(v,φh,dΩ),K,b,assem
 assemble_matrix!((u,v) -> a(v,u,φh,dΩ),adjoint_K,assem_adjoint,V,U)
 
 ### Test
-@time op = AffineFEOperator((u,v) -> a(u,v,φh,dΩ),v -> l(v,φh,dΩ),U,V,SparseMatrixAssembler(U,V))
-K_test = get_matrix(op);
-@assert K_test == K
+@time op_test = AffineFEOperator((u,v) -> a(u,v,φh,dΩ),v -> l(v,φh,dΩ),U,V,SparseMatrixAssembler(U,V))
+K_test = get_matrix(op_test);
 @show Base.summarysize(K)
 @show Base.summarysize(K_test)
 
-# # K.blocks[1,1].matrix_partition.items[:] .≈ full_A_cached.blocks[1,1].matrix_partition.items[:]
-# # K.blocks[2,2].matrix_partition.items[:] .≈ full_A_cached.blocks[2,2].matrix_partition.items[:]
-# # K.blocks[3,3].matrix_partition.items[:] .≈ full_A_cached.blocks[3,3].matrix_partition.items[:]
+if typeof(K_test) <: BlockArray
+  @assert K_test == K
+else
+  @assert all(K.blocks[1,1].matrix_partition.items[:] .≈ K_test.blocks[1,1].matrix_partition.items[:])
+  @assert all(K.blocks[2,2].matrix_partition.items[:] .≈ K_test.blocks[2,2].matrix_partition.items[:])
+  @assert all(K.blocks[3,3].matrix_partition.items[:] .≈ K_test.blocks[3,3].matrix_partition.items[:])
+end
+
+# # OLD
+# # # First iteration
+# # full_assem = DiagonalBlockMatrixAssembler(assem=SparseMatrixAssembler(U,V));
+# # full_du = get_trial_fe_basis(U);
+# # full_dv = get_fe_basis(V);
+# # full_matcontribs = a(full_du[diag_block_axes],full_dv[diag_block_axes],φh,dΩ)
+# # full_data = Gridap.FESpaces.collect_cell_matrix(U,V,full_matcontribs);
+# # @time full_A_cached = allocate_matrix(full_assem,full_data);
+# # Base.summarysize(full_A_cached)
+
+# # # nth iteration
+# # matcontribs = a(full_du[diag_block_axes],full_dv[diag_block_axes],φh,dΩ)
+# # data = Gridap.FESpaces.collect_cell_matrix(U,V,matcontribs);
+# # assemble_matrix!(full_A_cached,full_assem,data)
+
+# # blocks_size = size(full_A_cached.blocks,1);
+# # block_iter = blocks_size % last(diag_block_axes)
+# # @check iszero(block_iter) "Inconsistant number of blocks to match `diag_block_axes`: 
+# #     Expected to fit multiples of $diag_block_axes blocks into $(blocks_size)x$(blocks_size) block matrix."
+# # nothing
+
+# # for i ∈ Iterators.partition(last(diag_block_axes)+1:blocks_size,last(diag_block_axes))
+# #   full_A_cached.blocks[i,i] = full_A_cached.blocks[diag_block_axes,diag_block_axes]
+# # end
+# # Base.summarysize(full_A_cached)
