@@ -23,8 +23,8 @@ C = isotropic_2d(1.,0.3);
 path = dirname(dirname(@__DIR__))*"/results/block_testing"
 
 ## FE Setup
-# model = CartesianDiscreteModel(ranks,(2,3),dom,el_size,isperiodic=(true,true));
-model = CartesianDiscreteModel(dom,el_size,isperiodic=(true,true));
+model = CartesianDiscreteModel(ranks,(2,3),dom,el_size,isperiodic=(true,true));
+#model = CartesianDiscreteModel(dom,el_size,isperiodic=(true,true));
 Δ = get_Δ(model)
 f_Γ_D(x) = iszero(x)
 update_labels!(1,model,f_Γ_D,"origin")
@@ -252,3 +252,33 @@ end
 # #   full_A_cached.blocks[i,i] = full_A_cached.blocks[diag_block_axes,diag_block_axes]
 # # end
 # # Base.summarysize(full_A_cached)
+
+using SparseArrays
+using SparseMatricesCSR
+
+function zero_block(::Type{SparseMatrixCSC{Tv,Ti}},rows,cols) where {Tv,Ti}
+  m = length(rows)
+  n = length(cols)
+  return SparseMatrixCSC(m,n,fill(Ti(1),n+1),Ti[],Tv[])
+end
+
+function zero_block(::Type{SparseMatrixCSR{Tv,Ti}},rows,cols) where {Tv,Ti}
+  SparseMatrixCSR(transpose(zero_block(SparseMatrixCSC{Tv,Ti},cols,rows)))
+end
+
+function zero_block(::Type{<:PSparseMatrix{Tm}},rows,cols) where Tm
+  mats = map(partition(rows),partition(cols)) do rows,cols
+    zero_block(Tm,rows,cols)
+  end
+  return PSparseMatrix(mats,partition(rows),partition(cols))
+end
+
+rows = get_free_dof_ids(_V)
+cols = get_free_dof_ids(_U)
+
+T1 = SparseMatrixCSC{Float64,Int32}
+T2 = SparseMatrixCSR{Float64,Int32}
+T3 = PSparseMatrix{T1}
+zero_block(T3,rows,cols)
+T4 = PSparseMatrix{T2}
+zero_block(T4,rows,cols)
