@@ -1,6 +1,7 @@
 using Gridap, Gridap.MultiField, GridapDistributed, GridapPETSc, GridapSolvers, 
   PartitionedArrays, LSTO_Distributed, SparseMatricesCSR
 
+nothing
   
 np = (2,3);
 
@@ -23,8 +24,8 @@ C = isotropic_2d(1.,0.3);
 path = dirname(dirname(@__DIR__))*"/results/block_testing"
 
 ## FE Setup
-# model = CartesianDiscreteModel(ranks,(2,3),dom,el_size,isperiodic=(true,true));
-model = CartesianDiscreteModel(dom,el_size,isperiodic=(true,true));
+model = CartesianDiscreteModel(ranks,(2,3),dom,el_size,isperiodic=(true,true));
+# model = CartesianDiscreteModel(dom,el_size,isperiodic=(true,true));
 Δ = get_Δ(model)
 f_Γ_D(x) = iszero(x)
 update_labels!(1,model,f_Γ_D,"origin")
@@ -184,17 +185,30 @@ end
 function BlockArrays.mortar(blocks::Matrix{<:PSparseMatrix})
   rows = map(b->axes(b,1),blocks[:,1])
   cols = map(b->axes(b,2),blocks[1,:])
+  @show rows, cols
 
   function check_axes(a,r,c)
     A = PartitionedArrays.matching_local_indices(axes(a,1),r)
     B = PartitionedArrays.matching_local_indices(axes(a,2),c)
     return A & B
   end
-  # @check all(map(I -> check_axes(blocks[I],rows[I[1]],cols[I[2]]),CartesianIndices(size(blocks))))
+  @show map(I -> check_axes(blocks[I],rows[I[1]],cols[I[2]]),CartesianIndices(size(blocks)))
+  @check all(map(I -> check_axes(blocks[I],rows[I[1]],cols[I[2]]),CartesianIndices(size(blocks))))
   # Jordi the above doesn't like when the blocks are set to be equal at later stage.
 
   return GridapDistributed.BlockPMatrix(blocks,rows,cols)
 end
+
+K11 = K.blocks[1,1]
+K22 = K.blocks[2,2]
+
+K11_full = K_test.blocks[1,1]
+K22_full = K_test.blocks[2,2]
+
+_assemble_matrix_and_vector!((u,v) -> a(u,v,φh,dΩ),v -> l(v,φh,dΩ),K,b,assem,U,V,uhd)
+
+BlockArrays.mortar(K.blocks)
+
 
 #### New way
 ## Initialise op
