@@ -95,8 +95,6 @@ Base.getindex(a::MultiFieldCellField,i::UnitRange) = a.single_fields[i]
 #     these must correspond to `diag_block_axes` and
 #     be ordered in the manor they appear. E.g., ...
 # 3. The block ordering must not change via `BlockMultiFieldStyle`
-diag_block_axes = 1:1;
-
 Base.@kwdef struct DiagonalBlockMatrixAssembler{A<:Assembler} <: SparseMatrixAssembler 
   assem::A
   diag_block_axes::UnitRange{Int64} = 1:1
