@@ -98,7 +98,7 @@ Base.getindex(a::DistributedMultiFieldFEBasis,i::UnitRange) = a.field_fe_basis[i
 # 3. The block ordering must not change via `BlockMultiFieldStyle`
 Base.@kwdef struct DiagonalBlockMatrixAssembler{A<:Assembler} <: SparseMatrixAssembler 
   assem::A
-  diag_block_axes::UnitRange{Int64} = 1:1
+  diag_block_axes::UnitRange{Int64} = 1:1 # <- adjust so that user can't pass 'silly' unit ranges (e.g., starting from something other than zero) 
 end
 
 function  AffineFEOperator(
