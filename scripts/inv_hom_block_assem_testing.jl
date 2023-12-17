@@ -23,7 +23,8 @@ C = isotropic_2d(1.,0.3);
 path = dirname(dirname(@__DIR__))*"/results/block_testing"
 
 ## FE Setup
-model = CartesianDiscreteModel(ranks,(2,3),dom,el_size,isperiodic=(true,true));
+# model = CartesianDiscreteModel(ranks,(2,3),dom,el_size,isperiodic=(true,true));
+model = CartesianDiscreteModel(dom,el_size,isperiodic=(true,true));
 Δ = get_Δ(model)
 f_Γ_D(x) = iszero(x)
 update_labels!(1,model,f_Γ_D,"origin")
@@ -57,9 +58,8 @@ I,H,DH,ρ = interp.I,interp.H,interp.DH,interp.ρ
     TensorValue(0.,0.,0.,1.),     # ϵᵢⱼ⁽²²⁾≡ϵᵢⱼ⁽²⁾
     TensorValue(0.,1/2,1/2,0.))   # ϵᵢⱼ⁽¹²⁾≡ϵᵢⱼ⁽³⁾
 
-a(u,v,φ,dΩ) = ∫((I ∘ φ)*sum(C ⊙ ε(u[i]) ⊙ ε(v[i]) for i ∈ eachindex(εᴹ)))dΩ
-a_single(u,v,φ,dΩ) = ∫((I ∘ φ)*(C ⊙ ε(u) ⊙ ε(v)))dΩ
-l(v,φ,dΩ) = ∫(-(I ∘ φ)*sum(C ⊙ εᴹ[i] ⊙ ε(v[i]) for i ∈ eachindex(εᴹ)))dΩ;
+a(u,v,φ,dΩ) = ∫((I ∘ φ)*sum(C ⊙ ε(u[i]) ⊙ ε(v[i]) for i = 1:length(u)))dΩ
+l(v,φ,dΩ) = ∫(-(I ∘ φ)*sum(C ⊙ εᴹ[i] ⊙ ε(v[i]) for i ∈ 1:length(v)))dΩ;
 res(u,v,φ,dΩ) = a(u,v,φ,dΩ) - l(v,φ,dΩ)
 
 ## Optimisation functionals
@@ -78,34 +78,134 @@ reinit!(stencil,φ,γ_reinit)
 
 ## Special assembly option
 using BlockArrays
+using Gridap, Gridap.TensorValues, Gridap.Geometry, Gridap.FESpaces, 
+  Gridap.Helpers, Gridap.ReferenceFEs, Gridap.Algebra,  Gridap.CellData, Gridap.FESpaces
 
-assem = SparseMatrixAssembler(first(U),first(V));
-du = get_trial_fe_basis(first(U));
-dv = get_fe_basis(first(V));
-uhd = zero(first(U))
-matcontribs = a_single(du,dv,φh,dΩ);
-data = Gridap.FESpaces.collect_cell_matrix(first(U),first(V),matcontribs);
-@time A = assemble_matrix(assem,data);
+import GridapDistributed: DistributedCellField, DistributedMultiFieldFEBasis
+import Gridap.FESpaces: AffineFEOperator, assemble_matrix_and_vector, assemble_matrix!, assemble_matrix
 
-full_assem = SparseMatrixAssembler(U,V);
-full_du = get_trial_fe_basis(U);
-full_dv = get_fe_basis(V);
-full_uhd = zero(U);
-full_matcontribs = a(full_du,full_dv,φh,dΩ)
-full_data = Gridap.FESpaces.collect_cell_matrix(U,V,full_matcontribs);
-@time full_A = assemble_matrix(full_assem,full_data);
-# @time full_A = Gridap.FESpaces.allocate_matrix(full_assem,full_data);
+Base.length(::DistributedCellField) = 1;
+Base.length(a::DistributedMultiFieldFEBasis) = length(a.field_fe_basis);
+Base.length(a::MultiFieldCellField) = length(a.single_fields);
+Base.getindex(a::MultiFieldCellField,i::UnitRange) = a.single_fields[i]
 
-full_A_cached = zero(full_A);
-copy!(full_A_cached[Block(1,1)],A)
-full_A_cached[Block(2,2)] = full_A_cached[Block(1,1)]
-full_A_cached[Block(3,3)] = full_A_cached[Block(1,1)]
-full_A_cached[Block(2,2)] === full_A_cached[Block(1,1)]
-full_A_cached[Block(3,3)] === full_A_cached[Block(1,1)]
+## Assumptions
+# 1. Blocks down the diagonal are exactly the same
+# 2. If a diagonal block is made of several blocks 
+#     these must correspond to `diag_block_axes` and
+#     be ordered in the manor they appear. E.g., ...
+# 3. The block ordering must not change via `BlockMultiFieldStyle`
+diag_block_axes = 1:1;
 
-fill(full_A_cached,1);
+Base.@kwdef struct DiagonalBlockMatrixAssembler{A<:Assembler} <: SparseMatrixAssembler 
+  assem::A
+  diag_block_axes::UnitRange{Int64} = 1:1
+end
 
-full_A_cached == full_A
+function  AffineFEOperator(
+  a::Function,l::Function,trial::FESpace,test::FESpace,assem::DiagonalBlockMatrixAssembler)
+  @assert ! isa(test,TrialFESpace) """\n
+  It is not allowed to build an AffineFEOperator with a test space of type TrialFESpace.
 
-# op = AffineFEOperator((u,v) -> a(u,v,φh,dΩ),v -> l(v,φh,dΩ),U,V,SparseMatrixAssembler(U,V))
-# K = get_matrix(op);
+  Make sure that you are writing first the trial space and then the test space when
+  building an AffineFEOperator or a FEOperator.
+  """
+  A,b = assemble_matrix_and_vector(a,l,assem,trial,test)
+
+  AffineFEOperator(trial,test,A,b)
+end
+
+function assemble_matrix_and_vector(a::Function,l::Function,assem::DiagonalBlockMatrixAssembler,U::FESpace,V::FESpace)
+  diag_block_axes = assem.diag_block_axes
+  _assem = assem.assem
+
+  v = get_fe_basis(V)
+  u = get_trial_fe_basis(U)
+  uhd = zero(U)
+  matcontribs, veccontribs = a(u[diag_block_axes],v[diag_block_axes]),l(v)
+  data = collect_cell_matrix_and_vector(U,V,matcontribs,veccontribs,uhd);
+  A,b = assemble_matrix_and_vector(_assem,data)
+  _identical_diag_block_assemble!(A,diag_block_axes)
+
+  return A,b
+end
+
+function _assemble_matrix_and_vector!(a::Function,l::Function,A::AbstractMatrix,b::AbstractVector,assem::Assembler,U::FESpace,V::FESpace,uhd)
+  v = get_fe_basis(V)
+  u = get_trial_fe_basis(U)
+  assemble_matrix_and_vector!(A,b,assem,collect_cell_matrix_and_vector(U,V,a(u,v),l(v),uhd))
+end
+
+function _assemble_matrix_and_vector!(a::Function,l::Function,A::AbstractMatrix,b::AbstractVector,assem::DiagonalBlockMatrixAssembler,U::FESpace,V::FESpace,uhd)
+  diag_block_axes = assem.diag_block_axes
+  _assem = assem.assem
+  
+  v = get_fe_basis(V)
+  u = get_trial_fe_basis(U)
+  matcontribs, veccontribs = a(u[diag_block_axes],v[diag_block_axes]),l(v)
+  data = collect_cell_matrix_and_vector(U,V,matcontribs,veccontribs,uhd)
+  assemble_matrix_and_vector!(A,b,_assem,data)
+  _identical_diag_block_assemble!(A,diag_block_axes)
+end
+
+function assemble_matrix!(a::Function,A::AbstractMatrix,assem::DiagonalBlockMatrixAssembler,U::FESpace,V::FESpace)
+  diag_block_axes = assem.diag_block_axes
+  _assem = assem.assem
+  
+  v = get_fe_basis(V)
+  u = get_trial_fe_basis(U)
+  assemble_matrix!(A,_assem,collect_cell_matrix(U,V,a(u[diag_block_axes],v[diag_block_axes])))
+  _identical_diag_block_assemble!(A,diag_block_axes)
+end
+
+function assemble_matrix(a::Function,assem::DiagonalBlockMatrixAssembler,U::FESpace,V::FESpace)
+  diag_block_axes = assem.diag_block_axes
+  _assem = assem.assem
+  
+  v = get_fe_basis(V)
+  u = get_trial_fe_basis(U)
+  A = assemble_matrix(_assem,collect_cell_matrix(U,V,a(u[diag_block_axes],v[diag_block_axes])))
+  _identical_diag_block_assemble!(A,diag_block_axes)
+  return A
+end
+
+function _identical_diag_block_assemble!(A::AbstractMatrix,diag_block_axes::UnitRange)
+  @check typeof(A) <: BlockArrays.AbstractBlockArray "`DiagonalBlockMatrixAssembler` expects a block structure, recieved $(typeof(A))"
+  blocks_size = size(A.blocks,1);
+  block_iter = blocks_size % last(diag_block_axes)
+  @check iszero(block_iter) "Inconsistant number of blocks to match `diag_block_axes`: 
+      Expected to fit multiples of $diag_block_axes blocks into $(blocks_size)x$(blocks_size) block matrix."
+  
+  for i ∈ Iterators.partition(last(diag_block_axes)+1:blocks_size,last(diag_block_axes))
+    A.blocks[i,i] = A.blocks[diag_block_axes,diag_block_axes]
+  end
+  return nothing
+end
+
+#### New way
+## Initialise op
+uhd = zero(U);
+assem = DiagonalBlockMatrixAssembler(assem=SparseMatrixAssembler(U,V));
+@time op = AffineFEOperator((u,v) -> a(u,v,φh,dΩ),v -> l(v,φh,dΩ),U,V,assem);
+K = get_matrix(op); b = get_vector(op); 
+## Initialise adjoint
+assem_adjoint = DiagonalBlockMatrixAssembler(assem=SparseMatrixAssembler(V,U));
+adjoint_K = assemble_matrix((u,v) -> a(v,u,φh,dΩ),assem_adjoint,V,U);
+
+## Update mat and vec
+_assemble_matrix_and_vector!((u,v) -> a(u,v,φh,dΩ),v -> l(v,φh,dΩ),K,b,assem,U,V,uhd)
+# numerical_setup!(...)
+
+## Update adjoint
+assemble_matrix!((u,v) -> a(v,u,φh,dΩ),adjoint_K,assem_adjoint,V,U)
+
+### Test
+@time op = AffineFEOperator((u,v) -> a(u,v,φh,dΩ),v -> l(v,φh,dΩ),U,V,SparseMatrixAssembler(U,V))
+K_test = get_matrix(op);
+@assert K_test == K
+@show Base.summarysize(K)
+@show Base.summarysize(K_test)
+
+# # K.blocks[1,1].matrix_partition.items[:] .≈ full_A_cached.blocks[1,1].matrix_partition.items[:]
+# # K.blocks[2,2].matrix_partition.items[:] .≈ full_A_cached.blocks[2,2].matrix_partition.items[:]
+# # K.blocks[3,3].matrix_partition.items[:] .≈ full_A_cached.blocks[3,3].matrix_partition.items[:]
