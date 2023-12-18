@@ -65,15 +65,17 @@
 struct DiagonalBlockMatrixAssembler{A<:Assembler} <: SparseMatrixAssembler 
   assem::A
   diag_block_axes::UnitRange{Int64}
-  function DiagonalBlockMatrixAssembler(assem::A,diag_block_axes::UnitRange{Int64}=1:1) where A<:Assembler
+  pranges::Vector # <- Could do better than this TODO
+  function DiagonalBlockMatrixAssembler(assem::A;diag_block_axes::UnitRange{Int64}=1:1) where A<:Assembler
     @assert isone(first(diag_block_axes)) && last(diag_block_axes) >= first(diag_block_axes) 
-    new{A}(assem,diag_block_axes)
+    new{A}(assem,diag_block_axes,[])
   end
 end
 
-function _identical_diag_block_assemble!(A::AbstractMatrix,diag_block_axes::UnitRange)
+function _identical_diag_block_assemble!(A::AbstractMatrix,assem::DiagonalBlockMatrixAssembler)
   @check typeof(A) <: BlockArrays.AbstractBlockArray "`DiagonalBlockMatrixAssembler`"*
     " expects a block structure\n\n   Recieved $(typeof(A)).\n\n   Check that you are using `BlockMultiFieldStyle`"
+  diag_block_axes = assem.diag_block_axes
   blocks_size = size(A.blocks,1);
   block_iter = blocks_size % last(diag_block_axes)
   @check iszero(block_iter) "Inconsistant number of blocks to match `diag_block_axes`: 
@@ -89,9 +91,35 @@ function _identical_diag_block_assemble!(A::AbstractMatrix,diag_block_axes::Unit
     I.I ∈ _non_empty_blocks && continue
     A.blocks[I] = zero_block(eltype(A.blocks),axes(A.blocks[I[1],I[1]],1),axes(A.blocks[I[2],I[2]],2))
   end
+  # Track pranges
+  track_prange!(assem,A)
   # Checks that axes are consistant
   @check ~isnothing(mortar(A.blocks))
   return nothing
+end
+
+function _identical_diag_block_assemble!(A::AbstractMatrix,::AbstractVector,assem::DiagonalBlockMatrixAssembler)
+  _identical_diag_block_assemble!(A,assem)
+end
+
+function _identical_diag_block_assemble!(A::AbstractMatrix,b::BlockPVector,assem::DiagonalBlockMatrixAssembler)
+  _identical_diag_block_assemble!(A,assem)
+  for i ∈ axes(b.blocks,1)
+    if ~matching_ghost_indices(axes(A.blocks[i,i],2),axes(b.blocks[i],1))
+      b.blocks[i] = change_ghost(b.blocks[i],axes(A.blocks[i,i],2))
+    end
+  end
+end
+
+function track_prange!(assem::DiagonalBlockMatrixAssembler,A::BlockPMatrix)
+  ~isempty(assem.pranges) && return nothing
+  for i ∈ axes(A.blocks,1)
+    push!(assem.pranges,axes(A.blocks[i,i],2))
+  end
+end
+
+function track_prange!(::DiagonalBlockMatrixAssembler,::AbstractMatrix)
+  nothing
 end
 
 ## AffineFEOperator & Assemblers
@@ -119,7 +147,7 @@ function assemble_matrix_and_vector(
   matcontribs, veccontribs = a(u[diag_block_axes],v[diag_block_axes]),l(v)
   data = collect_cell_matrix_and_vector(U,V,matcontribs,veccontribs,uhd);
   A,b = assemble_matrix_and_vector(_assem,data)
-  _identical_diag_block_assemble!(A,diag_block_axes)
+  _identical_diag_block_assemble!(A,b,assem)
 
   return A,b
 end
@@ -132,7 +160,7 @@ function assemble_matrix!(
   v = get_fe_basis(V)
   u = get_trial_fe_basis(U)
   assemble_matrix!(A,_assem,collect_cell_matrix(U,V,a(u[diag_block_axes],v[diag_block_axes])))
-  _identical_diag_block_assemble!(A,diag_block_axes)
+  _identical_diag_block_assemble!(A,assem)
 end
 
 function assemble_matrix(
@@ -143,13 +171,32 @@ function assemble_matrix(
   v = get_fe_basis(V)
   u = get_trial_fe_basis(U)
   A = assemble_matrix(_assem,collect_cell_matrix(U,V,a(u[diag_block_axes],v[diag_block_axes])))
-  _identical_diag_block_assemble!(A,diag_block_axes)
+  _identical_diag_block_assemble!(A,assem)
   return A
 end
 
-allocate_vector(a::DiagonalBlockMatrixAssembler,data) = allocate_vector(a.assem,data)
-assemble_vector(a::DiagonalBlockMatrixAssembler,data) = assemble_vector(a.assem,data)
-assemble_vector!(b,a::DiagonalBlockMatrixAssembler,data) = assemble_vector!(b,a.assem,data)
+function allocate_vector(a::DiagonalBlockMatrixAssembler,data)
+  _change_block_ghosts!(allocate_vector(a.assem,data),a)
+end
+function assemble_vector(a::DiagonalBlockMatrixAssembler,data)
+  _change_block_ghosts!(assemble_vector(a.assem,data),a)
+end
+function assemble_vector!(b,a::DiagonalBlockMatrixAssembler,data)
+  assemble_vector!(b,a.assem,data)
+  _change_block_ghosts!(b,a)
+end
+
+function _change_block_ghosts!(b::BlockPVector,a::DiagonalBlockMatrixAssembler)
+  pranges = a.pranges
+  @check ~isempty(pranges) "You need to allocate the matrix before assembly."
+  for i ∈ axes(b.blocks,1)
+    b.blocks[i] = change_ghost(b.blocks[i],pranges[i])
+  end
+  b
+end
+function _change_block_ghosts!(::BlockArrays.BlockVector,::DiagonalBlockMatrixAssembler)
+  nothing
+end
 
 # Custom inplace assembler
 function _assemble_matrix_and_vector!(
@@ -169,7 +216,7 @@ function _assemble_matrix_and_vector!(
   matcontribs, veccontribs = a(u[diag_block_axes],v[diag_block_axes]),l(v)
   data = collect_cell_matrix_and_vector(U,V,matcontribs,veccontribs,uhd)
   assemble_matrix_and_vector!(A,b,_assem,data)
-  _identical_diag_block_assemble!(A,diag_block_axes)
+  _identical_diag_block_assemble!(A,b,assem)
 end
 
 ## Zero block assemble
@@ -198,3 +245,16 @@ Base.length(a::MultiFieldFEFunction) = length(a.single_fe_functions);
 Base.getindex(a::MultiFieldCellField,i::UnitRange) = a.single_fields[i]
 Base.getindex(a::DistributedMultiFieldFEBasis,i::UnitRange) = a.field_fe_basis[i]
 Base.getindex(a::MultiFieldFEFunction,i::UnitRange) = a.single_fe_functions[i]
+
+## Modify `allocate_in_domain` for testing
+function GridapDistributed.allocate_in_domain(matrix::BlockPMatrix)
+  V = Vector{eltype(matrix)}
+  y = allocate_in_domain(BlockPVector{V},matrix)
+
+  for i ∈ axes(y.blocks,1)
+    if ~matching_ghost_indices(axes(matrix.blocks[i,i],2),axes(y.blocks[i],1))
+      y.blocks[i] = change_ghost(y.blocks[i],axes(matrix.blocks[i,i],2))
+    end
+  end
+  y
+end

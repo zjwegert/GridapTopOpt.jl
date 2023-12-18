@@ -26,8 +26,9 @@ import Gridap.Geometry: get_faces
 import GridapPETSc: PetscScalar, PetscInt, PETSC,  @check_error_code
 import GridapDistributed: DistributedDiscreteModel, DistributedTriangulation, 
   DistributedFESpace, DistributedDomainContribution, to_parray_of_arrays,
-  allocate_in_domain, DistributedCellField, DistributedMultiFieldFEBasis
-import PartitionedArrays: getany, tuple_of_arrays
+  allocate_in_domain, DistributedCellField, DistributedMultiFieldFEBasis,
+  BlockPMatrix, BlockPVector, change_ghost
+import PartitionedArrays: getany, tuple_of_arrays, matching_ghost_indices
 
 include("ChainRules.jl")
 export PDEConstrainedFunctionals
