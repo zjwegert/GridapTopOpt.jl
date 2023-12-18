@@ -1,28 +1,31 @@
 using Gridap, GridapDistributed, GridapPETSc, PartitionedArrays, LSTO_Distributed
+using GridapSolvers: LinearSolvers
+using Gridap.MultiField: BlockMultiFieldStyle
 
 """
-  (Serial) Maximum bulk modulus inverse homogenisation with Lagrangian method in 2D.
+  (Serial) Maximum bulk modulus inverse homogenisation with augmented Lagrangian method in 2D.
 
   Optimisation problem:
-      Min J(Ω) = -κ(Ω) + ∫ ξ dΩ
+      Min J(Ω) = -κ(Ω)
         Ω
-    s.t., ⎡For unique εᴹᵢ, find uᵢ∈V=H¹ₚₑᵣ(Ω)ᵈ, 
+    s.t., Vol(Ω) = Vf,
+          ⎡For unique εᴹᵢ, find uᵢ∈V=H¹ₚₑᵣ(Ω)ᵈ, 
           ⎣∫ ∑ᵢ C ⊙ ε(uᵢ) ⊙ ε(vᵢ) dΩ = ∫ -∑ᵢ C ⊙ ε⁰ᵢ ⊙ ε(vᵢ) dΩ, ∀v∈V.
 """ 
-function main()
+function main(diag_block)
   ## Parameters
-  order = 1;
+  order = 2;
   xmax,ymax=(1.0,1.0)
   dom = (0,xmax,0,ymax);
   el_size = (200,200);
-  γ = 0.1;
+  γ = 0.05;
   γ_reinit = 0.5;
   max_steps = floor(Int,minimum(el_size)/10)
   tol = 1/(order^2*10)*prod(inv,minimum(el_size))
   C = isotropic_2d(1.,0.3);
   η_coeff = 2;
   α_coeff = 4;
-  path = dirname(dirname(@__DIR__))*"/results/main_inverse_homogenisation"
+  path = dirname(dirname(@__DIR__))*"/results/main_inverse_homogenisation_ALM"
 
   ## FE Setup
   model = CartesianDiscreteModel(dom,el_size,isperiodic=(true,true));
@@ -33,14 +36,16 @@ function main()
   ## Triangulations and measures
   Ω = Triangulation(model)
   dΩ = Measure(Ω,2order)
+  vol_D = sum(∫(1)dΩ)
 
   ## Spaces
   reffe = ReferenceFE(lagrangian,VectorValue{2,Float64},order)
   reffe_scalar = ReferenceFE(lagrangian,Float64,order)
   _V = TestFESpace(model,reffe;dirichlet_tags=["origin"])
   _U = TrialFESpace(_V,VectorValue(0.0,0.0))
-  U = MultiFieldFESpace([_U,_U,_U]);
-  V = MultiFieldFESpace([_V,_V,_V]);
+  mfs = BlockMultiFieldStyle()
+  U = MultiFieldFESpace([_U,_U,_U];style=mfs);
+  V = MultiFieldFESpace([_V,_V,_V];style=mfs);
   V_reg = V_φ = TestFESpace(model,reffe_scalar)
   U_reg = TrialFESpace(V_reg)
 
@@ -64,19 +69,38 @@ function main()
   ## Optimisation functionals
   _C(C,ε_p,ε_q) = C ⊙ ε_p ⊙ ε_q;
   _K(C,(u1,u2,u3),εᴹ) = (_C(C,ε(u1)+εᴹ[1],εᴹ[1]) + _C(C,ε(u2)+εᴹ[2],εᴹ[2]) + 2*_C(C,ε(u1)+εᴹ[1],εᴹ[2]))/4
-  _v_K(C,(u1,u2,u3),εᴹ) = (_C(C,ε(u1)+εᴹ[1],ε(u1)+εᴹ[1]) + _C(C,ε(u2)+εᴹ[2],ε(u2)+εᴹ[2]) + 2*_C(C,ε(u1)+εᴹ[1],ε(u2)+εᴹ[2]))/4   
+  _v_K(C,(u1,u2,u3),εᴹ) = (_C(C,ε(u1)+εᴹ[1],ε(u1)+εᴹ[1]) + _C(C,ε(u2)+εᴹ[2],ε(u2)+εᴹ[2]) + 2*_C(C,ε(u1)+εᴹ[1],ε(u2)+εᴹ[2]))/4    
 
-  ξ = 0.54983
-  J = (u,φ,dΩ) -> ∫(-(I ∘ φ)*_K(C,u,εᴹ) + ξ*(ρ ∘ φ))dΩ
-  dJ = (q,u,φ,dΩ) -> ∫((ξ - _v_K(C,u,εᴹ))*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ;
+  J = (u,φ,dΩ) -> ∫(-(I ∘ φ)*_K(C,u,εᴹ))dΩ
+  dJ = (q,u,φ,dΩ) -> ∫(-_v_K(C,u,εᴹ)*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ;
+  Vol = (u,φ,dΩ) -> ∫(((ρ ∘ φ) - 0.5)/vol_D)dΩ;
+  dVol = (q,u,φ,dΩ) -> ∫(1/vol_D*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
 
   ## Finite difference solver and level set function
   stencil = AdvectionStencil(FirstOrderStencil(2,Float64),model,V_φ,Δ./order,max_steps,tol)
   reinit!(stencil,φ,γ_reinit)
 
   ## Setup solver and FE operators
-  state_map = AffineFEStateMap(a,l,res,U,V,V_φ,U_reg,φh,dΩ)
-  pcfs = PDEConstrainedFunctionals(J,state_map,analytic_dJ=dJ)
+  P = LinearSolvers.JacobiLinearSolver()
+  pcg = LinearSolvers.CGSolver(P;rtol=10e-12,verbose=true)
+
+  assem = if diag_block
+    DiagonalBlockMatrixAssembler(SparseMatrixAssembler(U,V)) 
+  else
+    SparseMatrixAssembler(U,V)
+  end
+
+  state_map = AffineFEStateMap(a,l,res,U,V,V_φ,U_reg,φh,dΩ;
+    ls = pcg,
+    adjoint_ls = pcg,
+    assem_U=assem,
+    assem_adjoint=assem)
+  pcfs = PDEConstrainedFunctionals(J,[Vol],state_map;analytic_dJ=dJ,analytic_dC=[dVol])
+
+  J_init,C_init,dJ,dC = Gridap.evaluate!(pcfs,φ)
+  u_vec = pcfs.state_map.fwd_caches[4]
+
+  return pcfs,[J_init,C_init,dJ,dC],u_vec
 
   ## Hilbertian extension-regularisation problems
   α = α_coeff*maximum(Δ)
@@ -88,16 +112,39 @@ function main()
   optimiser = AugmentedLagrangian(φ,pcfs,stencil,vel_ext,interp,el_size,γ,γ_reinit);
   for history in optimiser
     it,Ji,Ci,Li = last(history)
-    print_history(it,["J"=>Ji])
+    λi = optimiser.λ; Λi = optimiser.Λ
+    print_history(it,["J"=>Ji,"C"=>Ci,"L"=>Li,"λ"=>λi,"Λ"=>Λi])
     write_history(history,path*"/history.csv")
     write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh))])
   end
   it,Ji,Ci,Li = last(optimiser.history)
-  print_history(it,["J"=>Ji])
+  λi = optimiser.λ; Λi = optimiser.Λ
+  print_history(it,["J"=>Ji,"C"=>Ci,"L"=>Li,"λ"=>λi,"Λ"=>Λi])
   write_history(optimiser.history,path*"/history.csv")
-  uhi = get_state(pcfs)
-  write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),
-    "|nabla(phi))|"=>(norm ∘ ∇(φh)),"uh1"=>uhi[1],"uh2"=>uhi[2],"uh3"=>uhi[3]];iter_mod=1)
+  write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh))];iter_mod=1)
 end
 
-main();
+using LinearAlgebra
+using BlockArrays
+function LinearAlgebra.diag(A::BlockArray)
+  @assert ndims(A) == 2 "diag only supports matrices currently"
+  _blk_axes = blockaxes(A);
+  blkrng = (_blk_axes[1]<_blk_axes[2]) ? _blk_axes[1] : _blk_axes[2] 
+
+  mortar(map(I->diag(A[I,I]),blkrng))
+end
+function Gridap.Algebra.numerical_setup!(ns::LinearSolvers.JacobiNumericalSetup, A::AbstractMatrix)
+  ns.inv_diag .= 1.0 ./ diag(A)
+end
+
+# The above is a crappy solver for this problem, use AMG instead (see MPI version)
+
+_PSFs,_OBJ_VALS,_U = main(false);
+_PSFs_diag,_OBJ_VALS_diag,_U_diag = main(true);
+
+
+
+_without = Base.summarysize(_PSFs.state_map.fwd_caches[2])
+_with = Base.summarysize(_PSFs_diag.state_map.fwd_caches[2])
+
+_with/_without

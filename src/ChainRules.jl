@@ -213,15 +213,13 @@ function (φ_to_u::AffineFEStateMap)(φ::T) where T <: AbstractVector
   a=φ_to_u.a
   l=φ_to_u.l
   dΩ = φ_to_u.dΩ
-  U,V,V_φ,U_reg = φ_to_u.spaces
+  U,V,V_φ,_ = φ_to_u.spaces
   ns,K,b,x,uhd,assem_U = φ_to_u.fwd_caches
   φh = FEFunction(V_φ,φ)
   
   ## Assemble and solve
-  du = get_trial_fe_basis(U)
-  dv = get_fe_basis(V);
-  data = collect_cell_matrix_and_vector(U,V,a(du,dv,φh,dΩ...),l(dv,φh,dΩ...),uhd)
-  assemble_matrix_and_vector!(K,b,assem_U,data)
+  _assemble_matrix_and_vector!((u,v) -> a(u,v,φh,dΩ...),v -> l(v,φh,dΩ...),
+    K,b,assem_U,U,V,uhd)
   numerical_setup!(ns,K)
   solve!(x,ns,b)
   x

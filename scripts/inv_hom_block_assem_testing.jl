@@ -77,155 +77,21 @@ dVol = (q,u,φ,dΩ) -> ∫(1/vol_D*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
 stencil = AdvectionStencil(FirstOrderStencil(2,Float64),model,V_φ,Δ./order,max_steps,tol);
 reinit!(stencil,φ,γ_reinit)
 
-## Special assembly option
-using BlockArrays
-using SparseArrays
-using SparseMatricesCSR
-using Gridap, Gridap.TensorValues, Gridap.Geometry, Gridap.FESpaces, 
-  Gridap.Helpers, Gridap.ReferenceFEs, Gridap.Algebra,  Gridap.CellData, Gridap.FESpaces
-
-import GridapDistributed: DistributedCellField, DistributedMultiFieldFEBasis
-import Gridap.FESpaces: AffineFEOperator, assemble_matrix_and_vector, assemble_matrix!, assemble_matrix
-
-Base.length(::DistributedCellField) = 1;
-Base.length(a::DistributedMultiFieldFEBasis) = length(a.field_fe_basis);
-Base.length(a::MultiFieldCellField) = length(a.single_fields);
-Base.getindex(a::MultiFieldCellField,i::UnitRange) = a.single_fields[i]
-Base.getindex(a::DistributedMultiFieldFEBasis,i::UnitRange) = a.field_fe_basis[i]
-
-## Assumptions
-# 1. Blocks down the diagonal are exactly the same
-# 2. If a diagonal block is made of several blocks 
-#     these must correspond to `diag_block_axes` and
-#     be ordered in the manor they appear. E.g., ...
-# 3. The block ordering must not change via `BlockMultiFieldStyle`
-Base.@kwdef struct DiagonalBlockMatrixAssembler{A<:Assembler} <: SparseMatrixAssembler 
-  assem::A
-  diag_block_axes::UnitRange{Int64} = 1:1 # <- adjust so that user can't pass 'silly' unit ranges (e.g., starting from something other than zero) 
-end
-
-function  AffineFEOperator(
-  a::Function,l::Function,trial::FESpace,test::FESpace,assem::DiagonalBlockMatrixAssembler)
-  @assert ! isa(test,TrialFESpace) """\n
-  It is not allowed to build an AffineFEOperator with a test space of type TrialFESpace.
-
-  Make sure that you are writing first the trial space and then the test space when
-  building an AffineFEOperator or a FEOperator.
-  """
-  A,b = assemble_matrix_and_vector(a,l,assem,trial,test)
-
-  AffineFEOperator(trial,test,A,b)
-end
-
-function assemble_matrix_and_vector(a::Function,l::Function,assem::DiagonalBlockMatrixAssembler,U::FESpace,V::FESpace)
-  diag_block_axes = assem.diag_block_axes
-  _assem = assem.assem
-
-  v = get_fe_basis(V)
-  u = get_trial_fe_basis(U)
-  uhd = zero(U)
-  matcontribs, veccontribs = a(u[diag_block_axes],v[diag_block_axes]),l(v)
-  data = collect_cell_matrix_and_vector(U,V,matcontribs,veccontribs,uhd);
-  A,b = assemble_matrix_and_vector(_assem,data)
-  _identical_diag_block_assemble!(A,diag_block_axes)
-
-  return A,b
-end
-
-function _assemble_matrix_and_vector!(a::Function,l::Function,A::AbstractMatrix,b::AbstractVector,assem::Assembler,U::FESpace,V::FESpace,uhd)
-  v = get_fe_basis(V)
-  u = get_trial_fe_basis(U)
-  assemble_matrix_and_vector!(A,b,assem,collect_cell_matrix_and_vector(U,V,a(u,v),l(v),uhd))
-end
-
-function _assemble_matrix_and_vector!(a::Function,l::Function,A::AbstractMatrix,b::AbstractVector,assem::DiagonalBlockMatrixAssembler,U::FESpace,V::FESpace,uhd)
-  diag_block_axes = assem.diag_block_axes
-  _assem = assem.assem
-  
-  v = get_fe_basis(V)
-  u = get_trial_fe_basis(U)
-  matcontribs, veccontribs = a(u[diag_block_axes],v[diag_block_axes]),l(v)
-  data = collect_cell_matrix_and_vector(U,V,matcontribs,veccontribs,uhd)
-  assemble_matrix_and_vector!(A,b,_assem,data)
-  _identical_diag_block_assemble!(A,diag_block_axes)
-end
-
-function assemble_matrix!(a::Function,A::AbstractMatrix,assem::DiagonalBlockMatrixAssembler,U::FESpace,V::FESpace)
-  diag_block_axes = assem.diag_block_axes
-  _assem = assem.assem
-  
-  v = get_fe_basis(V)
-  u = get_trial_fe_basis(U)
-  assemble_matrix!(A,_assem,collect_cell_matrix(U,V,a(u[diag_block_axes],v[diag_block_axes])))
-  _identical_diag_block_assemble!(A,diag_block_axes)
-end
-
-function assemble_matrix(a::Function,assem::DiagonalBlockMatrixAssembler,U::FESpace,V::FESpace)
-  diag_block_axes = assem.diag_block_axes
-  _assem = assem.assem
-  
-  v = get_fe_basis(V)
-  u = get_trial_fe_basis(U)
-  A = assemble_matrix(_assem,collect_cell_matrix(U,V,a(u[diag_block_axes],v[diag_block_axes])))
-  _identical_diag_block_assemble!(A,diag_block_axes)
-  return A
-end
-
-function zero_block(::Type{SparseMatrixCSC{Tv,Ti}},rows,cols) where {Tv,Ti}
-  m = length(rows)
-  n = length(cols)
-  return SparseMatrixCSC(m,n,fill(Ti(1),n+1),Ti[],Tv[])
-end
-
-function zero_block(::Type{SparseMatrixCSR{Tv,Ti}},rows,cols) where {Tv,Ti}
-  SparseMatrixCSR(transpose(zero_block(SparseMatrixCSC{Tv,Ti},cols,rows)))
-end
-
-function zero_block(::Type{<:PSparseMatrix{Tm}},rows,cols) where Tm
-  mats = map(partition(rows),partition(cols)) do rows,cols
-    zero_block(Tm,rows,cols)
-  end
-  return PSparseMatrix(mats,partition(rows),partition(cols))
-end
-
-function _identical_diag_block_assemble!(A::AbstractMatrix,diag_block_axes::UnitRange)
-  @check typeof(A) <: BlockArrays.AbstractBlockArray "`DiagonalBlockMatrixAssembler` expects a block structure, recieved $(typeof(A))"
-  blocks_size = size(A.blocks,1);
-  block_iter = blocks_size % last(diag_block_axes)
-  @check iszero(block_iter) "Inconsistant number of blocks to match `diag_block_axes`: 
-      Expected to fit multiples of $diag_block_axes blocks into $(blocks_size)x$(blocks_size) block matrix."
-  # Set diagonal
-  for i ∈ Iterators.partition(last(diag_block_axes)+1:blocks_size,last(diag_block_axes))
-    A.blocks[i,i] = A.blocks[diag_block_axes,diag_block_axes]
-  end
-  # Allocate empty blocks 
-  _blocks = Iterators.partition(Base.OneTo(blocks_size),last(diag_block_axes))
-  _non_empty_blocks = Iterators.flatten(Iterators.product.(_blocks,_blocks))
-  for I ∈ CartesianIndices(A.blocks)
-    I.I ∈ _non_empty_blocks && continue
-    A.blocks[I] = zero_block(eltype(A.blocks),axes(A.blocks[I[1],I[1]],1),axes(A.blocks[I[2],I[2]],2))
-  end
-  # Checks that axes are consistant
-  @check ~isnothing(mortar(A.blocks))
-  return nothing
-end
-
-#### New way
 ## Initialise op
 uhd = zero(U);
-assem = DiagonalBlockMatrixAssembler(assem=SparseMatrixAssembler(U,V));
+assem = DiagonalBlockMatrixAssembler(SparseMatrixAssembler(U,V));
 @time op = AffineFEOperator((u,v) -> a(u,v,φh,dΩ),v -> l(v,φh,dΩ),U,V,assem);
 K = get_matrix(op); b = get_vector(op);
 ## Initialise adjoint
-assem_adjoint = DiagonalBlockMatrixAssembler(assem=SparseMatrixAssembler(V,U));
+assem_adjoint = DiagonalBlockMatrixAssembler(SparseMatrixAssembler(V,U));
 adjoint_K = assemble_matrix((u,v) -> a(v,u,φh,dΩ),assem_adjoint,V,U);
 
 ## Update mat and vec
-_assemble_matrix_and_vector!((u,v) -> a(u,v,φh,dΩ),v -> l(v,φh,dΩ),K,b,assem,U,V,uhd)
+LSTO_Distributed._assemble_matrix_and_vector!((u,v) -> a(u,v,φh,dΩ),v -> l(v,φh,dΩ),K,b,assem,U,V,uhd)
 # numerical_setup!(...)
 
 ## Update adjoint
-assemble_matrix!((u,v) -> a(v,u,φh,dΩ),adjoint_K,assem_adjoint,V,U)
+LSTO_Distributed.assemble_matrix!((u,v) -> a(v,u,φh,dΩ),adjoint_K,assem_adjoint,V,U)
 
 ### Test
 @time op_test = AffineFEOperator((u,v) -> a(u,v,φh,dΩ),v -> l(v,φh,dΩ),U,V,SparseMatrixAssembler(U,V))
@@ -233,6 +99,7 @@ K_test = get_matrix(op_test);
 @show Base.summarysize(K)
 @show Base.summarysize(K_test)
 
+using BlockArrays
 if typeof(K_test) <: BlockArray
   @assert K_test == K
 else
