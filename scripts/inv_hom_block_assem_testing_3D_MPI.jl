@@ -93,7 +93,7 @@ function main(mesh_partition,distribute,el_size,diag_assem::Bool)
   Tm=SparseMatrixCSR{0,PetscScalar,PetscInt}
   Tv=Vector{PetscScalar}
   P = BlockDiagonalPreconditioner(map(Vi -> ElasticitySolver(Vi),V))
-  solver = GridapSolvers.LinearSolvers.GMRESSolver(100;Pr=P,rtol=1.e-8,verbose=i_am_main(ranks))
+  solver = GridapSolvers.LinearSolvers.CGSolver(P;rtol=1.e-8,verbose=i_am_main(ranks))
 
   assem_U,assem_adjoint = if diag_assem
     DiagonalBlockMatrixAssembler(SparseMatrixAssembler(Tm,Tv,U,V)),
@@ -144,25 +144,22 @@ function main(mesh_partition,distribute,el_size,diag_assem::Bool)
   write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh))];iter_mod=1)
 end
 
-# RUN: mpiexecjl --project=. -n 64 julia ./scripts/MPI/MPI_main_inverse_homenisation_ALM.jl
+# RUN: mpiexecjl --project=. -n 6 julia ./scripts/inv_hom_block_assem_testing_3D_MPI.jl
 with_mpi() do distribute
-  mesh_partition = (3,2,2)
-  el_size = (40,40,40)
+  mesh_partition = (1,2,3)
+  el_size = (10,10,10)
   hilb_solver_options = "-pc_type gamg -ksp_type cg -ksp_error_if_not_converged true 
     -ksp_converged_reason -ksp_rtol 1.0e-12 -mat_block_size 3
     -mg_levels_ksp_type chebyshev -mg_levels_esteig_ksp_type cg -mg_coarse_sub_pc_type cholesky"
   
-  _PSFs,_OBJ_VALS,_U,T = GridapPETSc.with(args=split(hilb_solver_options)) do
-    main(mesh_partition,distribute,el_size,false)
-  end
+  GridapPETSc.with(args=split(hilb_solver_options)) do
+    _PSFs,_OBJ_VALS,_U,T = main(mesh_partition,distribute,el_size,false)
+    _PSFs_diag,_OBJ_VALS_diag,_U_diag,T_diag = main(mesh_partition,distribute,el_size,true)
 
-  _PSFs_diag,_OBJ_VALS_diag,_U_diag,T_diag = GridapPETSc.with(args=split(hilb_solver_options)) do
-    main(mesh_partition,distribute,el_size,true)
-  end
+    @show _OBJ_VALS==_OBJ_VALS_diag
+    @show _U == _U_diag
 
-  @show _OBJ_VALS==_OBJ_VALS_diag
-  @show _U == _U_diag
-
-  display(T)
-  display(T_diag)
+    display(T)
+    display(T_diag)
+  end  
 end;

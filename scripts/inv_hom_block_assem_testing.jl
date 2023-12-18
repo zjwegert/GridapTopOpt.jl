@@ -24,8 +24,8 @@ C = isotropic_2d(1.,0.3);
 path = dirname(dirname(@__DIR__))*"/results/block_testing"
 
 ## FE Setup
-# model = CartesianDiscreteModel(ranks,(2,3),dom,el_size,isperiodic=(true,true));
-model = CartesianDiscreteModel(dom,el_size,isperiodic=(true,true));
+model = CartesianDiscreteModel(ranks,(2,3),dom,el_size,isperiodic=(true,true));
+# model = CartesianDiscreteModel(dom,el_size,isperiodic=(true,true));
 Δ = get_Δ(model)
 f_Γ_D(x) = iszero(x)
 update_labels!(1,model,f_Γ_D,"origin")
@@ -79,9 +79,20 @@ reinit!(stencil,φ,γ_reinit)
 
 ## Initialise op
 uhd = zero(U);
-assem = DiagonalBlockMatrixAssembler(SparseMatrixAssembler(U,V));
+Tm=SparseMatrixCSR{0,PetscScalar,PetscInt}
+Tv=Vector{PetscScalar}
+assem = DiagonalBlockMatrixAssembler(SparseMatrixAssembler(Tm,Tv,U,V));
 @time op = AffineFEOperator((u,v) -> a(u,v,φh,dΩ),v -> l(v,φh,dΩ),U,V,assem);
 K = get_matrix(op); b = get_vector(op);
+x = GridapDistributed.allocate_in_domain(K);
+w = GridapDistributed.allocate_in_domain(K);
+### Testing mul!
+using LinearAlgebra: mul!
+LinearAlgebra.mul!(w,K,x)
+PartitionedArrays.matching_ghost_indices(axes(K.blocks[1,1],2),axes(x.blocks[1],1))
+PartitionedArrays.matching_ghost_indices(axes(K.blocks[2,2],2),axes(x.blocks[2],1))
+PartitionedArrays.matching_ghost_indices(axes(K.blocks[2,2],2),axes(x.blocks[1],1))
+
 ## Initialise adjoint
 assem_adjoint = DiagonalBlockMatrixAssembler(SparseMatrixAssembler(V,U));
 adjoint_K = assemble_matrix((u,v) -> a(v,u,φh,dΩ),assem_adjoint,V,U);

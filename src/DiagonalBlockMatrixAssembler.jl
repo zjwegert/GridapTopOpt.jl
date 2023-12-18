@@ -179,8 +179,8 @@ function zero_block(::Type{SparseMatrixCSC{Tv,Ti}},rows,cols) where {Tv,Ti}
   return SparseMatrixCSC(m,n,fill(Ti(1),n+1),Ti[],Tv[])
 end
 
-function zero_block(::Type{SparseMatrixCSR{Tv,Ti}},rows,cols) where {Tv,Ti}
-  SparseMatrixCSR(transpose(zero_block(SparseMatrixCSC{Tv,Ti},cols,rows)))
+function zero_block(::Type{SparseMatrixCSR{Bi,Tv,Ti}},rows,cols) where {Bi,Tv,Ti}
+  SparseMatrixCSR{Bi}(transpose(zero_block(SparseMatrixCSC{Tv,Ti},cols,rows)))
 end
 
 function zero_block(::Type{<:PSparseMatrix{Tm}},rows,cols) where Tm
