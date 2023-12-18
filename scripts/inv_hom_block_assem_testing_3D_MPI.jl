@@ -99,8 +99,8 @@ function main(mesh_partition,distribute,el_size,diag_assem::Bool)
     DiagonalBlockMatrixAssembler(SparseMatrixAssembler(Tm,Tv,U,V)),
       DiagonalBlockMatrixAssembler(SparseMatrixAssembler(Tm,Tv,V,U))
   else
-    SparseMatrixAssembler(Tm,Tv,V,U),
-      SparseMatrixAssembler(Tm,Tv,U_reg,U_reg)
+    SparseMatrixAssembler(Tm,Tv,U,V),
+      SparseMatrixAssembler(Tm,Tv,V,U)
   end
 
   state_map = AffineFEStateMap(a,l,res,U,V,V_φ,U_reg,φh,dΩ;
