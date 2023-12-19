@@ -9,7 +9,7 @@
   |:---------------------------------:|---------|---------|:----------:|---------|
   | Minimum thermal compliance        | &#9745; | &#9745; | &#9745;    | &#9745; |
   | Minimum elastic compliance        | &#9745; | &#9745; | &#9745;    | &#9745; |
-  | Inverter mechanism                | &#9745; | &#9745;** | &#9745;    | &#9745;* |
+  | Inverter mechanism                | &#9745; | &#9745; | &#9745;    | &#9745;* |
   | Elastic inverse homogenisation    | &#9745; | &#9745;** | &#9745;    | &#9745; |
   | Minimum NL thermal compliance     | &#9745; | &#9745; | &#9745;    | &#9745;* |
   | Minimum hyperelastic compliance   | &#9745; | &#9745; | &#9745;    | &#9745;* |
@@ -33,7 +33,7 @@
 - [x] `create_dof_permutation` doesn't work for periodic models.
 - [x] `MultiFieldFESpace` breaks `ElasticitySolver`
 - [x] `NonlinearFEStateMap` breaks in parallel due need for transpose of jacobian. This likely means there is also a bug in `AffineFEStateMap` when dealing with non-symmetric weak forms. See `scripts/nonlinear_adjoint_MWE.jl`
-- [ ] Inverse homogenisation problems over allocate the stiffness matrix. Only one stiffness matrix should be assembled, then we should create a larger block matrix from this.
+- [ ] Inverse homogenisation problems over allocate the stiffness matrix. Only one stiffness matrix should be assembled, then we should create a larger block matrix from this. `DiagonalBlockMatrixAssembler` is designed to help with this problem but there are ongoing issues that will be resolved in 2024 New Year.
 - [ ] There appears to be a memory leak in `write_vtk`.
 
 ## Other notes
