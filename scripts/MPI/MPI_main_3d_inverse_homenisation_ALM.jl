@@ -1,5 +1,6 @@
 using Gridap, Gridap.MultiField, GridapDistributed, GridapPETSc, GridapSolvers, 
   PartitionedArrays, LSTO_Distributed, SparseMatricesCSR
+using Gridap.MultiField: BlockMultiFieldStyle
 
 """
   (MPI) Maximum bulk modulus inverse homogenisation with augmented Lagrangian method in 3D.
@@ -43,8 +44,9 @@ function main(mesh_partition,distribute,el_size)
   reffe_scalar = ReferenceFE(lagrangian,Float64,order)
   _V = TestFESpace(model,reffe;dirichlet_tags=["origin"])
   _U = TrialFESpace(_V,VectorValue(0.0,0.0,0.0))
-  U = MultiFieldFESpace([_U,_U,_U,_U,_U,_U]);
-  V = MultiFieldFESpace([_V,_V,_V,_V,_V,_V]);
+  mfs = BlockMultiFieldStyle()
+  U = MultiFieldFESpace([_U,_U,_U,_U,_U,_U];style=mfs);
+  V = MultiFieldFESpace([_V,_V,_V,_V,_V,_V];style=mfs);
   V_reg = V_φ = TestFESpace(model,reffe_scalar)
   U_reg = TrialFESpace(V_reg)
 
@@ -64,8 +66,8 @@ function main(mesh_partition,distribute,el_size)
         TensorValue(0.,0.,1/2,0.,0.,0.,1/2,0.,0.),         # ϵᵢⱼ⁽¹³⁾≡ϵᵢⱼ⁽⁵⁾
         TensorValue(0.,1/2,0.,1/2,0.,0.,0.,0.,0.))         # ϵᵢⱼ⁽¹²⁾≡ϵᵢⱼ⁽⁶⁾
 
-  a(u,v,φ,dΩ) = ∫((I ∘ φ)*sum(C ⊙ ε(u[i]) ⊙ ε(v[i]) for i ∈ eachindex(εᴹ)))dΩ
-  l(v,φ,dΩ) = ∫(-(I ∘ φ)*sum(C ⊙ εᴹ[i] ⊙ ε(v[i]) for i ∈ eachindex(εᴹ)))dΩ;
+  a(u,v,φ,dΩ) = ∫((I ∘ φ)*sum(C ⊙ ε(u[i]) ⊙ ε(v[i]) for i = 1:length(u)))dΩ
+  l(v,φ,dΩ) = ∫(-(I ∘ φ)*sum(C ⊙ εᴹ[i] ⊙ ε(v[i]) for i = 1:length(v)))dΩ;
   res(u,v,φ,dΩ) = a(u,v,φ,dΩ) - l(v,φ,dΩ)
 
   ## Optimisation functionals
@@ -90,11 +92,11 @@ function main(mesh_partition,distribute,el_size)
   Tm=SparseMatrixCSR{0,PetscScalar,PetscInt}
   Tv=Vector{PetscScalar}
   P = BlockDiagonalPreconditioner(map(Vi -> ElasticitySolver(Vi),V))
-  solver = GridapSolvers.LinearSolvers.GMRESSolver(100;Pr=P,rtol=1.e-8,verbose=i_am_main(ranks))
+  solver = GridapSolvers.LinearSolvers.CGSolver(P;rtol=1.e-8,verbose=i_am_main(ranks))
 
   state_map = AffineFEStateMap(a,l,res,U,V,V_φ,U_reg,φh,dΩ;
-    assem_U = SparseMatrixAssembler(Tm,Tv,U,V),
-    assem_adjoint = SparseMatrixAssembler(Tm,Tv,V,U),
+    assem_U = DiagonalBlockMatrixAssembler(SparseMatrixAssembler(Tm,Tv,U,V)),
+    assem_adjoint = DiagonalBlockMatrixAssembler(SparseMatrixAssembler(Tm,Tv,V,U)),
     assem_deriv = SparseMatrixAssembler(Tm,Tv,U_reg,U_reg),
     ls=solver,
     adjoint_ls=solver)
@@ -124,9 +126,9 @@ function main(mesh_partition,distribute,el_size)
   write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh))];iter_mod=1)
 end
 
-# RUN: mpiexecjl --project=. -n 64 julia ./scripts/MPI/MPI_main_inverse_homenisation_ALM.jl
+# RUN: mpiexecjl --project=. -n 80 julia ./scripts/MPI/MPI_main_inverse_homenisation_ALM.jl
 with_mpi() do distribute
-  mesh_partition = (10,8,7)
+  mesh_partition = (5,4,4)
   el_size = (100,100,100)
   hilb_solver_options = "-pc_type gamg -ksp_type cg -ksp_error_if_not_converged true 
     -ksp_converged_reason -ksp_rtol 1.0e-12 -mat_block_size 3

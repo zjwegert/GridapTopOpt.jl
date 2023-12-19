@@ -48,7 +48,7 @@ U_reg = TrialFESpace(V_reg)
 
 ## Create FE functions
 lsf_fn = x->max(gen_lsf(2,0.4)(x),gen_lsf(2,0.4;b=VectorValue(0,0.5))(x));
-φh = interpolate(lsf_fn,V_φ);
+φh = interpolate(-1,V_φ);
 φ = get_free_dof_values(φh)
 
 ## Interpolation and weak form
@@ -84,8 +84,7 @@ Tv=Vector{PetscScalar}
 assem = DiagonalBlockMatrixAssembler(SparseMatrixAssembler(Tm,Tv,U,V));
 @time op = AffineFEOperator((u,v) -> a(u,v,φh,dΩ),v -> l(v,φh,dΩ),U,V,assem);
 K = get_matrix(op); b = get_vector(op);
-x = allocate_in_domain(K);
-w = allocate_in_domain(K);
+x = GridapDistributed.allocate_in_domain(K)
 
 ## Initialise adjoint
 assem_adjoint = DiagonalBlockMatrixAssembler(SparseMatrixAssembler(V,U));
@@ -100,7 +99,8 @@ LSTO_Distributed.assemble_matrix!((u,v) -> a(v,u,φh,dΩ),adjoint_K,assem_adjoin
 
 ### Test
 @time op_test = AffineFEOperator((u,v) -> a(u,v,φh,dΩ),v -> l(v,φh,dΩ),U,V,SparseMatrixAssembler(U,V))
-K_test = get_matrix(op_test);
+K_test = get_matrix(op_test); b_test=get_vector(op_test)
+x_test = GridapDistributed.allocate_in_domain(K_test)
 @show Base.summarysize(K)
 @show Base.summarysize(K_test)
 
@@ -111,4 +111,22 @@ else
   for I ∈ CartesianIndices(K.blocks)
     @assert K.blocks[I].matrix_partition.items[:] ≈ K_test.blocks[I].matrix_partition.items[:]
   end
+end
+
+## Solver
+options = "-pc_type gamg -ksp_type cg -ksp_error_if_not_converged true 
+  -ksp_converged_reason -ksp_rtol 1.0e-12 -mat_block_size 3
+  -mg_levels_ksp_type chebyshev -mg_levels_esteig_ksp_type cg -mg_coarse_sub_pc_type cholesky";
+
+GridapPETSc.with(args=split(options)) do
+  P = BlockDiagonalPreconditioner(map(Vi -> ElasticitySolver(Vi),V))
+  solver = GridapSolvers.LinearSolvers.CGSolver(P;rtol=1.e-8,verbose=i_am_main(ranks))
+  P2 = BlockDiagonalPreconditioner(map(Vi -> ElasticitySolver(Vi),V))
+  solver2 = GridapSolvers.LinearSolvers.CGSolver(P2;rtol=1.e-8,verbose=i_am_main(ranks))
+
+  @time ns = numerical_setup(symbolic_setup(solver,K),K)
+  @time ns_test = numerical_setup(symbolic_setup(solver2,K_test),K_test)
+
+  @time numerical_setup!(ns,K)
+  @time numerical_setup!(ns_test,K_test)
 end

@@ -109,16 +109,17 @@ function main(mesh_partition,distribute,el_size,diag_assem::Bool)
     assem_deriv = SparseMatrixAssembler(Tm,Tv,U_reg,U_reg),
     ls=solver,
     adjoint_ls=solver)
-  pcfs = PDEConstrainedFunctionals(J,[Vol],state_map;analytic_dJ=dJ,analytic_dC=[dVol])
-
-  J_init,C_init,dJ,dC = Gridap.evaluate!(pcfs,φ)
-  u_vec = pcfs.state_map.fwd_caches[4]
 
   tic!(t)
   state_map(φ)
   toc!(t,"Assembly and solve")
 
-  return pcfs,[J_init,C_init,dJ,dC],u_vec,t
+  pcfs = PDEConstrainedFunctionals(J,[Vol],state_map;analytic_dJ=dJ,analytic_dC=[dVol])
+
+  J_init,C_init,dJ,dC = Gridap.evaluate!(pcfs,φ)
+  u_vec = pcfs.state_map.fwd_caches[4]
+
+  return [J_init,C_init,dJ,dC],u_vec,t
 
   ## Hilbertian extension-regularisation problems
   α = α_coeff*maximum(Δ)
@@ -153,13 +154,16 @@ with_mpi() do distribute
     -mg_levels_ksp_type chebyshev -mg_levels_esteig_ksp_type cg -mg_coarse_sub_pc_type cholesky"
   
   GridapPETSc.with(args=split(hilb_solver_options)) do
-    _PSFs,_OBJ_VALS,_U,T = main(mesh_partition,distribute,el_size,false)
-    _PSFs_diag,_OBJ_VALS_diag,_U_diag,T_diag = main(mesh_partition,distribute,el_size,true)
+    main(mesh_partition,distribute,el_size,false)
+    main(mesh_partition,distribute,el_size,true)
+
+    _OBJ_VALS,_U,T = main(mesh_partition,distribute,el_size,false)
+    _OBJ_VALS_diag,_U_diag,T_diag = main(mesh_partition,distribute,el_size,true)
 
     @show _OBJ_VALS[1] - _OBJ_VALS_diag[1]
     @show _OBJ_VALS[2] - _OBJ_VALS_diag[2]
     @show maximum(abs,_OBJ_VALS[3] - _OBJ_VALS_diag[3])
-    @show maximum(abs,_U - _U_diag)
+    @show maximum(maximum.(abs,_U.blocks - _U_diag.blocks))
 
     display(T)
     display(T_diag)

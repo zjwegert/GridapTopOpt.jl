@@ -27,7 +27,7 @@ function main(mesh_partition,distribute,el_size)
   C = isotropic_2d(1.,0.3);
   η_coeff = 2;
   α_coeff = 4;
-  path = dirname(dirname(@__DIR__))*"/results/MPI_main_inverse_homenisation_ALM"
+  path = dirname(dirname(@__DIR__))*"/results/MPI_main_inverse_homenisation_ALM_no_diag"
 
   ## FE Setup
   model = CartesianDiscreteModel(ranks,mesh_partition,dom,el_size,isperiodic=(true,true));
@@ -65,8 +65,8 @@ function main(mesh_partition,distribute,el_size)
         TensorValue(0.,0.,0.,1.),     # ϵᵢⱼ⁽²²⁾≡ϵᵢⱼ⁽²⁾
         TensorValue(0.,1/2,1/2,0.))   # ϵᵢⱼ⁽¹²⁾≡ϵᵢⱼ⁽³⁾
 
-  a(u,v,φ,dΩ) = ∫((I ∘ φ)*sum(C ⊙ ε(u[i]) ⊙ ε(v[i]) for i ∈ eachindex(εᴹ)))dΩ
-  l(v,φ,dΩ) = ∫(-(I ∘ φ)*sum(C ⊙ εᴹ[i] ⊙ ε(v[i]) for i ∈ eachindex(εᴹ)))dΩ;
+  a(u,v,φ,dΩ) = ∫((I ∘ φ)*sum(C ⊙ ε(u[i]) ⊙ ε(v[i]) for i = 1:length(u)))dΩ
+  l(v,φ,dΩ) = ∫(-(I ∘ φ)*sum(C ⊙ εᴹ[i] ⊙ ε(v[i]) for i = 1:length(v)))dΩ;
   res(u,v,φ,dΩ) = a(u,v,φ,dΩ) - l(v,φ,dΩ)
 
   ## Optimisation functionals
@@ -90,8 +90,8 @@ function main(mesh_partition,distribute,el_size)
   solver = GridapSolvers.LinearSolvers.CGSolver(P;rtol=1.e-8,verbose=i_am_main(ranks))
   
   state_map = AffineFEStateMap(a,l,res,U,V,V_φ,U_reg,φh,dΩ;
-    assem_U = SparseMatrixAssembler(Tm,Tv,U,V),
-    assem_adjoint = SparseMatrixAssembler(Tm,Tv,V,U),
+    assem_U = DiagonalBlockMatrixAssembler(SparseMatrixAssembler(Tm,Tv,U,V)),
+    assem_adjoint = DiagonalBlockMatrixAssembler(SparseMatrixAssembler(Tm,Tv,V,U)),
     assem_deriv = SparseMatrixAssembler(Tm,Tv,U_reg,U_reg),
     ls=solver,
     adjoint_ls=solver)
