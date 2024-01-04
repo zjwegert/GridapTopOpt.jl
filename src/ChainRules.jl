@@ -174,7 +174,7 @@ function adjoint_solve!(φ_to_u::AbstractFEStateMap,du::AbstractVector)
 end
 
 function res_grad(φ_to_u::AbstractFEStateMap,uh,vh,φh)
-  @abstractmethod
+  @abstractmethod #TODO: please give me a better name
 end
 
 function res_grad(φ_to_u::AbstractFEStateMap,u::AbstractVector,v::AbstractVector,φ::AbstractVector)
@@ -403,6 +403,115 @@ function adjoint_solve!(φ_to_u::NonlinearFEStateMap,du::AbstractVector)
 end
 
 """
+  RepeatingAffineFEStateMap
+  #TODO: please give me a better name
+"""
+struct RepeatingAffineFEStateMap{A,B,C,D,E,F} <: AbstractFEStateMap
+  biform     :: A
+  liform     :: B
+  spaces     :: C
+  plb_caches :: D
+  fwd_caches :: E
+  adj_caches :: F
+
+  function RepeatingAffineFEStateMap(
+    nblocks::Int,a::Function,l::Vector{<:Function},
+    U0,V0,V_φ,U_reg,φh,dΩ...;
+    assem_U = SparseMatrixAssembler(U0,V0),
+    assem_adjoint = SparseMatrixAssembler(V0,U0),
+    assem_deriv = SparseMatrixAssembler(U_reg,U_reg),
+    ls::LinearSolver = LUSolver(),
+    adjoint_ls::LinearSolver = LUSolver()
+  )
+    @check nblocks == length(l)
+
+    biform  = IntegrandWithMeasure(a,dΩ)
+    liforms = map(li -> IntegrandWithMeasure(li,dΩ),l)
+    U = MultiFieldFESpace([U0 for i in 1:nblocks])
+    V = MultiFieldFESpace([V0 for i in 1:nblocks])
+    spaces = (U,V,V_φ,U_reg)
+
+    ## Pullback cache
+    uhd = zero(U0)
+    contr = nblocks * ∇(biform,[uhd,uhd,φh],3)
+    for liform in liforms
+      contr = contr - ∇(liform,[uhd,φh],2)
+    end
+    dφdu_vec = allocate_vector(assem_deriv,collect_cell_vector(U_reg,contr))
+    plb_caches = (dφdu_vec,assem_deriv)
+
+    ## Forward cache
+    K  = allocate_matrix((u,v) -> biform(u,v,φh),assem_U,U0,V0)
+    b  = allocate_in_range(K); fill!(b,zero(eltype(b)))
+    b0 = allocate_in_range(K); fill!(b0,zero(eltype(b0)))
+    x  = mortar(map(i -> allocate_in_domain(K)), 1:nblocks); fill!(x,zero(eltype(x)))
+    ns = numerical_setup(symbolic_setup(ls,K),K)
+    fwd_caches = (ns,K,b,x,uhd,assem_U,b0)
+
+    ## Adjoint cache
+    adjoint_K  = assemble_matrix((u,v)->biform(v,u,φh),assem_adjoint,V0,U0)
+    adjoint_x  = mortar(map(i -> allocate_in_domain(adjoint_K)), 1:nblocks); fill!(adjoint_x,zero(eltype(adjoint_x)))
+    adjoint_ns = numerical_setup(symbolic_setup(adjoint_ls,adjoint_K),adjoint_K)
+    adj_caches = (adjoint_ns,adjoint_K,adjoint_x,assem_adjoint)
+
+    A,B,C = typeof(biform), typeof(liforms), typeof(spaces)
+    D,E,F = typeof(plb_caches),typeof(fwd_caches), typeof(adj_caches)
+    return new{A,B,C,D,E,F}(biform,liforms,spaces,plb_caches,fwd_caches,adj_caches)
+  end
+end
+
+function forward_solve(φ_to_u::RepeatingAffineFEStateMap,φh)
+  biform, liforms = φ_to_u.biform, φ_to_u.liform
+  U, V, _, _ = φ_to_u.spaces
+  ns, K, b, x, uhd, assem_U, b0 = φ_to_u.fwd_caches
+  U0, V0 = first(U), first(V)
+
+  a_fwd(u,v) = biform(u,v,φh)
+  assemble_matrix!(a_fwd,K,assem_U,U0,V0)
+  numerical_setup!(ns,K)
+
+  l0_fwd(v) = a_fwd(uhd,v)
+  assemble_vector!(l0_fwd,b0,assem_U,V)
+  rmul!(b0,-1)
+
+  v = get_fe_basis(V0)
+  map(blocks(x),liforms) do xi, li
+    copy!(b,b0)
+    vecdata = collect_cell_vector(V,li(v,φh))
+    assemble_vector_add!(b,assem_U,vecdata)
+    solve!(xi,ns,b)
+  end
+  return x
+end
+
+function res_grad(φ_to_u::RepeatingAffineFEStateMap,uh,vh,φh)
+  biform, liforms = φ_to_u.biform, φ_to_u.liform
+
+  res = DomainContribution() # TODO: This will blow up in parallel, needs trick from ODE refactoring branch
+  for (liform,uhi,vhi) in zip(liforms,uh,vh)
+    res = res + ∇(biform,[uhi,vhi,φh],3) - ∇(liform,[vhi,φh],2)
+  end
+  return res
+end
+
+function update_adjoint_caches!(φ_to_u::RepeatingAffineFEStateMap,uh,φh)
+  adjoint_ns, adjoint_K, _, assem_adjoint = φ_to_u.adj_caches
+  U, V, _, _ = φ_to_u.spaces
+  U0, V0 = first(U), first(V)
+  assemble_matrix!((u,v) -> φ_to_u.biform(v,u,φh),adjoint_K,assem_adjoint,V0,U0)
+  numerical_setup!(adjoint_ns,adjoint_K)
+  return φ_to_u.adj_caches
+end
+
+function adjoint_solve!(φ_to_u::RepeatingAffineFEStateMap,du::AbstractVector)
+  adjoint_ns, _, adjoint_x, _ = φ_to_u.adj_caches
+  map(blocks(adjoint_x),du) do xi, dui
+    solve!(xi,adjoint_ns,dui)
+  end
+  return adjoint_x
+end
+
+"""
   PDEConstrainedFunctionals
 """
 struct PDEConstrainedFunctionals{N,A}
@@ -473,9 +582,9 @@ function _evaluate_derivatives(pcf::PDEConstrainedFunctionals,φ::T) where T <: 
 
   function ∇!(F::StateParamIntegrandWithMeasure,dF,::Nothing)
     # Automatic differentation
-    j_val, j_pullback = rrule(F,u,φ); # Compute functional and pull back
-    _, dFdu, dFdφ     = j_pullback(1); # Compute dFdu, dFdφ
-    _, dφ_adj         = u_pullback(dFdu); # Compute -dFdu*dudφ via adjoint 
+    j_val, j_pullback = rrule(F,u,φ)     # Compute functional and pull back
+    _, dFdu, dFdφ     = j_pullback(1)    # Compute dFdu, dFdφ
+    _, dφ_adj         = u_pullback(dFdu) # Compute -dFdu*dudφ via adjoint 
     copy!(dF,dφ_adj)
     dF .+= dFdφ
     return j_val

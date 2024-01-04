@@ -1,5 +1,5 @@
 ############################################################################################
-###  These are things that should eventually moved to official Gridap packages           ###
+###  These are things that should eventually be moved to official Gridap packages        ###
 ############################################################################################
 
 # Instantiate nonlinear solver caches (without actually doing the first iteration)
@@ -54,7 +54,18 @@ function assemble_adjoint_matrix!(f::Function,A::AbstractMatrix,a::Assembler,U::
   assemble_matrix!(A,a,collect_cell_matrix(V,U,contr))
 end
 
-# Matrix-Vector in-place assembly with dirichlet contributions
+# Assembly addons
+
+function Gridap.FESpaces.allocate_matrix(a::Function,assem::Assembler,U::FESpace,V::FESpace)
+  v = get_fe_basis(V)
+  u = get_trial_fe_basis(U)
+  allocate_matrix(assem,collect_cell_matrix(U,V,a(u,v)))
+end
+
+function Gridap.FESpaces.allocate_vector(l::Function,assem::Assembler,V::FESpace)
+  v = get_fe_basis(V)
+  allocate_vector(assem,collect_cell_vector(V,l(v)))
+end
 
 function Gridap.FESpaces.assemble_matrix_and_vector!(
     a::Function,l::Function,A::AbstractMatrix,b::AbstractVector,assem::Assembler,U::FESpace,V::FESpace,uhd)
