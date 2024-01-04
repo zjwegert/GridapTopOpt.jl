@@ -370,7 +370,7 @@ struct NonlinearFEStateMap{A,B,C,D,E,F} <: LSTO_Distributed.AbstractFEStateMap
   end
 end
 
-get_state(m::NonlinearFEStateMap) = m.fwd_caches[3]
+get_state(m::NonlinearFEStateMap) = FEFunction(get_trial_space(m),m.fwd_caches[3])
 get_measure(m::NonlinearFEStateMap) = m.res.dΩ
 get_spaces(m::NonlinearFEStateMap) = m.spaces
 get_assemblers(m::NonlinearFEStateMap) = (m.fwd_caches[4],m.plb_caches[2],m.adj_caches[4])
