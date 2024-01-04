@@ -222,7 +222,10 @@ function StateParamIntegrandWithMeasure(f::Function,φ_to_u::AbstractFEStateMap)
 end
 
 function StateParamIntegrandWithMeasure(F::IntegrandWithMeasure,φ_to_u::AbstractFEStateMap)
-  @abstractmethod
+  U,V,V_φ,U_reg = φ_to_u.spaces
+  assem_deriv = get_deriv_assembler(φ_to_u)
+  assem_U = get_pde_assembler(φ_to_u)
+  StateParamIntegrandWithMeasure(F,U,V_φ,U_reg,assem_U,assem_deriv)
 end
 
 """
@@ -313,13 +316,6 @@ function adjoint_solve!(φ_to_u::AffineFEStateMap,du::AbstractVector)
   return adjoint_x
 end
 
-function StateParamIntegrandWithMeasure(F::IntegrandWithMeasure,φ_to_u::AffineFEStateMap)
-  U,V,V_φ,U_reg = φ_to_u.spaces
-  assem_deriv = last(φ_to_u.plb_caches)
-  assem_U = last(φ_to_u.fwd_caches)
-  StateParamIntegrandWithMeasure(F,U,V_φ,U_reg,assem_U,assem_deriv)
-end
-
 """
   NonlinearFEStateMap
 """
@@ -404,13 +400,6 @@ function adjoint_solve!(φ_to_u::NonlinearFEStateMap,du::AbstractVector)
   adjoint_ns, _, adjoint_x, _ = φ_to_u.adj_caches
   solve!(adjoint_x,adjoint_ns,du)
   return adjoint_x
-end
-
-function StateParamIntegrandWithMeasure(F::IntegrandWithMeasure,φ_to_u::NonlinearFEStateMap)
-  U,V,V_φ,U_reg = φ_to_u.spaces
-  assem_deriv = last(φ_to_u.plb_caches)
-  assem_U = last(φ_to_u.fwd_caches)
-  StateParamIntegrandWithMeasure(F,U,V_φ,U_reg,assem_U,assem_deriv)
 end
 
 # Instantiate nonlinear solver caches
