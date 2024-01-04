@@ -8,7 +8,7 @@ struct IntegrandWithMeasure{A,B<:Tuple}
   dΩ :: B
 end
 
-(F::IntegrandWithMeasure)(args...) = sum(F.F(args...,F.dΩ...))
+(F::IntegrandWithMeasure)(args...) = F.F(args...,F.dΩ...)
 
 Gridap.gradient(F::IntegrandWithMeasure,uh) = Gridap.gradient(F,[uh],1)
 
@@ -80,18 +80,15 @@ end
 struct StateParamIntegrandWithMeasure{A<:IntegrandWithMeasure,B<:Tuple,C<:Tuple,D<:Tuple}
   F       :: A
   spaces  :: B
-  assem   :: C
+  assems  :: C
   caches  :: D
 end
 
 function StateParamIntegrandWithMeasure(
-    F::IntegrandWithMeasure,
-    U,
-    V_φ,
-    U_reg,
-    assem_U,
-    assem_deriv)
-
+  F::IntegrandWithMeasure,
+  U::FESpace,V_φ::FESpace,U_reg::FESpace,
+  assem_U::Assembler,assem_deriv::Assembler
+)
   φ₀ = zero(V_φ); u₀ = zero(U)
   djdu_vecdata = collect_cell_vector(U,∇(F,[u₀,φ₀],1))
   djdφ_vecdata = collect_cell_vector(U_reg,∇(F,[u₀,φ₀],2))
@@ -100,24 +97,24 @@ function StateParamIntegrandWithMeasure(
   assems = (assem_U,assem_deriv)
   spaces = (U,V_φ,U_reg)
   caches = (djdu_vec,djdφ_vec)
-  StateParamIntegrandWithMeasure(F,spaces,assems,caches)
+  return StateParamIntegrandWithMeasure(F,spaces,assems,caches)
 end
 
 function (u_to_j::StateParamIntegrandWithMeasure)(u::T1,φ::T2) where {T1<:AbstractArray,T2<:AbstractArray}
   U,V_φ,_ = u_to_j.spaces
   uh = FEFunction(U,u)
   φh = FEFunction(V_φ,φ)
-  return u_to_j.F(uh,φh)
+  return sum(u_to_j.F(uh,φh))
 end
 
 function ChainRulesCore.rrule(u_to_j::StateParamIntegrandWithMeasure,u::T1,φ::T2) where {T1<:AbstractArray,T2<:AbstractArray}
-  F=u_to_j.F
+  F = u_to_j.F
   U,V_φ,U_reg = u_to_j.spaces
-  assem_U,assem_deriv = u_to_j.assem
+  assem_U,assem_deriv = u_to_j.assems
   djdu_vec,djdφ_vec = u_to_j.caches
   uh = FEFunction(U,u)
   φh = FEFunction(V_φ,φ)
-  fields = [uh,φh];
+  fields = [uh,φh]
   function u_to_j_pullback(dj)
     ## Compute ∂F/∂uh(uh) and ∂F/∂φh(φh)
     djdu = ∇(F,fields,1)
@@ -130,7 +127,7 @@ function ChainRulesCore.rrule(u_to_j::StateParamIntegrandWithMeasure,u::T1,φ::T
     djdφ_vec .*= dj
     (  NoTangent(), djdu_vec, djdφ_vec )
   end
-  u_to_j(u,φ), u_to_j_pullback
+  return u_to_j(u,φ), u_to_j_pullback
 end
 
 """
@@ -138,215 +135,294 @@ end
 """
 abstract type AbstractFEStateMap end
 
-# Getters
 get_state(::AbstractFEStateMap) = @abstractmethod
-get_measure(::AbstractFEStateMap) = @abstractmethod;
-get_trial_space(::AbstractFEStateMap) = @abstractmethod;
-get_test_space(::AbstractFEStateMap) = @abstractmethod;
-get_aux_space(::AbstractFEStateMap) = @abstractmethod;
-get_deriv_space(::AbstractFEStateMap) = @abstractmethod;
-get_state_assembler(::AbstractFEStateMap) = @abstractmethod
-get_deriv_assembler(::AbstractFEStateMap) = @abstractmethod
+get_measure(::AbstractFEStateMap) = @abstractmethod
+get_spaces(::AbstractFEStateMap) = @abstractmethod
+get_assemblers(::AbstractFEStateMap) = @abstractmethod
+
+get_trial_space(m::AbstractFEStateMap) = get_spaces(m)[1]
+get_test_space(m::AbstractFEStateMap) = get_spaces(m)[2]
+get_aux_space(m::AbstractFEStateMap) = get_spaces(m)[3]
+get_deriv_space(m::AbstractFEStateMap) = get_spaces(m)[4]
+
+get_pde_assembler(m::AbstractFEStateMap) = get_assemblers(m)[1]
+get_deriv_assembler(m::AbstractFEStateMap) = get_assemblers(m)[2]
+
+@inline (φ_to_u::AbstractFEStateMap)(φ::AbstractVector) = forward_solve(φ_to_u,φ)
+
+function forward_solve(φ_to_u::AbstractFEStateMap,φ::AbstractVector)
+  @abstractmethod
+end
+
+function adjoint_solve(φ_to_u::AbstractFEStateMap,du::AbstractVector)
+  update_adjoint_caches!(φ_to_u,du)
+  adjoint_solve!(φ_to_u,du)
+end
+
+function update_adjoint_caches!(φ_to_u::AbstractFEStateMap,du::AbstractVector)
+  @abstractmethod
+end
+
+function adjoint_solve!(φ_to_u::AbstractFEStateMap,du::AbstractVector)
+  @abstractmethod
+end
+
+function res_grad(φ_to_u::AbstractFEStateMap,uh,vh,φh)
+  @abstractmethod
+end
+
+function res_grad(φ_to_u::AbstractFEStateMap,u::AbstractVector,v::AbstractVector,φ::AbstractVector)
+  U, V, V_φ, _ = φ_to_u.spaces
+  uh, vh, φh = FEFunction(U,u), FEFunction(V,v), FEFunction(V_φ,φ)
+  return res_grad(φ_to_u,uh,vh,φh)
+end
+
+function pullback(φ_to_u::AbstractFEStateMap,u,du,φ;updated=false)
+  dφdu_vec, assem_deriv = φ_to_u.plb_caches
+
+  ## Adjoint Solve
+  if !updated
+    update_adjoint_caches!(φ_to_u,du)
+  end
+  λ = adjoint_solve!(φ_to_u,du)
+
+  ## Compute grad
+  dφdu_vecdata = collect_cell_vector(U_reg,res_grad(φ_to_u,u,λ,φ)) 
+  assemble_vector!(dφdu_vec,assem_deriv,dφdu_vecdata)
+  rmul!(dφdu_vec, -1)
+  
+  return (NoTangent(),dφdu_vec)
+end
+
+function ChainRulesCore.rrule(φ_to_u::AbstractFEStateMap,φ::AbstractVector)
+  u = forward_solve(φ_to_u,φ)
+  update_adjoint_caches!(φ_to_u,φ)
+  return u, du -> pullback(φ_to_u,u,du,φ;updated=true)
+end
+
+function StateParamIntegrandWithMeasure(f::Function,φ_to_u::AbstractFEStateMap)
+  dΩ = get_measure(φ_to_u)
+  F  = IntegrandWithMeasure(f,dΩ)
+  StateParamIntegrandWithMeasure(F,φ_to_u)
+end
+
+function StateParamIntegrandWithMeasure(F::IntegrandWithMeasure,φ_to_u::AbstractFEStateMap)
+  @abstractmethod
+end
 
 """
   AffineFEStateMap
 """
-struct AffineFEStateMap{A,B,C,D<:Tuple,E<:Tuple,F<:Tuple,G<:Tuple,H<:Tuple} <: AbstractFEStateMap
-  a               ::A
-  l               ::B
-  res             ::C
-  dΩ              ::D
-  spaces          ::E
-  cache           ::F
-  fwd_caches      ::G
-  adjoint_caches  ::H
+struct AffineFEStateMap{A,B,C,D,E,F} <: AbstractFEStateMap
+  biform     :: A
+  liform     :: B
+  spaces     :: C
+  plb_caches :: D
+  fwd_caches :: E
+  adj_caches :: F
 
   function AffineFEStateMap(
-      a::A,l::B,res::C,
-      U,V,V_φ,U_reg,φh,
-      dΩ...;
-      assem_U = SparseMatrixAssembler(U,V),
-      assem_adjoint = SparseMatrixAssembler(V,U),
-      assem_deriv = SparseMatrixAssembler(U_reg,U_reg),
-      ls::LinearSolver = LUSolver(),
-      adjoint_ls::LinearSolver = LUSolver()) where {A,B,C}
-    
+    a::Function,l::Function,
+    U,V,V_φ,U_reg,φh,dΩ...;
+    assem_U = SparseMatrixAssembler(U,V),
+    assem_adjoint = SparseMatrixAssembler(V,U),
+    assem_deriv = SparseMatrixAssembler(U_reg,U_reg),
+    ls::LinearSolver = LUSolver(),
+    adjoint_ls::LinearSolver = LUSolver()
+  )
+
+    biform = IntegrandWithMeasure(a,dΩ)
+    liform = IntegrandWithMeasure(l,dΩ)
     spaces = (U,V,V_φ,U_reg)
-    ## dφdu cache
+
+    ## Pullback cache
     uhd = zero(U)
-    vecdata = collect_cell_vector(U_reg,∇(IntegrandWithMeasure(res,dΩ),[uhd,uhd,φh],3))
+    vecdata = collect_cell_vector(U_reg,∇(biform,[uhd,uhd,φh],3) - ∇(liform,[uhd,φh],2))
     dφdu_vec = allocate_vector(assem_deriv,vecdata)
+    plb_caches = (dφdu_vec,assem_deriv)
 
-    ## K,b,x
-    op = AffineFEOperator((u,v) -> a(u,v,φh,dΩ...),v -> l(v,φh,dΩ...),U,V,assem_U)
-    K = get_matrix(op); b = get_vector(op); 
-    x = allocate_in_domain(K); fill!(x,zero(eltype(x)))
-
-    ## Adjoint K,b,x
-    adjoint_K = assemble_matrix((u,v) -> a(v,u,φh,dΩ...),assem_adjoint,V,U)
-    adjoint_x = allocate_in_domain(adjoint_K); fill!(adjoint_x,zero(eltype(adjoint_x)))
-
-    ## Numerical setups
+    ## Forward cache
+    op = AffineFEOperator((u,v)->biform(u,v,φh),v->liform(v,φh),U,V,assem_U)
+    K, b = get_matrix(op), get_vector(op)
+    x  = allocate_in_domain(K); fill!(x,zero(eltype(x)))
     ns = numerical_setup(symbolic_setup(ls,K),K)
-    adjoint_ns = numerical_setup(symbolic_setup(adjoint_ls,adjoint_K),adjoint_K)
-    
-    ## Caches and adjoint caches
-    cache = (dφdu_vec,assem_deriv)
     fwd_caches = (ns,K,b,x,uhd,assem_U)
-    adjoint_caches = (adjoint_ns,adjoint_K,adjoint_x,assem_adjoint)
-    return new{A,B,C,typeof(dΩ),typeof(spaces),typeof(cache),typeof(fwd_caches),
-      typeof(adjoint_caches)}(a,l,res,dΩ,spaces,cache,fwd_caches,adjoint_caches)
+
+    ## Adjoint cache
+    adjoint_K  = assemble_matrix((u,v)->biform(v,u,φh),assem_adjoint,V,U)
+    adjoint_x  = allocate_in_domain(adjoint_K); fill!(adjoint_x,zero(eltype(adjoint_x)))
+    adjoint_ns = numerical_setup(symbolic_setup(adjoint_ls,adjoint_K),adjoint_K)
+    adj_caches = (adjoint_ns,adjoint_K,adjoint_x,assem_adjoint)
+
+    A,B,C = typeof(biform), typeof(liform), typeof(spaces)
+    D,E,F = typeof(plb_caches),typeof(fwd_caches), typeof(adj_caches)
+    return new{A,B,C,D,E,F}(biform,liform,spaces,plb_caches,fwd_caches,adj_caches)
   end
 end
 
 # Getters
 get_state(m::AffineFEStateMap) = FEFunction(get_trial_space(m),m.fwd_caches[4])
-get_measure(m::AffineFEStateMap) = m.dΩ;
-get_trial_space(m::AffineFEStateMap) = m.spaces[1];
-get_test_space(m::AffineFEStateMap) = m.spaces[2];
-get_aux_space(m::AffineFEStateMap) = m.spaces[3];
-get_deriv_space(m::AffineFEStateMap) = m.spaces[4];
-get_state_assembler(m::AffineFEStateMap) = last(m.fwd_caches)
-get_deriv_assembler(m::AffineFEStateMap) = last(m.cache)
+get_measure(m::AffineFEStateMap) = m.biform.dΩ
+get_spaces(m::AffineFEStateMap) = m.spaces
+get_assemblers(m::AffineFEStateMap) = (m.fwd_caches[6],m.plb_caches[2],m.adj_caches[4])
 
-function (φ_to_u::AffineFEStateMap)(φ::T) where T <: AbstractVector
-  a=φ_to_u.a
-  l=φ_to_u.l
-  dΩ = φ_to_u.dΩ
-  U,V,V_φ,_ = φ_to_u.spaces
-  ns,K,b,x,uhd,assem_U = φ_to_u.fwd_caches
+function forward_solve(φ_to_u::AffineFEStateMap,φ::AbstractVector)
+  biform, liform = φ_to_u.biform, φ_to_u.liform
+  U, V, V_φ, _ = φ_to_u.spaces
+  ns, K, b, x, uhd, assem_U = φ_to_u.fwd_caches
+
   φh = FEFunction(V_φ,φ)
-  
-  ## Assemble and solve
-  _assemble_matrix_and_vector!((u,v) -> a(u,v,φh,dΩ...),v -> l(v,φh,dΩ...),
-    K,b,assem_U,U,V,uhd)
+  a_fwd(u,v) = biform(u,v,φh)
+  l_fwd(v)   = liform(v,φh)
+  assemble_matrix_and_vector!(a_fwd,l_fwd,K,b,assem_U,U,V,uhd)
   numerical_setup!(ns,K)
   solve!(x,ns,b)
-  x
+  return x
 end
 
-function ChainRulesCore.rrule(φ_to_u::AffineFEStateMap,φ::T) where T <: AbstractVector
-  a=φ_to_u.a
-  res = φ_to_u.res
-  dΩ = φ_to_u.dΩ
-  U,V,V_φ,U_reg = φ_to_u.spaces
-  dφdu_vec,assem_deriv = φ_to_u.cache
-  adjoint_ns,adjoint_K,λ,assem_adjoint = φ_to_u.adjoint_caches
-  
-  ## Forward problem
-  u = φ_to_u(φ)
+function res_grad(φ_to_u::AffineFEStateMap,uh,vh,φh)
+  biform, liform = φ_to_u.biform, φ_to_u.liform
+  return ∇(biform,[uh,vh,φh],3) - ∇(liform,[vh,φh],2)
+end
 
-  ## Adjoint operator
+function update_adjoint_caches!(φ_to_u::AffineFEStateMap,φ::AbstractVector)
+  adjoint_ns, adjoint_K, _, assem_adjoint = φ_to_u.adj_caches
+  U, V, V_φ, _ = φ_to_u.spaces
   φh = FEFunction(V_φ,φ)
-  assemble_matrix!((u,v) -> a(v,u,φh,dΩ...),adjoint_K,assem_adjoint,V,U)
-  function φ_to_u_pullback(du)
-    ## Adjoint Solve
-    numerical_setup!(adjoint_ns,adjoint_K)
-    solve!(λ,adjoint_ns,du)
-    λh = FEFunction(V,λ)
-    
-    ## Compute grad
-    uh = FEFunction(U,u)
-    res_functional = IntegrandWithMeasure(res,dΩ)
-    dφdu_contrib = ∇(res_functional,[uh,λh,φh],3)
-    dφdu_vecdata = collect_cell_vector(U_reg,dφdu_contrib) 
-    assemble_vector!(dφdu_vec,assem_deriv,dφdu_vecdata)
-    dφdu_vec .*= -1;
-    ( NoTangent(),dφdu_vec)
-  end
-  u, φ_to_u_pullback
+  assemble_matrix!((u,v) -> φ_to_u.biform(v,u,φh),adjoint_K,assem_adjoint,V,U)
+  numerical_setup!(adjoint_ns,adjoint_K)
+  return φ_to_u.adj_caches
+end
+
+function adjoint_solve!(φ_to_u::AffineFEStateMap,du::AbstractVector)
+  adjoint_ns, _, adjoint_x, _ = φ_to_u.adj_caches
+  solve!(adjoint_x,adjoint_ns,du)
+  return adjoint_x
+end
+
+function StateParamIntegrandWithMeasure(F::IntegrandWithMeasure,φ_to_u::AffineFEStateMap)
+  U,V,V_φ,U_reg = φ_to_u.spaces
+  assem_deriv = last(φ_to_u.plb_caches)
+  assem_U = last(φ_to_u.fwd_caches)
+  StateParamIntegrandWithMeasure(F,U,V_φ,U_reg,assem_U,assem_deriv)
 end
 
 """
   NonlinearFEStateMap
 """
-struct NonlinearFEStateMap{A,B<:Tuple,C<:Tuple,D<:Tuple,E<:Tuple,F<:Tuple} <: LSTO_Distributed.AbstractFEStateMap
-  res             ::A
-  dΩ              ::B
-  spaces          ::C
-  cache           ::D
-  fwd_caches      ::E
-  adjoint_caches  ::F
+struct NonlinearFEStateMap{A,B,C,D,E} <: LSTO_Distributed.AbstractFEStateMap
+  res        :: A
+  spaces     :: B
+  plb_caches :: C
+  fwd_caches :: D
+  adj_caches :: E
 
   function NonlinearFEStateMap(
-      res::A,U,V,V_φ,U_reg,φh,dΩ...;
-      assem_U = SparseMatrixAssembler(U,V),
-      assem_adjoint = SparseMatrixAssembler(V,U),
-      assem_deriv = SparseMatrixAssembler(U_reg,U_reg),
-      nls::NonlinearSolver = NRSolver(LUSolver(),10^-10,50,true),
-      adjoint_ls::LinearSolver = LUSolver()) where {A}
-    
+    res::Function,U,V,V_φ,U_reg,φh,dΩ...;
+    assem_U = SparseMatrixAssembler(U,V),
+    assem_adjoint = SparseMatrixAssembler(V,U),
+    assem_deriv = SparseMatrixAssembler(U_reg,U_reg),
+    nls::NonlinearSolver = NewtonSolver(LUSolver();maxiter=50,rtol=1.e-10,verbose=true),
+    adjoint_ls::LinearSolver = LUSolver()
+  )
+    res = IntegrandWithMeasure(res,dΩ)
     spaces = (U,V,V_φ,U_reg)
-    ## dφdu cache
+
+    ## Pullback cache
     uhd = zero(U)
-    res_iwm = IntegrandWithMeasure(res,dΩ)
-    vecdata = collect_cell_vector(U_reg,∇(res_iwm,[uhd,uhd,φh],3))
+    vecdata = collect_cell_vector(U_reg,∇(res,[uhd,uhd,φh],3))
     dφdu_vec = allocate_vector(assem_deriv,vecdata)
+    plb_caches = (dφdu_vec,assem_deriv)
 
-    ## Nonlinear FE operator and solution vector x
-    jac(u,du,dv) = jacobian(res_iwm,[u,dv,φh],1)
-    op = FEOperator((u,v) -> res(u,v,φh,dΩ...),jac,U,V,assem_U)
-    op_cache = CachedFEOperator(op)
-    x = zero(U)#get_free_dof_values(zero(U));
+    ## Forward cache
+    x = zero_free_values(U)
+    jac(u,du,dv) = jacobian(res,[u,dv,φh],1)
+    op = get_algebraic_operator(FEOperator(res,jac,U,V,assem_U))
+    nls_cache = instantiate_caches(x,nls,op)
+    fwd_caches = (nls,nls_cache,x,assem_U)
 
-    ## Adjoint K,x
-    adjoint_K = assemble_matrix((u,v) -> op.jac(uhd,v,u),assem_adjoint,V,U)
-    adjoint_x = get_free_dof_values(zero(V)); fill!(adjoint_x,zero(eltype(adjoint_x)))
-
-    ## Numerical setups
-    nls_cache = NLCache(nothing)
+    ## Adjoint cache
+    adjoint_K  = assemble_adjoint_matrix((u,v) -> jac(uhd,u,v),assem_adjoint,U,V)
+    adjoint_x  = allocate_in_domain(adjoint_K); fill!(adjoint_x,zero(eltype(adjoint_x)))
     adjoint_ns = numerical_setup(symbolic_setup(adjoint_ls,adjoint_K),adjoint_K)
+    adj_caches = (adjoint_ns,adjoint_K,adjoint_x,assem_adjoint)
     
-    ## Caches and adjoint caches
-    cache = (dφdu_vec,assem_deriv)
-    fwd_caches = (nls,nls_cache,x,op_cache,assem_U)
-    adjoint_caches = (adjoint_ns,adjoint_K,adjoint_x,assem_adjoint)
-    return new{A,typeof(dΩ),typeof(spaces),typeof(cache),typeof(fwd_caches),
-      typeof(adjoint_caches)}(res,dΩ,spaces,cache,fwd_caches,adjoint_caches)
+    A, B = typeof(res), typeof(spaces)
+    C, D, E = typeof(plb_caches), typeof(fwd_caches), typeof(adj_caches)
+    return new{A,B,C,D,E}(res,spaces,plb_caches,fwd_caches,adj_caches)
   end
 end
 
-# Helpers and getters
-mutable struct NLCache
-  cache
-end
-
-mutable struct CachedFEOperator
-  op
-end
-
 get_state(m::NonlinearFEStateMap) = m.fwd_caches[3]
-get_measure(m::NonlinearFEStateMap) = m.dΩ;
-get_trial_space(m::NonlinearFEStateMap) = m.spaces[1];
-get_test_space(m::NonlinearFEStateMap) = m.spaces[2];
-get_aux_space(m::NonlinearFEStateMap) = m.spaces[3];
-get_deriv_space(m::NonlinearFEStateMap) = m.spaces[4];
-get_state_assembler(m::NonlinearFEStateMap) = last(m.fwd_caches)
-get_deriv_assembler(m::NonlinearFEStateMap) = last(m.cache)
+get_measure(m::NonlinearFEStateMap) = m.res.dΩ
+get_spaces(m::AffineFEStateMap) = m.spaces
+get_assemblers(m::AffineFEStateMap) = (m.fwd_caches[4],m.plb_caches[2],m.adj_caches[4])
 
-# φ is not used because op already depends on it.
-#  This is rather dangerous but currently required 
-#  if we want to cache PETScNonlinearSolver. 
-#  Basically op.op !=== nl_cache.op which is bad, and 
-#  there is no clear way to get around this
-#     Jordi?
-function (φ_to_u::NonlinearFEStateMap)(φ::T) where T <: AbstractVector
-  res=φ_to_u.res
-  dΩ = φ_to_u.dΩ
-  U,V,V_φ,U_reg = φ_to_u.spaces
-  nls,nls_cache,x,op,assem_U = φ_to_u.fwd_caches
-  nl_cache = nls_cache.cache
- 
-  ## Update residual and jacobian, and solve
-  # φh = FEFunction(V_φ,φ)
-  # jac(u,du,dv) = jacobian(IntegrandWithMeasure(res,dΩ),[u,dv,φh],1)
-  # op.op = FEOperator((u,v) -> res(u,v,φh,dΩ...),jac,U,V,assem_U)
-  # Uncomment the above and run with PETScLinearSolver to see problem
-  x,cache = solve!(x,nls,op.op,nl_cache)
-  # Update cache for next call
-  nls_cache.cache = cache 
-  get_free_dof_values(x)
+function forward_solve(φ_to_u::NonlinearFEStateMap,φ::AbstractVector)
+  res = φ_to_u.res
+  U, V, V_φ, _ = φ_to_u.spaces
+  nls, nls_cache, x, assem_U = φ_to_u.fwd_caches
+
+  φh = FEFunction(V_φ,φ)
+  jac(u,du,dv) = jacobian(res,[u,dv,φh],1)
+  op = get_algebraic_operator(FEOperator(res,jac,U,V,assem_U))
+  solve!(x,nls,op,nls_cache)
+  return x
 end
+
+function res_grad(φ_to_u::NonlinearFEStateMap,uh,vh,φh)
+  res = φ_to_u.res
+  return ∇(res,[uh,vh,φh],3)
+end
+
+function update_adjoint_caches!(φ_to_u::NonlinearFEStateMap,φ::AbstractVector)
+  adjoint_ns, adjoint_K, _, assem_adjoint = φ_to_u.adj_caches
+  U, V, V_φ, _ = φ_to_u.spaces
+  φh = FEFunction(V_φ,φ)
+  jac(u,du,dv) = jacobian(res,[u,dv,φh],1)
+  assemble_adjoint_matrix!((u,v) -> jac(u,v,φh),adjoint_K,assem_adjoint,U,V)
+  numerical_setup!(adjoint_ns,adjoint_K)
+  return φ_to_u.adj_caches
+end
+
+function adjoint_solve!(φ_to_u::NonlinearFEStateMap,du::AbstractVector)
+  adjoint_ns, _, adjoint_x, _ = φ_to_u.adj_caches
+  solve!(adjoint_x,adjoint_ns,du)
+  return adjoint_x
+end
+
+function StateParamIntegrandWithMeasure(F::IntegrandWithMeasure,φ_to_u::NonlinearFEStateMap)
+  U,V,V_φ,U_reg = φ_to_u.spaces
+  assem_deriv = last(φ_to_u.plb_caches)
+  assem_U = last(φ_to_u.fwd_caches)
+  StateParamIntegrandWithMeasure(F,U,V_φ,U_reg,assem_U,assem_deriv)
+end
+
+# Instantiate nonlinear solver caches
+
+function instantiate_caches(x,nls::NLSolver,op::NonlinearOperator)
+  Gridap.Algebra._new_nlsolve_cache(x,nls,op)
+end
+
+function instantiate_caches(x,nls::NewtonRaphsonSolver,op::NonlinearOperator)
+  b = residual(op, x)
+  A = jacobian(op, x)
+  dx = similar(b)
+  ss = symbolic_setup(nls.ls, A)
+  ns = numerical_setup(ss,A)
+  return Gridap.Algebra.NewtonRaphsonCache(A,b,dx,ns)
+end
+
+function instantiate_caches(x,nls::NewtonSolver,op::NonlinearOperator)
+  b  = residual(op, x)
+  A  = jacobian(op, x)
+  dx = allocate_in_domain(A); fill!(dx,zero(eltype(dx)))
+  ss = symbolic_setup(nls.ls, A)
+  ns = numerical_setup(ss,A,x)
+  return GridapSolvers.NonlinearSolvers.NewtonCache(A,b,dx,ns)
+end
+
+# Transpose contributions
 
 transpose_contributions(b::DistributedDomainContribution) = 
   DistributedDomainContribution(map(transpose_contributions,local_views(b)))
@@ -360,6 +436,13 @@ function transpose_contributions(b::DomainContribution)
   return c
 end
 
+function assemble_adjoint_matrix(f::Function,a::Assembler,U::FESpace,V::FESpace)
+  v = get_fe_basis(V)
+  u = get_trial_fe_basis(U)
+  contr = transpose_contributions(f(u,v))
+  assemble_matrix(a,collect_cell_matrix(V,U,contr))
+end
+
 function assemble_adjoint_matrix!(f::Function,A::AbstractMatrix,a::Assembler,U::FESpace,V::FESpace)
   v = get_fe_basis(V)
   u = get_trial_fe_basis(U)
@@ -367,49 +450,17 @@ function assemble_adjoint_matrix!(f::Function,A::AbstractMatrix,a::Assembler,U::
   assemble_matrix!(A,a,collect_cell_matrix(V,U,contr))
 end
 
-function ChainRulesCore.rrule(φ_to_u::NonlinearFEStateMap,φ::T) where T <: AbstractVector
-  res = φ_to_u.res
-  dΩ = φ_to_u.dΩ
-  U,V,V_φ,U_reg = φ_to_u.spaces
-  dφdu_vec,assem_deriv = φ_to_u.cache
-  _,_,_,op,assem_U = φ_to_u.fwd_caches
-  adjoint_ns,adjoint_K,λ,assem_adjoint = φ_to_u.adjoint_caches
-  
-  ## Forward problem
-  u = φ_to_u(φ)
-
-  ## Adjoint operator
-  uh = FEFunction(U,u)
-  φh = FEFunction(V_φ,φ)
-
-  assemble_adjoint_matrix!((u,v) -> op.op.jac(uh,u,v),adjoint_K,assem_adjoint,U,V)
-  function φ_to_u_pullback(du)
-    ## Adjoint Solve
-    numerical_setup!(adjoint_ns,adjoint_K)
-    ## DEBUG only
-    # K = jacobian(op.op,uh)
-    # println("**Debug** |adjoint_K - K| = ", norm(adjoint_K - K,Inf)) # This should be > 0
-    # println("**Debug** |adjoint(adjoint_K) - K| = ", norm(adjoint(adjoint_K) - K,Inf)) # This should be zero
-    ##
-    solve!(λ,adjoint_ns,du)
-    λh = FEFunction(V,λ)
-    
-    ## Compute grad
-    uh = FEFunction(U,u)
-    res_functional = IntegrandWithMeasure(res,dΩ)
-    dφdu_contrib = ∇(res_functional,[uh,λh,φh],3)
-    dφdu_vecdata = collect_cell_vector(U_reg,dφdu_contrib) 
-    assemble_vector!(dφdu_vec,assem_deriv,dφdu_vecdata)
-    dφdu_vec .*= -1;
-    ( NoTangent(),dφdu_vec)
-  end
-  u, φ_to_u_pullback
+function Gridap.FESpaces.assemble_matrix_and_vector!(
+    a::Function,l::Function,A::AbstractMatrix,b::AbstractVector,assem::Assembler,U::FESpace,V::FESpace,uhd)
+  v = get_fe_basis(V)
+  u = get_trial_fe_basis(U)
+  assemble_matrix_and_vector!(A,b,assem,collect_cell_matrix_and_vector(U,V,a(u,v),l(v),uhd))
 end
 
 """
   PDEConstrainedFunctionals
 """
-struct PDEConstrainedFunctionals{N,A<:AbstractFEStateMap}
+struct PDEConstrainedFunctionals{N,A}
   J
   C
   dJ
@@ -425,25 +476,19 @@ struct PDEConstrainedFunctionals{N,A<:AbstractFEStateMap}
       analytic_dJ = nothing,
       analytic_dC = fill(nothing,length(C))) where T<:AbstractFEStateMap
 
-    dΩ = get_measure(state_map)
-    U = get_trial_space(state_map)
-    V_φ = get_aux_space(state_map)
-    U_reg = get_deriv_space(state_map)
-    assem_U = get_state_assembler(state_map)
-    assem_deriv = get_deriv_assembler(state_map)
-
     # Create StateParamIntegrandWithMeasures
-    spiwm(f) = StateParamIntegrandWithMeasure(
-      IntegrandWithMeasure(f,dΩ),U,V_φ,U_reg,assem_U,assem_deriv)
-    J_spiwm = spiwm(J)
-    C_spiwm = isempty(C) ? StateParamIntegrandWithMeasure[] : map(spiwm,C);
+    J_spiwm = StateParamIntegrandWithMeasure(J,state_map)
+    if isempty(C)
+      C_spiwm = StateParamIntegrandWithMeasure[]
+    else
+      C_spiwm = map(ci -> StateParamIntegrandWithMeasure(ci,state_map),C)
+    end
 
     # Preallocate
     dJ = similar(J_spiwm.caches[2])
     dC = map(Ci_spiwm->similar(Ci_spiwm.caches[2]),C_spiwm)
 
-    return new{length(C),T}(
-      J_spiwm,C_spiwm,dJ,dC,analytic_dJ,analytic_dC,state_map)
+    return new{length(C),T}(J_spiwm,C_spiwm,dJ,dC,analytic_dJ,analytic_dC,state_map)
   end
 end
 
@@ -455,7 +500,7 @@ get_state(m::PDEConstrainedFunctionals) = get_state(m.state_map)
 function evaluate_functionals!(pcf::PDEConstrainedFunctionals,φ::T) where T <: AbstractVector
   u = pcf.state_map(φ)
   J = pcf.J; C = pcf.C
-  return J(u,φ), map(i->C[i](u,φ),1:length(C))
+  return J(u,φ), map(Ci->Ci(u,φ),C)
 end
 
 function evaluate_derivatives!(pcf::PDEConstrainedFunctionals,φ::T) where T <: AbstractVector
