@@ -26,6 +26,8 @@ using PartitionedArrays: getany, tuple_of_arrays, matching_ghost_indices
 using GridapSolvers
 using GridapSolvers.LinearSolvers, GridapSolvers.NonlinearSolvers, GridapSolvers.BlockSolvers
 
+include("GridapExtensions.jl")
+
 include("ChainRules.jl")
 export PDEConstrainedFunctionals
 export AffineFEStateMap
