@@ -60,7 +60,6 @@ function main()
 
   a(u,v,φ,dΩ,dΓ_N) = ∫((I ∘ φ)*D*∇(u)⋅∇(v))dΩ
   l(v,φ,dΩ,dΓ_N) = ∫(v)dΓ_N
-  res(u,v,φ,dΩ,dΓ_N) = a(u,v,φ,dΩ,dΓ_N) - l(v,φ,dΩ,dΓ_N)
 
   ## Optimisation functionals
   ξ = 0.2;
@@ -72,7 +71,7 @@ function main()
   reinit!(stencil,φ,γ_reinit)
 
   ## Setup solver and FE operators
-  state_map = AffineFEStateMap(a,l,res,U,V,V_φ,U_reg,φh,dΩ,dΓ_N)
+  state_map = AffineFEStateMap(a,l,U,V,V_φ,U_reg,φh,dΩ,dΓ_N)
   pcfs = PDEConstrainedFunctionals(J,state_map,analytic_dJ=dJ)
 
   ## Hilbertian extension-regularisation problems
