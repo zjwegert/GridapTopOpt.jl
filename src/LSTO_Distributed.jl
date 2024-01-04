@@ -1,34 +1,30 @@
 module LSTO_Distributed
 
-using Gridap
-using Gridap.TensorValues, Gridap.Geometry, Gridap.FESpaces, Gridap.Helpers,
-  Gridap.ReferenceFEs, Gridap.Algebra, Gridap.CellData, Gridap.MultiField
-using GridapDistributed
-using GridapPETSc, GridapPETSc.PETSC
-using PartitionedArrays
 using MPI
-using BlockArrays
-using SparseArrays
-using SparseMatricesCSR
+using BlockArrays, SparseArrays, CircularArrays
+using LinearAlgebra, SparseMatricesCSR
 using ChainRulesCore
-using DelimitedFiles
-using BlockArrays
-using LinearAlgebra
-using CircularArrays
-using Printf
+using DelimitedFiles, Printf
 
-import Gridap.solve!
-import Gridap.FESpaces: AffineFEOperator, assemble_matrix_and_vector, 
-  assemble_matrix!, assemble_matrix, allocate_vector, assemble_vector,
-  assemble_vector!
-import Gridap.Algebra: LinearSolver, SymbolicSetup, NonlinearSolver
-import Gridap.Geometry: get_faces
-import GridapPETSc: PetscScalar, PetscInt, PETSC,  @check_error_code
-import GridapDistributed: DistributedDiscreteModel, DistributedTriangulation, 
+using Gridap
+using Gridap.TensorValues, Gridap.Geometry, Gridap.FESpaces, Gridap.Helpers
+using Gridap.ReferenceFEs, Gridap.Algebra, Gridap.CellData, Gridap.MultiField
+using Gridap.Geometry: get_faces
+
+using GridapDistributed
+using GridapDistributed: DistributedDiscreteModel, DistributedTriangulation, 
   DistributedFESpace, DistributedDomainContribution, to_parray_of_arrays,
   allocate_in_domain, DistributedCellField, DistributedMultiFieldFEBasis,
   BlockPMatrix, BlockPVector, change_ghost
-import PartitionedArrays: getany, tuple_of_arrays, matching_ghost_indices
+
+using GridapPETSc, GridapPETSc.PETSC
+using GridapPETSc: PetscScalar, PetscInt, PETSC,  @check_error_code
+
+using PartitionedArrays
+using PartitionedArrays: getany, tuple_of_arrays, matching_ghost_indices
+
+using GridapSolvers
+using GridapSolvers.LinearSolvers, GridapSolvers.NonlinearSolvers, GridapSolvers.BlockSolvers
 
 include("ChainRules.jl")
 export PDEConstrainedFunctionals
@@ -57,9 +53,6 @@ export make_dir
 export print_history
 export write_vtk
 
-include("DiagonalBlockMatrixAssembler.jl")
-export DiagonalBlockMatrixAssembler
-
 include("Advection.jl")
 export AdvectionStencil
 export FirstOrderStencil
@@ -70,7 +63,6 @@ include("Solvers.jl")
 export ElasticitySolver
 export BlockDiagonalPreconditioner
 export MUMPSSolver
-export NRSolver
 
 include("VelocityExtension.jl")
 export VelocityExtension
