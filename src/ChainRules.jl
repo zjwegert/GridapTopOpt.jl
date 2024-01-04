@@ -150,17 +150,23 @@ get_deriv_assembler(m::AbstractFEStateMap) = get_assemblers(m)[2]
 
 @inline (φ_to_u::AbstractFEStateMap)(φ::AbstractVector) = forward_solve(φ_to_u,φ)
 
+function forward_solve(φ_to_u::AbstractFEStateMap,φh)
+  @abstractmethod
+end
+
 function forward_solve(φ_to_u::AbstractFEStateMap,φ::AbstractVector)
+  φh = FEFunction(get_aux_space(φ_to_u),φ)
+  return forward_solve(φ_to_u,φh)
+end
+
+function update_adjoint_caches!(φ_to_u::AbstractFEStateMap,uh,φh)
   @abstractmethod
 end
 
-function adjoint_solve(φ_to_u::AbstractFEStateMap,du::AbstractVector)
-  update_adjoint_caches!(φ_to_u,du)
-  adjoint_solve!(φ_to_u,du)
-end
-
-function update_adjoint_caches!(φ_to_u::AbstractFEStateMap,du::AbstractVector)
-  @abstractmethod
+function update_adjoint_caches!(φ_to_u::AbstractFEStateMap,u::AbstractVector,φ::AbstractVector)
+  uh = FEFunction(get_trial_space(φ_to_u),u)
+  φh = FEFunction(get_aux_space(φ_to_u),φ)
+  return update_adjoint_caches!(φ_to_u,uh,φh)
 end
 
 function adjoint_solve!(φ_to_u::AbstractFEStateMap,du::AbstractVector)
@@ -172,32 +178,41 @@ function res_grad(φ_to_u::AbstractFEStateMap,uh,vh,φh)
 end
 
 function res_grad(φ_to_u::AbstractFEStateMap,u::AbstractVector,v::AbstractVector,φ::AbstractVector)
-  U, V, V_φ, _ = φ_to_u.spaces
-  uh, vh, φh = FEFunction(U,u), FEFunction(V,v), FEFunction(V_φ,φ)
+  uh = FEFunction(get_trial_space(φ_to_u),u)
+  vh = FEFunction(get_test_space(φ_to_u),v)
+  φh = FEFunction(get_aux_space(φ_to_u),φ)
   return res_grad(φ_to_u,uh,vh,φh)
 end
 
-function pullback(φ_to_u::AbstractFEStateMap,u,du,φ;updated=false)
+function pullback(φ_to_u::AbstractFEStateMap,uh,φh,du;updated=false)
   dφdu_vec, assem_deriv = φ_to_u.plb_caches
+  U_reg = get_deriv_space(φ_to_u)
 
   ## Adjoint Solve
   if !updated
-    update_adjoint_caches!(φ_to_u,du)
+    update_adjoint_caches!(φ_to_u,uh,φh)
   end
-  λ = adjoint_solve!(φ_to_u,du)
+  λ  = adjoint_solve!(φ_to_u,du)
+  λh = FEFunction(get_test_space(φ_to_u),λ)
 
   ## Compute grad
-  dφdu_vecdata = collect_cell_vector(U_reg,res_grad(φ_to_u,u,λ,φ)) 
+  dφdu_vecdata = collect_cell_vector(U_reg,res_grad(φ_to_u,uh,λh,φh)) 
   assemble_vector!(dφdu_vec,assem_deriv,dφdu_vecdata)
   rmul!(dφdu_vec, -1)
   
   return (NoTangent(),dφdu_vec)
 end
 
+function ChainRulesCore.rrule(φ_to_u::AbstractFEStateMap,φh)
+  u  = forward_solve(φ_to_u,φh)
+  uh = FEFunction(get_trial_space(φ_to_u),u)
+  update_adjoint_caches!(φ_to_u,uh,φh)
+  return u, du -> pullback(φ_to_u,uh,φh,du;updated=true)
+end
+
 function ChainRulesCore.rrule(φ_to_u::AbstractFEStateMap,φ::AbstractVector)
-  u = forward_solve(φ_to_u,φ)
-  update_adjoint_caches!(φ_to_u,φ)
-  return u, du -> pullback(φ_to_u,u,du,φ;updated=true)
+  φh = FEFunction(get_aux_space(φ_to_u),φ)
+  return ChainRulesCore.rrule(φ_to_u,φh)
 end
 
 function StateParamIntegrandWithMeasure(f::Function,φ_to_u::AbstractFEStateMap)
@@ -266,12 +281,11 @@ get_measure(m::AffineFEStateMap) = m.biform.dΩ
 get_spaces(m::AffineFEStateMap) = m.spaces
 get_assemblers(m::AffineFEStateMap) = (m.fwd_caches[6],m.plb_caches[2],m.adj_caches[4])
 
-function forward_solve(φ_to_u::AffineFEStateMap,φ::AbstractVector)
+function forward_solve(φ_to_u::AffineFEStateMap,φh)
   biform, liform = φ_to_u.biform, φ_to_u.liform
-  U, V, V_φ, _ = φ_to_u.spaces
+  U, V, _, _ = φ_to_u.spaces
   ns, K, b, x, uhd, assem_U = φ_to_u.fwd_caches
 
-  φh = FEFunction(V_φ,φ)
   a_fwd(u,v) = biform(u,v,φh)
   l_fwd(v)   = liform(v,φh)
   assemble_matrix_and_vector!(a_fwd,l_fwd,K,b,assem_U,U,V,uhd)
@@ -285,10 +299,9 @@ function res_grad(φ_to_u::AffineFEStateMap,uh,vh,φh)
   return ∇(biform,[uh,vh,φh],3) - ∇(liform,[vh,φh],2)
 end
 
-function update_adjoint_caches!(φ_to_u::AffineFEStateMap,φ::AbstractVector)
+function update_adjoint_caches!(φ_to_u::AffineFEStateMap,uh,φh)
   adjoint_ns, adjoint_K, _, assem_adjoint = φ_to_u.adj_caches
-  U, V, V_φ, _ = φ_to_u.spaces
-  φh = FEFunction(V_φ,φ)
+  U, V, _, _ = φ_to_u.spaces
   assemble_matrix!((u,v) -> φ_to_u.biform(v,u,φh),adjoint_K,assem_adjoint,V,U)
   numerical_setup!(adjoint_ns,adjoint_K)
   return φ_to_u.adj_caches
@@ -310,12 +323,13 @@ end
 """
   NonlinearFEStateMap
 """
-struct NonlinearFEStateMap{A,B,C,D,E} <: LSTO_Distributed.AbstractFEStateMap
+struct NonlinearFEStateMap{A,B,C,D,E,F} <: LSTO_Distributed.AbstractFEStateMap
   res        :: A
-  spaces     :: B
-  plb_caches :: C
-  fwd_caches :: D
-  adj_caches :: E
+  jac        :: B
+  spaces     :: C
+  plb_caches :: D
+  fwd_caches :: E
+  adj_caches :: F
 
   function NonlinearFEStateMap(
     res::Function,U,V,V_φ,U_reg,φh,dΩ...;
@@ -326,6 +340,7 @@ struct NonlinearFEStateMap{A,B,C,D,E} <: LSTO_Distributed.AbstractFEStateMap
     adjoint_ls::LinearSolver = LUSolver()
   )
     res = IntegrandWithMeasure(res,dΩ)
+    jac = (u,du,dv,φh) -> jacobian(res,[u,dv,φh],1)
     spaces = (U,V,V_φ,U_reg)
 
     ## Pullback cache
@@ -336,35 +351,36 @@ struct NonlinearFEStateMap{A,B,C,D,E} <: LSTO_Distributed.AbstractFEStateMap
 
     ## Forward cache
     x = zero_free_values(U)
-    jac(u,du,dv) = jacobian(res,[u,dv,φh],1)
-    op = get_algebraic_operator(FEOperator(res,jac,U,V,assem_U))
+    _res(u,v) = res(u,v,φh)
+    _jac(u,du,dv) = jac(u,du,dv,φh)
+    op = get_algebraic_operator(FEOperator(_res,_jac,U,V,assem_U))
     nls_cache = instantiate_caches(x,nls,op)
     fwd_caches = (nls,nls_cache,x,assem_U)
 
     ## Adjoint cache
-    adjoint_K  = assemble_adjoint_matrix((u,v) -> jac(uhd,u,v),assem_adjoint,U,V)
+    _jac_adj(du,dv) = jac(uhd,du,dv,φh)
+    adjoint_K  = assemble_adjoint_matrix(_jac_adj,assem_adjoint,U,V)
     adjoint_x  = allocate_in_domain(adjoint_K); fill!(adjoint_x,zero(eltype(adjoint_x)))
     adjoint_ns = numerical_setup(symbolic_setup(adjoint_ls,adjoint_K),adjoint_K)
     adj_caches = (adjoint_ns,adjoint_K,adjoint_x,assem_adjoint)
     
-    A, B = typeof(res), typeof(spaces)
-    C, D, E = typeof(plb_caches), typeof(fwd_caches), typeof(adj_caches)
-    return new{A,B,C,D,E}(res,spaces,plb_caches,fwd_caches,adj_caches)
+    A, B, C = typeof(res), typeof(jac), typeof(spaces)
+    D, E, F = typeof(plb_caches), typeof(fwd_caches), typeof(adj_caches)
+    return new{A,B,C,D,E,F}(res,jac,spaces,plb_caches,fwd_caches,adj_caches)
   end
 end
 
 get_state(m::NonlinearFEStateMap) = m.fwd_caches[3]
 get_measure(m::NonlinearFEStateMap) = m.res.dΩ
-get_spaces(m::AffineFEStateMap) = m.spaces
-get_assemblers(m::AffineFEStateMap) = (m.fwd_caches[4],m.plb_caches[2],m.adj_caches[4])
+get_spaces(m::NonlinearFEStateMap) = m.spaces
+get_assemblers(m::NonlinearFEStateMap) = (m.fwd_caches[4],m.plb_caches[2],m.adj_caches[4])
 
-function forward_solve(φ_to_u::NonlinearFEStateMap,φ::AbstractVector)
-  res = φ_to_u.res
-  U, V, V_φ, _ = φ_to_u.spaces
+function forward_solve(φ_to_u::NonlinearFEStateMap,φh)
+  U, V, _, _ = φ_to_u.spaces
   nls, nls_cache, x, assem_U = φ_to_u.fwd_caches
 
-  φh = FEFunction(V_φ,φ)
-  jac(u,du,dv) = jacobian(res,[u,dv,φh],1)
+  res(u,v) = φ_to_u.res(u,v,φh)
+  jac(u,du,dv) = φ_to_u.jac(u,du,dv,φh)
   op = get_algebraic_operator(FEOperator(res,jac,U,V,assem_U))
   solve!(x,nls,op,nls_cache)
   return x
@@ -375,12 +391,11 @@ function res_grad(φ_to_u::NonlinearFEStateMap,uh,vh,φh)
   return ∇(res,[uh,vh,φh],3)
 end
 
-function update_adjoint_caches!(φ_to_u::NonlinearFEStateMap,φ::AbstractVector)
+function update_adjoint_caches!(φ_to_u::NonlinearFEStateMap,uh,φh)
   adjoint_ns, adjoint_K, _, assem_adjoint = φ_to_u.adj_caches
-  U, V, V_φ, _ = φ_to_u.spaces
-  φh = FEFunction(V_φ,φ)
-  jac(u,du,dv) = jacobian(res,[u,dv,φh],1)
-  assemble_adjoint_matrix!((u,v) -> jac(u,v,φh),adjoint_K,assem_adjoint,U,V)
+  U, V, _, _ = φ_to_u.spaces
+  jac(du,dv) =  φ_to_u.jac(uh,du,dv,φh)
+  assemble_adjoint_matrix!(jac,adjoint_K,assem_adjoint,U,V)
   numerical_setup!(adjoint_ns,adjoint_K)
   return φ_to_u.adj_caches
 end
