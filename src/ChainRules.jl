@@ -248,6 +248,7 @@ struct AffineFEStateMap{A,B,C,D,E,F} <: AbstractFEStateMap
     ls::LinearSolver = LUSolver(),
     adjoint_ls::LinearSolver = LUSolver()
   )
+    # TODO: I really want to get rid of the φh argument...
 
     biform = IntegrandWithMeasure(a,dΩ)
     liform = IntegrandWithMeasure(l,dΩ)
@@ -319,7 +320,7 @@ end
 """
   NonlinearFEStateMap
 """
-struct NonlinearFEStateMap{A,B,C,D,E,F} <: LSTO_Distributed.AbstractFEStateMap
+struct NonlinearFEStateMap{A,B,C,D,E,F} <: AbstractFEStateMap
   res        :: A
   jac        :: B
   spaces     :: C
@@ -551,26 +552,25 @@ PDEConstrainedFunctionals(J::Function,state_map::AbstractFEStateMap;analytic_dJ=
 
 get_state(m::PDEConstrainedFunctionals) = get_state(m.state_map)
 
-function evaluate_functionals!(pcf::PDEConstrainedFunctionals,φ::T) where T <: AbstractVector
+function evaluate_functionals!(pcf::PDEConstrainedFunctionals,φ::AbstractVector)
   u = pcf.state_map(φ)
   J = pcf.J; C = pcf.C
   return J(u,φ), map(Ci->Ci(u,φ),C)
 end
 
-function evaluate_derivatives!(pcf::PDEConstrainedFunctionals,φ::T) where T <: AbstractVector
+function evaluate_derivatives!(pcf::PDEConstrainedFunctionals,φ::AbstractVector)
   _,_,dJ,dC = _evaluate_derivatives(pcf,φ)
   return dJ,dC
 end
 
-function Gridap.evaluate!(pcf::PDEConstrainedFunctionals,φ::T) where T <: AbstractVector
+function Gridap.evaluate!(pcf::PDEConstrainedFunctionals,φ::AbstractVector)
   _evaluate_derivatives(pcf,φ)
 end
 
-function _evaluate_derivatives(pcf::PDEConstrainedFunctionals,φ::T) where T <: AbstractVector
-  J = pcf.J; C = pcf.C
-  dJ = pcf.dJ; dC = pcf.dC
-  analytic_dJ = pcf.analytic_dJ; 
-  analytic_dC = pcf.analytic_dC
+function _evaluate_derivatives(pcf::PDEConstrainedFunctionals,φ::AbstractVector)
+  J, C, dJ, dC = pcf.J,pcf.C,pcf.dJ,pcf.dC
+  analytic_dJ  = pcf.analytic_dJ
+  analytic_dC  = pcf.analytic_dC
   U = get_trial_space(pcf.state_map)
   V_φ = get_aux_space(pcf.state_map)
   U_reg = get_deriv_space(pcf.state_map)

@@ -8,165 +8,134 @@ abstract type AbstractOrthogMethod end
 (::AbstractOrthogMethod)(::AbstractArray{<:AbstractArray},::AbstractMatrix,cache) = @abstractmethod
 allocate_cache(::AbstractOrthogMethod,A::AbstractArray{<:AbstractArray},K::AbstractMatrix) = @abstractmethod
 
-## HilbertianProjectionHistory
-mutable struct HilbertianProjectionHistory
-  it      :: Int
-  const J :: Vector
-  const C :: Matrix
-  function HilbertianProjectionHistory(max_iters::Int,nconsts::Int)
-    J = zeros(max_iters+1);
-    C = zeros(max_iters+1,nconsts)
-    new(-1,J,C)
-  end
-end
 
-# Convienence 
-Base.last(m::HilbertianProjectionHistory) = (m.it,m.J[m.it+1],m.C[m.it+1,:])
 
-function write_history(m::HilbertianProjectionHistory,path;ranks=nothing)
-  it = m.it; J = m.J; C = m.C;
-  if i_am_main(ranks) 
-    data = @views zip(J[1:it],eachslice(C[1:it,:],dims=2)...)
-    writedlm(path,data)
-  end
-end
-
-function update!(m::HilbertianProjectionHistory,J,C)
-  m.it += 1
-  m.J[m.it+1] = J 
-  m.C[m.it+1,:] .= C
-  return nothing
-end
-
-struct HilbertianProjection{T<:AbstractOrthogMethod} <: AbstractOptimiser
-  λ                 :: Real
-  α_min             :: Real
-  α_max             :: Real
-  α                 :: Vector
-  max_iters         :: Int
-  history           :: HilbertianProjectionHistory
-  conv_criterion    :: Function
-  orthog_method     :: T
-  verbose
-  orthog_cache
-  line_search_cache
-  γ_cache
-  cache
+struct HilbertianProjection{T,N} <: AbstractOptimiser
+  problem   :: PDEConstrainedFunctionals{N}
+  stencil   :: AdvectionStencil
+  interp    :: MaterialInterpolation
+  vel_ext   :: VelocityExtension
+  orthog    :: OrthogonalisationMethod
+  history   :: OptimiserHistory{Float64}
+  converged :: Function
+  params    :: NamedTuple
   function HilbertianProjection(
-      φ::AbstractVector,
-      pcfs::PDEConstrainedFunctionals{N},
-      stencil,vel_ext,interp,el_size,γ,γ_reinit;
-      α_min = convert(eltype(φ),0.1),
-      α_max = convert(eltype(φ),1.0),
-      λ = convert(eltype(φ),0.5),
-      orthog_method::T = HPModifiedGramSchmidt(),
-      max_iters::Int = 1000,
-      conv_criterion::Function = conv_cond,
-      ls_max_iters::Int = 10,
-      ls_δ_inc = convert(eltype(φ),1.1),
-      ls_δ_dec = convert(eltype(φ),0.7),
-      ls_ξ = convert(eltype(φ),0.005),
-      ls_ξ_reduce_coef = convert(eltype(φ),0.1),
-      ls_ξ_reduce_abs_tol = convert(eltype(φ),0.01),
-      ls_γ_min = convert(eltype(φ),0.001),
-      ls_γ_max = convert(eltype(φ),0.1),
-      verbose=nothing) where {N,T<:AbstractOrthogMethod}
+    problem :: PDEConstrainedFunctionals{N},
+    stencil :: AdvectionStencil,
+    interp  :: MaterialInterpolation,
+    vel_ext :: VelocityExtension;
+    orthog = HPModifiedGramSchmidt(),
+    λ=0.5, α_min=0.1, α_max=1.0, γ=0.1, γ_reinit=0.5,
+    ls_max_iters = 10, ls_δ_inc = 1.1, ls_δ_dec = 0.7,
+    ls_ξ = 0.005, ls_ξ_reduce_coef = 0.1, ls_ξ_reduce_abs_tol = 0.01,
+    ls_γ_min = 0.001, ls_γ_max = 0.1,
+    maxiter = 1000, verbose=false, constraint_names = map(i -> Symbol("C_$i"),1:N),
+    converged::Function = default_al_converged
+  ) where {N}
 
-    V_φ = get_aux_space(pcfs.state_map)
-    history = HilbertianProjectionHistory(max_iters,N)
-    vel = get_free_dof_values(interpolate(0,V_φ))
-    dC = pcfs.dC;
-    α = zeros(eltype(φ),length(dC))
-    orthog_cache = allocate_cache(orthog_method,dC,vel_ext.K)
-    φ_tmp = zero(φ);
-    cache = (φ,φ_tmp,pcfs,stencil,vel_ext,interp,vel,el_size)
-    line_search_cache = (ls_max_iters,ls_δ_inc,ls_δ_dec,ls_ξ,
-      ls_ξ_reduce_coef,ls_ξ_reduce_abs_tol,ls_γ_min,ls_γ_max);
-    γ_cache = [γ,γ_reinit]
-    new{T}(λ,α_min,α_max,α,max_iters,history,conv_criterion,
-      orthog_method,verbose,orthog_cache,line_search_cache,γ_cache,cache)
+    al_keys = [:J,constraint_names...]
+    al_bundles = Dict(:C => constraint_names)
+    history = OptimiserHistory(Float64,al_keys,al_bundles,maxiter,verbose)
+
+    params = (;λ,α_min,α_max,γ,γ_reinit,ls_max_iters,ls_δ_inc,ls_δ_dec,ls_ξ,
+      ls_ξ_reduce_coef,ls_ξ_reduce_abs_tol,ls_γ_min,ls_γ_max)
+    T = typeof(orthog)
+    new{T,N}(problem,stencil,interp,vel_ext,orthog,history,converged,params)
   end
 end
 
-get_optimiser_history(m::HilbertianProjection) = m.history
-get_level_set(m::HilbertianProjection) = FEFunction(get_aux_space(m.cache[3]),first(m.cache))
+get_history(m::HilbertianProjection) = m.history
 
-# Stopping criterion
-function conv_cond(m::HilbertianProjection;coef=1/5)
-  _,_,_,_,_,_,_,el_size = m.cache
-  history = m.history
-  it,Ji,Ci = last(history)
-
-  return it > 10 && (all(@.(abs(Ji-history.J[it-5:it])) .< coef/maximum(el_size)*abs(Ji)) &&
-    all(@. abs(Ci) < 0.001))
+function default_hp_converged(m::AugmentedLagrangian;L_tol=0.001,C_tol=0.001)
+  h, params = m.history, m.params
+  it = get_last_iteration(h)
+  s  = h[it]
+  Ji, Ci = s.J, s.C
+  # TODO: How do we input the element size here? 
+  A = all(J -> abs(Ji - J)/abs(Ji) < J_tol, h.J[it-5:it])
+  B = all(C -> abs(C) < C_tol, Ci)
+  return (it > 10) && A && B
 end
 
 # 0th iteration
 function Base.iterate(m::HilbertianProjection)
-  φ,φ_tmp,pcfs,_,vel_ext,_,_,_ = m.cache
-  K = vel_ext.K; verbose=m.verbose
+  K = vel_ext.K; verbose=m.
+  
+  history, params = m.history, m.params 
+
   ## Compute FE problem and shape derivatives
-  J_init,C_init,dJ,dC = Gridap.evaluate!(pcfs,φ)
-  update!(m.history,J_init,C_init)
+  J, C, dJ, dC = Gridap.evaluate!(m.problem,φh)
+  uh  = get_state(m.problem)
+  vel = copy(get_free_dof_values(φh))
+
   ## Hilbertian extension-regularisation
-  project!(vel_ext,dJ)
-  project!(vel_ext,dC)
+  project!(m.vel_ext,dJ)
+  project!(m.vel_ext,dC)
+
   ## Compute descent direction θ and store in dJ
   θ = update_descent_direction!(m,dJ,dJ,C_init,dC,K;verbose=verbose)
-  return m.history,θ
+  
+  # Update history and build state
+  push!(history,(J,C))
+  state = (0,J,C,θ,dJ,dC,uh,φh,vel,params.γ,params.γ_reinit)
+  return (0,uh,φh), state
 end
 
 # ith iteration
-function Base.iterate(m::HilbertianProjection,θ)
-  φ,φ_tmp,pcfs,stencil,vel_ext,_,vel,_ = m.cache
-  ls_max_iters,δ_inc,δ_dec,ξ,ξ_reduce,
-    ξ_reduce_tol,γ_min,γ_max = m.line_search_cache
-  conv_criterion = m.conv_criterion
-  U_reg = get_deriv_space(pcfs.state_map)
-  V_φ = get_aux_space(pcfs.state_map)
-  history = m.history
-  it = history.it
-  J_prev = iszero(it) ? 0 : history.J[it]
-  γ,γ_reinit = m.γ_cache
-  verbose = m.verbose
+function Base.iterate(m::HilbertianProjection,state)
+  it, J, C, θ, dJ, dC, uh, φh, vel, γ, γ_reinit = state
+  history, params = m.history, m.params
+  it = it + 1
+
   ## Line search
   interpolate!(FEFunction(U_reg,θ),vel,V_φ)
-  copy!(φ_tmp,φ);
-  for _ ∈ Base.OneTo(ls_max_iters)
-    ## Advect  & Reinitialise
+  
+  ls_max_iters,δ_inc,δ_dec,ξ = params.ls_max_iters,params.ls_δ_inc,params.ls_δ_dec
+  ξ, ξ_reduce, ξ_reduce_tol = params.ls_ξ, params.ls_ξ_reduce_coef, params.ls_ξ_reduce_abs_tol
+  γ_min, γ_max = params.ls_γ_min,params.ls_γ_max
+  
+  ls_it = 0; done = false; copy!(φ_tmp,φ);
+  while !done && (ls_it <= ls_max_iters)
+    # Advect  & Reinitialise
     advect!(stencil,φ,vel,γ)
     reinit!(stencil,φ,γ_reinit)
-    ## Calcuate new objective and constraints
-    J_interm,C_interm = evaluate_functionals!(pcfs,φ)
-    ## Reduce line search parameter if constraints close to saturation
-    _ξ = all(@. abs(C_interm) < ξ_reduce_tol) ? ξ*ξ_reduce : ξ
-    ## Accept/reject
-    if J_interm < J_prev + _ξ*abs(J_prev) || γ <= γ_min || iszero(it)
-      γ = min(δ_inc*γ,γ_max)
-      ~isnothing(verbose) && i_am_main(verbose) ?
-        printstyled("  Accepted iteration with γ = ",γ,"\n";color = :yellow) : 0;
-      break
+
+    # Calcuate new objective and constraints
+    J_interm, C_interm = evaluate_functionals!(m.problem,φh)
+
+    # Reduce line search parameter if constraints close to saturation
+    _ξ = all(Ci -> abs(Ci) < ξ_reduce_tol, C_interm) ? ξ*ξ_reduce : ξ
+
+    # Accept/reject
+    if (J_interm < J + _ξ*abs(J)) || (γ <= γ_min)
+      γ = min(δ_inc*γ, γ_max)
+      done = true
+      print_msg(history,"  Accepted iteration with γ = $(γ) \n";color=:yellow)
     else
-      γ = max(δ_dec*γ,γ_min)
-      copy!(φ,φ_tmp);
-      ~isnothing(verbose) && i_am_main(verbose) ?
-        printstyled("  Reject iteration with γ = ",γ,"\n"; color = :red) : 0;
+      γ = max(δ_dec*γ, γ_min)
+      copy!(φ,φ_tmp)
+      print_msg(history,"  Reject iteration with γ = $(γ) \n";color=:red)
     end
   end
-  m.γ_cache[1] = γ
+
   ## Calculate objective, constraints, and shape derivatives after line search
-  J_new,C_new,dJ,dC = Gridap.evaluate!(pcfs,φ)
+  J, C, dJ, dC = Gridap.evaluate!(m.problem,φh)
+
   ## Hilbertian extension-regularisation
   project!(vel_ext,dJ)
   project!(vel_ext,dC)
+
   ## Compute descent direction θ and store in dJ
-  θ = update_descent_direction!(m,dJ,dJ,C_new,dC,vel_ext.K;verbose=verbose)
-  ## History
-  update!(history,J_new,C_new)
-  if conv_criterion(m) || it + 1 >= m.max_iters
+  θ = update_descent_direction!(m,dJ,dJ,C_new,dC,vel_ext.K)
+
+  ## Update history and build state
+  push!(history,(J,C))
+  state = (it, J, C, θ, dJ, dC, uh, φh, vel, γ, γ_reinit)
+
+  if finished(m)
     return nothing
   else
-    return history,θ
+    return (it,uh,φh), state
   end
 end
 
@@ -343,29 +312,3 @@ function verbose_print(orthog,dV,dC,dC_orthog,K,P,λ,nullity,debug_code,verbose)
     end
   end
 end
-
-# using SparseArrays
-# function test(n,k)
-#   λ,α_min,α_max = 0.1,0.01,1.0
-#   debug = true
-
-#   C = rand(n)
-#   dC = [rand(k) for _ = 1:n];
-#   α = zeros(n)
-#   dC[1] = dC[2] = dC[3];
-#   _M = sprand(Float64,k,k,0.1)
-#   K = 0.5*(_M+_M') + k*I;
-#   dV = K\rand(k)
-#   P = zero(dV)
-
-#   mgs_hp = HPModifiedGramSchmidt()
-#   dC_orthog,normsq,nullity = mgs_hp(dC,K);
-  
-#   dV_norm = project_dV!(dV,dC_orthog,normsq,K,P)
-
-#   ∑α²,debug_code = compute_α!(α,C,dC_orthog,dC,normsq,K,P,λ,α_min,α_max)
-
-#   verbose_print(mgs_hp,dV,dC,dC_orthog,K,P,λ,nullity,debug_code,debug)
-# end
-
-# test(5,10);

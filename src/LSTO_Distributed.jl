@@ -25,6 +25,7 @@ using PartitionedArrays: getany, tuple_of_arrays, matching_ghost_indices
 
 using GridapSolvers
 using GridapSolvers.LinearSolvers, GridapSolvers.NonlinearSolvers, GridapSolvers.BlockSolvers
+using GridapSolvers.SolverInterfaces: SolverVerboseLevel, SOLVER_VERBOSE_NONE, SOLVER_VERBOSE_LOW, SOLVER_VERBOSE_HIGH
 
 include("GridapExtensions.jl")
 

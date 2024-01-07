@@ -33,7 +33,9 @@ end
 function update!(m::AugmentedLagrangianHistory,J,C,L)
   m.it += 1
   m.J[m.it+1] = J 
-  length(C)>0 ? m.C[m.it+1,:] .= C : nothing 
+  if !isempty(C) # length(C)>0 
+    m.C[m.it+1,:] .= C
+  end
   m.L[m.it+1] = L
   return nothing
 end
@@ -99,7 +101,7 @@ function conv_cond(m::AugmentedLagrangian;coef=1/5)
   return it > 10 && (all(@.(abs(Li-history.L[it-5:it])) .< coef/maximum(el_size)*abs(Li)) &&
     all(@. abs(Ci) < 0.001))
 end
-  
+
 # 0th iteration
 function Base.iterate(m::AugmentedLagrangian)
   φ,pcfs,_,vel_ext,_,_,_ = m.cache
@@ -118,7 +120,7 @@ function Base.iterate(m::AugmentedLagrangian)
   project!(vel_ext,dL)
   return m.history,dL
 end
-  
+
 # ith iteration
 function Base.iterate(m::AugmentedLagrangian,dL)
   φ,pcfs,stencil,vel_ext,_,vel,_ = m.cache
