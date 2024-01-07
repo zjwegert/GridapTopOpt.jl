@@ -327,8 +327,8 @@ end
 
 function reinit!(s::AdvectionStencil{O},φ::PVector,γ) where O
   φ_tmp, vel_tmp, perm_caches, stencil_cache = s.cache
-  Δ, isperiodic,  = s.params.Δ, s.params.isperiodic
-  ndof, max_steps = s.params.ndof, s.params.max_steps_reinit
+  Δ, isperiodic, ndof  = s.params.Δ, s.params.isperiodic, s.params.ndof
+  tol, max_steps = s.params.tol, s.params.max_steps_reinit
 
   _φ = (O >= 2) ? permute!(perm_caches[1],φ,s.perm) : φ
 
@@ -340,7 +340,7 @@ function reinit!(s::AdvectionStencil{O},φ::PVector,γ) where O
 
   # Apply operations across partitions
   step = 1; err = maximum(abs,φ); fill!(φ_tmp,0.0)
-  while (err > s.tol) && (step <= max_steps) 
+  while (err > tol) && (step <= max_steps) 
     # Step of 1st order upwind reinitialisation equation
     map(local_views(φ_tmp),local_views(_φ),local_views(vel_tmp),stencil_cache,ndof) do φ_tmp,_φ,vel_tmp,stencil_cache,S
       φ_tmp_mat   = reshape(φ_tmp,S)
@@ -364,8 +364,8 @@ end
 
 function reinit!(s::AdvectionStencil{O},φ::Vector,γ) where O
   isperiodic, Δ, ndof, φ_tmp, vel_tmp, perm_caches, stencil_cache = s.cache
-  Δ, isperiodic,  = s.params.Δ, s.params.isperiodic
-  ndof, max_steps = s.params.ndof, s.params.max_steps_reinit
+  Δ, isperiodic, ndof = s.params.Δ, s.params.isperiodic, s.params.ndof
+  tol, max_steps = s.params.tol, s.params.max_steps_reinit
 
   _φ = (O >= 2) ? permute!(perm_caches[1],φ,s.perm) : φ
 
@@ -377,7 +377,7 @@ function reinit!(s::AdvectionStencil{O},φ::Vector,γ) where O
 
   # Apply operations across partitions
   step = 1; err = maximum(abs,φ); fill!(φ_tmp,0.0)
-  while (err > s.tol) && (step <= max_steps) 
+  while (err > tol) && (step <= max_steps) 
     # Step of 1st order upwind reinitialisation equation
     φ_tmp_mat   = reshape(φ_tmp,ndof)
     φ_mat       = reshape(_φ,ndof)
