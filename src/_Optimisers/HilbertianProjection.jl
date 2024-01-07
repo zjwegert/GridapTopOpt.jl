@@ -42,12 +42,16 @@ end
 
 get_history(m::HilbertianProjection) = m.history
 
-function default_hp_converged(m::AugmentedLagrangian;L_tol=0.001,C_tol=0.001)
+function default_hp_converged(
+  m::AugmentedLagrangian;
+  J_tol=0.2*maximum(m.stencil.params.Δ),
+  C_tol=0.001
+)
   h, params = m.history, m.params
   it = get_last_iteration(h)
   s  = h[it]
   Ji, Ci = s.J, s.C
-  # TODO: How do we input the element size here? 
+
   A = all(J -> abs(Ji - J)/abs(Ji) < J_tol, h.J[it-5:it])
   B = all(C -> abs(C) < C_tol, Ci)
   return (it > 10) && A && B

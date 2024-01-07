@@ -36,12 +36,16 @@ function converged(m::AugmentedLagrangian)
   return m.converged(m.h)
 end
 
-function default_al_converged(m::AugmentedLagrangian;L_tol=0.001,C_tol=0.001)
+function default_al_converged(
+  m::AugmentedLagrangian;
+  L_tol=0.2*maximum(m.stencil.params.Δ),
+  C_tol=0.001
+)
   h, params = m.history, m.params
   it = get_last_iteration(h)
   s  = h[it]
   Li, Ci = s.L, s.C
-  # TODO: How do we input the element size here? 
+
   A = all(L -> abs(Li - L)/abs(Li) < L_tol,h.L[it-5:it])
   B = all(C -> abs(C) < C_tol,Ci)
   return (it > 10) && A && B
