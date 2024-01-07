@@ -1,10 +1,13 @@
 """
-  AbstractOptimiser
+  abstract type Optimiser end
 
   Your own optimiser can be implemented by implementing 
     concrete functionality of the below.
 """
 abstract type Optimiser end
+
+Base.IteratorEltype(::Type{<:Optimiser}) = Base.EltypeUnknown()
+Base.IteratorSize(::Type{<:Optimiser}) = Base.SizeUnknown()
 
 # Return tuple of first iteration state
 function Base.iterate(::Optimiser)
@@ -16,6 +19,12 @@ function Base.iterate(::Optimiser,state)
   @abstractmethod
 end
 
+get_history(::Optimiser) :: OptimiserHistory = @abstractmethod
+
+function converged(::Optimiser)
+  @abstractmethod
+end
+
 function finished(m::Optimiser) :: Bool
   h = get_history(m)
 
@@ -24,8 +33,6 @@ function finished(m::Optimiser) :: Bool
   B = it + 1 >= h.maxiter
   return A || B
 end
-
-get_history(::Optimiser) :: OptimiserHistory = @abstractmethod
 
 function print_msg(opt::Optimiser,msg::String;kwargs...) 
   print_msg(get_optimiser_history(opt),msg;kwargs...)
@@ -64,7 +71,6 @@ Base.iterate(h::OptimiserHistory) = iterate(h,-1)
 Base.iterate(h::OptimiserHistory,it::Int) = (it < h.niter) ? (h[it+1],it+1) : nothing
 
 function Base.getindex(h::OptimiserHistory,k::Symbol,it::Union{<:Integer,<:UnitRange{<:Integer}})
-  @assert (it <= h.niter)
   if haskey(h.values,k)
     return h.values[k][it.+1]
   elseif haskey(h.bundles,k)

@@ -133,64 +133,54 @@ end
 
 # Advection stencil
 struct AdvectionStencil{O}
-  stencil   :: Stencil
+  stencil :: Stencil
   model
   space
   perm
-  max_steps
-  max_steps_reinit
-  tol
+  params
   cache
 end
 
-function AdvectionStencil(stencil::Stencil,
-                          model::CartesianDiscreteModel,
-                          space::FESpace,
-                          Δ::Tuple,
-                          max_steps::Int,
-                          tol::T; 
-                          max_steps_reinit::Int = 2000) where T
-  ## Get DoF description and permutation
+function AdvectionStencil(
+  stencil::Stencil,
+  model,
+  space,
+  tol=1.e-3,
+  max_steps=100,
+  max_steps_reinit=2000
+)
+  # Parameters
+  order, isperiodic, Δ, ndof = get_stencil_params(model,space)
+  params = (;isperiodic,Δ,ndof,max_steps,max_steps_reinit,tol)
+
+  # Dof permutation
+  perm = create_dof_permutation(model,space,order)
+
+  # Caches
+  φ, vel = zero_free_values(space), zero_free_values(space)
+  cache  = allocate_caches(stencil,φ,vel,perm,order,ndof)
+
+  return AdvectionStencil{order}(stencil,model,space,perm,params,cache)
+end
+
+function get_stencil_params(model::CartesianDiscreteModel,space::FESpace)
   order = get_order(first(Gridap.CellData.get_data(get_fe_basis(space))))
   desc = get_cartesian_descriptor(model)
   isperiodic = desc.isperiodic
-  ndof = order .* desc.partition .+ 1 .* (.~isperiodic)
-  perm = create_dof_permutation(model,space,order)
-  
-  ## Cache
-  _φ = get_free_dof_values(zero(space));
-  vel = get_free_dof_values(zero(space));
-  _cache = allocate_caches(stencil,_φ,vel,perm,order,ndof)
-  cache = (isperiodic,Δ,ndof,_cache...)
-
-  return AdvectionStencil{order}(
-    stencil,model,space,perm,max_steps,max_steps_reinit,tol,cache)
+  ndof = order .* desc.partition .+ 1 .- isperiodic
+  Δ = desc.sizes ./ order
+  return order, isperiodic, Δ, ndof
 end
 
-function AdvectionStencil(stencil::Stencil,
-                          model::DistributedDiscreteModel,
-                          space::DistributedFESpace,
-                          Δ::Tuple,max_steps::Int,tol::T; max_steps_reinit::Int = 500) where T
-  ## Get DoF description and permutation
-  isperiodic = getany(map(x->get_cartesian_descriptor(x).isperiodic,local_views(model)))
-
-  order, local_ndofs = map(local_views(model),local_views(space)) do model, space
-    order = get_order(first(Gridap.CellData.get_data(get_fe_basis(space))))
-    desc  = get_cartesian_descriptor(model)
-    ndof = order .* desc.partition .+ 1
-    return order, ndof
+function get_stencil_params(model::DistributedDiscreteModel,space::DistributedFESpace)
+  order, isperiodic, Δ, ndof = map(local_views(model),local_views(space)) do model, space
+    get_stencil_params(model,space)
   end |> PartitionedArrays.tuple_of_arrays
+  
+  isperiodic = getany(isperiodic)
   order = getany(order)
-
-  ## Cache
-  perm = create_dof_permutation(model,space,order)
-  _φ = get_free_dof_values(zero(space));
-  vel = get_free_dof_values(zero(space));
-  _cache = allocate_caches(stencil,_φ,vel,perm,order,local_ndofs)
-  cache = (isperiodic,Δ,local_ndofs,_cache...)
-
-  return AdvectionStencil{order}(
-    stencil,model,space,perm,max_steps,max_steps_reinit,tol,cache)
+  Δ = getany(Δ)
+  return order, isperiodic, Δ, ndof
 end
 
 Gridap.ReferenceFEs.get_order(f::Gridap.Fields.LinearCombinationFieldVector) = get_order(f.fields)
@@ -293,19 +283,21 @@ function permute_inv!(x_out::PVector,x_in::PVector,perm)
 end
 
 function advect!(s::AdvectionStencil{O},φ::PVector,vel::PVector,γ) where O
-  isperiodic, Δ, local_ndof, _, _, perm_caches, local_stencil_caches = s.cache
+  _, _, perm_caches, stencil_cache = s.cache
+  Δ, isperiodic,  = s.params.Δ, s.params.isperiodic
+  ndof, max_steps = s.params.ndof, s.params.max_steps
 
   _φ   = (O >= 2) ? permute!(perm_caches[1],φ,s.perm) : φ
   _vel = (O >= 2) ? permute!(perm_caches[2],vel,s.perm) : vel
 
   ## CFL Condition (requires γ≤1.0)
   Δt = compute_Δt(s.stencil,Δ,γ,φ,vel)
-  for _ ∈ Base.OneTo(s.max_steps)
+  for _ in 1:max_steps
     # Apply operations across partitions
-    map(local_views(_φ),local_views(_vel),local_stencil_caches,local_ndof) do _φ,_vel,stencil_caches,S
+    map(local_views(_φ),local_views(_vel),stencil_cache,ndof) do _φ,_vel,stencil_cache,S
       φ_mat   = reshape(_φ,S)
       vel_mat = reshape(_vel,S)
-      advect!(s.stencil,φ_mat,vel_mat,Δt,Δ,isperiodic,stencil_caches)
+      advect!(s.stencil,φ_mat,vel_mat,Δt,Δ,isperiodic,stencil_cache)
     end
     # Update ghost nodes
     consistent!(_φ) |> fetch
@@ -315,14 +307,16 @@ function advect!(s::AdvectionStencil{O},φ::PVector,vel::PVector,γ) where O
 end
 
 function advect!(s::AdvectionStencil{O},φ::Vector,vel::Vector,γ) where O
-  isperiodic, Δ, ndof, _, _, perm_caches, stencil_cache = s.cache
+  _, _, perm_caches, stencil_cache = s.cache
+  Δ, isperiodic,  = s.params.Δ, s.params.isperiodic
+  ndof, max_steps = s.params.ndof, s.params.max_steps
 
   _φ   = (O >= 2) ? permute!(perm_caches[1],φ,s.perm) : φ
   _vel = (O >= 2) ? permute!(perm_caches[2],vel,s.perm) : vel
 
   ## CFL Condition (requires γ≤1.0)
   Δt = compute_Δt(s.stencil,Δ,γ,φ,vel)
-  for _ ∈ Base.OneTo(s.max_steps)
+  for _ in 1:max_steps
     φ_mat   = reshape(_φ,ndof)
     vel_mat = reshape(_vel,ndof)
     advect!(s.stencil,φ_mat,vel_mat,Δt,Δ,isperiodic,stencil_cache)
@@ -332,26 +326,27 @@ function advect!(s::AdvectionStencil{O},φ::Vector,vel::Vector,γ) where O
 end
 
 function reinit!(s::AdvectionStencil{O},φ::PVector,γ) where O
-  isperiodic, Δ, local_ndof, φ_tmp, vel_tmp, perm_caches, local_stencil_caches = s.cache
+  φ_tmp, vel_tmp, perm_caches, stencil_cache = s.cache
+  Δ, isperiodic,  = s.params.Δ, s.params.isperiodic
+  ndof, max_steps = s.params.ndof, s.params.max_steps_reinit
 
   _φ = (O >= 2) ? permute!(perm_caches[1],φ,s.perm) : φ
 
   # Compute approx sign function S
-  pΔ = prod(Δ)
-  vel_tmp = @. _φ / sqrt(_φ*_φ + pΔ)
+  vel_tmp = @. _φ / sqrt(_φ*_φ + prod(Δ))
 
   ## CFL Condition (requires γ≤0.5)
   Δt = compute_Δt(s.stencil,Δ,γ,_φ,1.0) # As inform(vel_tmp) = 1.0
 
   # Apply operations across partitions
   step = 1; err = maximum(abs,φ); fill!(φ_tmp,0.0)
-  while (err > s.tol) && (step <= s.max_steps_reinit) 
+  while (err > s.tol) && (step <= max_steps) 
     # Step of 1st order upwind reinitialisation equation
-    map(local_views(φ_tmp),local_views(_φ),local_views(vel_tmp),local_stencil_caches,local_ndof) do φ_tmp,_φ,vel_tmp,stencil_caches,S
+    map(local_views(φ_tmp),local_views(_φ),local_views(vel_tmp),stencil_cache,ndof) do φ_tmp,_φ,vel_tmp,stencil_cache,S
       φ_tmp_mat   = reshape(φ_tmp,S)
       φ_mat       = reshape(_φ,S)
       vel_tmp_mat = reshape(vel_tmp,S)
-      reinit!(s.stencil,φ_tmp_mat,φ_mat,vel_tmp_mat,Δt,Δ,isperiodic,stencil_caches)
+      reinit!(s.stencil,φ_tmp_mat,φ_mat,vel_tmp_mat,Δt,Δ,isperiodic,stencil_cache)
     end
 
     # Compute error
@@ -369,19 +364,20 @@ end
 
 function reinit!(s::AdvectionStencil{O},φ::Vector,γ) where O
   isperiodic, Δ, ndof, φ_tmp, vel_tmp, perm_caches, stencil_cache = s.cache
+  Δ, isperiodic,  = s.params.Δ, s.params.isperiodic
+  ndof, max_steps = s.params.ndof, s.params.max_steps_reinit
 
   _φ = (O >= 2) ? permute!(perm_caches[1],φ,s.perm) : φ
 
   # Compute approx sign function S
-  pΔ = prod(Δ)
-  vel_tmp .= @. _φ / sqrt(_φ*_φ + pΔ)
+  vel_tmp .= @. _φ / sqrt(_φ*_φ + prod(Δ))
 
   ## CFL Condition (requires γ≤0.5)
   Δt = compute_Δt(s.stencil,Δ,γ,_φ,1.0)
 
   # Apply operations across partitions
   step = 1; err = maximum(abs,φ); fill!(φ_tmp,0.0)
-  while (err > s.tol) && (step <= s.max_steps_reinit) 
+  while (err > s.tol) && (step <= max_steps) 
     # Step of 1st order upwind reinitialisation equation
     φ_tmp_mat   = reshape(φ_tmp,ndof)
     φ_mat       = reshape(_φ,ndof)
