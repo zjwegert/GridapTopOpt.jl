@@ -1,8 +1,7 @@
 
-struct AugmentedLagrangian{N} <: AbstractOptimiser
+struct AugmentedLagrangian{N} <: Optimiser
   problem   :: PDEConstrainedFunctionals{N}
   stencil   :: AdvectionStencil
-  interp    :: MaterialInterpolation
   vel_ext   :: VelocityExtension
   history   :: OptimiserHistory{Float64}
   converged :: Function
@@ -10,7 +9,6 @@ struct AugmentedLagrangian{N} <: AbstractOptimiser
   function AugmentedLagrangian(
     problem :: PDEConstrainedFunctionals{N},
     stencil :: AdvectionStencil,
-    interp  :: MaterialInterpolation,
     vel_ext :: VelocityExtension;
     Λ_max = 5.0, ζ = 1.1, update_mod = 5, γ = 0.1, γ_reinit = 0.5,
     maxiter = 1000, verbose=false, constraint_names = map(i -> Symbol("C_$i"),1:N),
@@ -22,7 +20,7 @@ struct AugmentedLagrangian{N} <: AbstractOptimiser
     history = OptimiserHistory(Float64,al_keys,al_bundles,maxiter,verbose)
 
     params = (;Λ_max,ζ,update_mod,γ,γ_reinit)
-    new{N}(problem,stencil,interp,vel_ext,history,converged,params)
+    new{N}(problem,stencil,vel_ext,history,converged,params)
   end
 end
 

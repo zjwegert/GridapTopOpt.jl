@@ -37,15 +37,6 @@ export get_state
 export evaluate_functionals!
 export evaluate_derivatives!
 
-include("Optimisers/Optimisers.jl")
-export AbstractOptimiser
-export get_optimiser_history
-export get_level_set
-export write_history
-export AugmentedLagrangian
-export HilbertianProjection
-export HPModifiedGramSchmidt
-
 include("Utilities.jl")
 export gen_lsf
 export get_Δ
@@ -73,5 +64,14 @@ export project!
 
 include("MaterialInterpolation.jl")
 export SmoothErsatzMaterialInterpolation
+
+include("_Optimisers/Optimisers.jl")
+export AbstractOptimiser
+export get_optimiser_history
+export get_level_set
+export write_history
+export AugmentedLagrangian
+export HilbertianProjection
+export HPModifiedGramSchmidt
 
 end

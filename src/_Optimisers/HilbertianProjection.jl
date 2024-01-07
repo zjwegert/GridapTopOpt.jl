@@ -1,19 +1,16 @@
 # Orthogonalisation method
 """
-  AbstractOrthogMethod
+  OrthogonalisationMethod
 
   Method must return C_orthog, normsq, nullity.
 """
-abstract type AbstractOrthogMethod end
-(::AbstractOrthogMethod)(::AbstractArray{<:AbstractArray},::AbstractMatrix,cache) = @abstractmethod
-allocate_cache(::AbstractOrthogMethod,A::AbstractArray{<:AbstractArray},K::AbstractMatrix) = @abstractmethod
+abstract type OrthogonalisationMethod end
+(::OrthogonalisationMethod)(::AbstractArray{<:AbstractArray},::AbstractMatrix,cache) = @abstractmethod
+allocate_cache(::OrthogonalisationMethod,A::AbstractArray{<:AbstractArray},K::AbstractMatrix) = @abstractmethod
 
-
-
-struct HilbertianProjection{T,N} <: AbstractOptimiser
+struct HilbertianProjection{T,N} <: Optimiser
   problem   :: PDEConstrainedFunctionals{N}
   stencil   :: AdvectionStencil
-  interp    :: MaterialInterpolation
   vel_ext   :: VelocityExtension
   orthog    :: OrthogonalisationMethod
   history   :: OptimiserHistory{Float64}
@@ -22,7 +19,6 @@ struct HilbertianProjection{T,N} <: AbstractOptimiser
   function HilbertianProjection(
     problem :: PDEConstrainedFunctionals{N},
     stencil :: AdvectionStencil,
-    interp  :: MaterialInterpolation,
     vel_ext :: VelocityExtension;
     orthog = HPModifiedGramSchmidt(),
     λ=0.5, α_min=0.1, α_max=1.0, γ=0.1, γ_reinit=0.5,
@@ -40,7 +36,7 @@ struct HilbertianProjection{T,N} <: AbstractOptimiser
     params = (;λ,α_min,α_max,γ,γ_reinit,ls_max_iters,ls_δ_inc,ls_δ_dec,ls_ξ,
       ls_ξ_reduce_coef,ls_ξ_reduce_abs_tol,ls_γ_min,ls_γ_max)
     T = typeof(orthog)
-    new{T,N}(problem,stencil,interp,vel_ext,orthog,history,converged,params)
+    new{T,N}(problem,stencil,vel_ext,orthog,history,converged,params)
   end
 end
 
@@ -232,7 +228,7 @@ end
 
   High performance modified Gram-Schmidt. Based on https://doi.org/10.1007/s13160-019-00356-4.
 """
-struct HPModifiedGramSchmidt <: AbstractOrthogMethod end
+struct HPModifiedGramSchmidt <: OrthogonalisationMethod end
 
 function (m::HPModifiedGramSchmidt)(A::AbstractArray{<:AbstractArray},K::AbstractMatrix)
   cache = allocate_cache(m,A,K)
