@@ -68,8 +68,7 @@ export SmoothErsatzMaterialInterpolation
 
 include("_Optimisers/Optimisers.jl")
 export AbstractOptimiser
-export get_optimiser_history
-export get_level_set
+export get_history
 export write_history
 export AugmentedLagrangian
 export HilbertianProjection

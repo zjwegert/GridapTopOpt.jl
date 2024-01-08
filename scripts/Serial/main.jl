@@ -39,8 +39,8 @@ function main()
   ## Triangulations and measures
   Ω = Triangulation(model)
   Γ_N = BoundaryTriangulation(model,tags="Gamma_N")
-  dΩ = Measure(Ω,2order)
-  dΓ_N = Measure(Γ_N,2order)
+  dΩ = Measure(Ω,2*order)
+  dΓ_N = Measure(Γ_N,2*order)
 
   ## Spaces
   reffe_scalar = ReferenceFE(lagrangian,Float64,order)
@@ -90,4 +90,4 @@ function main()
   # write_history(optimiser.history,path*"/history.csv")
 end
 
-main();
+main()

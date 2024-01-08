@@ -40,8 +40,8 @@ function main()
   ## Triangulations and measures
   Ω = Triangulation(model)
   Γ_N = BoundaryTriangulation(model,tags="Gamma_N")
-  dΩ = Measure(Ω,2order)
-  dΓ_N = Measure(Γ_N,2order)
+  dΩ = Measure(Ω,2*order)
+  dΓ_N = Measure(Γ_N,2*order)
 
   ## Spaces
   reffe_scalar = ReferenceFE(lagrangian,Float64,order)
@@ -53,7 +53,6 @@ function main()
 
   ## Create FE functions
   φh = interpolate(gen_lsf(4,0.2),V_φ);
-  φ = get_free_dof_values(φh)
 
   ## Interpolation and weak form
   interp = SmoothErsatzMaterialInterpolation(η = η_coeff*maximum(Δ))
@@ -70,8 +69,8 @@ function main()
   J = (u,φ,dΩ,dΓ_N) -> ∫((I ∘ φ)*(D ∘ u)*∇(u)⋅∇(u) + ξ*(ρ ∘ φ))dΩ
 
   ## Finite difference solver and level set function
-  stencil = AdvectionStencil(FirstOrderStencil(2,Float64),model,V_φ,Δ./order,max_steps,tol)
-  reinit!(stencil,φ,γ_reinit)
+  stencil = AdvectionStencil(FirstOrderStencil(2,Float64),model,V_φ,tol,max_steps)
+  reinit!(stencil,φh,γ_reinit)
 
   ## Setup solver and FE operators
   state_map = NonlinearFEStateMap(res,U,V,V_φ,U_reg,φh,dΩ,dΓ_N)
@@ -84,20 +83,12 @@ function main()
   
   ## Optimiser
   make_dir(path)
-  _conv_cond = t->LSTO_Distributed.conv_cond(t;coef=1/50);
-  optimiser = AugmentedLagrangian(φ,pcfs,stencil,vel_ext,interp,el_size,γ,γ_reinit;conv_criterion=_conv_cond);
-  for history in optimiser
-    it,Ji,_,_ = last(history)
-    print_history(it,["J"=>Ji])
-    write_history(history,path*"/history.csv")
-    uhi = get_state(pcfs)
-    write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh)),"uh"=>uhi])
+  converged(m) = LSTO_Distributed.default_al_converged(m;L_tol=0.02*maximum(Δ))
+  optimiser = AugmentedLagrangian(pcfs,stencil,vel_ext,φh;γ,γ_reinit,converged,verbose=true)
+  for (it, uh, φh) in optimiser
+    write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh)),"uh"=>uh])
   end
-  it,Ji,_,_ = last(optimiser.history)
-  print_history(it,["J"=>Ji])
-  write_history(optimiser.history,path*"/history.csv")
-  uhi = get_state(pcfs)
-  write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh)),"uh"=>uhi];iter_mod=1)
+
 end
 
-main();
+main()
