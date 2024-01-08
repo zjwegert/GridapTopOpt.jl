@@ -27,10 +27,10 @@ end
 
 function finished(m::Optimiser) :: Bool
   h = get_history(m)
+  it = get_last_iteration(h)
 
-  it = length(h)
   A = converged(m)
-  B = it + 1 >= h.maxiter
+  B = (it >= h.maxiter)
   return A || B
 end
 
@@ -53,7 +53,7 @@ function OptimiserHistory(
   T::Type{<:Real},
   keys::Vector{Symbol},
   bundles::Dict{Symbol,Vector{Symbol}}=Dict{Symbol,Vector{Symbol}}(),
-  maxiter = 100,
+  maxiter = 200,
   verbose = SOLVER_VERBOSE_NONE
 )
   values = Dict{Symbol,Vector{T}}()
@@ -108,7 +108,7 @@ function Base.push!(h::OptimiserHistory,vals,keys)
   @assert length(vals) == length(keys)
   h.niter += 1
   setindex!(h,vals,keys,h.niter)
-  if get_verbose_level(h) > SOLVER_VERBOSE_LOW
+  if get_verbose_level(h) > SOLVER_VERBOSE_NONE
     display(h[length(h)])
   end
 end

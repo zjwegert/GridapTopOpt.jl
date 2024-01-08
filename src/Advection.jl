@@ -282,6 +282,10 @@ function permute_inv!(x_out::PVector,x_in::PVector,perm)
   return x_out
 end
 
+function advect!(s::AdvectionStencil,φh,args...)
+  advect!(s,get_free_dof_values(φh),args...)
+end
+
 function advect!(s::AdvectionStencil{O},φ::PVector,vel::PVector,γ) where O
   _, _, perm_caches, stencil_cache = s.cache
   Δ, isperiodic,  = s.params.Δ, s.params.isperiodic
@@ -325,6 +329,10 @@ function advect!(s::AdvectionStencil{O},φ::Vector,vel::Vector,γ) where O
   return φ
 end
 
+function reinit!(s::AdvectionStencil,φh,args...)
+  reinit!(s,get_free_dof_values(φh),args...)
+end
+
 function reinit!(s::AdvectionStencil{O},φ::PVector,γ) where O
   φ_tmp, vel_tmp, perm_caches, stencil_cache = s.cache
   Δ, isperiodic, ndof  = s.params.Δ, s.params.isperiodic, s.params.ndof
@@ -333,7 +341,7 @@ function reinit!(s::AdvectionStencil{O},φ::PVector,γ) where O
   _φ = (O >= 2) ? permute!(perm_caches[1],φ,s.perm) : φ
 
   # Compute approx sign function S
-  vel_tmp = @. _φ / sqrt(_φ*_φ + prod(Δ))
+  vel_tmp = _φ ./ sqrt(_φ .* _φ .+ prod(Δ))
 
   ## CFL Condition (requires γ≤0.5)
   Δt = compute_Δt(s.stencil,Δ,γ,_φ,1.0) # As inform(vel_tmp) = 1.0
@@ -363,14 +371,14 @@ function reinit!(s::AdvectionStencil{O},φ::PVector,γ) where O
 end
 
 function reinit!(s::AdvectionStencil{O},φ::Vector,γ) where O
-  isperiodic, Δ, ndof, φ_tmp, vel_tmp, perm_caches, stencil_cache = s.cache
+  φ_tmp, vel_tmp, perm_caches, stencil_cache = s.cache
   Δ, isperiodic, ndof = s.params.Δ, s.params.isperiodic, s.params.ndof
   tol, max_steps = s.params.tol, s.params.max_steps_reinit
 
   _φ = (O >= 2) ? permute!(perm_caches[1],φ,s.perm) : φ
 
   # Compute approx sign function S
-  vel_tmp .= @. _φ / sqrt(_φ*_φ + prod(Δ))
+  vel_tmp .= _φ ./ sqrt.(_φ .* _φ .+ prod(Δ))
 
   ## CFL Condition (requires γ≤0.5)
   Δt = compute_Δt(s.stencil,Δ,γ,_φ,1.0)

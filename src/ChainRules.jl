@@ -77,7 +77,7 @@ end
     - There is a single auxilary field. Again, this can possibly be a MultiFieldFEFunction.
       E.g., multiple level set functions.
 """
-struct StateParamIntegrandWithMeasure{A<:IntegrandWithMeasure,B<:Tuple,C<:Tuple,D<:Tuple}
+struct StateParamIntegrandWithMeasure{A<:IntegrandWithMeasure,B,C,D}
   F       :: A
   spaces  :: B
   assems  :: C
@@ -89,7 +89,7 @@ function StateParamIntegrandWithMeasure(
   U::FESpace,V_φ::FESpace,U_reg::FESpace,
   assem_U::Assembler,assem_deriv::Assembler
 )
-  φ₀ = zero(V_φ); u₀ = zero(U)
+  φ₀, u₀ = zero(V_φ), zero(U)
   djdu_vecdata = collect_cell_vector(U,∇(F,[u₀,φ₀],1))
   djdφ_vecdata = collect_cell_vector(U_reg,∇(F,[u₀,φ₀],2))
   djdu_vec = allocate_vector(assem_U,djdu_vecdata)
@@ -100,34 +100,41 @@ function StateParamIntegrandWithMeasure(
   return StateParamIntegrandWithMeasure(F,spaces,assems,caches)
 end
 
-function (u_to_j::StateParamIntegrandWithMeasure)(u::T1,φ::T2) where {T1<:AbstractArray,T2<:AbstractArray}
+(u_to_j::StateParamIntegrandWithMeasure)(uh,φh) = sum(u_to_j.F(uh,φh))
+
+function (u_to_j::StateParamIntegrandWithMeasure)(u::AbstractVector,φ::AbstractVector)
   U,V_φ,_ = u_to_j.spaces
   uh = FEFunction(U,u)
   φh = FEFunction(V_φ,φ)
-  return sum(u_to_j.F(uh,φh))
+  return u_to_j(uh,φh)
 end
 
-function ChainRulesCore.rrule(u_to_j::StateParamIntegrandWithMeasure,u::T1,φ::T2) where {T1<:AbstractArray,T2<:AbstractArray}
+function ChainRulesCore.rrule(u_to_j::StateParamIntegrandWithMeasure,uh,φh)
   F = u_to_j.F
   U,V_φ,U_reg = u_to_j.spaces
   assem_U,assem_deriv = u_to_j.assems
   djdu_vec,djdφ_vec = u_to_j.caches
-  uh = FEFunction(U,u)
-  φh = FEFunction(V_φ,φ)
-  fields = [uh,φh]
+
   function u_to_j_pullback(dj)
-    ## Compute ∂F/∂uh(uh) and ∂F/∂φh(φh)
-    djdu = ∇(F,fields,1)
+    ## Compute ∂F/∂uh(uh,φh) and ∂F/∂φh(uh,φh)
+    djdu = ∇(F,[uh,φh],1)
     djdu_vecdata = collect_cell_vector(U,djdu)
     assemble_vector!(djdu_vec,assem_U,djdu_vecdata)
-    djdφ = ∇(F,fields,2)
+    djdφ = ∇(F,[uh,φh],2)
     djdφ_vecdata = collect_cell_vector(U_reg,djdφ)
     assemble_vector!(djdφ_vec,assem_deriv,djdφ_vecdata)
     djdu_vec .*= dj
     djdφ_vec .*= dj
     (  NoTangent(), djdu_vec, djdφ_vec )
   end
-  return u_to_j(u,φ), u_to_j_pullback
+  return u_to_j(uh,φh), u_to_j_pullback
+end
+
+function ChainRulesCore.rrule(u_to_j::StateParamIntegrandWithMeasure,u::AbstractVector,φ::AbstractVector)
+  U,V_φ,U_reg = u_to_j.spaces
+  uh = FEFunction(U,u)
+  φh = FEFunction(V_φ,φ)
+  return ChainRulesCore.rrule(u_to_j,uh,φh)
 end
 
 """
@@ -201,6 +208,12 @@ function pullback(φ_to_u::AbstractFEStateMap,uh,φh,du;updated=false)
   rmul!(dφdu_vec, -1)
   
   return (NoTangent(),dφdu_vec)
+end
+
+function pullback(φ_to_u::AbstractFEStateMap,u::AbstractVector,φ::AbstractVector,du::AbstractVector;updated=false)
+  uh = FEFunction(get_trial_space(φ_to_u),u)
+  φh = FEFunction(get_aux_space(φ_to_u),φ)
+  return pullback(φ_to_u,uh,φh,du;updated=updated)
 end
 
 function ChainRulesCore.rrule(φ_to_u::AbstractFEStateMap,φh)
@@ -525,25 +538,23 @@ struct PDEConstrainedFunctionals{N,A}
   state_map :: A
 
   function PDEConstrainedFunctionals(
-      J :: Function,
-      C :: Vector{<:Function},
-      state_map :: T;
+      objective   :: Function,
+      constraints :: Vector{<:Function},
+      state_map   :: AbstractFEStateMap;
       analytic_dJ = nothing,
-      analytic_dC = fill(nothing,length(C))) where T<:AbstractFEStateMap
+      analytic_dC = fill(nothing,length(constraints)))
 
     # Create StateParamIntegrandWithMeasures
-    J_spiwm = StateParamIntegrandWithMeasure(J,state_map)
-    if isempty(C)
-      C_spiwm = StateParamIntegrandWithMeasure[]
-    else
-      C_spiwm = map(ci -> StateParamIntegrandWithMeasure(ci,state_map),C)
-    end
-
+    J = StateParamIntegrandWithMeasure(objective,state_map)
+    C = map(Ci -> StateParamIntegrandWithMeasure(Ci,state_map),constraints)
+    
     # Preallocate
-    dJ = similar(J_spiwm.caches[2])
-    dC = map(Ci_spiwm->similar(Ci_spiwm.caches[2]),C_spiwm)
+    dJ = similar(J.caches[2])
+    dC = map(Ci->similar(Ci.caches[2]),C)
 
-    return new{length(C),T}(J_spiwm,C_spiwm,dJ,dC,analytic_dJ,analytic_dC,state_map)
+    N = length(constraints)
+    T = typeof(state_map)
+    return new{N,T}(J,C,dJ,dC,analytic_dJ,analytic_dC,state_map)
   end
 end
 
@@ -553,36 +564,47 @@ PDEConstrainedFunctionals(J::Function,state_map::AbstractFEStateMap;analytic_dJ=
 get_state(m::PDEConstrainedFunctionals) = get_state(m.state_map)
 
 function evaluate_functionals!(pcf::PDEConstrainedFunctionals,φ::AbstractVector)
-  u = pcf.state_map(φ)
-  J = pcf.J; C = pcf.C
-  return J(u,φ), map(Ci->Ci(u,φ),C)
+  V_φ = get_aux_space(pcf.state_map)
+  φh = FEFunction(V_φ,φ)
+  return evaluate_functionals!(pcf,φh)
 end
 
-function evaluate_derivatives!(pcf::PDEConstrainedFunctionals,φ::AbstractVector)
-  _,_,dJ,dC = _evaluate_derivatives(pcf,φ)
+function evaluate_functionals!(pcf::PDEConstrainedFunctionals,φh)
+  J, C = pcf.J, pcf.C
+  u = pcf.state_map(φh)
+  U = get_trial_space(pcf.state_map)
+  uh = FEFunction(U,u)
+  return J(uh,φh), map(Ci->Ci(uh,φh),C)
+end
+
+function evaluate_derivatives!(pcf::PDEConstrainedFunctionals,φh)
+  _,_,dJ,dC = evaluate!(pcf,φh)
   return dJ,dC
 end
 
-function Gridap.evaluate!(pcf::PDEConstrainedFunctionals,φ::AbstractVector)
-  _evaluate_derivatives(pcf,φ)
+function Fields.evaluate!(pcf::PDEConstrainedFunctionals,φ::AbstractVector)
+  V_φ = get_aux_space(pcf.state_map)
+  φh = FEFunction(V_φ,φ)
+  return _evaluate_derivatives(pcf,φh)
 end
 
-function _evaluate_derivatives(pcf::PDEConstrainedFunctionals,φ::AbstractVector)
+function Fields.evaluate!(pcf::PDEConstrainedFunctionals,φh)
   J, C, dJ, dC = pcf.J,pcf.C,pcf.dJ,pcf.dC
   analytic_dJ  = pcf.analytic_dJ
   analytic_dC  = pcf.analytic_dC
   U = get_trial_space(pcf.state_map)
-  V_φ = get_aux_space(pcf.state_map)
+
   U_reg = get_deriv_space(pcf.state_map)
   deriv_assem = get_deriv_assembler(pcf.state_map)
   dΩ = get_measure(pcf.state_map)
 
   ## Foward problem
-  u, u_pullback = rrule(pcf.state_map,φ)
+  u, u_pullback = rrule(pcf.state_map,φh)
+  uh = FEFunction(U,u)
 
   function ∇!(F::StateParamIntegrandWithMeasure,dF,::Nothing)
     # Automatic differentation
-    j_val, j_pullback = rrule(F,u,φ)     # Compute functional and pull back
+    j_val, j_pullback = rrule(F,uh,φh)   # Compute functional and pull back
     _, dFdu, dFdφ     = j_pullback(1)    # Compute dFdu, dFdφ
     _, dφ_adj         = u_pullback(dFdu) # Compute -dFdu*dudφ via adjoint 
     copy!(dF,dφ_adj)
@@ -591,10 +613,8 @@ function _evaluate_derivatives(pcf::PDEConstrainedFunctionals,φ::AbstractVector
   end
   function ∇!(F::StateParamIntegrandWithMeasure,dF,dF_analytic)
     # Analytic shape derivative
-    j_val = F(u,φ)
-    uh = FEFunction(U,u)
-    φh = FEFunction(V_φ,φ)
-    _dF = (q) -> dF_analytic(q,uh,φh,dΩ...)
+    j_val = F(uh,φh)
+    _dF(q) = dF_analytic(q,uh,φh,dΩ...)
     assemble_vector!(_dF,dF,deriv_assem,U_reg)
     dF .*= -1 # <- Take θ=-vn
     return j_val

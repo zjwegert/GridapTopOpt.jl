@@ -44,15 +44,18 @@ get_history(m::HilbertianProjection) = m.history
 
 function default_hp_converged(
   m::AugmentedLagrangian;
-  J_tol=0.2*maximum(m.stencil.params.Δ),
-  C_tol=0.001
+  J_tol = 0.2*maximum(m.stencil.params.Δ),
+  C_tol = 0.001
 )
-  h, params = m.history, m.params
+  h  = m.history
   it = get_last_iteration(h)
-  s  = h[it]
-  Ji, Ci = s.J, s.C
+  if it < 10
+    return false
+  end
 
-  A = all(J -> abs(Ji - J)/abs(Ji) < J_tol, h.J[it-5:it])
+  Ji, Ci = h[:J,it], h[:C,it]
+  J_prev = h[:J,it-5:it]
+  A = all(J -> abs(Ji - J)/abs(Ji) < J_tol, J_prev)
   B = all(C -> abs(C) < C_tol, Ci)
   return (it > 10) && A && B
 end
@@ -77,7 +80,7 @@ function Base.iterate(m::HilbertianProjection)
   
   # Update history and build state
   push!(history,(J,C))
-  state = (0,J,C,θ,dJ,dC,uh,φh,vel,params.γ,params.γ_reinit)
+  state = (1,J,C,θ,dJ,dC,uh,φh,vel,params.γ,params.γ_reinit)
   return (0,uh,φh), state
 end
 
@@ -85,7 +88,10 @@ end
 function Base.iterate(m::HilbertianProjection,state)
   it, J, C, θ, dJ, dC, uh, φh, vel, γ, γ_reinit = state
   history, params = m.history, m.params
-  it = it + 1
+
+  if finished(m)
+    return nothing
+  end
 
   ## Line search
   interpolate!(FEFunction(U_reg,θ),vel,V_φ)
@@ -130,13 +136,8 @@ function Base.iterate(m::HilbertianProjection,state)
 
   ## Update history and build state
   push!(history,(J,C))
-  state = (it, J, C, θ, dJ, dC, uh, φh, vel, γ, γ_reinit)
-
-  if finished(m)
-    return nothing
-  else
-    return (it,uh,φh), state
-  end
+  state = (it+1, J, C, θ, dJ, dC, uh, φh, vel, γ, γ_reinit)
+  return (it,uh,φh), state
 end
 
 ## Methods for descent direction

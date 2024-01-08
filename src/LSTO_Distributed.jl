@@ -7,8 +7,9 @@ using ChainRulesCore
 using DelimitedFiles, Printf
 
 using Gridap
-using Gridap.TensorValues, Gridap.Geometry, Gridap.FESpaces, Gridap.Helpers
-using Gridap.ReferenceFEs, Gridap.Algebra, Gridap.CellData, Gridap.MultiField
+using Gridap.Helpers, Gridap.Algebra, Gridap.TensorValues
+using Gridap.Geometry, Gridap.CellData, Gridap.Fields
+using Gridap.ReferenceFEs, Gridap.FESpaces,  Gridap.MultiField
 using Gridap.Geometry: get_faces
 
 using GridapDistributed
