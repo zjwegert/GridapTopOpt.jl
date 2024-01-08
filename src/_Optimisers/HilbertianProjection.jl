@@ -16,17 +16,19 @@ struct HilbertianProjection{T,N} <: Optimiser
   history   :: OptimiserHistory{Float64}
   converged :: Function
   params    :: NamedTuple
+  φ0 # TODO: Remove me please
   function HilbertianProjection(
     problem :: PDEConstrainedFunctionals{N},
     stencil :: AdvectionStencil,
-    vel_ext :: VelocityExtension;
+    vel_ext :: VelocityExtension,
+    φ0;
     orthog = HPModifiedGramSchmidt(),
     λ=0.5, α_min=0.1, α_max=1.0, γ=0.1, γ_reinit=0.5,
     ls_max_iters = 10, ls_δ_inc = 1.1, ls_δ_dec = 0.7,
     ls_ξ = 0.005, ls_ξ_reduce_coef = 0.1, ls_ξ_reduce_abs_tol = 0.01,
     ls_γ_min = 0.001, ls_γ_max = 0.1,
     maxiter = 1000, verbose=false, constraint_names = map(i -> Symbol("C_$i"),1:N),
-    converged::Function = default_al_converged
+    converged::Function = default_hp_converged
   ) where {N}
 
     al_keys = [:J,constraint_names...]
@@ -36,14 +38,18 @@ struct HilbertianProjection{T,N} <: Optimiser
     params = (;λ,α_min,α_max,γ,γ_reinit,ls_max_iters,ls_δ_inc,ls_δ_dec,ls_ξ,
       ls_ξ_reduce_coef,ls_ξ_reduce_abs_tol,ls_γ_min,ls_γ_max)
     T = typeof(orthog)
-    new{T,N}(problem,stencil,vel_ext,orthog,history,converged,params)
+    new{T,N}(problem,stencil,vel_ext,orthog,history,converged,params,φ0)
   end
 end
 
 get_history(m::HilbertianProjection) = m.history
 
+function converged(m::HilbertianProjection)
+  return m.converged(m)
+end
+
 function default_hp_converged(
-  m::AugmentedLagrangian;
+  m::HilbertianProjection;
   J_tol = 0.2*maximum(m.stencil.params.Δ),
   C_tol = 0.001
 )
@@ -62,31 +68,31 @@ end
 
 # 0th iteration
 function Base.iterate(m::HilbertianProjection)
-  K = vel_ext.K; verbose=m.
-  
-  history, params = m.history, m.params 
+  history, params = m.history, m.params
+  φh = m.φ0
 
   ## Compute FE problem and shape derivatives
   J, C, dJ, dC = Gridap.evaluate!(m.problem,φh)
   uh  = get_state(m.problem)
   vel = copy(get_free_dof_values(φh))
+  φ_tmp = copy(vel)
 
   ## Hilbertian extension-regularisation
   project!(m.vel_ext,dJ)
   project!(m.vel_ext,dC)
 
   ## Compute descent direction θ and store in dJ
-  θ = update_descent_direction!(m,dJ,dJ,C_init,dC,K;verbose=verbose)
+  θ = update_descent_direction!(m,dJ,dJ,C,dC,m.vel_ext.K;verbose=true)
   
   # Update history and build state
-  push!(history,(J,C))
-  state = (1,J,C,θ,dJ,dC,uh,φh,vel,params.γ,params.γ_reinit)
+  push!(history,(J,C...))
+  state = (1,J,C,θ,dJ,dC,uh,φh,vel,φ_tmp,params.γ,params.γ_reinit)
   return (0,uh,φh), state
 end
 
 # ith iteration
 function Base.iterate(m::HilbertianProjection,state)
-  it, J, C, θ, dJ, dC, uh, φh, vel, γ, γ_reinit = state
+  it, J, C, θ, dJ, dC, uh, φh, vel, φ_tmp, γ, γ_reinit = state
   history, params = m.history, m.params
 
   if finished(m)
@@ -94,17 +100,20 @@ function Base.iterate(m::HilbertianProjection,state)
   end
 
   ## Line search
+  U_reg = get_deriv_space(m.problem.state_map)
+  V_φ   = get_aux_space(m.problem.state_map)
   interpolate!(FEFunction(U_reg,θ),vel,V_φ)
   
-  ls_max_iters,δ_inc,δ_dec,ξ = params.ls_max_iters,params.ls_δ_inc,params.ls_δ_dec
+  ls_max_iters,δ_inc,δ_dec = params.ls_max_iters,params.ls_δ_inc,params.ls_δ_dec
   ξ, ξ_reduce, ξ_reduce_tol = params.ls_ξ, params.ls_ξ_reduce_coef, params.ls_ξ_reduce_abs_tol
   γ_min, γ_max = params.ls_γ_min,params.ls_γ_max
   
-  ls_it = 0; done = false; copy!(φ_tmp,φ);
+  ls_it = 0; done = false
+  φ = get_free_dof_values(φh); copy!(φ_tmp,φ)
   while !done && (ls_it <= ls_max_iters)
     # Advect  & Reinitialise
-    advect!(stencil,φ,vel,γ)
-    reinit!(stencil,φ,γ_reinit)
+    advect!(m.stencil,φ,vel,γ)
+    reinit!(m.stencil,φ,γ_reinit)
 
     # Calcuate new objective and constraints
     J_interm, C_interm = evaluate_functionals!(m.problem,φh)
@@ -128,15 +137,15 @@ function Base.iterate(m::HilbertianProjection,state)
   J, C, dJ, dC = Gridap.evaluate!(m.problem,φh)
 
   ## Hilbertian extension-regularisation
-  project!(vel_ext,dJ)
-  project!(vel_ext,dC)
+  project!(m.vel_ext,dJ)
+  project!(m.vel_ext,dC)
 
   ## Compute descent direction θ and store in dJ
-  θ = update_descent_direction!(m,dJ,dJ,C_new,dC,vel_ext.K)
+  θ = update_descent_direction!(m,dJ,dJ,C,dC,m.vel_ext.K)
 
   ## Update history and build state
-  push!(history,(J,C))
-  state = (it+1, J, C, θ, dJ, dC, uh, φh, vel, γ, γ_reinit)
+  push!(history,(J,C...))
+  state = (it+1, J, C, θ, dJ, dC, uh, φh, vel, φ_tmp, γ, γ_reinit)
   return (it,uh,φh), state
 end
 
@@ -153,11 +162,15 @@ function update_descent_direction!(m::HilbertianProjection,θ::Vector,dV,C,dC,K;
 end
 
 function _update_descent_direction!(m::HilbertianProjection,θ,dV,C,dC,K,verbose)
-  α=m.α; λ=m.λ; α_min=m.α_min; α_max=m.α_max
-  orthog_cache=m.orthog_cache; orthogonalise = m.orthog_method
+  λ=m.params.λ; α_min=m.params.α_min; α_max=m.params.α_max
+  orthogonalise = m.orthog
+  orthog_cache = allocate_cache(orthogonalise,dC,K)
   _,_,_,_,P,_,_ = orthog_cache
+
+  α = zeros(length(dC))
+
   # Orthogonalisation of dC
-  dC_orthog,normsq,nullity = orthogonalise(dC,K,orthog_cache)
+  dC_orthog, normsq, nullity = orthogonalise(dC,K,orthog_cache)
 
   # Project dV
   dV_norm = project_dV!(dV,dC_orthog,normsq,K,P)

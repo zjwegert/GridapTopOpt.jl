@@ -155,7 +155,7 @@ get_deriv_space(m::AbstractFEStateMap) = get_spaces(m)[4]
 get_pde_assembler(m::AbstractFEStateMap) = get_assemblers(m)[1]
 get_deriv_assembler(m::AbstractFEStateMap) = get_assemblers(m)[2]
 
-@inline (φ_to_u::AbstractFEStateMap)(φ::AbstractVector) = forward_solve(φ_to_u,φ)
+@inline (φ_to_u::AbstractFEStateMap)(φh) = forward_solve(φ_to_u,φh)
 
 function forward_solve(φ_to_u::AbstractFEStateMap,φh)
   @abstractmethod
@@ -575,11 +575,10 @@ function evaluate_functionals!(pcf::PDEConstrainedFunctionals,φ::AbstractVector
 end
 
 function evaluate_functionals!(pcf::PDEConstrainedFunctionals,φh)
-  J, C = pcf.J, pcf.C
-  u = pcf.state_map(φh)
-  U = get_trial_space(pcf.state_map)
+  u  = pcf.state_map(φh)
+  U  = get_trial_space(pcf.state_map)
   uh = FEFunction(U,u)
-  return J(uh,φh), map(Ci->Ci(uh,φh),C)
+  return pcf.J(uh,φh), map(Ci->Ci(uh,φh),pcf.C)
 end
 
 function evaluate_derivatives!(pcf::PDEConstrainedFunctionals,φh)
