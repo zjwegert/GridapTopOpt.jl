@@ -441,8 +441,8 @@ struct RepeatingAffineFEStateMap{A,B,C,D,E,F} <: AbstractFEStateMap
 
     biform  = IntegrandWithMeasure(a,dΩ)
     liforms = map(li -> IntegrandWithMeasure(li,dΩ),l)
-    U = MultiFieldFESpace([U0 for i in 1:nblocks])
-    V = MultiFieldFESpace([V0 for i in 1:nblocks])
+    U = MultiFieldFESpace([U0 for i in 1:nblocks];style=BlockMultiFieldStyle())
+    V = MultiFieldFESpace([V0 for i in 1:nblocks];style=BlockMultiFieldStyle())
     spaces = (U,V,V_φ,U_reg)
 
     ## Pullback cache
@@ -455,24 +455,29 @@ struct RepeatingAffineFEStateMap{A,B,C,D,E,F} <: AbstractFEStateMap
     plb_caches = (dφdu_vec,assem_deriv)
 
     ## Forward cache
-    K  = allocate_matrix((u,v) -> biform(u,v,φh),assem_U,U0,V0)
+    K  = assemble_matrix((u,v) -> biform(u,v,φh),assem_U,U0,V0)
     b  = allocate_in_range(K); fill!(b,zero(eltype(b)))
     b0 = allocate_in_range(K); fill!(b0,zero(eltype(b0)))
-    x  = mortar(map(i -> allocate_in_domain(K)), 1:nblocks); fill!(x,zero(eltype(x)))
+    x  = mortar(map(i -> allocate_in_domain(K), 1:nblocks)); fill!(x,zero(eltype(x)))
     ns = numerical_setup(symbolic_setup(ls,K),K)
     fwd_caches = (ns,K,b,x,uhd,assem_U,b0)
 
     ## Adjoint cache
     adjoint_K  = assemble_matrix((u,v)->biform(v,u,φh),assem_adjoint,V0,U0)
-    adjoint_x  = mortar(map(i -> allocate_in_domain(adjoint_K)), 1:nblocks); fill!(adjoint_x,zero(eltype(adjoint_x)))
+    adjoint_x  = mortar(map(i -> allocate_in_domain(adjoint_K), 1:nblocks)); fill!(adjoint_x,zero(eltype(adjoint_x)))
     adjoint_ns = numerical_setup(symbolic_setup(adjoint_ls,adjoint_K),adjoint_K)
     adj_caches = (adjoint_ns,adjoint_K,adjoint_x,assem_adjoint)
 
     A,B,C = typeof(biform), typeof(liforms), typeof(spaces)
-    D,E,F = typeof(plb_caches),typeof(fwd_caches), typeof(adj_caches)
+    D,E,F = typeof(plb_caches), typeof(fwd_caches), typeof(adj_caches)
     return new{A,B,C,D,E,F}(biform,liforms,spaces,plb_caches,fwd_caches,adj_caches)
   end
 end
+
+get_state(m::RepeatingAffineFEStateMap) = FEFunction(get_trial_space(m),m.fwd_caches[4])
+get_measure(m::RepeatingAffineFEStateMap) = m.biform.dΩ
+get_spaces(m::RepeatingAffineFEStateMap) = m.spaces
+get_assemblers(m::RepeatingAffineFEStateMap) = (m.fwd_caches[6],m.plb_caches[2],m.adj_caches[4])
 
 function forward_solve(φ_to_u::RepeatingAffineFEStateMap,φh)
   biform, liforms = φ_to_u.biform, φ_to_u.liform
@@ -485,13 +490,13 @@ function forward_solve(φ_to_u::RepeatingAffineFEStateMap,φh)
   numerical_setup!(ns,K)
 
   l0_fwd(v) = a_fwd(uhd,v)
-  assemble_vector!(l0_fwd,b0,assem_U,V)
+  assemble_vector!(l0_fwd,b0,assem_U,V0)
   rmul!(b0,-1)
 
   v = get_fe_basis(V0)
   map(blocks(x),liforms) do xi, li
     copy!(b,b0)
-    vecdata = collect_cell_vector(V,li(v,φh))
+    vecdata = collect_cell_vector(V0,li(v,φh))
     assemble_vector_add!(b,assem_U,vecdata)
     solve!(xi,ns,b)
   end

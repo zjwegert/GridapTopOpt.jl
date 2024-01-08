@@ -13,18 +13,18 @@ using Gridap, GridapDistributed, GridapPETSc, PartitionedArrays, LSTO_Distribute
 """ 
 function main()
   ## Parameters
-  order = 1;
+  order = 1
   xmax=ymax=1.0
-  prop_Γ_N = 0.4;
+  prop_Γ_N = 0.4
   prop_Γ_D = 0.2
-  dom = (0,xmax,0,ymax);
-  el_size = (200,200);
-  γ = 0.1;
-  γ_reinit = 0.5;
+  dom = (0,xmax,0,ymax)
+  el_size = (200,200)
+  γ = 0.1
+  γ_reinit = 0.5
   max_steps = floor(Int,minimum(el_size)/10)
   tol = 1/(order^2*10)*prod(inv,minimum(el_size)) # <- We can do better than this I think
-  η_coeff = 2;
-  α_coeff = 4;
+  η_coeff = 2
+  α_coeff = 4
   path = dirname(dirname(@__DIR__))*"/results/main_nonlinear"
 
   ## FE Setup
@@ -52,15 +52,15 @@ function main()
   U_reg = TrialFESpace(V_reg,0)
 
   ## Create FE functions
-  φh = interpolate(gen_lsf(4,0.2),V_φ);
+  φh = interpolate(gen_lsf(4,0.2),V_φ)
 
   ## Interpolation and weak form
   interp = SmoothErsatzMaterialInterpolation(η = η_coeff*maximum(Δ))
   I,H,DH,ρ = interp.I,interp.H,interp.DH,interp.ρ
 
-  D0 = 1;
-  ξ = -1;
-  D(u) = D0*(exp(ξ*u));
+  D0 = 1
+  ξ = -1
+  D(u) = D0*(exp(ξ*u))
 
   res(u,v,φ,dΩ,dΓ_N) = ∫((I ∘ φ)*(D ∘ u)*∇(u)⋅∇(v))dΩ - ∫(v)dΓ_N
 
@@ -78,7 +78,7 @@ function main()
 
   ## Hilbertian extension-regularisation problems
   α = α_coeff*maximum(Δ)
-  a_hilb(p,q) =∫(α^2*∇(p)⋅∇(q) + p*q)dΩ;
+  a_hilb(p,q) =∫(α^2*∇(p)⋅∇(q) + p*q)dΩ
   vel_ext = VelocityExtension(a_hilb,U_reg,V_reg)
   
   ## Optimiser

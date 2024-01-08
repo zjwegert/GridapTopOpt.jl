@@ -34,6 +34,7 @@ include("ChainRules.jl")
 export PDEConstrainedFunctionals
 export AffineFEStateMap
 export NonlinearFEStateMap
+export RepeatingAffineFEStateMap
 export get_state
 export evaluate_functionals!
 export evaluate_derivatives!
