@@ -1,12 +1,3 @@
-# Orthogonalisation method
-"""
-  OrthogonalisationMethod
-
-  Method must return C_orthog, normsq, nullity.
-"""
-abstract type OrthogonalisationMethod end
-(::OrthogonalisationMethod)(::AbstractArray{<:AbstractArray},::AbstractMatrix,cache) = @abstractmethod
-allocate_cache(::OrthogonalisationMethod,A::AbstractArray{<:AbstractArray},K::AbstractMatrix) = @abstractmethod
 
 struct HilbertianProjection{T,N} <: Optimiser
   problem   :: PDEConstrainedFunctionals{N}
