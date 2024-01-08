@@ -11,28 +11,28 @@ using Gridap, GridapDistributed, GridapPETSc, PartitionedArrays, LSTO_Distribute
 """ 
 function main()
   ## Parameters
-  order = 2;
-  xmax=ymax=1.0
-  prop_Γ_N = 0.4;
+  order = 2
+  xmax = ymax = 1.0
+  prop_Γ_N = 0.4
   prop_Γ_D = 0.2
-  dom = (0,xmax,0,ymax);
-  el_size = (200,200);
-  γ = 0.1;
-  γ_reinit = 0.5;
+  dom = (0,xmax,0,ymax)
+  el_size = (200,200)
+  γ = 0.1
+  γ_reinit = 0.5
   max_steps = floor(Int,minimum(el_size)/10)
   tol = 1/(order^2*10)*prod(inv,minimum(el_size)) # <- We can do better than this I think
-  D = 1;
-  η_coeff = 2;
-  α_coeff = 4;
+  D = 1
+  η_coeff = 2
+  α_coeff = 4
   path = dirname(dirname(@__DIR__))*"/results/main"
 
   ## FE Setup
   model = CartesianDiscreteModel(dom,el_size);
   Δ = get_Δ(model)
   f_Γ_D(x) = (x[1] ≈ 0.0 && (x[2] <= ymax*prop_Γ_D + eps() || 
-    x[2] >= ymax-ymax*prop_Γ_D - eps())) ? true : false;
+    x[2] >= ymax-ymax*prop_Γ_D - eps())) ? true : false
   f_Γ_N(x) = (x[1] ≈ xmax && ymax/2-ymax*prop_Γ_N/4 - eps() <= x[2] <= 
-    ymax/2+ymax*prop_Γ_N/4 + eps()) ? true : false;
+    ymax/2+ymax*prop_Γ_N/4 + eps()) ? true : false
   update_labels!(1,model,f_Γ_D,"Gamma_D")
   update_labels!(2,model,f_Γ_N,"Gamma_N")
 
@@ -51,8 +51,7 @@ function main()
   U_reg = TrialFESpace(V_reg,0)
 
   ## Create FE functions
-  φh = interpolate(gen_lsf(4,0.2),V_φ);
-  φ = get_free_dof_values(φh)
+  φh = interpolate(gen_lsf(4,0.2),V_φ)
 
   ## Interpolation and weak form
   interp = SmoothErsatzMaterialInterpolation(η = η_coeff*maximum(Δ))
@@ -63,12 +62,12 @@ function main()
 
   ## Optimisation functionals
   ξ = 0.2;
-  J = (u,φ,dΩ,dΓ_N) -> ∫((I ∘ φ)*D*∇(u)⋅∇(u) + ξ*(ρ ∘ φ))dΩ
-  dJ = (q,u,φ,dΩ,dΓ_N) -> ∫((ξ-D*∇(u)⋅∇(u))*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ;
+  J(u,φ,dΩ,dΓ_N) = ∫((I ∘ φ)*D*∇(u)⋅∇(u) + ξ*(ρ ∘ φ))dΩ
+  dJ(q,u,φ,dΩ,dΓ_N) = ∫((ξ-D*∇(u)⋅∇(u))*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
 
   ## Finite difference solver and level set function
-  stencil = AdvectionStencil(FirstOrderStencil(2,Float64),model,V_φ,Δ./order,max_steps,tol)
-  reinit!(stencil,φ,γ_reinit)
+  stencil = AdvectionStencil(FirstOrderStencil(2,Float64),model,V_φ,tol,max_steps)
+  reinit!(stencil,φh,γ_reinit)
 
   ## Setup solver and FE operators
   state_map = AffineFEStateMap(a,l,U,V,V_φ,U_reg,φh,dΩ,dΓ_N)
@@ -76,24 +75,19 @@ function main()
 
   ## Hilbertian extension-regularisation problems
   α = α_coeff*maximum(Δ)
-  a_hilb(p,q) =∫(α^2*∇(p)⋅∇(q) + p*q)dΩ;
+  a_hilb(p,q) =∫(α^2*∇(p)⋅∇(q) + p*q)dΩ
   vel_ext = VelocityExtension(a_hilb,U_reg,V_reg)
   
   ## Optimiser
   make_dir(path)
-  _conv_cond = t->LSTO_Distributed.conv_cond(t;coef=1/50);
-  optimiser = AugmentedLagrangian(φ,pcfs,stencil,vel_ext,interp,el_size,γ,γ_reinit;conv_criterion=_conv_cond);
-  for history in optimiser
-    it,Ji,_,_ = last(history)
-    print_history(it,["J"=>Ji])
-    write_history(history,path*"/history.csv")
+  converged(m) = LSTO_Distributed.default_al_converged(m;L_tol=0.02*maximum(Δ))
+  optimiser = AugmentedLagrangian(pcfs,stencil,vel_ext,φh;γ,γ_reinit,converged,verbose=true)
+  for (it, uh, φh) in optimiser
     write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh))])
   end
-  it,Ji,_,_ = last(optimiser.history)
-  print_history(it,["J"=>Ji])
-  write_history(optimiser.history,path*"/history.csv")
-  uhi = get_state(pcfs)
-  write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh)),"uh"=>uhi];iter_mod=1)
+
+  # history = get_history(optimiser)
+  # write_history(optimiser.history,path*"/history.csv")
 end
 
 main();
