@@ -2,10 +2,10 @@
 """
   OrthogonalisationMap
 """
-abstract type OrthogonalisationMap <: Arrays.Map end
+abstract type OrthogonalisationMap <: Gridap.Arrays.Map end
 
-Fields.evaluate!(cache,::OrthogonalisationMap,::AbstractArray{<:AbstractArray},::AbstractMatrix) = @abstractmethod
-Fields.return_cache(::OrthogonalisationMap,::AbstractArray{<:AbstractArray},::AbstractMatrix) = @abstractmethod
+Gridap.Arrays.evaluate!(cache,::OrthogonalisationMap,::AbstractArray{<:AbstractArray},::AbstractMatrix) = @abstractmethod
+Gridap.Arrays.return_cache(::OrthogonalisationMap,::AbstractArray{<:AbstractArray},::AbstractMatrix) = @abstractmethod
 
 """
   HPModifiedGramSchmidt
@@ -14,7 +14,7 @@ Fields.return_cache(::OrthogonalisationMap,::AbstractArray{<:AbstractArray},::Ab
 """
 struct HPModifiedGramSchmidt <: OrthogonalisationMap end
 
-function Arrays.return_cache(::HPModifiedGramSchmidt,A::AbstractArray{<:AbstractArray},K::AbstractMatrix)
+function Gridap.Arrays.return_cache(::HPModifiedGramSchmidt,A::AbstractArray{<:AbstractArray},K::AbstractMatrix)
   n = length(A)
   Z = [allocate_in_domain(K) for _ = 1:n]
   X = [allocate_in_domain(K) for _ = 1:n]
@@ -23,7 +23,7 @@ function Arrays.return_cache(::HPModifiedGramSchmidt,A::AbstractArray{<:Abstract
   return n,Z,X,Q,R
 end
 
-function Arrays.evaluate!(cache,::HPModifiedGramSchmidt,A::AbstractArray{<:AbstractArray},K::AbstractMatrix)
+function Gridap.Arrays.evaluate!(cache,::HPModifiedGramSchmidt,A::AbstractArray{<:AbstractArray},K::AbstractMatrix)
   n,Z,X,Q,R = cache
   map(copy!,Z,A)
 

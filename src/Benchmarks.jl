@@ -8,7 +8,7 @@ function process_timer(t::PTimer)
   return tmax, tmin, tmean
 end
 
-function benchmark(f, args, ranks; nreps = 10; reset! = x -> nothing)
+function benchmark(f, args, ranks; nreps = 10, reset! = x -> nothing)
   t = PTimer(ranks)
   f(args...)
   for i in 1:nreps
@@ -20,7 +20,7 @@ function benchmark(f, args, ranks; nreps = 10; reset! = x -> nothing)
   return process_timer(t)
 end
 
-function benchmark_optimizer(m::Optimizer, niter, ranks; nreps = 10)
+function benchmark_optimizer(m::Optimiser, niter, ranks; nreps = 10)
   function f(m)
     _, state = iterate(m)
     for _ in 1:niter

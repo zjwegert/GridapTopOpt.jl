@@ -3,7 +3,7 @@ struct HilbertianProjection{T,N} <: Optimiser
   problem   :: PDEConstrainedFunctionals{N}
   stencil   :: AdvectionStencil
   vel_ext   :: VelocityExtension
-  orthog    :: OrthogonalisationMethod
+  orthog    :: OrthogonalisationMap
   history   :: OptimiserHistory{Float64}
   converged :: Function
   params    :: NamedTuple
