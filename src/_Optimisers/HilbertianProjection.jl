@@ -133,7 +133,7 @@ function Base.iterate(m::HilbertianProjection,state)
   project!(m.vel_ext,dC)
 
   ## Compute descent direction θ and store in dJ
-  θ = update_descent_direction!(m,dJ,dJ,C,dC,m.vel_ext.K) # TODO: Wtf so dJ = θ? Then why treat them separately? 
+  θ = update_descent_direction!(m,dJ,dJ,C,dC,m.vel_ext.K)
 
   ## Update history and build state
   push!(history,(J,C...))
@@ -142,38 +142,71 @@ function Base.iterate(m::HilbertianProjection,state)
   return vars, state
 end
 
-## Methods for descent direction
-function update_descent_direction!(m::HilbertianProjection,θ::PVector,dV,C,dC,K;verbose=nothing)
-  # Change ghosts of dV and dC (This will change in future as allocates TODO)
-  dV = GridapDistributed.change_ghost(dV,axes(K,2))
-  dC = GridapDistributed.change_ghost.(dC,(axes(K,2),))
-  _update_descent_direction!(m::HilbertianProjection,θ,dV,C,dC,K,verbose)
+struct HilbertianProjectionMap{A}
+  orthog  :: OrthogonalisationMap
+  vel_ext :: VelocityExtension{A}
+  caches
+  params
+  function HilbertianProjectionMap(
+    nC :: Int,
+    orthog::OrthogonalisationMap,
+    vel_ext::VelocityExtension{A};
+    λ=0.5, α_min=0.1, α_max=1.0, debug=false
+  ) where A <: AbstractMatrix
+    θ = allocate_in_domain(vel_ext.K)
+    θ_aux = allocate_in_domain(vel_ext.K)
+    orth_caches = return_cache(orthog,fill(θ,nC),vel_ext.K)
+    caches = (θ,θ_aux,orth_caches)
+    params = (;λ,α_min,α_max,debug)
+    return new{A}(orthog,vel_ext,caches,params)
+  end
+  function HilbertianProjectionMap(
+    nC :: Int,
+    orthog::OrthogonalisationMap,
+    vel_ext::VelocityExtension{A};
+    λ=0.5, α_min=0.1, α_max=1.0, debug=false
+  ) where A <: PSparseMatrix
+    θ  = allocate_in_domain(vel_ext.K)
+    dC = [allocate_in_domain(vel_ext.K) for _ = 1:nC]
+    θ_aux = allocate_in_domain(vel_ext.K)
+    orth_caches = return_cache(orthog,dC,vel_ext.K)
+    caches = (θ,θ_aux,dC,orth_caches)
+    params = (;λ,α_min,α_max,debug)
+    return new{A}(orthog,vel_ext,caches,params)
+  end
 end
 
-function update_descent_direction!(m::HilbertianProjection,θ::Vector,dV,C,dC,K;verbose=nothing)
-  _update_descent_direction!(m::HilbertianProjection,θ,dV,C,dC,K,verbose)
+function update_descent_direction!(m::HilbertianProjectionMap{<:AbstractMatrix},dV,C,dC,K)
+  θ, _ = m.caches
+  copy!(θ,dV)
+  _update_descent_direction!(m,θ,C,dC,K)
 end
 
-function _update_descent_direction!(m::HilbertianProjection,θ,dV,C,dC,K,verbose)
-  orthogonalise = m.orthog
-  orthog_cache = allocate_cache(orthogonalise,dC,K)
-  _,_,_,_,P,_,_ = orthog_cache
+function update_descent_direction!(m::HilbertianProjectionMap{<:PSparseMatrix},dV,C,dC,K)
+  θ, dC_aux, _, _ = m.caches
+  copy!(θ,dV)
+  copy!.(dC_aux,dC)
+  _update_descent_direction!(m,θ,C,dC_aux,K)
+end
+
+function _update_descent_direction!(m::HilbertianProjectionMap,θ,C,dC,K)
+  _, _, θ_aux, orthog_cache = m.caches
 
   # Orthogonalisation of dC
-  dC_orthog, normsq, nullity = orthogonalise(dC,K,orthog_cache)
+  dC_orthog, normsq, nullity = evaluate!(m.orthog,dC,K,orthog_cache)
 
-  # Project dV
-  dV_norm = project_dV!(dV,dC_orthog,normsq,K,P)
+  # Project θ and normalize
+  project_θ!(θ,dC_orthog,normsq,K,θ_aux)
 
   # Calculate αᵢ
   λ, α_min, α_max = m.params.λ, m.params.α_min, m.params.α_max
-  α, ∑α²,debug_code = compute_α(C,dC_orthog,dC,normsq,K,P,λ,α_min,α_max)
+  α, ∑α², debug_flag = compute_α(C,dC_orthog,dC,normsq,K,θ_aux,λ,α_min,α_max)
 
   # Print debug info (if requested)
-  verbose_print(orthogonalise,dV,dC,dC_orthog,K,P,λ,nullity,debug_code,verbose)
+  debug_print(m.orthog,θ,dC,dC_orthog,K,θ_aux,nullity,debug_flag,params.debug)
 
   # Calculate direction
-  θ .= sqrt(1-∑α²)*dV/dV_norm
+  θ .*= sqrt(1-∑α²)
   for (i,n) in enumerate(normsq)
     if !iszero(n)
       θ .+= (α[i]/sqrt(n)) .* dC_orthog[i] 
@@ -182,29 +215,26 @@ function _update_descent_direction!(m::HilbertianProjection,θ,dV,C,dC,K,verbose
   return θ
 end
 
-# Form projection operator for Cperp: P_C⟂(dV) = dV - ∑[(̄vᵢ ⋅ m)/|̄vᵢ|² ̄vᵢ] 
-#  where ̄vᵢ spans C and ̄vᵢ ⋅ ̄vⱼ = δᵢⱼ. Return norm of projected dV
-function project_dV!(dV,dC_orthog,normsq,K,P)
-  mul!(P,K,dV)
+# Form projection operator for Cperp: P_C⟂(θ) = θ - ∑[(̄vᵢ ⋅ m)/|̄vᵢ|² ̄vᵢ] 
+#  where ̄vᵢ spans C and ̄vᵢ ⋅ ̄vⱼ = δᵢⱼ. Returns P_C⟂(θ)/norm(P_C⟂(θ))
+function project_θ!(θ,dC_orthog,normsq,K,θ_aux)
+  mul!(θ_aux,K,θ)
   for (i,n) in enumerate(normsq)
     if !iszero(n)
-      αi = dot(dC_orthog[i],P)
-      dV .-= (αi/n) .* dC_orthog[i] # [(̄vᵢ ⋅ m)/|̄vᵢ|² ̄vᵢ]
+      αi = dot(dC_orthog[i],θ_aux)
+      θ .-= (αi/n) .* dC_orthog[i] # [(̄vᵢ ⋅ m)/|̄vᵢ|² ̄vᵢ]
     end
   end
   # Check if projected dV is zero vector
-  mul!(P,K,dV)
-  dV_norm = sqrt(dot(dV,P))
-  if iszero(dV_norm)
-    return one(eltype(normsq))
-  else
-    return dV_norm
+  mul!(θ_aux,K,θ)
+  θ_norm = sqrt(dot(θ,θ_aux))
+  if !iszero(θ_norm)
+    θ ./= θ_norm
   end
 end
 
 # Compute α coefficents using αᵢ|̄vᵢ| = λCᵢ - ∑ⱼ₌₁ⁱ⁻¹[ αⱼ(̄vⱼ⋅vᵢ)/|̄vⱼ| ]
 function compute_α(C,dC_orthog,dC,normsq,K,P,λ,α_min,α_max)
-  
   α = copy(C)
   for i = 1:length(C)
     if iszero(normsq[i])
@@ -234,6 +264,37 @@ function compute_α(C,dC_orthog,dC,normsq,K,P,λ,α_min,α_max)
     debug_flag = 2
   end
   α .*= λ
-
   return α, ∑α², debug_flag
+end
+
+function debug_print(orthog,dV,dC,dC_orthog,K,P,nullity,debug_code,debug)
+  if debug
+    orth_norm = 0.0
+    for i = 1:length(dC)
+      mul!(P,K,dC_orthog[i])
+      for j = i+1:length(dC)
+        orth_norm = max(orth_norm,abs(dot(dC_orthog[j],P)))
+      end
+    end
+    mul!(P,K,dV)
+    proj_norm = maximum(map(dCi -> dot(dCi,P),dC_orthog))
+    if i_am_main(verbose)
+      orth_norm[diagind(orth_norm)] .= 0; 
+      println("  ↱----------------------------------------------------------↰")
+      print("                   ")
+      printstyled("Hilbertian Projection Method\n\n",color=:yellow,underline=true);
+      println("      -->         Orthog. method: $(typeof(orthog))");
+      @printf("      --> Orthogonality inf-norm: %e\n",orth_norm)
+      @printf("      -->    Projection inf-norm: %e\n",proj_norm)
+      println("      -->          Basis nullity: ",nullity)
+      if iszero(debug_code)
+        println("      --> Constraints satisfied: ∑α² ≈ 0.")
+      elseif isone(debug_code)
+        println("      -->            ∑α² > α_max: scaling λ")
+      elseif isequal(debug_code,2)
+        println("      -->            ∑α² < α_max: scaling λ")
+      end
+      print("  ↳----------------------------------------------------------↲\n")
+    end
+  end
 end

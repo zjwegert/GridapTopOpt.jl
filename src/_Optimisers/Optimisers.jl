@@ -157,5 +157,6 @@ function Base.display(s::OptimiserHistorySlice)
   println("Iteration: $(s.it) | $(content)")
 end
 
-include("./AugmentedLagrangian.jl")
-include("./HilbertianProjection.jl")
+include("OrthogonalisationMaps.jl")
+include("AugmentedLagrangian.jl")
+include("HilbertianProjection.jl")
