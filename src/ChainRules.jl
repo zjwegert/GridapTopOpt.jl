@@ -178,17 +178,17 @@ end
 
 function adjoint_solve!(φ_to_u::AbstractFEStateMap,du::AbstractVector)
   @abstractmethod
+end 
+
+function dRdφ(φ_to_u::AbstractFEStateMap,uh,vh,φh)
+  @abstractmethod
 end
 
-function res_grad(φ_to_u::AbstractFEStateMap,uh,vh,φh)
-  @abstractmethod #TODO: please give me a better name
-end
-
-function res_grad(φ_to_u::AbstractFEStateMap,u::AbstractVector,v::AbstractVector,φ::AbstractVector)
+function dRdφ(φ_to_u::AbstractFEStateMap,u::AbstractVector,v::AbstractVector,φ::AbstractVector)
   uh = FEFunction(get_trial_space(φ_to_u),u)
   vh = FEFunction(get_test_space(φ_to_u),v)
   φh = FEFunction(get_aux_space(φ_to_u),φ)
-  return res_grad(φ_to_u,uh,vh,φh)
+  return dRdφ(φ_to_u,uh,vh,φh)
 end
 
 function pullback(φ_to_u::AbstractFEStateMap,uh,φh,du;updated=false)
@@ -203,7 +203,7 @@ function pullback(φ_to_u::AbstractFEStateMap,uh,φh,du;updated=false)
   λh = FEFunction(get_test_space(φ_to_u),λ)
 
   ## Compute grad
-  dφdu_vecdata = collect_cell_vector(U_reg,res_grad(φ_to_u,uh,λh,φh)) 
+  dφdu_vecdata = collect_cell_vector(U_reg,dRdφ(φ_to_u,uh,λh,φh)) 
   assemble_vector!(dφdu_vec,assem_deriv,dφdu_vecdata)
   rmul!(dφdu_vec, -1)
   
@@ -311,7 +311,7 @@ function forward_solve(φ_to_u::AffineFEStateMap,φh)
   return x
 end
 
-function res_grad(φ_to_u::AffineFEStateMap,uh,vh,φh)
+function dRdφ(φ_to_u::AffineFEStateMap,uh,vh,φh)
   biform, liform = φ_to_u.biform, φ_to_u.liform
   return ∇(biform,[uh,vh,φh],3) - ∇(liform,[vh,φh],2)
 end
@@ -396,7 +396,7 @@ function forward_solve(φ_to_u::NonlinearFEStateMap,φh)
   return x
 end
 
-function res_grad(φ_to_u::NonlinearFEStateMap,uh,vh,φh)
+function dRdφ(φ_to_u::NonlinearFEStateMap,uh,vh,φh)
   res = φ_to_u.res
   return ∇(res,[uh,vh,φh],3)
 end
@@ -503,7 +503,7 @@ function forward_solve(φ_to_u::RepeatingAffineFEStateMap,φh)
   return x
 end
 
-function res_grad(φ_to_u::RepeatingAffineFEStateMap,uh,vh,φh)
+function dRdφ(φ_to_u::RepeatingAffineFEStateMap,uh,vh,φh)
   biform, liforms = φ_to_u.biform, φ_to_u.liform
 
   res = DomainContribution() # TODO: This will blow up in parallel, needs trick from ODE refactoring branch
