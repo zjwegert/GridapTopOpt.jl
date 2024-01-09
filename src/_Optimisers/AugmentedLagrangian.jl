@@ -14,14 +14,14 @@ struct AugmentedLagrangian{N,O} <: Optimiser
     φ0;
     Λ_max = 5.0, ζ = 1.1, update_mod = 5, γ = 0.1, γ_reinit = 0.5,
     maxiter = 1000, verbose=false, constraint_names = map(i -> Symbol("C_$i"),1:N),
-    converged::Function = default_al_converged
+    converged::Function = default_al_converged, debug = false
   ) where {N,O}
 
     al_keys = [:L,:J,constraint_names...]
     al_bundles = Dict(:C => constraint_names)
     history = OptimiserHistory(Float64,al_keys,al_bundles,maxiter,verbose)
 
-    params = (;Λ_max,ζ,update_mod,γ,γ_reinit)
+    params = (;Λ_max,ζ,update_mod,γ,γ_reinit,debug)
     new{N,O}(problem,stencil,vel_ext,history,converged,params,φ0)
   end
 end
@@ -55,7 +55,7 @@ function default_al_converged(
   end
 
   Li, Ci = h[:L,it], h[:C,it]
-  L_prev = h[:L,it-5:it]
+  L_prev = h[:L,it-5:it-1]
   A = all(L -> abs(Li - L)/abs(Li) < L_tol, L_prev)
   B = all(C -> abs(C) < C_tol,Ci)
   return A && B
@@ -88,13 +88,14 @@ function Base.iterate(m::AugmentedLagrangian)
 
   # Update history and build state
   push!(history,(L,J,C...))
-  state = (1,L,J,C,dL,dJ,dC,uh,φh,vel,λ,Λ,params.γ,params.γ_reinit)
-  return (0,uh,φh), state
+  state = (;it=1,L,J,C,dL,dJ,dC,uh,φh,vel,λ,Λ,params.γ)
+  vars  = params.debug ? (0,uh,φh,state) : (0,uh,φh)
+  return vars, state
 end
 
 function Base.iterate(m::AugmentedLagrangian,state)
-  it, L, J, C, dL, dJ, dC, uh, φh, vel, λ, Λ, γ, γ_reinit = state
-  update_mod, ζ, Λ_max = m.params.update_mod, m.params.ζ, m.params.Λ_max
+  it, L, J, C, dL, dJ, dC, uh, φh, vel, λ, Λ, γ = state
+  update_mod, ζ, Λ_max, γ_reinit = m.params.update_mod, m.params.ζ, m.params.Λ_max, m.params.γ_reinit
 
   if finished(m)
     return nothing
@@ -134,6 +135,7 @@ function Base.iterate(m::AugmentedLagrangian,state)
 
   ## Update history and build state
   push!(m.history,(L,J,C...))
-  state = (it+1,L,J,C,dL,dJ,dC,uh,φh,vel,λ,Λ,γ,γ_reinit)
-  return (it,uh,φh), state
+  state = (it+1,L,J,C,dL,dJ,dC,uh,φh,vel,λ,Λ,γ)
+  vars  = params.debug ? (it,uh,φh,state) : (it,uh,φh)
+  return vars, state
 end
