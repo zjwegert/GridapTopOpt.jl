@@ -75,4 +75,6 @@ export AugmentedLagrangian
 export HilbertianProjection
 export HPModifiedGramSchmidt
 
+include("Benchmarks.jl")
+
 end
