@@ -64,6 +64,13 @@ function OptimiserHistory(
   return OptimiserHistory{T}(-1,keys,values,bundles,verbose,maxiter)
 end
 
+function reset!(h::OptimiserHistory)
+  h.niter = -1
+  for k in keys(h.values)
+    fill!(h.values[k],0)
+  end
+end
+
 Base.keys(h::OptimiserHistory) = h.keys
 Base.length(h::OptimiserHistory) = h.niter
 
