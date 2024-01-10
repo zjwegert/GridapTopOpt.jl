@@ -42,11 +42,8 @@ function main(mesh_partition,distribute,el_size)
   ## Spaces
   reffe = ReferenceFE(lagrangian,VectorValue{3,Float64},order)
   reffe_scalar = ReferenceFE(lagrangian,Float64,order)
-  _V = TestFESpace(model,reffe;dirichlet_tags=["origin"])
-  _U = TrialFESpace(_V,VectorValue(0.0,0.0,0.0))
-  mfs = BlockMultiFieldStyle()
-  U = MultiFieldFESpace([_U,_U,_U,_U,_U,_U];style=mfs);
-  V = MultiFieldFESpace([_V,_V,_V,_V,_V,_V];style=mfs);
+  V = TestFESpace(model,reffe;dirichlet_tags=["origin"])
+  U = TrialFESpace(_V,VectorValue(0.0,0.0,0.0))
   V_reg = V_φ = TestFESpace(model,reffe_scalar)
   U_reg = TrialFESpace(V_reg)
 
@@ -66,9 +63,8 @@ function main(mesh_partition,distribute,el_size)
         TensorValue(0.,0.,1/2,0.,0.,0.,1/2,0.,0.),         # ϵᵢⱼ⁽¹³⁾≡ϵᵢⱼ⁽⁵⁾
         TensorValue(0.,1/2,0.,1/2,0.,0.,0.,0.,0.))         # ϵᵢⱼ⁽¹²⁾≡ϵᵢⱼ⁽⁶⁾
 
-  a(u,v,φ,dΩ) = ∫((I ∘ φ)*sum(C ⊙ ε(u[i]) ⊙ ε(v[i]) for i = 1:length(u)))dΩ
-  l(v,φ,dΩ) = ∫(-(I ∘ φ)*sum(C ⊙ εᴹ[i] ⊙ ε(v[i]) for i = 1:length(v)))dΩ;
-  res(u,v,φ,dΩ) = a(u,v,φ,dΩ) - l(v,φ,dΩ)
+  a(u,v,φ,dΩ) = ∫((I ∘ φ) * C ⊙ ε(u) ⊙ ε(v))dΩ
+  l = [(v,φ,dΩ) -> ∫(-(I ∘ φ) * C ⊙ εᴹ[i] ⊙ ε(v))dΩ for i in 1:6]
 
   ## Optimisation functionals
   _C(C,ε_p,ε_q) = C ⊙ ε_p ⊙ ε_q;

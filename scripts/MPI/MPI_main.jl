@@ -81,7 +81,7 @@ function main(mesh_partition,distribute)
   ## Optimiser
   make_dir(path;ranks=ranks)
   converged(m) = LSTO_Distributed.default_al_converged(m;L_tol=0.02*maximum(Δ))
-  optimiser = AugmentedLagrangian(pcfs,stencil,vel_ext,φh;γ,γ_reinit,converged,verbose=true)
+  optimiser = AugmentedLagrangian(pcfs,stencil,vel_ext,φh;γ,γ_reinit,converged,verbose=i_am_main(ranks))
   for (it, uh, φh) in optimiser
     write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh)),"uh"=>uh])
   end
