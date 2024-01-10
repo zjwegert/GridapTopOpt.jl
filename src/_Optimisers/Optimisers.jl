@@ -160,8 +160,8 @@ function Base.setindex!(::OptimiserHistorySlice,args...)
 end
 
 function Base.display(s::OptimiserHistorySlice)
-  content = join([string(k,"=",s[k]) for k in keys(s)],", ")
-  println("Iteration: $(s.it) | $(content)")
+  content = join([string(k,"=",@sprintf("%.4e",s[k])) for k in keys(s)],", ")
+  println("Iteration: $(@sprintf("%3i",s.it)) | $(content)")
 end
 
 include("OrthogonalisationMaps.jl")

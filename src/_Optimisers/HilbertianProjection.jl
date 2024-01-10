@@ -276,23 +276,20 @@ function debug_print(orthog,dV,dC,dC_orthog,K,P,nullity,debug_code,debug)
     end
     mul!(P,K,dV)
     proj_norm = maximum(map(dCi -> dot(dCi,P),dC_orthog))
-    if i_am_main(verbose)
-      orth_norm[diagind(orth_norm)] .= 0; 
-      println("  ↱----------------------------------------------------------↰")
-      print("                   ")
-      printstyled("Hilbertian Projection Method\n\n",color=:yellow,underline=true);
-      println("      -->         Orthog. method: $(typeof(orthog))");
-      @printf("      --> Orthogonality inf-norm: %e\n",orth_norm)
-      @printf("      -->    Projection inf-norm: %e\n",proj_norm)
-      println("      -->          Basis nullity: ",nullity)
-      if iszero(debug_code)
-        println("      --> Constraints satisfied: ∑α² ≈ 0.")
-      elseif isone(debug_code)
-        println("      -->            ∑α² > α_max: scaling λ")
-      elseif isequal(debug_code,2)
-        println("      -->            ∑α² < α_max: scaling λ")
-      end
-      print("  ↳----------------------------------------------------------↲\n")
+    println("  ↱----------------------------------------------------------↰")
+    print("                   ")
+    printstyled("Hilbertian Projection Method\n\n",color=:yellow,underline=true);
+    println("      -->         Orthog. method: $(typeof(orthog))");
+    @printf("      --> Orthogonality inf-norm: %e\n",orth_norm)
+    @printf("      -->    Projection inf-norm: %e\n",proj_norm)
+    println("      -->          Basis nullity: ",nullity)
+    if iszero(debug_code)
+      println("      --> Constraints satisfied: ∑α² ≈ 0.")
+    elseif isone(debug_code)
+      println("      -->            ∑α² > α_max: scaling λ")
+    elseif isequal(debug_code,2)
+      println("      -->            ∑α² < α_max: scaling λ")
     end
+    print("  ↳----------------------------------------------------------↲\n")
   end
 end

@@ -26,10 +26,10 @@ end
 function Gridap.Arrays.evaluate!(cache,::HPModifiedGramSchmidt,A::AbstractArray{<:AbstractArray},K::AbstractMatrix)
   n,Z,X,Q,R = cache
   map(copy!,Z,A)
+  map((x,z) -> mul!(x,K,z), X, Z)
 
   nullity = 0
   for i = 1:n
-    mul!(X[i],K,Z[i])
     R[i,i] = dot(Z[i],X[i])
     if R[i,i] < 1.e-14
       R[i,i] = zero(eltype(R))
@@ -50,6 +50,7 @@ function Gridap.Arrays.evaluate!(cache,::HPModifiedGramSchmidt,A::AbstractArray{
     X[i] .-= (Rij_sum / Ri) .* X[i]
   end
 
-  return Z, view(R,diagind(R)), nullity
+  D = map(i -> R[i,i]^2, 1:n)
+  return Z, D, nullity
   #return Z, X, Q, R, nullity
 end
