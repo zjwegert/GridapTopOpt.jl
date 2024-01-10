@@ -346,7 +346,7 @@ struct NonlinearFEStateMap{A,B,C,D,E,F} <: AbstractFEStateMap
     assem_U = SparseMatrixAssembler(U,V),
     assem_adjoint = SparseMatrixAssembler(V,U),
     assem_deriv = SparseMatrixAssembler(U_reg,U_reg),
-    nls::NonlinearSolver = NewtonSolver(LUSolver();maxiter=50,rtol=1.e-10,verbose=true),
+    nls::NonlinearSolver = NewtonSolver(LUSolver();maxiter=50,rtol=1.e-8,verbose=true),
     adjoint_ls::LinearSolver = LUSolver()
   )
     res = IntegrandWithMeasure(res,dΩ)
