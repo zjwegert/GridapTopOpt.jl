@@ -1,4 +1,3 @@
-
 function process_timer(t::PTimer)
   data = t.data
   tmax, tmin, tmean = map_main(data) do data
@@ -6,6 +5,20 @@ function process_timer(t::PTimer)
     maximum(times), minimum(times), sum(times)/length(times)
   end |> PartitionedArrays.tuple_of_arrays
   return tmax, tmin, tmean
+end
+
+function process_timer(t::Vector)
+  return maximum(t), minimum(t), sum(t)/length(t)
+end
+
+function benchmark(f, args, ranks::Nothing; nreps = 10, reset! = x -> nothing)
+  t = zeros(Float64,nreps)
+  f(args...)
+  for i in 1:nreps
+    reset!(args...)
+    t[i] = @elapsed f(args...)
+  end
+  return process_timer(t)
 end
 
 function benchmark(f, args, ranks; nreps = 10, reset! = x -> nothing)
@@ -43,7 +56,7 @@ function benchmark_forward_problem(m::AbstractFEStateMap, φh, ranks; nreps = 10
   return benchmark(f, (m,φh), ranks; nreps)
 end
 
-function benchmark_advection(stencil::AdvectionStencil,φ0,v0,γ,ranks; nreps = 10)
+function benchmark_advection(stencil::AdvectionStencil, φ0, v0, γ, ranks; nreps = 10)
   function f(stencil,φ,v,γ)
     advect!(stencil,φ,v,γ)
   end
@@ -56,7 +69,7 @@ function benchmark_advection(stencil::AdvectionStencil,φ0,v0,γ,ranks; nreps = 
   return benchmark(f, (stencil,φ,v,γ), ranks; nreps, reset!)
 end
 
-function benchmark_reinitialisation(stencil::AdvectionStencil,φ0,v0,γ,ranks; nreps = 10)
+function benchmark_reinitialisation(stencil::AdvectionStencil, φ0, v0, γ, ranks; nreps = 10)
   function f(stencil,φ,v,γ)
     reinit!(stencil,φ,v,γ)
   end
@@ -69,7 +82,7 @@ function benchmark_reinitialisation(stencil::AdvectionStencil,φ0,v0,γ,ranks; n
   return benchmark(f, (stencil,φ,v,γ), ranks; nreps, reset!)
 end
 
-function benchmark_velocity_extension(ext::VelocityExtension,v0,ranks; nreps = 10)
+function benchmark_velocity_extension(ext::VelocityExtension, v0, ranks; nreps = 10)
   function f(ext,v)
     project!(ext,v)
   end
