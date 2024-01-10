@@ -30,10 +30,8 @@ function main()
   ## FE Setup
   model = CartesianDiscreteModel(dom,el_size);
   Δ = get_Δ(model)
-  f_Γ_D(x) = (x[1] ≈ 0.0 && (x[2] <= ymax*prop_Γ_D + eps() || 
-    x[2] >= ymax-ymax*prop_Γ_D - eps())) ? true : false;
-  f_Γ_N(x) = (x[1] ≈ xmax && ymax/2-ymax*prop_Γ_N/4 - eps() <= x[2] <= 
-    ymax/2+ymax*prop_Γ_N/4 + eps()) ? true : false;
+  f_Γ_D(x) = (x[1] ≈ 0.0 && (x[2] <= ymax*prop_Γ_D + eps()) || (x[2] >= ymax-ymax*prop_Γ_D - eps()))
+  f_Γ_N(x) = (x[1] ≈ xmax && ymax/2-ymax*prop_Γ_N/4 - eps() <= x[2] <= ymax/2+ymax*prop_Γ_N/4 + eps())
   update_labels!(1,model,f_Γ_D,"Gamma_D")
   update_labels!(2,model,f_Γ_N,"Gamma_N")
 
@@ -61,12 +59,11 @@ function main()
   D0 = 1
   ξ = -1
   D(u) = D0*(exp(ξ*u))
-
   res(u,v,φ,dΩ,dΓ_N) = ∫((I ∘ φ)*(D ∘ u)*∇(u)⋅∇(v))dΩ - ∫(v)dΓ_N
 
   ## Optimisation functionals
-  ξ = 0.2;
-  J = (u,φ,dΩ,dΓ_N) -> ∫((I ∘ φ)*(D ∘ u)*∇(u)⋅∇(u) + ξ*(ρ ∘ φ))dΩ
+  ξ = 0.2
+  J(u,φ,dΩ,dΓ_N) = ∫((I ∘ φ)*(D ∘ u)*∇(u)⋅∇(u) + ξ*(ρ ∘ φ))dΩ
 
   ## Finite difference solver and level set function
   stencil = AdvectionStencil(FirstOrderStencil(2,Float64),model,V_φ,tol,max_steps)

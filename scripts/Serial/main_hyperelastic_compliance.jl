@@ -8,32 +8,31 @@ using Gridap, GridapDistributed, GridapPETSc, PartitionedArrays, LSTO_Distribute
 """ 
 function main()
   ## Parameters
-  order = 1;
+  order = 1
   xmax,ymax=2.0,1.0
-  prop_Γ_N = 0.4;
-  dom = (0,xmax,0,ymax);
-  el_size = (200,200);
-  γ = 0.03;
-  γ_reinit = 0.5;
+  prop_Γ_N = 0.4
+  dom = (0,xmax,0,ymax)
+  el_size = (200,200)
+  γ = 0.03
+  γ_reinit = 0.5
   max_steps = floor(Int,minimum(el_size)/10)
   tol = 1/(order^2*10)*prod(inv,minimum(el_size)) # <- We can do better than this I think
-  η_coeff = 2;
-  α_coeff = 4;
+  η_coeff = 2
+  α_coeff = 4
 
   ## FE Setup
   model = CartesianDiscreteModel(dom,el_size);
   Δ = get_Δ(model)
-  f_Γ_D(x) = (x[1] ≈ 0.0) ? true : false;
-  f_Γ_N(x) = (x[1] ≈ xmax && ymax/2-ymax*prop_Γ_N/4 - eps() <= x[2] <= 
-    ymax/2+ymax*prop_Γ_N/4 + eps()) ? true : false;
+  f_Γ_D(x) = (x[1] ≈ 0.0)
+  f_Γ_N(x) = (x[1] ≈ xmax && ymax/2-ymax*prop_Γ_N/4 - eps() <= x[2] <= ymax/2+ymax*prop_Γ_N/4 + eps())
   update_labels!(1,model,f_Γ_D,"Gamma_D")
   update_labels!(2,model,f_Γ_N,"Gamma_N")
 
   ## Triangulations and measures
   Ω = Triangulation(model)
   Γ_N = BoundaryTriangulation(model,tags="Gamma_N")
-  dΩ = Measure(Ω,2order)
-  dΓ_N = Measure(Γ_N,2order)
+  dΩ = Measure(Ω,2*order)
+  dΓ_N = Measure(Γ_N,2*order)
   vol_D = sum(∫(1)dΩ)
 
   ## Spaces
@@ -46,15 +45,14 @@ function main()
   U_reg = TrialFESpace(V_reg,0)
 
   ## Create FE functions
-  φh = interpolate(gen_lsf(4,0.2),V_φ);
-  φ = get_free_dof_values(φh)
+  φh = interpolate(gen_lsf(4,0.2),V_φ)
 
   ## Interpolation and weak form
   interp = SmoothErsatzMaterialInterpolation(η = η_coeff*maximum(Δ))
   I,H,DH,ρ = interp.I,interp.H,interp.DH,interp.ρ
 
-  _E = 1000;
-  ν = 0.3;
+  _E = 1000
+  ν = 0.3
   μ, λ = _E/(2*(1 + ν)), _E*ν/((1 + ν)*(1 - 2*ν))
   g = VectorValue(0,-20)
   # Deformation gradient
@@ -84,13 +82,13 @@ function main()
   # Obj = (u,φ,dΩ,dΓ_N) -> ∫((I ∘ φ)*((T ∘ ∇(u)) ⊙ ∇(u)) + ξ*(ρ ∘ φ))dΩ
 
   ## Optimisation functionals
-  ξ = 0.5;
-  Obj = (u,φ,dΩ,dΓ_N) -> ∫((I ∘ φ)*((dE∘(∇(u),∇(u))) ⊙ (S∘∇(u))) + ξ*(ρ ∘ φ))dΩ
-  # Obj = (u,φ,dΩ,dΓ_N) -> ∫((I ∘ φ)*((T ∘ ∇(u)) ⊙ ∇(u)) + ξ*(ρ ∘ φ))dΩ
+  ξ = 0.5
+  Obj(u,φ,dΩ,dΓ_N) = ∫((I ∘ φ)*((dE∘(∇(u),∇(u))) ⊙ (S∘∇(u))) + ξ*(ρ ∘ φ))dΩ
+  # Obj(u,φ,dΩ,dΓ_N) = ∫((I ∘ φ)*((T ∘ ∇(u)) ⊙ ∇(u)) + ξ*(ρ ∘ φ))dΩ
 
   ## Finite difference solver and level set function
-  stencil = AdvectionStencil(FirstOrderStencil(2,Float64),model,V_φ,Δ./order,max_steps,tol)
-  reinit!(stencil,φ,γ_reinit)
+  stencil = AdvectionStencil(FirstOrderStencil(2,Float64),model,V_φ,tol,max_steps)
+  reinit!(stencil,φh,γ_reinit)
 
   ## Setup solver and FE operators
   state_map = NonlinearFEStateMap(res,U,V,V_φ,U_reg,φh,dΩ,dΓ_N)
@@ -98,25 +96,16 @@ function main()
 
   ## Hilbertian extension-regularisation problems
   α = α_coeff*maximum(Δ)
-  a_hilb(p,q) =∫(α^2*∇(p)⋅∇(q) + p*q)dΩ;
+  a_hilb(p,q) =∫(α^2*∇(p)⋅∇(q) + p*q)dΩ
   vel_ext = VelocityExtension(a_hilb,U_reg,V_reg)
   
   ## Optimiser
   path = dirname(dirname(@__DIR__))*"/results/main_hyperelastic_compliance_neohook_NonSymmetric_xi=$ξ"
   make_dir(path)
-  optimiser = AugmentedLagrangian(φ,pcfs,stencil,vel_ext,interp,el_size,γ,γ_reinit);
-  for history in optimiser
-    it,Ji,_,_ = last(history)
-    print_history(it,["J"=>Ji])
-    write_history(history,path*"/history.csv")
-    uhi = get_state(pcfs)
-    write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh)),"uh"=>uhi])
+  optimiser = AugmentedLagrangian(pcfs,stencil,vel_ext,φh;γ,γ_reinit,verbose=true)
+  for (it,uh,φh) in optimiser
+    write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh)),"uh"=>uh])
   end
-  it,Ji,_,_ = last(optimiser.history)
-  print_history(it,["J"=>Ji])
-  write_history(optimiser.history,path*"/history.csv")
-  uhi = get_state(pcfs)
-  write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh)),"uh"=>uhi];iter_mod=1)
 end
 
-main();
+main()

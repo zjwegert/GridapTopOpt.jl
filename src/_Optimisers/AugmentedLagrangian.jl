@@ -17,7 +17,8 @@ struct AugmentedLagrangian{N,O} <: Optimiser
     converged::Function = default_al_converged, debug = false
   ) where {N,O}
 
-    al_keys = [:L,:J,constraint_names...]
+    constraint_names = map(Symbol,constraint_names)
+    al_keys = [:L,:J,constraint_names...,:γ]
     al_bundles = Dict(:C => constraint_names)
     history = OptimiserHistory(Float64,al_keys,al_bundles,maxiter,verbose)
 
@@ -87,7 +88,7 @@ function Base.iterate(m::AugmentedLagrangian)
   project!(m.vel_ext,dL)
 
   # Update history and build state
-  push!(history,(L,J,C...))
+  push!(history,(L,J,C...,params.γ))
   state = (;it=1,L,J,C,dL,dJ,dC,uh,φh,vel,λ,Λ,params.γ)
   vars  = params.debug ? (0,uh,φh,state) : (0,uh,φh)
   return vars, state
@@ -95,7 +96,8 @@ end
 
 function Base.iterate(m::AugmentedLagrangian,state)
   it, L, J, C, dL, dJ, dC, uh, φh, vel, λ, Λ, γ = state
-  update_mod, ζ, Λ_max, γ_reinit = m.params.update_mod, m.params.ζ, m.params.Λ_max, m.params.γ_reinit
+  params, history = m.params, m.history
+  update_mod, ζ, Λ_max, γ_reinit = params.update_mod, params.ζ, params.Λ_max, params.γ_reinit
 
   if finished(m)
     return nothing
@@ -134,7 +136,7 @@ function Base.iterate(m::AugmentedLagrangian,state)
   project!(m.vel_ext,dL)
 
   ## Update history and build state
-  push!(m.history,(L,J,C...))
+  push!(history,(L,J,C...,γ))
   state = (it+1,L,J,C,dL,dJ,dC,uh,φh,vel,λ,Λ,γ)
   vars  = params.debug ? (it,uh,φh,state) : (it,uh,φh)
   return vars, state

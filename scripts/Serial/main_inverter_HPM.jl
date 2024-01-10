@@ -16,29 +16,29 @@ using Gridap, GridapDistributed, GridapPETSc, PartitionedArrays, LSTO_Distribute
 """ 
 function main()
   ## Parameters
-  order = 1;
-  dom = (0,1,0,0.5);
-  el_size = (200,100);
-  γ = 0.05;
-  γ_reinit = 0.5;
+  order = 1
+  dom = (0,1,0,0.5)
+  el_size = (200,100)
+  γ = 0.05
+  γ_reinit = 0.5
   max_steps = floor(Int,minimum(el_size)/10)
   tol = 1/(order^2*10)*prod(inv,minimum(el_size))
-  C = isotropic_2d(1.0,0.3);
-  η_coeff = 2;
-  α_coeff = 4;
-  Vf=0.4;
-  δₓ=0.75;
-  ks = 0.01;
-  g = VectorValue(1,0);
+  C = isotropic_2d(1.0,0.3)
+  η_coeff = 2
+  α_coeff = 4
+  Vf = 0.4
+  δₓ = 0.75
+  ks = 0.01
+  g = VectorValue(1,0)
   path = dirname(dirname(@__DIR__))*"/results/main_inverter_mechanism_HPM"
   
   ## FE Setup
-  model = CartesianDiscreteModel(dom,el_size);
+  model = CartesianDiscreteModel(dom,el_size)
   Δ = get_Δ(model)
-  f_Γ_in(x) = (x[1] ≈ 0.0) && x[2] <= 0.03 + eps() ? true : false;
-  f_Γ_out(x) = (x[1] ≈ 1.0) && x[2] <= 0.07 + eps() ? true : false;
-  f_Γ_D(x) = x[1] ≈ 0.0 && x[2] >= 0.4  ? true : false;
-  f_Γ_D2(x) = x[2] ≈ 0.0 ? true : false;
+  f_Γ_in(x) = (x[1] ≈ 0.0) && (x[2] <= 0.03 + eps())
+  f_Γ_out(x) = (x[1] ≈ 1.0) && (x[2] <= 0.07 + eps())
+  f_Γ_D(x) = (x[1] ≈ 0.0) && (x[2] >= 0.4)
+  f_Γ_D2(x) = (x[2] ≈ 0.0)
   update_labels!(1,model,f_Γ_in,"Gamma_in")
   update_labels!(2,model,f_Γ_out,"Gamma_out")
   update_labels!(3,model,f_Γ_D,"Gamma_D")
@@ -64,9 +64,8 @@ function main()
   U_reg = TrialFESpace(V_reg,[0,0])
 
   ## Create FE functions
-  lsf_fn = x->max(gen_lsf(6,0.2)(x),-sqrt((x[1]-1)^2+(x[2]-0.5)^2)+0.2)
-  φh = interpolate(lsf_fn,V_φ);
-  φ = get_free_dof_values(φh)
+  lsf_fn(x) = max(gen_lsf(6,0.2)(x),-sqrt((x[1]-1)^2+(x[2]-0.5)^2)+0.2)
+  φh = interpolate(lsf_fn,V_φ)
 
   ## Interpolation and weak form
   interp = SmoothErsatzMaterialInterpolation(η = η_coeff*maximum(Δ))
@@ -78,42 +77,31 @@ function main()
 
   ## Optimisation functionals
   e₁ = VectorValue(1,0)
-  J = (u,φ,dΩ,dΓ_in,dΓ_out) -> 10*∫(u⋅e₁)dΓ_in
-  Vol = (u,φ,dΩ,dΓ_in,dΓ_out) -> ∫(((ρ ∘ φ) - Vf)/vol_D)dΩ;
-  dVol = (q,u,φ,dΩ,dΓ_in,dΓ_out) -> ∫(1/vol_D*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
-  UΓ_out = (u,φ,dΩ,dΓ_in,dΓ_out) -> ∫(u⋅-e₁-δₓ)dΓ_out
+  J(u,φ,dΩ,dΓ_in,dΓ_out) = 10*∫(u⋅e₁)dΓ_in
+  Vol(u,φ,dΩ,dΓ_in,dΓ_out) = ∫(((ρ ∘ φ) - Vf)/vol_D)dΩ
+  dVol(q,u,φ,dΩ,dΓ_in,dΓ_out) = ∫(1/vol_D*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
+  UΓ_out(u,φ,dΩ,dΓ_in,dΓ_out) = ∫(u⋅-e₁-δₓ)dΓ_out
 
   ## Finite difference solver and level set function
-  stencil = AdvectionStencil(FirstOrderStencil(2,Float64),model,V_φ,Δ./order,max_steps,tol)
-  reinit!(stencil,φ,γ_reinit)
+  stencil = AdvectionStencil(FirstOrderStencil(2,Float64),model,V_φ,tol,max_steps)
+  reinit!(stencil,φh,γ_reinit)
 
   ## Setup solver and FE operators
-  state_map = AffineFEStateMap(a,l,res,U,V,V_φ,U_reg,φh,dΩ,dΓ_in,dΓ_out)
+  state_map = AffineFEStateMap(a,l,U,V,V_φ,U_reg,φh,dΩ,dΓ_in,dΓ_out)
   pcfs = PDEConstrainedFunctionals(J,[Vol,UΓ_out],state_map,analytic_dC=[dVol,nothing])
 
   ## Hilbertian extension-regularisation problems
   α = α_coeff*maximum(Δ)
-  a_hilb(p,q) =∫(α^2*∇(p)⋅∇(q) + p*q)dΩ;
+  a_hilb(p,q) = ∫(α^2*∇(p)⋅∇(q) + p*q)dΩ;
   vel_ext = VelocityExtension(a_hilb,U_reg,V_reg)
   
   ## Optimiser
   make_dir(path)
-  optimiser = HilbertianProjection(φ,pcfs,stencil,vel_ext,interp,el_size,γ,γ_reinit;
-    α_min=0.5,ls_γ_min=0.01);
-  for history in optimiser
-    it,Ji,Ci = last(history)
-    γ = optimiser.γ_cache[1]
-    print_history(it,["J"=>Ji,"C"=>Ci,"γ"=>γ])
-    write_history(history,path*"/history.csv")
-    uhi = get_state(pcfs)
-    write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh)),"uh"=>uhi])
+  optimiser = HilbertianProjection(pcfs,stencil,vel_ext,φh;γ,γ_reinit,α_min=0.5,ls_γ_min=0.01,
+                                   verbose=true,constraint_names=["Vol","UΓ_out"])
+  for (it,uh,φh) in optimiser
+    write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh)),"uh"=>uh])
   end
-  it,Ji,Ci = last(optimiser.history)
-  γ = optimiser.γ_cache[1]
-  print_history(it,["J"=>Ji,"C"=>Ci,"γ"=>γ])
-  write_history(optimiser.history,path*"/history.csv")
-  uhi = get_state(pcfs)
-  write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh)),"uh"=>uhi];iter_mod=1)
 end
 
-main();
+main()

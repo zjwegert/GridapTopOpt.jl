@@ -1,147 +1,4 @@
-
-struct HilbertianProjection{T,N} <: Optimiser
-  problem   :: PDEConstrainedFunctionals{N}
-  stencil   :: AdvectionStencil
-  vel_ext   :: VelocityExtension
-  orthog    :: OrthogonalisationMap
-  history   :: OptimiserHistory{Float64}
-  converged :: Function
-  params    :: NamedTuple
-  φ0 # TODO: Remove me please
-  function HilbertianProjection(
-    problem :: PDEConstrainedFunctionals{N},
-    stencil :: AdvectionStencil,
-    vel_ext :: VelocityExtension,
-    φ0;
-    orthog = HPModifiedGramSchmidt(),
-    λ=0.5, α_min=0.1, α_max=1.0, γ=0.1, γ_reinit=0.5,
-    ls_max_iters = 10, ls_δ_inc = 1.1, ls_δ_dec = 0.7,
-    ls_ξ = 0.005, ls_ξ_reduce_coef = 0.1, ls_ξ_reduce_abs_tol = 0.01,
-    ls_γ_min = 0.001, ls_γ_max = 0.1,
-    maxiter = 1000, verbose=false, constraint_names = map(i -> Symbol("C_$i"),1:N),
-    converged::Function = default_hp_converged, debug = false
-  ) where {N}
-
-    al_keys = [:J,constraint_names...]
-    al_bundles = Dict(:C => constraint_names)
-    history = OptimiserHistory(Float64,al_keys,al_bundles,maxiter,verbose)
-
-    params = (;debug,λ,α_min,α_max,γ,γ_reinit,ls_max_iters,ls_δ_inc,ls_δ_dec,ls_ξ,
-      ls_ξ_reduce_coef,ls_ξ_reduce_abs_tol,ls_γ_min,ls_γ_max)
-    T = typeof(orthog)
-    new{T,N}(problem,stencil,vel_ext,orthog,history,converged,params,φ0)
-  end
-end
-
-get_history(m::HilbertianProjection) = m.history
-
-function converged(m::HilbertianProjection)
-  return m.converged(m)
-end
-
-function default_hp_converged(
-  m::HilbertianProjection;
-  J_tol = 0.2*maximum(m.stencil.params.Δ),
-  C_tol = 0.001
-)
-  h  = m.history
-  it = get_last_iteration(h)
-  if it < 10
-    return false
-  end
-
-  Ji, Ci = h[:J,it], h[:C,it]
-  J_prev = h[:J,it-5:it]
-  A = all(J -> abs(Ji - J)/abs(Ji) < J_tol, J_prev)
-  B = all(C -> abs(C) < C_tol, Ci)
-  return (it > 10) && A && B
-end
-
-# 0th iteration
-function Base.iterate(m::HilbertianProjection)
-  history, params = m.history, m.params
-  φh = m.φ0
-
-  ## Compute FE problem and shape derivatives
-  J, C, dJ, dC = Gridap.evaluate!(m.problem,φh)
-  uh  = get_state(m.problem)
-  vel = copy(get_free_dof_values(φh))
-  φ_tmp = copy(vel)
-
-  ## Hilbertian extension-regularisation
-  project!(m.vel_ext,dJ)
-  project!(m.vel_ext,dC)
-
-  ## Compute descent direction θ and store in dJ
-  θ = update_descent_direction!(m,dJ,dJ,C,dC,m.vel_ext.K;verbose=true)
-  
-  # Update history and build state
-  push!(history,(J,C...))
-  state = (1,J,C,θ,dJ,dC,uh,φh,vel,φ_tmp,params.γ)
-  vars  = params.debug ? (0,uh,φh,state) : (0,uh,φh)
-  return vars, state
-end
-
-# ith iteration
-function Base.iterate(m::HilbertianProjection,state)
-  it, J, C, θ, dJ, dC, uh, φh, vel, φ_tmp, γ = state
-  history, params = m.history, m.params
-
-  if finished(m)
-    return nothing
-  end
-
-  ## Line search
-  U_reg = get_deriv_space(m.problem.state_map)
-  V_φ   = get_aux_space(m.problem.state_map)
-  interpolate!(FEFunction(U_reg,θ),vel,V_φ)
-  
-  ls_max_iters,δ_inc,δ_dec = params.ls_max_iters,params.ls_δ_inc,params.ls_δ_dec
-  ξ, ξ_reduce, ξ_reduce_tol = params.ls_ξ, params.ls_ξ_reduce_coef, params.ls_ξ_reduce_abs_tol
-  γ_min, γ_max = params.ls_γ_min,params.ls_γ_max
-  
-  ls_it = 0; done = false
-  φ = get_free_dof_values(φh); copy!(φ_tmp,φ)
-  while !done && (ls_it <= ls_max_iters)
-    # Advect  & Reinitialise
-    advect!(m.stencil,φ,vel,γ)
-    reinit!(m.stencil,φ,params.γ_reinit)
-
-    # Calcuate new objective and constraints
-    J_interm, C_interm = evaluate_functionals!(m.problem,φh)
-
-    # Reduce line search parameter if constraints close to saturation
-    _ξ = all(Ci -> abs(Ci) < ξ_reduce_tol, C_interm) ? ξ*ξ_reduce : ξ
-
-    # Accept/reject
-    if (J_interm < J + _ξ*abs(J)) || (γ <= γ_min)
-      γ = min(δ_inc*γ, γ_max)
-      done = true
-      print_msg(history,"  Accepted iteration with γ = $(γ) \n";color=:yellow)
-    else
-      γ = max(δ_dec*γ, γ_min)
-      copy!(φ,φ_tmp)
-      print_msg(history,"  Reject iteration with γ = $(γ) \n";color=:red)
-    end
-  end
-
-  ## Calculate objective, constraints, and shape derivatives after line search
-  J, C, dJ, dC = Gridap.evaluate!(m.problem,φh)
-
-  ## Hilbertian extension-regularisation
-  project!(m.vel_ext,dJ)
-  project!(m.vel_ext,dC)
-
-  ## Compute descent direction θ and store in dJ
-  θ = update_descent_direction!(m,dJ,dJ,C,dC,m.vel_ext.K)
-
-  ## Update history and build state
-  push!(history,(J,C...))
-  state = (it+1, J, C, θ, dJ, dC, uh, φh, vel, φ_tmp, γ)
-  vars  = params.debug ? (it,uh,φh,state) : (it,uh,φh)
-  return vars, state
-end
-
+# Projection map
 struct HilbertianProjectionMap{A}
   orthog  :: OrthogonalisationMap
   vel_ext :: VelocityExtension{A}
@@ -177,23 +34,22 @@ struct HilbertianProjectionMap{A}
 end
 
 function update_descent_direction!(m::HilbertianProjectionMap{<:AbstractMatrix},dV,C,dC,K)
-  θ, _ = m.caches
+  θ, θ_aux, orthog_cache = m.caches
   copy!(θ,dV)
-  _update_descent_direction!(m,θ,C,dC,K)
+  _update_descent_direction!(m,θ,C,dC,K,θ_aux,orthog_cache)
 end
 
 function update_descent_direction!(m::HilbertianProjectionMap{<:PSparseMatrix},dV,C,dC,K)
-  θ, dC_aux, _, _ = m.caches
+  θ, dC_aux, θ_aux, orthog_cache = m.caches
   copy!(θ,dV)
   copy!.(dC_aux,dC)
-  _update_descent_direction!(m,θ,C,dC_aux,K)
+  _update_descent_direction!(m,θ,C,dC_aux,K,θ_aux,orthog_cache)
 end
 
-function _update_descent_direction!(m::HilbertianProjectionMap,θ,C,dC,K)
-  _, _, θ_aux, orthog_cache = m.caches
+function _update_descent_direction!(m::HilbertianProjectionMap,θ,C,dC,K,θ_aux,orthog_cache)
 
   # Orthogonalisation of dC
-  dC_orthog, normsq, nullity = evaluate!(m.orthog,dC,K,orthog_cache)
+  dC_orthog, normsq, nullity = evaluate!(orthog_cache,m.orthog,dC,K)
 
   # Project θ and normalize
   project_θ!(θ,dC_orthog,normsq,K,θ_aux)
@@ -203,7 +59,7 @@ function _update_descent_direction!(m::HilbertianProjectionMap,θ,C,dC,K)
   α, ∑α², debug_flag = compute_α(C,dC_orthog,dC,normsq,K,θ_aux,λ,α_min,α_max)
 
   # Print debug info (if requested)
-  debug_print(m.orthog,θ,dC,dC_orthog,K,θ_aux,nullity,debug_flag,params.debug)
+  debug_print(m.orthog,θ,dC,dC_orthog,K,θ_aux,nullity,debug_flag,m.params.debug)
 
   # Calculate direction
   θ .*= sqrt(1-∑α²)
@@ -265,6 +121,148 @@ function compute_α(C,dC_orthog,dC,normsq,K,P,λ,α_min,α_max)
   end
   α .*= λ
   return α, ∑α², debug_flag
+end
+
+# Optimizer
+struct HilbertianProjection{T,N} <: Optimiser
+  problem   :: PDEConstrainedFunctionals{N}
+  stencil   :: AdvectionStencil
+  vel_ext   :: VelocityExtension
+  projector :: HilbertianProjectionMap
+  history   :: OptimiserHistory{Float64}
+  converged :: Function
+  params    :: NamedTuple
+  φ0 # TODO: Remove me please
+  function HilbertianProjection(
+    problem :: PDEConstrainedFunctionals{N},
+    stencil :: AdvectionStencil,
+    vel_ext :: VelocityExtension,
+    φ0;
+    orthog = HPModifiedGramSchmidt(),
+    λ=0.5, α_min=0.1, α_max=1.0, γ=0.1, γ_reinit=0.5,
+    ls_max_iters = 10, ls_δ_inc = 1.1, ls_δ_dec = 0.7,
+    ls_ξ = 0.005, ls_ξ_reduce_coef = 0.1, ls_ξ_reduce_abs_tol = 0.01,
+    ls_γ_min = 0.001, ls_γ_max = 0.1,
+    maxiter = 1000, verbose=false, constraint_names = map(i -> Symbol("C_$i"),1:N),
+    converged::Function = default_hp_converged, debug = false
+  ) where {N}
+
+    constraint_names = map(Symbol,constraint_names)
+    al_keys = [:J,constraint_names...,:γ]
+    al_bundles = Dict(:C => constraint_names)
+    history = OptimiserHistory(Float64,al_keys,al_bundles,maxiter,verbose)
+
+    projector = HilbertianProjectionMap(N,orthog,vel_ext;λ,α_min,α_max,debug)
+    params = (;debug,γ,γ_reinit,ls_max_iters,ls_δ_inc,ls_δ_dec,ls_ξ,
+               ls_ξ_reduce_coef,ls_ξ_reduce_abs_tol,ls_γ_min,ls_γ_max)
+    T = typeof(orthog)
+    new{T,N}(problem,stencil,vel_ext,projector,history,converged,params,φ0)
+  end
+end
+
+get_history(m::HilbertianProjection) = m.history
+
+function converged(m::HilbertianProjection)
+  return m.converged(m)
+end
+
+function default_hp_converged(
+  m::HilbertianProjection;
+  J_tol = 0.2*maximum(m.stencil.params.Δ),
+  C_tol = 0.001
+)
+  h  = m.history
+  it = get_last_iteration(h)
+  if it < 10
+    return false
+  end
+
+  Ji, Ci = h[:J,it], h[:C,it]
+  J_prev = h[:J,it-5:it]
+  A = all(J -> abs(Ji - J)/abs(Ji) < J_tol, J_prev)
+  B = all(C -> abs(C) < C_tol, Ci)
+  return (it > 10) && A && B
+end
+
+# 0th iteration
+function Base.iterate(m::HilbertianProjection)
+  history, params = m.history, m.params
+  φh = m.φ0
+
+  ## Compute FE problem and shape derivatives
+  J, C, dJ, dC = Gridap.evaluate!(m.problem,φh)
+  uh  = get_state(m.problem)
+  vel = copy(get_free_dof_values(φh))
+  φ_tmp = copy(vel)
+
+  ## Hilbertian extension-regularisation
+  project!(m.vel_ext,dJ)
+  project!(m.vel_ext,dC)
+  θ = update_descent_direction!(m.projector,dJ,C,dC,m.vel_ext.K)
+  
+  # Update history and build state
+  push!(history,(J,C...,params.γ))
+  state = (1,J,C,θ,dJ,dC,uh,φh,vel,φ_tmp,params.γ)
+  vars  = params.debug ? (0,uh,φh,state) : (0,uh,φh)
+  return vars, state
+end
+
+# ith iteration
+function Base.iterate(m::HilbertianProjection,state)
+  it, J, C, θ, dJ, dC, uh, φh, vel, φ_tmp, γ = state
+  history, params = m.history, m.params
+
+  if finished(m)
+    return nothing
+  end
+
+  ## Line search
+  U_reg = get_deriv_space(m.problem.state_map)
+  V_φ   = get_aux_space(m.problem.state_map)
+  interpolate!(FEFunction(U_reg,θ),vel,V_φ)
+  
+  ls_max_iters,δ_inc,δ_dec = params.ls_max_iters,params.ls_δ_inc,params.ls_δ_dec
+  ξ, ξ_reduce, ξ_reduce_tol = params.ls_ξ, params.ls_ξ_reduce_coef, params.ls_ξ_reduce_abs_tol
+  γ_min, γ_max = params.ls_γ_min,params.ls_γ_max
+  
+  ls_it = 0; done = false
+  φ = get_free_dof_values(φh); copy!(φ_tmp,φ)
+  while !done && (ls_it <= ls_max_iters)
+    # Advect  & Reinitialise
+    advect!(m.stencil,φ,vel,γ)
+    reinit!(m.stencil,φ,params.γ_reinit)
+
+    # Calcuate new objective and constraints
+    J_interm, C_interm = evaluate_functionals!(m.problem,φh)
+
+    # Reduce line search parameter if constraints close to saturation
+    _ξ = all(Ci -> abs(Ci) < ξ_reduce_tol, C_interm) ? ξ*ξ_reduce : ξ
+
+    # Accept/reject
+    if (J_interm < J + _ξ*abs(J)) || (γ <= γ_min)
+      γ = min(δ_inc*γ, γ_max)
+      done = true
+      print_msg(history,"  Accepted iteration with γ = $(γ) \n";color=:yellow)
+    else
+      γ = max(δ_dec*γ, γ_min)
+      copy!(φ,φ_tmp)
+      print_msg(history,"  Reject iteration with γ = $(γ) \n";color=:red)
+    end
+  end
+
+  ## Calculate objective, constraints, and shape derivatives after line search
+  J, C, dJ, dC = Gridap.evaluate!(m.problem,φh)
+
+  ## Hilbertian extension-regularisation
+  project!(m.vel_ext,dJ)
+  project!(m.vel_ext,dC)
+  θ = update_descent_direction!(m.projector,dJ,C,dC,m.vel_ext.K)
+
+  ## Update history and build state
+  push!(history,(J,C...,γ))
+  state = (it+1, J, C, θ, dJ, dC, uh, φh, vel, φ_tmp, γ)
+  vars  = params.debug ? (it,uh,φh,state) : (it,uh,φh)
+  return vars, state
 end
 
 function debug_print(orthog,dV,dC,dC_orthog,K,P,nullity,debug_code,debug)
