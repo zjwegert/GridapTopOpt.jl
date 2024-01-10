@@ -42,11 +42,11 @@ function benchmark_optimizer(m::Optimiser, niter, ranks; nreps = 10)
   end
 
   φ0 = copy(get_free_dof_values(m.φ0))
-  function reset!(m)
+  function opt_reset!(m::Optimiser)
     copy!(get_free_dof_values(m.φ0), φ0)
     reset!(get_history(m))
   end
-  return benchmark(f, m, ranks; nreps, reset!)
+  return benchmark(f, (m,), ranks; nreps, reset! = opt_reset!)
 end
 
 function benchmark_forward_problem(m::AbstractFEStateMap, φh, ranks; nreps = 10)
