@@ -136,6 +136,20 @@ function Base.display(h::OptimiserHistory)
   end
 end
 
+function Base.write(io::IO,h::OptimiserHistory)
+  content = join([k for k in keys(first(h))],", ")
+  for s in h
+    content *= "\n"*join([@sprintf("%.4e",s[k]) for k in keys(s)],", ")
+  end
+  Base.write(io,content)
+end
+
+function write_history(path::String,h::OptimiserHistory)
+  open(path,"w") do f
+    write(f,h)
+  end  
+end
+
 function print_msg(h::OptimiserHistory,msg::String;kwargs...)
   if get_verbose_level(h) > SOLVER_VERBOSE_NONE
     printstyled(msg;kwargs...)
