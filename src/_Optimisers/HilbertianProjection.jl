@@ -144,7 +144,7 @@ struct HilbertianProjection{T,N} <: Optimiser
     orthog = HPModifiedGramSchmidt(),
     λ=0.5, α_min=0.1, α_max=1.0, γ=0.1, γ_reinit=0.5,
     ls_max_iters = 10, ls_δ_inc = 1.1, ls_δ_dec = 0.7,
-    ls_ξ = 0.005, ls_ξ_reduce_coef = 0.1, ls_ξ_reduce_abs_tol = 0.01,
+    ls_ξ = 0.0025, ls_ξ_reduce_coef = 0.1, ls_ξ_reduce_abs_tol = 0.01,
     ls_γ_min = 0.001, ls_γ_max = 0.1,
     maxiter = 1000, verbose=false, constraint_names = map(i -> Symbol("C_$i"),1:N),
     converged::Function = default_hp_converged, debug = false
