@@ -2,13 +2,13 @@ function process_timer(t::PTimer)
   data = t.data
   tmax, tmin, tmean = map_main(data) do data
     times = map(x -> x.max,values(data))
-    maximum(times), minimum(times), sum(times)/length(times)
+    process_timer(t)
   end |> PartitionedArrays.tuple_of_arrays
-  return tmax, tmin, tmean
+  return nreps, tmax, tmin, tmean
 end
 
 function process_timer(t::Vector)
-  return maximum(t), minimum(t), sum(t)/length(t)
+  return length(t), maximum(t), minimum(t), sum(t)/length(t)
 end
 
 function benchmark(f, args, ranks::Nothing; nreps = 10, reset! = (x...) -> nothing)
