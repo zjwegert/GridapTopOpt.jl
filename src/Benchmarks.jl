@@ -11,7 +11,7 @@ function process_timer(t::Vector)
   return maximum(t), minimum(t), sum(t)/length(t)
 end
 
-function benchmark(f, args, ranks::Nothing; nreps = 10, reset! = x -> nothing)
+function benchmark(f, args, ranks::Nothing; nreps = 10, reset! = (x...) -> nothing)
   t = zeros(Float64,nreps)
   f(args...)
   for i in 1:nreps
@@ -21,7 +21,7 @@ function benchmark(f, args, ranks::Nothing; nreps = 10, reset! = x -> nothing)
   return process_timer(t)
 end
 
-function benchmark(f, args, ranks; nreps = 10, reset! = x -> nothing)
+function benchmark(f, args, ranks; nreps = 10, reset! = (x...) -> nothing)
   t = PTimer(ranks)
   f(args...)
   for i in 1:nreps
