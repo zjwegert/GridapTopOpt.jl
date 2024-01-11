@@ -1,8 +1,8 @@
 """
   abstract type Optimiser end
 
-  Your own optimiser can be implemented by implementing 
-    concrete functionality of the below.
+Your own optimiser can be implemented by implementing 
+ concrete functionality of the below.
 """
 abstract type Optimiser end
 
@@ -43,8 +43,21 @@ function print_msg(opt::Optimiser,msg::String;kwargs...)
   print_msg(get_optimiser_history(opt),msg;kwargs...)
 end
 
-# Optimiser history
+"""
+  mutable struct OptimiserHistory{T} end
 
+Track historical information on optimisation problem
+ iteration history with
+  - keys    -- Vector of symbols associated to values
+  - values  -- Dictionary of vectors associated to keys
+  - bundles -- Groups of symbols (e.g., a group of constraints)
+
+Behaviour:
+ - Indexing at a specific iteration returns an OptimiserHistorySlice.
+ - Indexing with a key returns all values of that key
+ - Indexing with a key and iteration returns value/s of
+    the key at the iteration.
+"""
 mutable struct OptimiserHistory{T}
   niter   :: Int
   keys    :: Vector{Symbol}
@@ -161,8 +174,12 @@ function print_msg(h::OptimiserHistory,msg::String;kwargs...)
   end
 end
 
-# Optimiser history slice
+"""
+  struct OptimiserHistorySlice{T} end
 
+A read-only wrapper of OptimiserHistory for IO display 
+ of iteration history at a specific iteration.
+"""
 struct OptimiserHistorySlice{T}
   it :: Int
   h  :: OptimiserHistory{T}

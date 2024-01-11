@@ -123,7 +123,10 @@ function compute_α(C,dC_orthog,dC,normsq,K,P,λ,α_min,α_max)
   return α, ∑α², debug_flag
 end
 
-# Optimizer
+# Optimiser
+"""
+  struct HilbertianProjection{T,N} <: Optimiser end
+"""
 struct HilbertianProjection{T,N} <: Optimiser
   problem   :: PDEConstrainedFunctionals{N}
   stencil   :: AdvectionStencil

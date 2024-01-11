@@ -1,4 +1,6 @@
-
+"""
+  struct AugmentedLagrangian{N,O} <: Optimiser end
+"""
 struct AugmentedLagrangian{N,O} <: Optimiser
   problem   :: PDEConstrainedFunctionals{N}
   stencil   :: AdvectionStencil{O}
@@ -79,8 +81,6 @@ function Base.iterate(m::AugmentedLagrangian)
   end
 
   ## Compute dL and it's projection
-  #  Note: Since `project!` takes a linear form on the RHS this should
-  #    be the same as projecting each shape derivative then computing dL.
   dL = copy(dJ)
   for (λi,Λi,Ci,dCi) in zip(λ,Λ,C,dC)
     dL .+= -λi*dCi .+ Λi*Ci*dCi

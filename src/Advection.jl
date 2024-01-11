@@ -1,15 +1,43 @@
-# API definition for Stencil
+"""
+  abstract type Stencil end
 
+Finite difference stencil for a single step of the Hamilton-Jacobi 
+ evolution equation (Eqn. 1) and reinitialisation equation (Eqn. 2).
+
+Equation 1:
+ ∂ϕ/∂t + V|∇ϕ| = 0 for x∈D, t>0
+  with ϕ(0,x) = ϕ₀ for x∈D.
+Equation 2:
+ ∂ϕ/∂t + Sign(ϕ₀)(|∇ϕ|-1) = 0 for x∈D, t>0
+  with ϕ(0,x) = ϕ₀ for x∈D.
+"""
 abstract type Stencil end
 
+"""
+
+"""
 function allocate_caches(::Stencil,φ,vel)
   nothing # By default, no caches are required.
 end
 
-function reinit!(::Stencil,φ_new,φ_old,vel,Δt,Δx,caches)
+"""
+  reinit!(::Stencil,φ_new,φ,vel,Δt,Δx,isperiodic,caches) -> φ
+
+Single finite difference step of the reinitialisation equation:
+ ∂ϕ/∂t + Sign(ϕ₀)(|∇ϕ|-1) = 0 for x∈D, t>0
+  with ϕ(0,x) = ϕ₀ for x∈D.
+"""
+function reinit!(::Stencil,φ_new,φ,vel,Δt,Δx,isperiodic,caches)
   @abstractmethod
 end
 
+"""
+  advect!(::Stencil,φ_new,φ,vel,Δt,Δx,isperiodic,caches) -> φ
+
+Single finite difference step of the HJ evoluation equation:
+ ∂ϕ/∂t + V|∇ϕ| = 0 for x∈D, t>0
+  with ϕ(0,x) = ϕ₀ for x∈D.
+"""
 function advect!(::Stencil,φ,vel,Δt,Δx,caches)
   @abstractmethod
 end
@@ -19,7 +47,12 @@ function compute_Δt(::Stencil,φ,vel)
 end
 
 # First order stencil
+"""
+  struct FirstOrderStencil{D,T} <: Stencil end
 
+Godunov upwind difference scheme per Osher and Fedkiw
+ (10.1007/b98879)
+"""
 struct FirstOrderStencil{D,T} <: Stencil
   function FirstOrderStencil(D::Integer,::Type{T}) where T<:Real
     new{D,T}()
@@ -131,7 +164,12 @@ function compute_Δt(::FirstOrderStencil{D,T},Δ,γ,φ,vel) where {D,T}
   return γ * min(Δ...) / (eps(T)^2 + v_norm)
 end
 
-# Advection stencil
+"""
+  struct AdvectionStencil{O} end
+
+Wrapper around Stencil and other structs to enable
+ finite differences on arbitrary order finite elements. 
+"""
 struct AdvectionStencil{O}
   stencil :: Stencil
   model
@@ -185,6 +223,15 @@ end
 
 Gridap.ReferenceFEs.get_order(f::Gridap.Fields.LinearCombinationFieldVector) = get_order(f.fields)
 
+"""
+  create_dof_permutation(
+    model::CartesianDiscreteModel{Dc},
+    space::UnconstrainedFESpace,
+    order::Integer) where Dc -> n2o_dof_map
+
+Create dof permutation vector to enable finite differences on
+ higher order Lagrangian finite elements on a Cartesian mesh.  
+"""
 function create_dof_permutation(model::CartesianDiscreteModel{Dc},
                                 space::UnconstrainedFESpace,
                                 order::Integer) where Dc
@@ -266,6 +313,7 @@ function permute!(x_out,x_in,perm)
   end
   return x_out
 end
+
 function permute!(x_out::PVector,x_in::PVector,perm) 
   map(permute!,partition(x_out),partition(x_in),perm)
   return x_out
@@ -343,8 +391,8 @@ function reinit!(s::AdvectionStencil{O},φ::PVector,γ) where O
   # Compute approx sign function S
   vel_tmp = _φ ./ sqrt.(_φ .* _φ .+ prod(Δ))
 
-  ## CFL Condition (requires γ≤0.5)
-  Δt = compute_Δt(s.stencil,Δ,γ,_φ,1.0) # As inform(vel_tmp) = 1.0
+  ## CFL Condition (requires γ≤0.5). Note inform(vel_tmp) = 1.0
+  Δt = compute_Δt(s.stencil,Δ,γ,_φ,1.0)
 
   # Apply operations across partitions
   step = 1; err = maximum(abs,φ); fill!(φ_tmp,0.0)
@@ -359,7 +407,7 @@ function reinit!(s::AdvectionStencil{O},φ::PVector,γ) where O
 
     # Compute error
     _φ .-= φ_tmp # φ - φ_tmp
-    err = maximum(abs,_φ) # Ghosts not needed yet: partial maximums computed using owned values only. 
+    err = maximum(abs,_φ)
     step += 1
 
     # Update φ
