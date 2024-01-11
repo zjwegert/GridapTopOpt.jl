@@ -67,7 +67,7 @@ export project!
 include("MaterialInterpolation.jl")
 export SmoothErsatzMaterialInterpolation
 
-include("_Optimisers/Optimisers.jl")
+include("Optimisers/Optimisers.jl")
 export AbstractOptimiser
 export get_history
 export write_history
