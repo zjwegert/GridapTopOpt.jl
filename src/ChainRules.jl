@@ -644,7 +644,6 @@ function Base.show(io::IO,object::AbstractFEStateMap)
 end
 
 function Base.show(io::IO,::MIME"text/plain",f::PDEConstrainedFunctionals)
-  print(io,"$(nameof(typeof(object)))")
-  print(io,":")
-  print(io,"\n num_constraints: $(length(object.C))")
+  print(io,"$(nameof(typeof(object))):
+    num_constraints: $(length(object.C))")
 end
