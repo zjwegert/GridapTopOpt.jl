@@ -69,17 +69,15 @@ function benchmark_advection(stencil::AdvectionStencil, φ0, v0, γ, ranks; nrep
   return benchmark(f, (stencil,φ,v,γ), ranks; nreps, reset!)
 end
 
-function benchmark_reinitialisation(stencil::AdvectionStencil, φ0, v0, γ, ranks; nreps = 10)
-  function f(stencil,φ,v,γ)
-    reinit!(stencil,φ,v,γ)
+function benchmark_reinitialisation(stencil::AdvectionStencil, φ0, γ_reinit, ranks; nreps = 10)
+  function f(stencil,φ,γ_reinit)
+    reinit!(stencil,φ,γ_reinit)
   end
-  function reset!(stencil,φ,v,γ)
+  function reset!(stencil,φ,γ_reinit)
     copy!(φ,φ0)
-    copy!(v,v0)
   end
   φ = copy(φ0)
-  v = copy(v0)
-  return benchmark(f, (stencil,φ,v,γ), ranks; nreps, reset!)
+  return benchmark(f, (stencil,φ,γ_reinit), ranks; nreps, reset!)
 end
 
 function benchmark_velocity_extension(ext::VelocityExtension, v0, ranks; nreps = 10)
