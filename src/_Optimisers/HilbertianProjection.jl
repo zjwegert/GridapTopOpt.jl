@@ -219,9 +219,6 @@ function Base.iterate(m::HilbertianProjection,state)
     return nothing
   end
   
-  # ## TODO: Remove this in favour of state. Not sure why this is playing up currently.
-  # J = iszero(it) ? 0 : history[:J,it-1]
-
   ## Line search
   U_reg = get_deriv_space(m.problem.state_map)
   V_φ   = get_aux_space(m.problem.state_map)
@@ -245,8 +242,7 @@ function Base.iterate(m::HilbertianProjection,state)
     _ξ = all(Ci -> abs(Ci) < ξ_reduce_tol, C_interm) ? ξ*ξ_reduce : ξ
 
     # Accept/reject
-    # TODO: Remove iszero condition
-    if (J_interm < J + _ξ*abs(J)) || (γ <= γ_min) #|| iszero(it)
+    if (J_interm < J + _ξ*abs(J)) || (γ <= γ_min)
       γ = min(δ_inc*γ, γ_max)
       done = true
       print_msg(history,"  Accepted iteration with γ = $(γ) \n";color=:yellow)
