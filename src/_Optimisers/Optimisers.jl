@@ -6,6 +6,11 @@
 """
 abstract type Optimiser end
 
+# TODO: Add quality of life Base.show for each optimiser which displays extra info
+function Base.show(io::IO,object::Optimiser)
+  print(io,typeof(object))
+end
+
 Base.IteratorEltype(::Type{<:Optimiser}) = Base.EltypeUnknown()
 Base.IteratorSize(::Type{<:Optimiser}) = Base.SizeUnknown()
 

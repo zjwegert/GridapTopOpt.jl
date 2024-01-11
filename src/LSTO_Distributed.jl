@@ -76,5 +76,10 @@ export HilbertianProjection
 export HPModifiedGramSchmidt
 
 include("Benchmarks.jl")
+export benchmark_optimizer
+export benchmark_forward_problem
+export benchmark_advection
+export benchmark_reinitialisation
+export benchmark_velocity_extension
 
 end
