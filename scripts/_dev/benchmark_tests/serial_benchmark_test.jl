@@ -81,11 +81,11 @@ function main_benchmark()
   ## Benchmark forward problem
   bfwd = benchmark_forward_problem(opt.problem.state_map, opt.φ0, nothing)
   ## Benchmark advection
-  v = interpolate(FEFunction(LSTO_Distributed.get_deriv_space(opt.problem.state_map),opt.problem.dJ),
-    LSTO_Distributed.get_aux_space(opt.problem.state_map)).free_values
-  badv = benchmark_advection(opt.stencil, opt.φ0.free_values, v, 0.1, nothing)
+  v = get_free_dof_values(interpolate(FEFunction(LSTO_Distributed.get_deriv_space(opt.problem.state_map),
+    opt.problem.dJ),LSTO_Distributed.get_aux_space(opt.problem.state_map)))
+  badv = benchmark_advection(opt.stencil, get_free_dof_values(opt.φ0), v, 0.1, nothing)
   ## Benchmark reinitialisation
-  brinit = benchmark_reinitialisation(opt.stencil, opt.φ0.free_values, 0.1, nothing)
+  brinit = benchmark_reinitialisation(opt.stencil, get_free_dof_values(opt.φ0), 0.1, nothing)
   ## Benchmark velocity extension
   bvelext = benchmark_velocity_extension(opt.vel_ext, opt.problem.dJ, nothing)
   return bopt,bfwd,badv,brinit,bvelext
