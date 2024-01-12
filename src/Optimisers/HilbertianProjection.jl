@@ -40,7 +40,7 @@ function update_descent_direction!(m::HilbertianProjectionMap{<:AbstractMatrix},
 end
 
 function update_descent_direction!(m::HilbertianProjectionMap{<:PSparseMatrix},dV,C,dC,K)
-  θ, dC_aux, θ_aux, orthog_cache = m.caches
+  θ, θ_aux, dC_aux, orthog_cache = m.caches
   copy!(θ,dV)
   copy!.(dC_aux,dC)
   _update_descent_direction!(m,θ,C,dC_aux,K,θ_aux,orthog_cache)
