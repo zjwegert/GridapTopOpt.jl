@@ -68,7 +68,8 @@ include("MaterialInterpolation.jl")
 export SmoothErsatzMaterialInterpolation
 
 include("Optimisers/Optimisers.jl")
-export AbstractOptimiser
+export Optimiser
+export OptimiserHistory
 export get_history
 export write_history
 export AugmentedLagrangian
