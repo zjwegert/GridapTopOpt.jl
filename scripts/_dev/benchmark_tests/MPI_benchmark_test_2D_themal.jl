@@ -81,9 +81,11 @@ function main(mesh_partition,el_size,distribute)
 end
 
 with_mpi() do distribute
-  opt = main((2,3),(400,400),distribute)
+  mesh_partition = (2,3)
+  el_size = (400,400)
+  opt = main(mesh_partition,el_size,distribute)
   ## Benchmark optimiser
-  # bopt = benchmark_optimizer(opt, 1, nothing)
+  bopt = benchmark_optimizer(opt, 1, nothing)
   ## Benchmark forward problem
   bfwd = benchmark_forward_problem(opt.problem.state_map, opt.φ0, nothing)
   ## Benchmark advection
@@ -97,11 +99,11 @@ with_mpi() do distribute
   ## Printing
   ranks = distribute(LinearIndices((prod(mesh_partition),)))
   if i_am_main(ranks)
-    # display("bopt => $bopt")
-    display("bfwd => $bfwd")
-    display("badv => $badv")
-    display("brinit => $brinit")
-    display("bvelext => $bvelext")
+    println("bopt => $bopt")
+    println("bfwd => $bfwd")
+    println("badv => $badv")
+    println("brinit => $brinit")
+    println("bvelext => $bvelext")
   end
   nothing
 end;

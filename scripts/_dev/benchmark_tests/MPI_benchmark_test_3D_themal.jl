@@ -123,10 +123,10 @@ with_mpi() do distribute
     ranks = distribute(LinearIndices((prod(mesh_partition),)))
     if i_am_main(ranks)
       println("bopt => $bopt")
-      display("bfwd => $bfwd")
-      display("badv => $badv")
-      display("brinit => $brinit")
-      display("bvelext => $bvelext")
+      println("bfwd => $bfwd")
+      println("badv => $badv")
+      println("brinit => $brinit")
+      println("bvelext => $bvelext")
     end
     nothing
   end
