@@ -90,7 +90,7 @@ function main(diag_block)
     SparseMatrixAssembler(U,V)
   end
 
-  state_map = AffineFEStateMap(a,l,res,U,V,V_φ,U_reg,φh,dΩ;
+  state_map = AffineFEStateMap(a,l,U,V,V_φ,U_reg,φh,dΩ;
     ls = pcg,
     adjoint_ls = pcg,
     assem_U=assem,

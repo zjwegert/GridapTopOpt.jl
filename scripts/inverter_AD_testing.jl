@@ -93,7 +93,7 @@ function main()
   reinit!(stencil,φ,γ_reinit)
 
   ## Setup solver and FE operators
-  state_map = AffineFEStateMap(a,l,res,U,V,V_φ,U_reg,φh,dΩ,dΓ_in,dΓ_out)
+  state_map = AffineFEStateMap(a,l,U,V,V_φ,U_reg,φh,dΩ,dΓ_in,dΓ_out)
   pcfs = PDEConstrainedFunctionals(J,[Vol,J],state_map,analytic_dC=[dVol,dJ])
 
   J_val,C_val,dJ,dC = Gridap.evaluate!(pcfs,φ)

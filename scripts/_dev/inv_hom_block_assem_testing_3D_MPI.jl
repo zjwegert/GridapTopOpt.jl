@@ -103,7 +103,7 @@ function main(mesh_partition,distribute,el_size,diag_assem::Bool)
       SparseMatrixAssembler(Tm,Tv,V,U)
   end
 
-  state_map = AffineFEStateMap(a,l,res,U,V,V_φ,U_reg,φh,dΩ;
+  state_map = AffineFEStateMap(a,l,U,V,V_φ,U_reg,φh,dΩ;
     assem_U = assem_U,
     assem_adjoint = assem_adjoint,
     assem_deriv = SparseMatrixAssembler(Tm,Tv,U_reg,U_reg),

@@ -94,7 +94,7 @@ function main(mesh_partition,distribute,el_size)
   solver = ElasticitySolver(V)
   
   state_map = AffineFEStateMap(
-    a,l,res,U,V,V_φ,U_reg,φh,dΩ,dΓ_in,dΓ_out;
+    a,l,U,V,V_φ,U_reg,φh,dΩ,dΓ_in,dΓ_out;
     assem_U = SparseMatrixAssembler(Tm,Tv,U,V),
     assem_adjoint = SparseMatrixAssembler(Tm,Tv,V,U),
     assem_deriv = SparseMatrixAssembler(Tm,Tv,U_reg,U_reg),
