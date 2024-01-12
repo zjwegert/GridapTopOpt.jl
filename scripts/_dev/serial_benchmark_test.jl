@@ -1,14 +1,5 @@
 using Gridap, GridapDistributed, GridapPETSc, PartitionedArrays, LSTO_Distributed
 
-"""
-  (Serial) Minimum thermal compliance with Lagrangian method in 2D.
-
-  Optimisation problem:
-      Min J(Ω) = ∫ D*∇(u)⋅∇(u) + ξ dΩ
-        Ω
-    s.t., ⎡u∈V=H¹(Ω;u(Γ_D)=0),
-          ⎣∫ D*∇(u)⋅∇(v) dΩ = ∫ v dΓ_N, ∀v∈V.
-""" 
 function main()
   ## Parameters
   order = 2
@@ -80,14 +71,29 @@ function main()
   
   ## Optimiser
   make_dir(path)
-  converged(m) = LSTO_Distributed.default_al_converged(m;L_tol=0.02*maximum(Δ))
-  optimiser = AugmentedLagrangian(pcfs,stencil,vel_ext,φh;γ,γ_reinit,converged,verbose=true)
-  for (it, uh, φh) in optimiser
-    write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh))])
-  end
-
-  # history = get_history(optimiser)
-  # write_history(optimiser.history,path*"/history.csv")
+  return AugmentedLagrangian(pcfs,stencil,vel_ext,φh;γ,γ_reinit)
 end
 
-main()
+function main_benchmark()
+  opt = main()
+  ## Benchmark optimiser
+  bopt = benchmark_optimizer(opt, 1, nothing)
+  ## Benchmark forward problem
+  bfwd = benchmark_forward_problem(opt.problem.state_map, opt.φ0, nothing)
+  ## Benchmark advection
+  v = interpolate(FEFunction(LSTO_Distributed.get_deriv_space(opt.problem.state_map),opt.problem.dJ),
+    LSTO_Distributed.get_aux_space(opt.problem.state_map)).free_values
+  badv = benchmark_advection(opt.stencil, opt.φ0.free_values, v, 0.1, nothing)
+  ## Benchmark reinitialisation
+  brinit = benchmark_reinitialisation(opt.stencil, opt.φ0.free_values, 0.1, nothing)
+  ## Benchmark velocity extension
+  bvelext = benchmark_velocity_extension(opt.vel_ext, opt.problem.dJ, nothing)
+  return bopt,bfwd,badv,brinit,bvelext
+end
+bopt,bfwd,badv,brinit,bvelext = main_benchmark();
+
+bopt
+bfwd
+badv
+brinit
+bvelext

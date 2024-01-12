@@ -1,4 +1,9 @@
-# Material interpolation
+"""
+  struct SmoothErsatzMaterialInterpolation{M<:AbstractFloat} end
+
+Parameters and methods used for interpolating material properties across
+ a boundary.
+"""
 Base.@kwdef struct SmoothErsatzMaterialInterpolation{M<:AbstractFloat}
   η::M # Smoothing radius
   ϵₘ::M = 10^-3 # Void material multiplier
@@ -8,7 +13,7 @@ Base.@kwdef struct SmoothErsatzMaterialInterpolation{M<:AbstractFloat}
   ρ = φ -> 1 - H(φ)
 end
 
-# Heaviside function
+# Heaviside function and its derivative
 function H_η(t,η)
   M = typeof(η*t)
   if t<-η
