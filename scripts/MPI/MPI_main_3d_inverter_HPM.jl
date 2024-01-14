@@ -24,7 +24,7 @@ function main(mesh_partition,distribute,el_size)
   γ = 0.1
   γ_reinit = 0.5
   max_steps = floor(Int,minimum(el_size)/3)
-  tol = 1/(10order^2)*prod(inv,minimum(el_size))
+  tol = 1/(order^2)*prod(inv,minimum(el_size))
   C = isotropic_3d(1.0,0.3)
   η_coeff = 2
   α_coeff = 4
@@ -117,13 +117,14 @@ function main(mesh_partition,distribute,el_size)
     verbose=true,constraint_names=["Vol","UΓ_out"])
   for (it, uh, φh) in optimiser
     write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh)),"uh"=>uh])
+    write_history(path*"/history.txt",optimiser.history)
   end
   write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh)),"uh"=>uh])
   write_history(path*"/history.txt",optimiser.history)
 end
 
 with_mpi() do distribute
-  mesh_partition = (5,4,4)
+  mesh_partition = (8,4,4)
   el_size = (100,100,100)
   hilb_solver_options = "-pc_type gamg -ksp_type cg -ksp_error_if_not_converged true 
     -ksp_converged_reason -ksp_rtol 1.0e-12 -mat_block_size 3
