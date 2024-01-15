@@ -5,11 +5,11 @@ function generate(name,type;cputype="7702",wallhr=2,n_mesh_partition,
 
   ncpus = n_mesh_partition^3
 
-  _div,_rem=divrem(_N,cpus_per_node)
+  _div,_rem=divrem(ncpus,cpus_per_node)
   sel_text(nnode,ncpus,mem,type) = "select=$nnode:ncpus=$ncpus:mpiprocs=$ncpus:mem=$(mem)GB:cputype=$type"
   
   if _div < 1
-    select = sel_text(1,_rem,ceil.(Int,_N*gb_per_cpu),cputype)
+    select = sel_text(1,_rem,ceil.(Int,ncpus*gb_per_cpu),cputype)
   elseif _div > 0 && iszero(_rem)
     select = sel_text(_div,cpus_per_node,mem_per_node,cputype)
   elseif _div > 0 && _rem > 0
