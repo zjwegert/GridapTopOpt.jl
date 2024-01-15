@@ -5,15 +5,26 @@ function generate(name,type;cputype="7702",wallhr=2,n_mesh_partition,
 
   ncpus = n_mesh_partition^3
 
+  _div,_rem=divrem(_N,cpus_per_node)
+  sel_text(nnode,ncpus,mem,type) = "select=$nnode:ncpus=$ncpus:mpiprocs=$ncpus:mem=$(mem)GB:cputype=$type"
+  
+  if _div < 1
+    select = sel_text(1,_rem,ceil.(Int,_N*gb_per_cpu),cputype)
+  elseif _div > 0 && iszero(_rem)
+    select = sel_text(_div,cpus_per_node,mem_per_node,cputype)
+  elseif _div > 0 && _rem > 0
+    select = sel_text(_div,cpus_per_node,mem_per_node,cputype)*"+"
+    select *= sel_text(1,_rem,ceil.(Int,_rem*gb_per_cpu),cputype)
+  else
+    error()
+  end
+
   job_data = """
   #!/bin/bash -l
 
   #PBS -P LSTO
   #PBS -N "{{:name}}"
-  #PBS -l cputype={{:cputype}}
-  #PBS -l ncpus={{:ncpus}}
-  #PBS -l mpiprocs={{:ncpus}}
-  #PBS -l mem={{:mem}}GB
+  #PBS -l $select
   #PBS -l walltime={{:wallhr}}:00:00
   #PBS -j oe
 

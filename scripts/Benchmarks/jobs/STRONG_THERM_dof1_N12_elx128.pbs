@@ -2,10 +2,7 @@
 
 #PBS -P LSTO
 #PBS -N "STRONG_THERM_dof1_N12_elx128"
-#PBS -l cputype=7702
-#PBS -l ncpus=1728
-#PBS -l mpiprocs=1728
-#PBS -l mem=13824GB
+#PBS -l select=7:ncpus=128:mpiprocs=128:mem=1003GB:cputype=7702+select=1:ncpus=104:mpiprocs=104:mem=815GB:cputype=7702
 #PBS -l walltime=2:00:00
 #PBS -j oe
 
