@@ -21,7 +21,7 @@ function main(mesh_partition,distribute,el_size)
   ## Parameters
   order = 1
   dom = (0,1,0,1,0,1)
-  γ = 0.1
+  γ = 0.05
   γ_reinit = 0.5
   max_steps = floor(Int,minimum(el_size)/3)
   tol = 1/(5order^2)*prod(inv,minimum(el_size))
