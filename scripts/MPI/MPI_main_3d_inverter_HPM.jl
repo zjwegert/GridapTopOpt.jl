@@ -24,7 +24,7 @@ function main(mesh_partition,distribute,el_size)
   γ = 0.05
   γ_reinit = 0.5
   max_steps = floor(Int,minimum(el_size)/3)
-  tol = 1/(5order^2)*prod(inv,minimum(el_size))
+  tol = 1/(2order^2)*prod(inv,minimum(el_size))
   C = isotropic_3d(1.0,0.3)
   η_coeff = 2
   α_coeff = 4

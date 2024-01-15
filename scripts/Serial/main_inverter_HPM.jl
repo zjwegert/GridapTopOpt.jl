@@ -52,6 +52,8 @@ function main()
   dΓ_in = Measure(Γ_in,2order)
   dΓ_out = Measure(Γ_out,2order)
   vol_D = sum(∫(1)dΩ)
+  vol_Γ_in = sum(∫(1)dΓ_in)
+  vol_Γ_out = sum(∫(1)dΓ_out)
 
   ## Spaces
   reffe = ReferenceFE(lagrangian,VectorValue{2,Float64},order)
@@ -73,14 +75,13 @@ function main()
 
   a(u,v,φ,dΩ,dΓ_in,dΓ_out) = ∫((I ∘ φ)*(C ⊙ ε(u) ⊙ ε(v)))dΩ + ∫(ks*(u⋅v))dΓ_out
   l(v,φ,dΩ,dΓ_in,dΓ_out) = ∫(v⋅g)dΓ_in
-  res(u,v,φ,dΩ,dΓ_in,dΓ_out) = a(u,v,φ,dΩ,dΓ_in,dΓ_out) - l(v,φ,dΩ,dΓ_in,dΓ_out)
 
   ## Optimisation functionals
   e₁ = VectorValue(1,0)
-  J(u,φ,dΩ,dΓ_in,dΓ_out) = 10*∫(u⋅e₁)dΓ_in
+  J(u,φ,dΩ,dΓ_in,dΓ_out) = ∫((u⋅e₁)/vol_Γ_in)dΓ_in
   Vol(u,φ,dΩ,dΓ_in,dΓ_out) = ∫(((ρ ∘ φ) - Vf)/vol_D)dΩ
   dVol(q,u,φ,dΩ,dΓ_in,dΓ_out) = ∫(1/vol_D*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
-  UΓ_out(u,φ,dΩ,dΓ_in,dΓ_out) = ∫(u⋅-e₁-δₓ)dΓ_out
+  UΓ_out(u,φ,dΩ,dΓ_in,dΓ_out) = ∫((u⋅-e₁-δₓ)/vol_Γ_out)dΓ_out
 
   ## Finite difference solver and level set function
   stencil = AdvectionStencil(FirstOrderStencil(2,Float64),model,V_φ,tol,max_steps)
@@ -97,7 +98,7 @@ function main()
   
   ## Optimiser
   make_dir(path)
-  optimiser = HilbertianProjection(pcfs,stencil,vel_ext,φh;γ,γ_reinit,α_min=0.5,ls_γ_min=0.01,
+  optimiser = HilbertianProjection(pcfs,stencil,vel_ext,φh;γ,γ_reinit,α_min=0.5,
                                    verbose=true,constraint_names=["Vol","UΓ_out"])
   for (it,uh,φh) in optimiser
     write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh)),"uh"=>uh])
