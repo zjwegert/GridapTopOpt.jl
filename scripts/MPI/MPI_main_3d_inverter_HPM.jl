@@ -24,12 +24,12 @@ function main(mesh_partition,distribute,el_size)
   γ = 0.1
   γ_reinit = 0.5
   max_steps = floor(Int,minimum(el_size)/3)
-  tol = 1/(order^2)*prod(inv,minimum(el_size))
+  tol = 1/(5order^2)*prod(inv,minimum(el_size))
   C = isotropic_3d(1.0,0.3)
   η_coeff = 2
   α_coeff = 4
   Vf=0.4
-  δₓ=0.75
+  δₓ=0.5
   ks = 0.01
   g = VectorValue(1,0,0)
   path = dirname(dirname(@__DIR__))*"/results/MPI_main_3d_inverter_HPM"
@@ -54,6 +54,8 @@ function main(mesh_partition,distribute,el_size)
   dΓ_in = Measure(Γ_in,2*order)
   dΓ_out = Measure(Γ_out,2*order)
   vol_D = sum(∫(1)dΩ)
+  vol_Γ_in = sum(∫(1)dΓ_in)
+  vol_Γ_out = sum(∫(1)dΓ_out)
 
   ## Spaces
   reffe = ReferenceFE(lagrangian,VectorValue{3,Float64},order)
@@ -79,10 +81,10 @@ function main(mesh_partition,distribute,el_size)
 
   ## Optimisation functionals
   e₁ = VectorValue(1,0,0)
-  J(u,φ,dΩ,dΓ_in,dΓ_out) = 10*∫(u⋅e₁)dΓ_in
+  J(u,φ,dΩ,dΓ_in,dΓ_out) = ∫((u⋅e₁)/vol_Γ_in)dΓ_in
   Vol(u,φ,dΩ,dΓ_in,dΓ_out) = ∫(((ρ ∘ φ) - Vf)/vol_D)dΩ;
   dVol(q,u,φ,dΩ,dΓ_in,dΓ_out) = ∫(1/vol_D*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
-  UΓ_out(u,φ,dΩ,dΓ_in,dΓ_out) = 10*∫(u⋅-e₁-δₓ)dΓ_out
+  UΓ_out(u,φ,dΩ,dΓ_in,dΓ_out) = ∫((u⋅-e₁-δₓ)/vol_Γ_out)dΓ_out
 
   ## Finite difference solver and level set function
   stencil = AdvectionStencil(FirstOrderStencil(3,Float64),model,V_φ,tol,max_steps)
@@ -113,8 +115,8 @@ function main(mesh_partition,distribute,el_size)
   
   ## Optimiser
   make_dir(path;ranks=ranks)
-  optimiser = HilbertianProjection(pcfs,stencil,vel_ext,φh;γ,γ_reinit,α_min=0.6,ls_γ_min=0.01,
-    verbose=true,constraint_names=["Vol","UΓ_out"])
+  optimiser = HilbertianProjection(pcfs,stencil,vel_ext,φh;γ,γ_reinit,α_min=0.5,ls_γ_min=0.01,
+    verbose=i_am_main(ranks),constraint_names=["Vol","UΓ_out"])
   for (it, uh, φh) in optimiser
     write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh)),"uh"=>uh])
     write_history(path*"/history.txt",optimiser.history)
