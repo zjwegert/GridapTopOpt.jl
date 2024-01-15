@@ -1,0 +1,34 @@
+#!/bin/bash -l
+
+#PBS -P LSTO
+#PBS -N "WEAK_THERM_dof1_N6_elx189"
+#PBS -l cputype=7702
+#PBS -l ncpus=216
+#PBS -l mpiprocs=216
+#PBS -l mem=1728GB
+#PBS -l walltime=2:00:00
+#PBS -j oe
+
+cd $PBS_O_WORKDIR
+
+source $HOME/hpc-environments-main/lyra/load-ompi.sh
+export mpiexecjl=$HOME/.julia/bin/mpiexecjl
+
+julia --project=. -e "using Pkg; Pkg.precompile()"
+
+NAME="WEAK_THERM_dof1_N6_elx189"
+PROB_TYPE=THERM
+N=6
+N_EL=189
+ORDER=1
+VERBOSE=1
+
+$mpiexecjl --project=. -n 216 julia \
+  --check-bounds no \
+  ./scripts/Benchmarks/benchmark.jl \
+  $NAME \
+  $PROB_TYPE \
+  $N \
+  $N_EL \
+  $ORDER \
+  $VERBOSE

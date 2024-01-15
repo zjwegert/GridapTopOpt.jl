@@ -62,8 +62,8 @@ function generate_jobs(phys_type,ndof_per_node)
   node_mem_usage = mem/mem_per_node
   dof_sanity_check = maximum(abs,@. ndof_per_node*(weak_el_x+1)^3/strong/dofs_per_proc - 1)
 
-  sname(phys_type,ndof_per_node,n,elx) = "STRONG_$(phys_type)_dof=$(ndof_per_node)_N=$(n)_elx=$(elx)"
-  wname(phys_type,ndof_per_node,n,elx) = "WEAK_$(phys_type)_dof=$(ndof_per_node)_N=$(n)_elx=$(elx)"
+  sname(phys_type,ndof_per_node,n,elx) = "STRONG_$(phys_type)_dof$(ndof_per_node)_N$(n)_elx$(elx)"
+  wname(phys_type,ndof_per_node,n,elx) = "WEAK_$(phys_type)_dof$(ndof_per_node)_N$(n)_elx$(elx)"
 
   strong_jobs = map(n->(sname(phys_type,ndof_per_node,n,strong_el_x),
     generate((sname(phys_type,ndof_per_node,n,strong_el_x)),phys_type;
