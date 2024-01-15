@@ -2,7 +2,7 @@
 
 #PBS -P LSTO
 #PBS -N "WEAK_ELAST_dof3_N12_elx263"
-#PBS -l select=13:ncpus=128:mpiprocs=128:mem=1003GB:cputype=7702+select=1:ncpus=64:mpiprocs=64:mem=501GB:cputype=7702
+#PBS -l select=13:ncpus=128:mpiprocs=128:mem=1003GB:cputype=7702+1:ncpus=64:mpiprocs=64:mem=501GB:cputype=7702
 #PBS -l walltime=2:00:00
 #PBS -j oe
 
