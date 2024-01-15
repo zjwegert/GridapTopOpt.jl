@@ -1,6 +1,8 @@
 using Gridap, Gridap.MultiField, GridapDistributed, GridapPETSc, GridapSolvers, 
   PartitionedArrays, LSTO_Distributed, SparseMatricesCSR
 
+using GridapSolvers: NewtonSolver
+
 """
   (MPI) Minimum hyperelastic compliance with Lagrangian method in 3D.
 
@@ -85,7 +87,7 @@ function main(mesh_partition,distribute,el_size)
   Tm = SparseMatrixCSR{0,PetscScalar,PetscInt}
   Tv = Vector{PetscScalar}
   lin_solver = ElasticitySolver(V)
-  nl_solver = NRSolver(lin_solver,10^-10,50,ranks)
+  nl_solver = NewtonSolver(lin_solver;maxiter=50,rtol=10^-8,verbose=verbose)
 
   state_map = NonlinearFEStateMap(
     res,U,V,V_φ,U_reg,φh,dΩ,dΓ_N;
