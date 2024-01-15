@@ -1,0 +1,34 @@
+#!/bin/bash -l
+
+#PBS -P LSTO
+#PBS -N "WEAK_NLELAST_dof=3_N=12_elx=263"
+#PBS -l cputype=7702
+#PBS -l ncpus=1728
+#PBS -l mpiprocs=1728
+#PBS -l mem=13824GB
+#PBS -l walltime=2:00:00
+#PBS -j oe
+
+cd $PBS_O_WORKDIR
+
+source $HOME/hpc-environments-main/lyra/load-ompi.sh
+export mpiexecjl=$HOME/.julia/bin/mpiexecjl
+
+julia --project=. -e "using Pkg; Pkg.precompile()"
+
+NAME="WEAK_NLELAST_dof=3_N=12_elx=263"
+PROB_TYPE=NLELAST
+N=12
+N_EL=263
+ORDER=1
+VERBOSE=1
+
+$mpiexecjl --project=. -n 1728 julia \
+  --check-bounds no \
+  ./scripts/Benchmarks/benchmark.jl \
+  $NAME \
+  $PROB_TYPE \
+  $N \
+  $N_EL \
+  $ORDER \
+  $VERBOSE
