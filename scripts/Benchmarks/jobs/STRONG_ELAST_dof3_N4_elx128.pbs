@@ -6,26 +6,16 @@
 #PBS -l walltime=2:00:00
 #PBS -j oe
 
-cd $PBS_O_WORKDIR
-
 source $HOME/hpc-environments-main/lyra/load-ompi.sh
-export mpiexecjl=$HOME/.julia/bin/mpiexecjl
+PROJECT_DIR = $HOME/LSTO_Distributed/
 
-julia --project=. -e "using Pkg; Pkg.precompile()"
+julia --project=$PROJECT_DIR -e "using Pkg; Pkg.precompile()"
 
-NAME="STRONG_ELAST_dof3_N4_elx128"
-PROB_TYPE=ELAST
-N=4
-N_EL=128
-ORDER=1
-VERBOSE=1
-
-$mpiexecjl --project=. -n 64 julia \
-  --check-bounds no \
-  ./scripts/Benchmarks/benchmark.jl \
-  $NAME \
-  $PROB_TYPE \
-  $N \
-  $N_EL \
-  $ORDER \
-  $VERBOSE
+mpiexec --hostfile $PBS_NODEFILE --project=$PROJECT_DIR \
+  julia -O3 --check-bounds no $PROJECT_DIR/scripts/Benchmarks/benchmark.jl \
+  STRONG_ELAST_dof3_N4_elx128 \
+  ELAST \
+  4 \
+  128 \
+  1 \
+  1

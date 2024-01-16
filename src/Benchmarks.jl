@@ -13,8 +13,11 @@ end
 
 function benchmark(f, args, ranks::Nothing; nreps = 10, reset! = (x...) -> nothing)
   t = zeros(Float64,nreps)
+  println("<------------- Compilation ------------->")
   f(args...)
+  println("<------------- Benchmarking ------------->")
   for i in 1:nreps
+    println("      Benchmark - Iteration $i of $nreps")
     reset!(args...)
     t[i] = @elapsed f(args...)
   end
@@ -23,8 +26,11 @@ end
 
 function benchmark(f, args, ranks; nreps = 10, reset! = (x...) -> nothing)
   t = PTimer(ranks)
+  i_am_main(ranks) && println("<------------- Compilation ------------->")
   f(args...)
+  i_am_main(ranks) && println("<------------- Benchmarking ------------->")
   for i in 1:nreps
+    i_am_main(ranks) && println("      Benchmark - Iteration $i of $nreps")
     reset!(args...)
     tic!(t;barrier=true)
     f(args...)

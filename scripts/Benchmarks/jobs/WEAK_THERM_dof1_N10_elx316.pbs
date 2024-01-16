@@ -6,26 +6,16 @@
 #PBS -l walltime=2:00:00
 #PBS -j oe
 
-cd $PBS_O_WORKDIR
-
 source $HOME/hpc-environments-main/lyra/load-ompi.sh
-export mpiexecjl=$HOME/.julia/bin/mpiexecjl
+PROJECT_DIR = $HOME/LSTO_Distributed/
 
-julia --project=. -e "using Pkg; Pkg.precompile()"
+julia --project=$PROJECT_DIR -e "using Pkg; Pkg.precompile()"
 
-NAME="WEAK_THERM_dof1_N10_elx316"
-PROB_TYPE=THERM
-N=10
-N_EL=316
-ORDER=1
-VERBOSE=1
-
-$mpiexecjl --project=. -n 1000 julia \
-  --check-bounds no \
-  ./scripts/Benchmarks/benchmark.jl \
-  $NAME \
-  $PROB_TYPE \
-  $N \
-  $N_EL \
-  $ORDER \
-  $VERBOSE
+mpiexec --hostfile $PBS_NODEFILE --project=$PROJECT_DIR \
+  julia -O3 --check-bounds no $PROJECT_DIR/scripts/Benchmarks/benchmark.jl \
+  WEAK_THERM_dof1_N10_elx316 \
+  THERM \
+  10 \
+  316 \
+  1 \
+  1
