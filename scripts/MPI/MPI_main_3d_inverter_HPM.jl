@@ -41,10 +41,13 @@ function main(mesh_partition,distribute,el_size)
     (0.4 - eps() <= x[3] <= 0.6 + eps())
   f_Γ_out(x) = (x[1] ≈ 1.0) && (0.4 - eps() <= x[2] <= 0.6 + eps()) && 
     (0.4 - eps() <= x[3] <= 0.6 + eps())
+  f_Γ_out_ext(x) = (0.95 <= x[1] <= 1.0) && (0.35 - eps() <= x[2] <= 0.65 + eps()) && 
+    (0.35 - eps() <= x[3] <= 0.65 + eps())
   f_Γ_D(x) = (x[1] ≈ 0.0)  && (x[2] <= 0.1 || x[2] >= 0.9) && (x[3] <= 0.1 || x[3] >= 0.9)
   update_labels!(1,model,f_Γ_in,"Gamma_in")
   update_labels!(2,model,f_Γ_out,"Gamma_out")
-  update_labels!(3,model,f_Γ_D,"Gamma_D")
+  update_labels!(3,model,f_Γ_out_ext,"Gamma_out_ext")
+  update_labels!(4,model,f_Γ_D,"Gamma_D")
 
   ## Triangulations and measures
   Ω = Triangulation(model)
@@ -63,7 +66,7 @@ function main(mesh_partition,distribute,el_size)
   V = TestFESpace(model,reffe;dirichlet_tags=["Gamma_D"])
   U = TrialFESpace(V,VectorValue(0.0,0.0,0.0))
   V_φ = TestFESpace(model,reffe_scalar)
-  V_reg = TestFESpace(model,reffe_scalar;dirichlet_tags=["Gamma_in","Gamma_out"])
+  V_reg = TestFESpace(model,reffe_scalar;dirichlet_tags=["Gamma_in","Gamma_out_ext"])
   U_reg = TrialFESpace(V_reg,[0,0])
 
   ## Create FE functions
@@ -115,7 +118,7 @@ function main(mesh_partition,distribute,el_size)
   
   ## Optimiser
   make_dir(path;ranks=ranks)
-  optimiser = HilbertianProjection(pcfs,stencil,vel_ext,φh;γ,γ_reinit,α_min=0.5,ls_γ_max=0.05,
+  optimiser = HilbertianProjection(pcfs,stencil,vel_ext,φh;γ,γ_reinit,α_min=0.7,ls_γ_max=0.05,
     verbose=i_am_main(ranks),constraint_names=["Vol","UΓ_out"])
   for (it, uh, φh) in optimiser
     write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh)),"uh"=>uh])
