@@ -38,12 +38,12 @@ function generate(
   #PBS -j oe
 
   source \$HOME/hpc-environments-main/lyra/load-ompi.sh
-  PROJECT_DIR = \$HOME/{{:dir_name}}/
+  PROJECT_DIR=\$HOME/{{:dir_name}}/
 
   julia --project=\$PROJECT_DIR -e "using Pkg; Pkg.precompile()"
 
-  mpiexec --hostfile \$PBS_NODEFILE --project=\$PROJECT_DIR \\
-    julia -O3 --check-bounds no \$PROJECT_DIR/scripts/Benchmarks/benchmark.jl \\
+  mpiexec --hostfile \$PBS_NODEFILE 
+    julia --project=\$PROJECT_DIR --check-bounds no -O3 \$PROJECT_DIR/scripts/Benchmarks/benchmark.jl \\
     {{:name}} \\
     {{:type}} \\
     {{:n_mesh_partition}} \\

@@ -312,7 +312,8 @@ with_mpi() do distribute
   GridapPETSc.with(args=split(options)) do
     optim = opt(mesh_partition,ranks,el_size,ORDER,VERBOSE)
     ## Benchmark optimiser
-    bopt = benchmark_optimizer(optim, 1, nothing)
+    it = 1
+    bopt = benchmark_optimizer(optim, it, nothing)
     ## Benchmark forward problem
     bfwd = benchmark_forward_problem(optim.problem.state_map, optim.φ0, nothing)
     ## Benchmark advection
@@ -325,7 +326,10 @@ with_mpi() do distribute
     bvelext = benchmark_velocity_extension(optim.vel_ext, optim.problem.dJ, nothing)
     if i_am_main(ranks)
       open(out_dir*NAME*".txt","w") do f
-        bcontent = "bopt(1),bfwd,badv,brinit,bvelext\n$bopt,$bfwd,$badv,$brinit,$bvelext";
+        bcontent = "bopt($it),bfwd,badv,brinit,bvelext\n"
+        for i ∈ eachindex(bopt)
+          bcontent *= "$(bopt[i]),$(bfwd[i]),$(badv[i]),$(brinit[i]),$(bvelext[i])\n"
+        end
         write(f,bcontent)
       end
     end
