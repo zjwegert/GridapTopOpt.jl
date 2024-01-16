@@ -42,7 +42,7 @@ function generate(
 
   julia --project=\$PROJECT_DIR -e "using Pkg; Pkg.precompile()"
 
-  mpiexec --hostfile \$PBS_NODEFILE 
+  mpiexec --hostfile \$PBS_NODEFILE \\
     julia --project=\$PROJECT_DIR --check-bounds no -O3 \$PROJECT_DIR/scripts/Benchmarks/benchmark.jl \\
     {{:name}} \\
     {{:type}} \\
