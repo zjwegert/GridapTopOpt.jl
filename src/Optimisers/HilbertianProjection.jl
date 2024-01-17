@@ -255,6 +255,7 @@ function Base.iterate(m::HilbertianProjection,state)
 
   ## Calculate objective, constraints, and shape derivatives after line search
   J, C, dJ, dC = Gridap.evaluate!(m.problem,φh)
+  uh = get_state(m.problem) # Shouldn't need this!
 
   ## Hilbertian extension-regularisation
   project!(m.vel_ext,dJ)
