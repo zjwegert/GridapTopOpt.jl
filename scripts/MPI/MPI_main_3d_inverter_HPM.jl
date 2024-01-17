@@ -41,8 +41,8 @@ function main(mesh_partition,distribute,el_size)
     (0.4 - eps() <= x[3] <= 0.6 + eps())
   f_Γ_out(x) = (x[1] ≈ 1.0) && (0.4 - eps() <= x[2] <= 0.6 + eps()) && 
     (0.4 - eps() <= x[3] <= 0.6 + eps())
-  f_Γ_out_ext(x) = (0.95 <= x[1] <= 1.0) && (0.35 - eps() <= x[2] <= 0.65 + eps()) && 
-    (0.35 - eps() <= x[3] <= 0.65 + eps())
+  f_Γ_out_ext(x) = ~f_Γ_out(x) && (0.9 <= x[1] <= 1.0) && (0.3 - eps() <= x[2] <= 0.7 + eps()) && 
+    (0.3 - eps() <= x[3] <= 0.7 + eps())
   f_Γ_D(x) = (x[1] ≈ 0.0)  && (x[2] <= 0.1 || x[2] >= 0.9) && (x[3] <= 0.1 || x[3] >= 0.9)
   update_labels!(1,model,f_Γ_in,"Gamma_in")
   update_labels!(2,model,f_Γ_out,"Gamma_out")
@@ -66,8 +66,8 @@ function main(mesh_partition,distribute,el_size)
   V = TestFESpace(model,reffe;dirichlet_tags=["Gamma_D"])
   U = TrialFESpace(V,VectorValue(0.0,0.0,0.0))
   V_φ = TestFESpace(model,reffe_scalar)
-  V_reg = TestFESpace(model,reffe_scalar;dirichlet_tags=["Gamma_in","Gamma_out_ext"])
-  U_reg = TrialFESpace(V_reg,[0,0])
+  V_reg = TestFESpace(model,reffe_scalar;dirichlet_tags=["Gamma_in","Gamma_out","Gamma_out_ext"])
+  U_reg = TrialFESpace(V_reg,[0,0,0])
 
   ## Create FE functions
   # lsf_fn = x -> min(gen_lsf(4,0.1)(x),sqrt(x[1]^2+(x[2]-0.5)^2+x[3]^2)-0.3,
