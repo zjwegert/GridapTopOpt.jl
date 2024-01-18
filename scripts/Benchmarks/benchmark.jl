@@ -310,7 +310,7 @@ with_mpi() do distribute
   i_am_main(ranks) && ~isdir(out_dir) && mkpath(out_dir)
   # Run
   GridapPETSc.with(args=split(options)) do
-    optim = opt(mesh_partition,ranks,el_size,ORDER,VERBOSE)
+    optim = opt(mesh_partition,ranks,el_size,ORDER,verbose)
     ## Benchmark optimiser
     it = 1
     bopt = benchmark_optimizer(optim, it, ranks)
