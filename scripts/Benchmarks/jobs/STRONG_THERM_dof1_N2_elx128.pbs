@@ -2,8 +2,8 @@
 
 #PBS -P LSTO
 #PBS -N "STRONG_THERM_dof1_N2_elx128"
-#PBS -l select=1:ncpus=8:mpiprocs=8:mem=128GB:cputype=7702
-#PBS -l walltime=2:00:00
+#PBS -l select=1:ncpus=8:mpiprocs=8:mem=256GB:cputype=7702
+#PBS -l walltime=200:00:00
 #PBS -j oe
 
 source $HOME/hpc-environments-main/lyra/load-ompi.sh

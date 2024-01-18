@@ -18,9 +18,11 @@ function generate(
 
   _div,_rem=divrem(ncpus,cpus_per_node)
   function sel_text(nnode,ncpus,mem,type)
-    _mem = nnode <= 2 && ncpus <= 16 ? 128 : mem;
+    _mem = nnode <= 2 && ncpus <= 32 ? 256 : mem;
     return "$nnode:ncpus=$ncpus:mpiprocs=$ncpus:mem=$(_mem)GB:cputype=$type"
   end
+
+  n_mesh_partition <= 2 ? wallhr = 200 : nothing
   
   if _div < 1
     select = sel_text(1,_rem,ceil.(Int,ncpus*gb_per_cpu),cputype)
