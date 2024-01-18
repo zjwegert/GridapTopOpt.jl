@@ -117,7 +117,8 @@ function Base.iterate(m::AugmentedLagrangian,state)
 
   ## Calculate objective, constraints, and shape derivatives
   J, C, dJ, dC = evaluate!(m.problem,φh)
-  L = J
+  uh = get_state(m.problem)
+  L  = J
   for (λi,Λi,Ci) in zip(λ,Λ,C)
     L += -λi*Ci + 0.5*Λi*Ci^2
   end
