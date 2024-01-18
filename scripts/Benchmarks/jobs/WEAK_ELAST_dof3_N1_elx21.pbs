@@ -2,7 +2,7 @@
 
 #PBS -P LSTO
 #PBS -N "WEAK_ELAST_dof3_N1_elx21"
-#PBS -l select=1:ncpus=1:mpiprocs=1:mem=8GB:cputype=7702
+#PBS -l select=1:ncpus=1:mpiprocs=1:mem=128GB:cputype=7702
 #PBS -l walltime=2:00:00
 #PBS -j oe
 
@@ -12,7 +12,8 @@ PROJECT_DIR=$HOME/LSTO_Distributed/
 julia --project=$PROJECT_DIR -e "using Pkg; Pkg.precompile()"
 
 mpiexec --hostfile $PBS_NODEFILE \
-  julia --project=$PROJECT_DIR --check-bounds no -O3 $PROJECT_DIR/scripts/Benchmarks/benchmark.jl \
+  julia --project=$PROJECT_DIR --check-bounds no -O3 \
+  $PROJECT_DIR/scripts/Benchmarks/benchmark.jl \
   WEAK_ELAST_dof3_N1_elx21 \
   $HOME/LSTO_Distributed/results/benchmarks/ \
   ELAST \

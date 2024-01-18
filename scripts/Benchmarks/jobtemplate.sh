@@ -12,7 +12,8 @@ PROJECT_DIR=$HOME/{{:dir_name}}/
 julia --project=$PROJECT_DIR -e "using Pkg; Pkg.precompile()"
 
 mpiexec --hostfile $PBS_NODEFILE \
-  julia --project=$PROJECT_DIR --check-bounds no -O3 $PROJECT_DIR/scripts/Benchmarks/benchmark.jl \
+  julia --project=$PROJECT_DIR --check-bounds no -O3 \
+  $PROJECT_DIR/scripts/Benchmarks/benchmark.jl \
   {{:name}} \
   {{{:write_dir}}} \
   {{:type}} \

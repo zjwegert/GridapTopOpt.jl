@@ -12,7 +12,8 @@ PROJECT_DIR=$HOME/LSTO_Distributed/
 julia --project=$PROJECT_DIR -e "using Pkg; Pkg.precompile()"
 
 mpiexec --hostfile $PBS_NODEFILE \
-  julia --project=$PROJECT_DIR --check-bounds no -O3 $PROJECT_DIR/scripts/Benchmarks/benchmark.jl \
+  julia --project=$PROJECT_DIR --check-bounds no -O3 \
+  $PROJECT_DIR/scripts/Benchmarks/benchmark.jl \
   WEAK_ELAST_dof3_N12_elx263 \
   $HOME/LSTO_Distributed/results/benchmarks/ \
   ELAST \
