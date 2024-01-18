@@ -430,9 +430,9 @@ with_mpi() do distribute
     if PROB_TYPE == "INVERTER_HPM"
       J, C, dJ, dC = Gridap.evaluate!(optim.problem,optim.φ0)
       optim.projector,dJ,C,dC,optim.vel_ext.K
-      bhpm = benchmark_hilbertian_projection_map(optim,optim.projector,dJ,C,dC,optim.vel_ext.K,ranks)
+      bhpm = benchmark_hilbertian_projection_map(optim.projector,dJ,C,dC,optim.vel_ext.K,ranks)
     else
-      bhpm = zeros(length(bopt))
+      bhpm = i_am_main(ranks) && zeros(length(bopt))
     end
     if i_am_main(ranks)
       open(WRITE_DIR*NAME*".txt","w") do f
