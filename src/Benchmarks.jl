@@ -1,6 +1,6 @@
 function process_timer(t::PTimer)
   data = t.data
-  tmax, tmin, tmean = map_main(data) do data
+  nreps, tmax, tmin, tmean = map_main(data) do data
     times = map(x -> x.max,values(data))
     process_timer(times)
   end |> PartitionedArrays.tuple_of_arrays
