@@ -95,3 +95,10 @@ function benchmark_velocity_extension(ext::VelocityExtension, v0, ranks; nreps =
   v = copy(v0)
   return benchmark(f, (ext,v), ranks; nreps, reset!)
 end
+
+function benchmark_hilbertian_projection_map(m::HilbertianProjectionMap, dV, C, dC, K, ranks; nreps = 10)
+  function f(m,dV,C,dC,K)
+    update_descent_direction!(m,dV,C,dC,K)
+  end
+  return benchmark(f, (m,dV,C,dC,K), ranks; nreps)
+end

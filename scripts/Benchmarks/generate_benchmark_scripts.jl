@@ -78,6 +78,7 @@ strong_el_x=128; # Number of elements in x-axis (strong scaling)
 phys_types = [
   ("NLELAST",3),
   ("ELAST",3),
+  ("INVERTER_HPM",3),
   ("THERM",1)
 ];
 
