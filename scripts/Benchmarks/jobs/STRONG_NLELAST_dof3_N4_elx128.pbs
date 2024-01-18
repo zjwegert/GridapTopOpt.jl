@@ -14,6 +14,7 @@ julia --project=$PROJECT_DIR -e "using Pkg; Pkg.precompile()"
 mpiexec --hostfile $PBS_NODEFILE \
   julia --project=$PROJECT_DIR --check-bounds no -O3 $PROJECT_DIR/scripts/Benchmarks/benchmark.jl \
   STRONG_NLELAST_dof3_N4_elx128 \
+  $HOME/LSTO_Distributed/results/benchmarks/ \
   NLELAST \
   4 \
   128 \

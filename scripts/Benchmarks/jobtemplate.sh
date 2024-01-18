@@ -1,22 +1,22 @@
 #!/bin/bash -l
 
 #PBS -P LSTO
-#PBS -N "WEAK_THERM_dof1_N16_elx506"
-#PBS -l select=32:ncpus=128:mpiprocs=128:mem=1003GB:cputype=7702
-#PBS -l walltime=2:00:00
+#PBS -N "{{:name}}"
+#PBS -l select={{:select}}
+#PBS -l walltime={{:wallhr}}:00:00
 #PBS -j oe
 
 source $HOME/hpc-environments-main/lyra/load-ompi.sh
-PROJECT_DIR=$HOME/LSTO_Distributed/
+PROJECT_DIR=$HOME/{{:dir_name}}/
 
 julia --project=$PROJECT_DIR -e "using Pkg; Pkg.precompile()"
 
 mpiexec --hostfile $PBS_NODEFILE \
   julia --project=$PROJECT_DIR --check-bounds no -O3 $PROJECT_DIR/scripts/Benchmarks/benchmark.jl \
-  WEAK_THERM_dof1_N16_elx506 \
-  $HOME/LSTO_Distributed/results/benchmarks/ \
-  THERM \
-  16 \
-  506 \
-  1 \
-  1
+  {{:name}} \
+  {{{:write_dir}}} \
+  {{:type}} \
+  {{:n_mesh_partition}} \
+  {{:n_el_size}} \
+  {{:fe_order}} \
+  {{:verbose}}

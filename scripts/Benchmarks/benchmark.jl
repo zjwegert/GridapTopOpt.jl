@@ -4,11 +4,12 @@ using Gridap, Gridap.MultiField, GridapDistributed, GridapPETSc, GridapSolvers,
 using GridapSolvers: NewtonSolver
 
 global NAME = ARGS[1]
-global PROB_TYPE = ARGS[2]
-global N = parse(Int,ARGS[3])
-global N_EL = parse(Int,ARGS[4])
-global ORDER = parse(Int,ARGS[5])
-global VERBOSE = parse(Int,ARGS[6])
+global WRITE_DIR = ARGS[2]
+global PROB_TYPE = ARGS[3]
+global N = parse(Int,ARGS[4])
+global N_EL = parse(Int,ARGS[5])
+global ORDER = parse(Int,ARGS[6])
+global VERBOSE = parse(Int,ARGS[7])
 
 function nl_elast(mesh_partition,ranks,el_size,order,verbose)
   ## Parameters
@@ -306,8 +307,7 @@ with_mpi() do distribute
   end
 
   # Output
-  out_dir = "./results/benchmarks/"
-  i_am_main(ranks) && ~isdir(out_dir) && mkpath(out_dir)
+  i_am_main(ranks) && ~isdir(WRITE_DIR) && mkpath(WRITE_DIR)
   # Run
   GridapPETSc.with(args=split(options)) do
     optim = opt(mesh_partition,ranks,el_size,ORDER,verbose)
@@ -325,7 +325,7 @@ with_mpi() do distribute
     ## Benchmark velocity extension
     bvelext = benchmark_velocity_extension(optim.vel_ext, optim.problem.dJ, ranks)
     if i_am_main(ranks)
-      open(out_dir*NAME*".txt","w") do f
+      open(WRITE_DIR*NAME*".txt","w") do f
         bcontent = "bopt($it),bfwd,badv,brinit,bvelext\n"
         for i ∈ eachindex(bopt)
           bcontent *= "$(bopt[i]),$(bfwd[i]),$(badv[i]),$(brinit[i]),$(bvelext[i])\n"

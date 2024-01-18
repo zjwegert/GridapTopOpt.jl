@@ -1,6 +1,7 @@
 using Mustache
 
 function generate(
+    template,
     name,
     type,
     cputype,
@@ -9,7 +10,8 @@ function generate(
     n_el_size,
     fe_order,
     verbose,
-    dir_name
+    dir_name,
+    write_dir
   )
 
   ncpus = n_mesh_partition^3
@@ -28,36 +30,12 @@ function generate(
     error()
   end
 
-  job_data = """
-  #!/bin/bash -l
-
-  #PBS -P LSTO
-  #PBS -N "{{:name}}"
-  #PBS -l select=$select
-  #PBS -l walltime={{:wallhr}}:00:00
-  #PBS -j oe
-
-  source \$HOME/hpc-environments-main/lyra/load-ompi.sh
-  PROJECT_DIR=\$HOME/{{:dir_name}}/
-
-  julia --project=\$PROJECT_DIR -e "using Pkg; Pkg.precompile()"
-
-  mpiexec --hostfile \$PBS_NODEFILE \\
-    julia --project=\$PROJECT_DIR --check-bounds no -O3 \$PROJECT_DIR/scripts/Benchmarks/benchmark.jl \\
-    {{:name}} \\
-    {{:type}} \\
-    {{:n_mesh_partition}} \\
-    {{:n_el_size}} \\
-    {{:fe_order}} \\
-    {{:verbose}}
-  """;
-
-  settings = (;name,type,cputype,wallhr,ncpus,
-    n_mesh_partition,n_el_size,fe_order,verbose,dir_name)
-  Mustache.render(job_data, settings)
+  settings = (;name,select,type,cputype,wallhr,ncpus,
+    n_mesh_partition,n_el_size,fe_order,verbose,dir_name,write_dir)
+  Mustache.render(template, settings)
 end
 
-function generate_jobs(phys_type,ndof_per_node)
+function generate_jobs(template,phys_type,ndof_per_node)
   strong = (N).^3;
   weak_el_x = @. floor(Int,(dofs_per_proc*strong/ndof_per_node)^(1/3)-1);
   dof_sanity_check = @.(floor(Int,ndof_per_node*(weak_el_x+1)^3/strong)),
@@ -67,11 +45,11 @@ function generate_jobs(phys_type,ndof_per_node)
   wname(phys_type,ndof_per_node,n,elx) = "WEAK_$(phys_type)_dof$(ndof_per_node)_N$(n)_elx$(elx)"
 
   strong_jobs = map(n->(sname(phys_type,ndof_per_node,n,strong_el_x),
-    generate(sname(phys_type,ndof_per_node,n,strong_el_x),phys_type,
-    cputype,wallhr,n,strong_el_x,fe_order,verbose,dir_name)),N)
+    generate(template,sname(phys_type,ndof_per_node,n,strong_el_x),phys_type,
+    cputype,wallhr,n,strong_el_x,fe_order,verbose,dir_name,write_dir)),N)
   weak_jobs = map((n,elx)->(wname(phys_type,ndof_per_node,n,elx),
-    generate(wname(phys_type,ndof_per_node,n,elx),phys_type,
-    cputype,wallhr,n,elx,fe_order,verbose,dir_name)),N,weak_el_x)
+    generate(template,wname(phys_type,ndof_per_node,n,elx),phys_type,
+    cputype,wallhr,n,elx,fe_order,verbose,dir_name,write_dir)),N,weak_el_x)
 
   strong_jobs,weak_jobs,dof_sanity_check
 end
@@ -87,6 +65,7 @@ dofs_per_proc = 32000;
 fe_order=1;
 verbose=1;
 dir_name=splitpath(Base.active_project())[end-1];
+write_dir = "\$HOME/$dir_name/results/benchmarks/"
 
 mem_per_node = 1003;
 cpus_per_node = 128;
@@ -102,8 +81,11 @@ phys_types = [
   ("THERM",1)
 ];
 
+# Template
+template = read("./scripts/Benchmarks/jobtemplate.sh",String)
+
 ## Generate Jobs
-jobs_by_phys = map(x->(x[1],generate_jobs(x[1],x[2])),phys_types);
+jobs_by_phys = map(x->(x[1],generate_jobs(template,x[1],x[2])),phys_types);
 
 for jobs in jobs_by_phys
   strong_jobs,weak_jobs,dof_sanity_check = jobs[2]
