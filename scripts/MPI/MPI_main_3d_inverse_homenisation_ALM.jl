@@ -90,8 +90,8 @@ function main(mesh_partition,distribute,el_size)
 
   state_map = RepeatingAffineFEStateMap(
     6,a,l,U,V,V_φ,U_reg,φh,dΩ;
-    assem_U = DiagonalBlockMatrixAssembler(SparseMatrixAssembler(Tm,Tv,U,V)),
-    assem_adjoint = DiagonalBlockMatrixAssembler(SparseMatrixAssembler(Tm,Tv,V,U)),
+    assem_U = SparseMatrixAssembler(Tm,Tv,U,V),
+    assem_adjoint = SparseMatrixAssembler(Tm,Tv,V,U),
     assem_deriv = SparseMatrixAssembler(Tm,Tv,U_reg,U_reg),
     ls = solver, adjoint_ls = solver
   )

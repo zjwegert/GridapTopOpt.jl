@@ -307,23 +307,23 @@ with_mpi() do distribute
 
   # Output
   out_dir = "./results/benchmarks/"
-  i_am_main(ranks) && ~isdir(out_dir) ? mkpath(out_dir) : nothing
+  i_am_main(ranks) && ~isdir(out_dir) && mkpath(out_dir)
   # Run
   GridapPETSc.with(args=split(options)) do
     optim = opt(mesh_partition,ranks,el_size,ORDER,VERBOSE)
     ## Benchmark optimiser
     it = 1
-    bopt = benchmark_optimizer(optim, it, nothing)
+    bopt = benchmark_optimizer(optim, it, ranks)
     ## Benchmark forward problem
-    bfwd = benchmark_forward_problem(optim.problem.state_map, optim.φ0, nothing)
+    bfwd = benchmark_forward_problem(optim.problem.state_map, optim.φ0, ranks)
     ## Benchmark advection
     v = get_free_dof_values(interpolate(FEFunction(LSTO_Distributed.get_deriv_space(optim.problem.state_map),
       optim.problem.dJ),LSTO_Distributed.get_aux_space(optim.problem.state_map)))
-    badv = benchmark_advection(optim.stencil, get_free_dof_values(optim.φ0), v, 0.1, nothing)
+    badv = benchmark_advection(optim.stencil, get_free_dof_values(optim.φ0), v, 0.1, ranks)
     ## Benchmark reinitialisation
-    brinit = benchmark_reinitialisation(optim.stencil, get_free_dof_values(optim.φ0), 0.1, nothing)
+    brinit = benchmark_reinitialisation(optim.stencil, get_free_dof_values(optim.φ0), 0.1, ranks)
     ## Benchmark velocity extension
-    bvelext = benchmark_velocity_extension(optim.vel_ext, optim.problem.dJ, nothing)
+    bvelext = benchmark_velocity_extension(optim.vel_ext, optim.problem.dJ, ranks)
     if i_am_main(ranks)
       open(out_dir*NAME*".txt","w") do f
         bcontent = "bopt($it),bfwd,badv,brinit,bvelext\n"

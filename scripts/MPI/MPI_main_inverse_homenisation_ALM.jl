@@ -82,10 +82,10 @@ function main(mesh_partition,distribute,el_size)
   Tv = Vector{PetscScalar}
   solver = ElasticitySolver(V)
   
-  state_map = AffineFEStateMap(
+  state_map = RepeatingAffineFEStateMap(
     3,a,l,U,V,V_φ,U_reg,φh,dΩ;
-    assem_U = DiagonalBlockMatrixAssembler(SparseMatrixAssembler(Tm,Tv,U,V)),
-    assem_adjoint = DiagonalBlockMatrixAssembler(SparseMatrixAssembler(Tm,Tv,V,U)),
+    assem_U = SparseMatrixAssembler(Tm,Tv,U,V),
+    assem_adjoint = SparseMatrixAssembler(Tm,Tv,V,U),
     assem_deriv = SparseMatrixAssembler(Tm,Tv,U_reg,U_reg),
     ls = solver,adjoint_ls = solver
   )
