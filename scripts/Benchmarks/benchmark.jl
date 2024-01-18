@@ -432,7 +432,7 @@ with_mpi() do distribute
       optim.projector,dJ,C,dC,optim.vel_ext.K
       bhpm = benchmark_hilbertian_projection_map(optim,optim.projector,dJ,C,dC,optim.vel_ext.K,ranks)
     else
-      bhpm = Vector{Nothing}(nothing,length(bopt))
+      bhpm = zeros(length(bopt))
     end
     if i_am_main(ranks)
       open(WRITE_DIR*NAME*".txt","w") do f

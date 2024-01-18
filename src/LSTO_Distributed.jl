@@ -82,5 +82,6 @@ export benchmark_forward_problem
 export benchmark_advection
 export benchmark_reinitialisation
 export benchmark_velocity_extension
+export benchmark_hilbertian_projection_map
 
 end
