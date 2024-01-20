@@ -162,10 +162,12 @@ function Base.write(io::IO,h::OptimiserHistory)
   Base.write(io,content)
 end
 
-function write_history(path::String,h::OptimiserHistory)
-  open(path,"w") do f
-    write(f,h)
-  end  
+function write_history(path::String,h::OptimiserHistory;ranks=nothing)
+  if i_am_main(ranks)
+    open(path,"w") do f
+      write(f,h)
+    end  
+  end
 end
 
 function print_msg(h::OptimiserHistory,msg::String;kwargs...)
