@@ -122,11 +122,11 @@ function main(mesh_partition,distribute,el_size)
     verbose=i_am_main(ranks),constraint_names=["Vol","UΓ_out"])
   for (it, uh, φh) in optimiser
     write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh)),"uh"=>uh])
-    write_history(path*"/history.txt",optimiser.history)
+    write_history(path*"/history.txt",optimiser.history;ranks=ranks)
   end
   it = optimiser.history.niter; uh  = get_state(m.problem)
   write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh)),"uh"=>uh])
-  write_history(path*"/history.txt",optimiser.history)
+  write_history(path*"/history.txt",optimiser.history;ranks=ranks)
 end
 
 with_mpi() do distribute
