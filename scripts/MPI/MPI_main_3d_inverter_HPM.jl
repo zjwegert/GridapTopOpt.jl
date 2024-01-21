@@ -124,7 +124,7 @@ function main(mesh_partition,distribute,el_size)
     write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh)),"uh"=>uh])
     write_history(path*"/history.txt",optimiser.history;ranks=ranks)
   end
-  it = optimiser.history.niter; uh  = get_state(m.problem)
+  it = optimiser.history.niter; uh = get_state(optimiser.problem)
   write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh)),"uh"=>uh])
   write_history(path*"/history.txt",optimiser.history;ranks=ranks)
 end
