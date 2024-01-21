@@ -64,7 +64,7 @@ cputype="7702";
 mem_per_node = 1003; # GB
 cpus_per_node = 128;
 gb_per_cpu = mem_per_node/cpus_per_node*(1-0.001); # Only used for partial node use
-wallhr=2; # Hours
+wallhr=10; # Hours
 
 dofs_per_proc = 32000;
 fe_order=1;
@@ -72,12 +72,10 @@ verbose=1;
 dir_name=splitpath(Base.active_project())[end-1];
 write_dir = "\$HOME/$dir_name/results/benchmarks/"
 
-mem_per_node = 1003;
-cpus_per_node = 128;
-gb_per_cpu = mem_per_node/cpus_per_node*(1-0.001);
-
-N = vcat(1,2:2:16); # Number of partitions in x-axis
-strong_el_x=128; # Number of elements in x-axis (strong scaling)
+# N = vcat(1,2:2:16); # Number of partitions in x-axis
+# strong_el_x=128; # Number of elements in x-axis (strong scaling)
+N = 1:5; # Number of partitions in x-axis
+strong_el_x=100; # Number of elements in x-axis (strong scaling)
 
 # Phys type and number of dofs per node, this corresponds to driver
 phys_types = [

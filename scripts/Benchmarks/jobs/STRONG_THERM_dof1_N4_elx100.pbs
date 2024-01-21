@@ -1,7 +1,7 @@
 #!/bin/bash -l
 
 #PBS -P LSTO
-#PBS -N "WEAK_NLELAST_dof3_N4_elx87"
+#PBS -N "STRONG_THERM_dof1_N4_elx100"
 #PBS -l select=1:ncpus=64:mpiprocs=64:mem=501GB:cputype=7702
 #PBS -l walltime=10:00:00
 #PBS -j oe
@@ -14,10 +14,10 @@ julia --project=$PROJECT_DIR -e "using Pkg; Pkg.precompile()"
 mpiexec --hostfile $PBS_NODEFILE \
   julia --project=$PROJECT_DIR --check-bounds no -O3 \
   $PROJECT_DIR/scripts/Benchmarks/benchmark.jl \
-  WEAK_NLELAST_dof3_N4_elx87 \
+  STRONG_THERM_dof1_N4_elx100 \
   $HOME/LSTO_Distributed/results/benchmarks/ \
-  NLELAST \
+  THERM \
   4 \
-  87 \
+  100 \
   1 \
   1
