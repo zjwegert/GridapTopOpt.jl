@@ -64,7 +64,7 @@ cputype="7702";
 mem_per_node = 1003; # GB
 cpus_per_node = 128;
 gb_per_cpu = mem_per_node/cpus_per_node*(1-0.001); # Only used for partial node use
-wallhr=10; # Hours
+wallhr=24; # Hours
 
 dofs_per_proc = 32000;
 fe_order=1;

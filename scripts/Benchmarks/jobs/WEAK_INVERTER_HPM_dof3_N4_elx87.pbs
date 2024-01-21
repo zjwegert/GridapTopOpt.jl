@@ -3,7 +3,7 @@
 #PBS -P LSTO
 #PBS -N "WEAK_INVERTER_HPM_dof3_N4_elx87"
 #PBS -l select=1:ncpus=64:mpiprocs=64:mem=501GB:cputype=7702
-#PBS -l walltime=10:00:00
+#PBS -l walltime=24:00:00
 #PBS -j oe
 
 source $HOME/hpc-environments-main/lyra/load-ompi.sh

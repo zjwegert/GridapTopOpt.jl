@@ -3,7 +3,7 @@
 #PBS -P LSTO
 #PBS -N "WEAK_NLELAST_dof3_N5_elx109"
 #PBS -l select=1:ncpus=125:mpiprocs=125:mem=979GB:cputype=7702
-#PBS -l walltime=10:00:00
+#PBS -l walltime=24:00:00
 #PBS -j oe
 
 source $HOME/hpc-environments-main/lyra/load-ompi.sh
