@@ -1,0 +1,16 @@
+#!/bin/bash -l
+#PBS -P LSTO
+#PBS -N 3D_hyperelastic_compliance
+
+#PBS -l select=1:ncpus=125:mpiprocs=125:mem=1000GB:cputype=7702
+#PBS -l walltime=200:00:00
+#PBS -j oe
+
+cd $PBS_O_WORKDIR
+
+source $HOME/hpc-environments-main/lyra/load-ompi.sh
+PROJECT_DIR=$HOME/LSTO_Distributed/
+
+julia --project=$PROJECT_DIR -e "using Pkg; Pkg.precompile()"
+
+mpiexec --hostfile $PBS_NODEFILE julia --project=$PROJECT_DIR --check-bounds no -O3 ./scripts/MPI/MPI_main_3d_hyperelastic_compliance.jl

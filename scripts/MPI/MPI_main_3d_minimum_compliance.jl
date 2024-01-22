@@ -21,7 +21,7 @@ function main(mesh_partition,distribute,el_size)
   γ = 0.1
   γ_reinit = 0.5
   max_steps = floor(Int,minimum(el_size)/3)
-  tol = 1/(order^2*10)*prod(inv,minimum(el_size))
+  tol = 1/(2order^2)*prod(inv,minimum(el_size))
   C = isotropic_3d(1.,0.3)
   g = VectorValue(0,0,-1)
   η_coeff = 2
@@ -99,12 +99,16 @@ function main(mesh_partition,distribute,el_size)
   optimiser = AugmentedLagrangian(pcfs,stencil,vel_ext,φh;γ,γ_reinit,verbose=i_am_main(ranks))
   for (it, uh, φh) in optimiser
     write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh)),"uh"=>uh])
+    write_history(path*"/history.txt",optimiser.history;ranks=ranks)
   end
+  it = optimiser.history.niter; uh = get_state(optimiser.problem)
+  write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh)),"uh"=>uh])
+  write_history(path*"/history.txt",optimiser.history;ranks=ranks)
 end
 
 with_mpi() do distribute
-  mesh_partition = (4,3,2)
-  el_size = (100,50,50)
+  mesh_partition = (5,5,5)
+  el_size = (160,80,80)
   hilb_solver_options = "-pc_type gamg -ksp_type cg -ksp_error_if_not_converged true 
     -ksp_converged_reason -ksp_rtol 1.0e-12 -mat_block_size 3
     -mg_levels_ksp_type chebyshev -mg_levels_esteig_ksp_type cg -mg_coarse_sub_pc_type cholesky"

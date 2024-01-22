@@ -29,10 +29,10 @@ function main(mesh_partition,distribute,el_size)
   η_coeff = 2
   α_coeff = 4
   Vf=0.4
-  δₓ=0.5#75
+  δₓ=0.75
   ks = 0.01
   g = VectorValue(1,0,0)
-  path = dirname(dirname(@__DIR__))*"/results/MPI_main_3d_inverter_HPM"
+  path = dirname(dirname(@__DIR__))*"/results/MPI_main_3d_inverter_HPM_deltax=$δₓ"
 
   ## FE Setup
   model = CartesianDiscreteModel(ranks,mesh_partition,dom,el_size);
@@ -70,9 +70,6 @@ function main(mesh_partition,distribute,el_size)
   U_reg = TrialFESpace(V_reg,[0,0,0])
 
   ## Create FE functions
-  # lsf_fn = x -> min(gen_lsf(4,0.1)(x),sqrt(x[1]^2+(x[2]-0.5)^2+x[3]^2)-0.3,
-  #   sqrt(x[1]^2+(x[2]-0.5)^2+(x[3]-1)^2)-0.3)
-
   φh = interpolate(gen_lsf(4,0.1),V_φ);
 
   ## Interpolation and weak form

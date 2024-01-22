@@ -24,7 +24,7 @@ function main(mesh_partition,distribute,el_size)
   γ = 0.1
   γ_reinit = 0.5
   max_steps = floor(Int,minimum(el_size)/3)
-  tol = 1/(order^2*10)*prod(inv,minimum(el_size))
+  tol = 1/(2order^2)*prod(inv,minimum(el_size))
   η_coeff = 2
   α_coeff = 4
   path = dirname(dirname(@__DIR__))*"/results/MPI_main_3d_nonlinear"
@@ -103,13 +103,16 @@ function main(mesh_partition,distribute,el_size)
   optimiser = AugmentedLagrangian(pcfs,stencil,vel_ext,φh;γ,γ_reinit,verbose=i_am_main(ranks))
   for (it, uh, φh) in optimiser
     write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh)),"uh"=>uh])
+    write_history(path*"/history.txt",optimiser.history;ranks=ranks)
   end
+  it = optimiser.history.niter; uh = get_state(optimiser.problem)
+  write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh)),"uh"=>uh])
+  write_history(path*"/history.txt",optimiser.history;ranks=ranks)
 end
 
 with_mpi() do distribute
-  mesh_partition = (3,3,3)
-  el_size = (100,100,100)
-
+  mesh_partition = (5,5,5)
+  el_size = (150,150,150)
   options = "-snes_type newtonls -snes_linesearch_type basic  -snes_linesearch_damping 1.0"*
     " -snes_rtol 1.0e-14 -snes_atol 0.0 -snes_monitor -pc_type gamg -ksp_type cg"*
     " -snes_converged_reason -ksp_converged_reason -ksp_error_if_not_converged true -ksp_rtol 1.0e-12"*
