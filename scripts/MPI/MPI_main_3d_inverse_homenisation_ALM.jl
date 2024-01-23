@@ -114,7 +114,7 @@ function main(mesh_partition,distribute,el_size)
     write_history(path*"/history.txt",optimiser.history;ranks=ranks)
   end
   it = optimiser.history.niter; uh = get_state(optimiser.problem)
-  write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh)),"uh"=>uh])
+  write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh)),"uh"=>uh];iter_mod=1)
   write_history(path*"/history.txt",optimiser.history;ranks=ranks)
 end
 
