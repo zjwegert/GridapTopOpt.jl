@@ -102,7 +102,10 @@ function main()
                                    verbose=true,constraint_names=["Vol","UΓ_out"])
   for (it,uh,φh) in optimiser
     write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh)),"uh"=>uh])
+    write_history(path*"/history.txt",optimiser.history)
   end
+  it = optimiser.history.niter; uh = get_state(optimiser.problem)
+  write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh)),"uh"=>uh];iter_mod=1)
 end
 
 main()

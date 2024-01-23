@@ -11,7 +11,7 @@ using Gridap, GridapDistributed, GridapPETSc, PartitionedArrays, LSTO_Distribute
 """ 
 function main()
   ## Parameters
-  order = 2
+  order = 1
   xmax = ymax = 1.0
   prop_Γ_N = 0.4
   prop_Γ_D = 0.2
@@ -83,11 +83,11 @@ function main()
   converged(m) = LSTO_Distributed.default_al_converged(m;L_tol=0.02*maximum(Δ))
   optimiser = AugmentedLagrangian(pcfs,stencil,vel_ext,φh;γ,γ_reinit,converged,verbose=true)
   for (it, uh, φh) in optimiser
-    write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh))])
+    write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh)),"uh"=>uh])
+    write_history(path*"/history.txt",optimiser.history)
   end
-
-  # history = get_history(optimiser)
-  # write_history(optimiser.history,path*"/history.csv")
+  it = optimiser.history.niter; uh = get_state(optimiser.problem)
+  write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh)),"uh"=>uh];iter_mod=1)
 end
 
 main()
