@@ -64,7 +64,7 @@ function main()
   ## Optimisation functionals
   J(u,φ,dΩ,dΓ_N) = ∫((I ∘ φ)*(C ⊙ ε(u) ⊙ ε(u)))dΩ
   dJ(q,u,φ,dΩ,dΓ_N) = ∫((- C ⊙ ε(u) ⊙ ε(u))*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ;
-  Vol(u,φ,dΩ,dΓ_N) = ∫(((ρ ∘ φ) - 0.5)/vol_D)dΩ;
+  Vol(u,φ,dΩ,dΓ_N) = ∫((ρ ∘ φ)/vol_D - 0.5)dΩ;
   dVol(q,u,φ,dΩ,dΓ_N) = ∫(1/vol_D*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
 
   ## Finite difference solver and level set function

@@ -54,9 +54,7 @@ function main()
   U_reg = TrialFESpace(V_reg,0)
 
   ## Create FE functions
-  circle_lsf(x,xshift,r) = sqrt((x[1]-xshift[1])^2+(x[2]-xshift[2])^2) - r
-  fn(x) = min(gen_lsf(4,0.2)(x),circle_lsf(x,(0,0.25),0.2),circle_lsf(x,(0,0.75),0.2));
-  φh = interpolate(fn,V_φ)
+  φh = interpolate(gen_lsf(4,0.2),V_φ)
 
   ## Interpolation and weak form
   interp = SmoothErsatzMaterialInterpolation(η = η_coeff*maximum(Δ))
@@ -67,10 +65,10 @@ function main()
   res(u,v,φ,dΩ,dΓ_N) = a(u,v,φ,dΩ,dΓ_N) - l(v,φ,dΩ,dΓ_N)
 
   ## Optimisation functionals
-  J = (u,φ,dΩ,dΓ_N) -> ∫((I ∘ φ)*D*∇(u)⋅∇(u))dΩ
-  dJ = (q,u,φ,dΩ,dΓ_N) -> ∫(-D*∇(u)⋅∇(u)*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ;
-  Vol = (u,φ,dΩ,dΓ_N) -> ∫(((ρ ∘ φ) - vf)/vol_D)dΩ;
-  dVol = (q,u,φ,dΩ,dΓ_N) -> ∫(1/vol_D*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
+  J(u,φ,dΩ,dΓ_N) = ∫((I ∘ φ)*D*∇(u)⋅∇(u))dΩ
+  dJ(q,u,φ,dΩ,dΓ_N) = ∫(-D*∇(u)⋅∇(u)*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ;
+  Vol(u,φ,dΩ,dΓ_N) = ∫((ρ ∘ φ)/vol_D - vf)dΩ;
+  dVol(q,u,φ,dΩ,dΓ_N) = ∫(1/vol_D*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
 
   ## Finite difference solver and level set function
   stencil = AdvectionStencil(FirstOrderStencil(2,Float64),model,V_φ,tol,max_steps)

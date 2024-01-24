@@ -74,7 +74,7 @@ function main()
   ## Optimisation functionals
   J = (u,φ,dΩ,dΓ_in,dΓ_out) -> ∫(η_in*u⋅VectorValue(1,0))dΓ_in + 
                                ∫(η_out*u⋅VectorValue(1,0))dΓ_out
-  Vol = (u,φ,dΩ,dΓ_in,dΓ_out) -> ∫(((ρ ∘ φ) - 0.5)/vol_D)dΩ;
+  Vol = (u,φ,dΩ,dΓ_in,dΓ_out) -> ∫((ρ ∘ φ)/vol_D - 0.5)dΩ;
   dVol = (q,u,φ,dΩ,dΓ_in,dΓ_out) -> ∫(1/vol_D*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
 
   ## Finite difference solver and level set function
