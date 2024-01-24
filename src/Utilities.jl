@@ -15,7 +15,7 @@ function get_Δ(model::DistributedDiscreteModel)
   getany(local_Δ)
 end
 
-## Create label given function f_Γ. e is a count of added tags.
+## Create label given function f_Γ. e is a count of added tags. TODO: Can this go in GridapExtensions.jl? @Jordi
 function update_labels!(e::Int,model::CartesianDiscreteModel,f_Γ::Function,name::String)
   mask = mark_nodes(f_Γ,model)
   _update_labels_locally!(e,model,mask,name)
@@ -126,14 +126,14 @@ function isotropic_3d(E::M,ν::M) where M<:AbstractFloat
 end
 
 # Logging
-function make_dir(path;ranks=nothing)
+function make_dir(path;ranks=nothing) # TODO: Adjust to mkpath?
   if i_am_main(ranks)
     !isdir(path) ? mkdir(path) : rm(path,recursive=true);
     !isdir(path) ? mkdir(path) : 0;
   end
 end
 
-function print_history(it,entries::Vector{<:Pair};ranks=nothing)
+function print_history(it,entries::Vector{<:Pair};ranks=nothing) # TODO: Remove
   if i_am_main(ranks)
     str = "it: $it"
     for pair in entries
@@ -144,7 +144,7 @@ function print_history(it,entries::Vector{<:Pair};ranks=nothing)
   end
 end
 
-function write_vtk(Ω,path,it,entries::Vector{<:Pair};iter_mod=10)
+function write_vtk(Ω,path,it,entries::Vector{<:Pair};iter_mod=10) # TODO: Rename to writevtk
   if isone(it) || iszero(it % iter_mod) 
     writevtk(Ω,path,cellfields=entries)
   end
@@ -157,6 +157,7 @@ end
 ## Multiplication of DomainContributions
 using Gridap.CellData: DomainContribution, add_contribution!
 import Base.*
+# TODO: Remove? @Jordi? Sometimes people are interested in ∫()dΩ*∫()dΩ OR ∫()dΩ/∫()dΩ
 function (*)(a::DomainContribution,b::DomainContribution)
   c = copy(a)
   for (trian,array) in b.dict
