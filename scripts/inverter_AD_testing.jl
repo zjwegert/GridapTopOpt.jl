@@ -85,7 +85,7 @@ function main()
     ∫(q*(C ⊙ ε(u) ⊙ ε(λh))*(DH ∘ φh))dΩ
   end
 
-  Vol = (u,φ,dΩ,dΓ_in,dΓ_out) -> ∫((ρ ∘ φ)/vol_D - 0.5)dΩ;
+  Vol = (u,φ,dΩ,dΓ_in,dΓ_out) -> ∫(((ρ ∘ φ) - 0.5)/vol_D)dΩ;
   dVol = (q,u,φ,dΩ,dΓ_in,dΓ_out) -> ∫(1/vol_D*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
 
   ## Finite difference solver and level set function

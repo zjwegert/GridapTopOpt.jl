@@ -82,7 +82,7 @@ function main(mesh_partition,distribute,el_size)
   ## Optimisation functionals
   e₁ = VectorValue(1,0,0)
   J(u,φ,dΩ,dΓ_in,dΓ_out) = ∫((u⋅e₁)/vol_Γ_in)dΓ_in
-  Vol(u,φ,dΩ,dΓ_in,dΓ_out) = ∫((ρ ∘ φ)/vol_D - vf)dΩ;
+  Vol(u,φ,dΩ,dΓ_in,dΓ_out) = ∫(((ρ ∘ φ) - Vf)/vol_D)dΩ;
   dVol(q,u,φ,dΩ,dΓ_in,dΓ_out) = ∫(1/vol_D*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
   UΓ_out(u,φ,dΩ,dΓ_in,dΓ_out) = ∫((u⋅-e₁-δₓ)/vol_Γ_out)dΓ_out
 

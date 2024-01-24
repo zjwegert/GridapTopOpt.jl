@@ -62,12 +62,11 @@ function main()
 
   a(u,v,φ,dΩ,dΓ_N) = ∫((I ∘ φ)*D*∇(u)⋅∇(v))dΩ
   l(v,φ,dΩ,dΓ_N) = ∫(v)dΓ_N
-  res(u,v,φ,dΩ,dΓ_N) = a(u,v,φ,dΩ,dΓ_N) - l(v,φ,dΩ,dΓ_N)
 
   ## Optimisation functionals
   J(u,φ,dΩ,dΓ_N) = ∫((I ∘ φ)*D*∇(u)⋅∇(u))dΩ
   dJ(q,u,φ,dΩ,dΓ_N) = ∫(-D*∇(u)⋅∇(u)*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ;
-  Vol(u,φ,dΩ,dΓ_N) = ∫((ρ ∘ φ)/vol_D - vf)dΩ;
+  Vol(u,φ,dΩ,dΓ_N) = ∫(((ρ ∘ φ) - vf)/vol_D)dΩ;
   dVol(q,u,φ,dΩ,dΓ_N) = ∫(1/vol_D*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
 
   ## Finite difference solver and level set function
