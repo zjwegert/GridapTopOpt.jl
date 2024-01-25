@@ -1,36 +1,31 @@
-using Gridap, GridapDistributed, GridapPETSc, PartitionedArrays, LSTO_Distributed
+using Gridap, LSTO_Distributed
 
 """
-  (Serial) Minimum thermal compliance with Lagrangian method in 2D with nonlinear diffusivity.
+  (Serial) Minimum hyperelastic compliance with Lagrangian method in 2D.
 
   Optimisation problem:
-      Min J(Ω) = ∫ D(u)*∇(u)⋅∇(u) + ξ dΩ
-        Ω
-    s.t., ⎡u∈V=H¹(Ω;u(Γ_D)=0),
-          ⎣∫ D(u)*∇(u)⋅∇(v) dΩ = ∫ v dΓ_N, ∀v∈V.
-  
-  In this example D(u) = D0*(exp(ξ*u))
+    ...
 """ 
 function main()
   ## Parameters
   order = 1
-  xmax=ymax=1.0
+  xmax,ymax=2.0,1.0
   prop_Γ_N = 0.4
-  prop_Γ_D = 0.2
   dom = (0,xmax,0,ymax)
   el_size = (200,200)
-  γ = 0.1
+  γ = 0.03
   γ_reinit = 0.5
   max_steps = floor(Int,minimum(el_size)/10)
-  tol = 1/(order^2*10)*prod(inv,minimum(el_size)) # <- We can do better than this I think
+  tol = 1/(10order^2)*prod(inv,minimum(el_size))
   η_coeff = 2
   α_coeff = 4
-  path = dirname(dirname(@__DIR__))*"/results/main_nonlinear"
+  vf = 0.5
+  path = dirname(dirname(@__DIR__))*"/results/hyperelastic_compliance_ALM"
 
   ## FE Setup
   model = CartesianDiscreteModel(dom,el_size);
   Δ = get_Δ(model)
-  f_Γ_D(x) = (x[1] ≈ 0.0 && (x[2] <= ymax*prop_Γ_D + eps()) || (x[2] >= ymax-ymax*prop_Γ_D - eps()))
+  f_Γ_D(x) = (x[1] ≈ 0.0)
   f_Γ_N(x) = (x[1] ≈ xmax && ymax/2-ymax*prop_Γ_N/4 - eps() <= x[2] <= ymax/2+ymax*prop_Γ_N/4 + eps())
   update_labels!(1,model,f_Γ_D,"Gamma_D")
   update_labels!(2,model,f_Γ_N,"Gamma_N")
@@ -40,11 +35,13 @@ function main()
   Γ_N = BoundaryTriangulation(model,tags="Gamma_N")
   dΩ = Measure(Ω,2*order)
   dΓ_N = Measure(Γ_N,2*order)
+  vol_D = sum(∫(1)dΩ)
 
   ## Spaces
+  reffe = ReferenceFE(lagrangian,VectorValue{2,Float64},order)
   reffe_scalar = ReferenceFE(lagrangian,Float64,order)
-  V = TestFESpace(model,reffe_scalar;dirichlet_tags=["Gamma_D"])
-  U = TrialFESpace(V,0.0)
+  V = TestFESpace(model,reffe;dirichlet_tags=["Gamma_D"])
+  U = TrialFESpace(V,VectorValue(0.0,0.0))
   V_φ = TestFESpace(model,reffe_scalar)
   V_reg = TestFESpace(model,reffe_scalar;dirichlet_tags=["Gamma_N"])
   U_reg = TrialFESpace(V_reg,0)
@@ -56,14 +53,23 @@ function main()
   interp = SmoothErsatzMaterialInterpolation(η = η_coeff*maximum(Δ))
   I,H,DH,ρ = interp.I,interp.H,interp.DH,interp.ρ
 
-  D0 = 1
-  ξ = -1
-  D(u) = D0*(exp(ξ*u))
-  res(u,v,φ,dΩ,dΓ_N) = ∫((I ∘ φ)*(D ∘ u)*∇(u)⋅∇(v))dΩ - ∫(v)dΓ_N
+  ## Material properties and loading
+  _E = 1000
+  ν = 0.3
+  μ, λ = _E/(2*(1 + ν)), _E*ν/((1 + ν)*(1 - ν))
+  g = VectorValue(0,-20)
+
+  ## Saint Venant–Kirchhoff law
+  F(∇u) = one(∇u) + ∇u'
+  E(F) = 0.5*( F' ⋅ F - one(F) )
+  Σ(∇u) = λ*tr(E(F(∇u)))*one(∇u)+2*μ*E(F(∇u))
+  T(∇u) = F(∇u) ⋅ Σ(∇u)
+  res(u,v,φ,dΩ,dΓ_N) = ∫((I ∘ φ)*((T ∘ ∇(u)) ⊙ ∇(v)))*dΩ - ∫(g⋅v)dΓ_N
 
   ## Optimisation functionals
-  ξ = 0.2
-  J(u,φ,dΩ,dΓ_N) = ∫((I ∘ φ)*(D ∘ u)*∇(u)⋅∇(u) + ξ*(ρ ∘ φ))dΩ
+  J(u,φ,dΩ,dΓ_N) = ∫((I ∘ φ)*((T ∘ ∇(u)) ⊙ ∇(u)))dΩ
+  Vol(u,φ,dΩ,dΓ_N) = ∫(((ρ ∘ φ) - vf)/vol_D)dΩ;
+  dVol(q,u,φ,dΩ,dΓ_N) = ∫(1/vol_D*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
 
   ## Finite difference solver and level set function
   stencil = AdvectionStencil(FirstOrderStencil(2,Float64),model,V_φ,tol,max_steps)
@@ -71,7 +77,7 @@ function main()
 
   ## Setup solver and FE operators
   state_map = NonlinearFEStateMap(res,U,V,V_φ,U_reg,φh,dΩ,dΓ_N)
-  pcfs = PDEConstrainedFunctionals(J,state_map)
+  pcfs = PDEConstrainedFunctionals(J,[Vol],state_map,analytic_dC=[dVol])
 
   ## Hilbertian extension-regularisation problems
   α = α_coeff*maximum(Δ)
@@ -80,9 +86,9 @@ function main()
   
   ## Optimiser
   make_dir(path)
-  converged(m) = LSTO_Distributed.default_al_converged(m;L_tol=0.02*maximum(Δ))
-  optimiser = AugmentedLagrangian(pcfs,stencil,vel_ext,φh;γ,γ_reinit,converged,verbose=true)
-  for (it, uh, φh) in optimiser
+  optimiser = AugmentedLagrangian(pcfs,stencil,vel_ext,φh;
+    γ,γ_reinit,verbose=true,constraint_names=[:Vol])
+  for (it,uh,φh) in optimiser
     write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh)),"uh"=>uh])
     write_history(path*"/history.txt",optimiser.history)
   end
