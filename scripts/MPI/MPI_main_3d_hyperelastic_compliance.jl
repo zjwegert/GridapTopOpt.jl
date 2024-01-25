@@ -23,6 +23,8 @@ function main(mesh_partition,distribute,el_size)
   tol = 1/(2order^2)*prod(inv,minimum(el_size))
   η_coeff = 2
   α_coeff = 4
+  vf = 0.5
+  path = dirname(dirname(@__DIR__))*"/results/3d_hyperelastic_compliance_ALM"
 
   ## FE Setup
   model = CartesianDiscreteModel(ranks,mesh_partition,dom,el_size)
@@ -38,6 +40,7 @@ function main(mesh_partition,distribute,el_size)
   Γ_N = BoundaryTriangulation(model,tags="Gamma_N")
   dΩ = Measure(Ω,2order)
   dΓ_N = Measure(Γ_N,2order)
+  vol_D = sum(∫(1)dΩ)
 
   ## Spaces
   reffe = ReferenceFE(lagrangian,VectorValue{3,Float64},order)
@@ -55,29 +58,23 @@ function main(mesh_partition,distribute,el_size)
   interp = SmoothErsatzMaterialInterpolation(η = η_coeff*maximum(Δ))
   I,H,DH,ρ = interp.I,interp.H,interp.DH,interp.ρ
 
+  ## Material properties and loading
   _E = 1000
   ν = 0.3
-  μ, λ = _E/(2*(1 + ν)), _E*ν/((1 + ν)*(1 - 2*ν)) # Check these
-  g = VectorValue(0,0,-100)
-  # Deformation gradient
+  μ, λ = _E/(2*(1 + ν)), _E*ν/((1 + ν)*(1 - 2*ν))
+  g = VectorValue(0,0,-20)
+
+  ## Saint Venant–Kirchhoff law
   F(∇u) = one(∇u) + ∇u'
-  J(F) = sqrt(det(C(F)))
-  # Derivative of green Strain
-  dE(∇du,∇u) = 0.5*( ∇du⋅F(∇u) + (∇du⋅F(∇u))' )
-  # Right Caughy-green deformation tensor
-  C(F) = (F')⋅F
-  # Constitutive law (Neo hookean)
-  function S(∇u)
-    Cinv = inv(C(F(∇u)))
-    μ*(one(∇u)-Cinv) + λ*log(J(F(∇u)))*Cinv
-  end
-  # Cauchy stress tensor
-  σ(∇u) = (1.0/J(F(∇u)))*F(∇u)⋅S(∇u)⋅(F(∇u))'
-  res(u,v,φ,dΩ,dΓ_N) = ∫( (I ∘ φ)*((dE∘(∇(v),∇(u))) ⊙ (S∘∇(u))) )*dΩ - ∫(g⋅v)dΓ_N
+  E(F) = 0.5*( F' ⋅ F - one(F) )
+  Σ(∇u) = λ*tr(E(F(∇u)))*one(∇u)+2*μ*E(F(∇u))
+  T(∇u) = F(∇u) ⋅ Σ(∇u)
+  res(u,v,φ,dΩ,dΓ_N) = ∫((I ∘ φ)*((T ∘ ∇(u)) ⊙ ∇(v)))*dΩ - ∫(g⋅v)dΓ_N
 
   ## Optimisation functionals
-  ξ = 0.5
-  Obj(u,φ,dΩ,dΓ_N) = ∫((I ∘ φ)*((dE∘(∇(u),∇(u))) ⊙ (S∘∇(u))) + ξ*(ρ ∘ φ))dΩ
+  J(u,φ,dΩ,dΓ_N) = ∫((I ∘ φ)*((T ∘ ∇(u)) ⊙ ∇(u)))dΩ
+  Vol(u,φ,dΩ,dΓ_N) = ∫(((ρ ∘ φ) - vf)/vol_D)dΩ
+  dVol(q,u,φ,dΩ,dΓ_N) = ∫(1/vol_D*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
 
   ## Finite difference solver and level set function
   stencil = AdvectionStencil(FirstOrderStencil(3,Float64),model,V_φ,tol,max_steps)
@@ -87,7 +84,7 @@ function main(mesh_partition,distribute,el_size)
   Tm = SparseMatrixCSR{0,PetscScalar,PetscInt}
   Tv = Vector{PetscScalar}
   lin_solver = ElasticitySolver(V)
-  nl_solver = NewtonSolver(lin_solver;maxiter=50,rtol=10^-8,verbose=verbose)
+  nl_solver = NewtonSolver(lin_solver;maxiter=50,rtol=10^-8,verbose=i_am_main(ranks))
 
   state_map = NonlinearFEStateMap(
     res,U,V,V_φ,U_reg,φh,dΩ,dΓ_N;
@@ -96,7 +93,7 @@ function main(mesh_partition,distribute,el_size)
     assem_deriv = SparseMatrixAssembler(Tm,Tv,U_reg,U_reg),
     nls = nl_solver, adjoint_ls = lin_solver
   )
-  pcfs = PDEConstrainedFunctionals(Obj,state_map)
+  pcfs = PDEConstrainedFunctionals(J,[Vol],state_map,analytic_dC=[dVol])
 
   ## Hilbertian extension-regularisation problems
   α = α_coeff*maximum(Δ)
@@ -108,9 +105,9 @@ function main(mesh_partition,distribute,el_size)
   )
   
   ## Optimiser
-  path = dirname(dirname(@__DIR__))*"/results/MPI_main_3d_hyperelastic_compliance_neohook_xi=$ξ"
   make_dir(path,ranks=ranks)
-  optimiser = AugmentedLagrangian(pcfs,stencil,vel_ext,φh;γ,γ_reinit,verbose=i_am_main(ranks))
+  optimiser = AugmentedLagrangian(pcfs,stencil,vel_ext,φh;
+    γ,γ_reinit,verbose=i_am_main(ranks),constraint_names=[:Vol])
   for (it, uh, φh) in optimiser
     write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh)),"uh"=>uh])
     write_history(path*"/history.txt",optimiser.history;ranks=ranks)
@@ -120,8 +117,8 @@ function main(mesh_partition,distribute,el_size)
 end
 
 with_mpi() do distribute
-  mesh_partition = (5,5,5)
-  el_size = (160,80,80)
+  mesh_partition = (3,2,2)
+  el_size = (81,41,41)
   hilb_solver_options = "-pc_type gamg -ksp_type cg -ksp_error_if_not_converged true 
     -ksp_converged_reason -ksp_rtol 1.0e-12 -mat_block_size 3
     -mg_levels_ksp_type chebyshev -mg_levels_esteig_ksp_type cg -mg_coarse_sub_pc_type cholesky"
