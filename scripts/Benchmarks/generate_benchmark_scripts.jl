@@ -46,8 +46,8 @@ function generate_jobs(template,phys_type,ndof_per_node)
   dof_sanity_check = @.(floor(Int,ndof_per_node*(weak_el_x+1)^3/strong)),
     maximum(abs,@. ndof_per_node*(weak_el_x+1)^3/strong/dofs_per_proc - 1)
 
-  sname(phys_type,ndof_per_node,n,elx) = "STRONG_$(phys_type)_dof$(ndof_per_node)_N$(n)_elx$(elx)"
-  wname(phys_type,ndof_per_node,n,elx) = "WEAK_$(phys_type)_dof$(ndof_per_node)_N$(n)_elx$(elx)"
+  sname(phys_type,ndof_per_node,n,elx) = "STRONG_$(phys_type)_dof$(ndof_per_node)_N$(n)_elx$(elx)_DoFsPerProc$dofs_per_proc"
+  wname(phys_type,ndof_per_node,n,elx) = "WEAK_$(phys_type)_dof$(ndof_per_node)_N$(n)_elx$(elx)_DoFsPerProc$dofs_per_proc"
 
   strong_jobs = map(n->(sname(phys_type,ndof_per_node,n,strong_el_x),
     generate(template,sname(phys_type,ndof_per_node,n,strong_el_x),phys_type,
@@ -59,6 +59,9 @@ function generate_jobs(template,phys_type,ndof_per_node)
   strong_jobs,weak_jobs,dof_sanity_check
 end
 
+job_output_path = "./scripts/Benchmarks/jobs/DoFsPerProc_40000/";
+mkpath(job_output_path);
+
 # SETUP PARAMETERS
 cputype="7702";
 mem_per_node = 1003; # GB
@@ -66,7 +69,7 @@ cpus_per_node = 128;
 gb_per_cpu = mem_per_node/cpus_per_node*(1-0.001); # Only used for partial node use
 wallhr=24; # Hours
 
-dofs_per_proc = 32000;
+dofs_per_proc = 40000;
 fe_order=1;
 verbose=1;
 dir_name=splitpath(Base.active_project())[end-1];
@@ -79,9 +82,9 @@ strong_el_x=100; # Number of elements in x-axis (strong scaling)
 
 # Phys type and number of dofs per node, this corresponds to driver
 phys_types = [
-  ("NLELAST",3),
-  ("ELAST",3),
-  ("INVERTER_HPM",3),
+  # ("NLELAST",3),
+  # ("ELAST",3),
+  # ("INVERTER_HPM",3),
   ("THERM",1)
 ];
 
@@ -98,7 +101,7 @@ for jobs in jobs_by_phys
   for job in vcat(strong_jobs,weak_jobs)
     name = job[1]
     content = job[2]
-    open("./scripts/Benchmarks/jobs/$name.pbs","w") do f
+    open(job_output_path*"$name.pbs","w") do f
       write(f,content)
     end
   end
