@@ -65,7 +65,7 @@ function generate_jobs(template,phys_type,ndof_per_node)
   strong_jobs,weak_jobs,dof_sanity_check
 end
 
-job_output_path = "./scripts/Benchmarks/jobs/DoFsPerProc_40000/";
+job_output_path = "./scripts/Benchmarks/jobs/DoFsPerProc_50000/";
 mkpath(job_output_path);
 
 # SETUP PARAMETERS
@@ -75,7 +75,7 @@ cpus_per_node = 128;
 gb_per_cpu = mem_per_node/cpus_per_node*(1-0.001); # Only used for partial node use
 wallhr=24; # Hours
 
-dofs_per_proc = 40000;
+dofs_per_proc = 50000;
 fe_order=1;
 verbose=1;
 dir_name=splitpath(Base.active_project())[end-1];
@@ -104,7 +104,7 @@ for jobs in jobs_by_phys
   strong_jobs,weak_jobs,dof_sanity_check = jobs[2]
   
   println("$(jobs[1]): Weak dofs = $(dof_sanity_check[1])\n     Error = $(dof_sanity_check[2])\n")
-  for job in vcat(strong_jobs,weak_jobs)
+  for job in vcat(weak_jobs)
     name = job[1]
     content = job[2]
     open(job_output_path*"$name.pbs","w") do f
