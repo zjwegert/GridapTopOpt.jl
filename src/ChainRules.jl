@@ -589,7 +589,7 @@ end
 function Fields.evaluate!(pcf::PDEConstrainedFunctionals,φ::AbstractVector)
   V_φ = get_aux_space(pcf.state_map)
   φh = FEFunction(V_φ,φ)
-  return _evaluate_derivatives(pcf,φh)
+  return evaluate!(pcf,φh)
 end
 
 function Fields.evaluate!(pcf::PDEConstrainedFunctionals,φh)
