@@ -58,6 +58,10 @@ function benchmark_forward_problem(m::AbstractFEStateMap, φh, ranks; nreps = 10
   function f(m, φh)
     forward_solve(m,φh)
   end
+  function reset!(m,φh)
+    u = get_free_dof_values(get_state(m));
+    fill!(u,zero(eltype(u)))
+  end
   return benchmark(f, (m,φh), ranks; nreps)
 end
 
