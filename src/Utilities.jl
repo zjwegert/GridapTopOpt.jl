@@ -153,15 +153,3 @@ function write_vtk(Ω,path,it,entries::Vector{<:Pair};iter_mod=10) # TODO: Renam
     GC.gc() # Garbage collection, due to memory leak in writevtk - TODO
   end 
 end
-
-## Multiplication of DomainContributions
-using Gridap.CellData: DomainContribution, add_contribution!
-import Base.*
-# TODO: Remove? @Jordi? Sometimes people are interested in ∫()dΩ*∫()dΩ OR ∫()dΩ/∫()dΩ
-function (*)(a::DomainContribution,b::DomainContribution)
-  c = copy(a)
-  for (trian,array) in b.dict
-    add_contribution!(c,trian,array,*)
-  end
-  c
-end
