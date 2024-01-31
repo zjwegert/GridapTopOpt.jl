@@ -59,7 +59,7 @@ function main(mesh_partition,distribute,el_size,δₓ)
   ## Setup solver and FE operators
   Tm = SparseMatrixCSR{0,PetscScalar,PetscInt}
   Tv = Vector{PetscScalar}
-  lin_solver = ElasticitySolver(V)
+  lin_solver = MUMPSSolver()
   nl_solver = NewtonSolver(lin_solver;maxiter=50,rtol=10^-8,verbose=i_am_main(ranks))
 
   state_map = NonlinearFEStateMap(
@@ -159,7 +159,7 @@ function main_alt(mesh_partition,distribute,el_size,gz)
   ## Setup solver and FE operators
   Tm = SparseMatrixCSR{0,PetscScalar,PetscInt}
   Tv = Vector{PetscScalar}
-  lin_solver = ElasticitySolver(V)
+  lin_solver = MUMPSSolver()
   nl_solver = NewtonSolver(lin_solver;maxiter=50,rtol=10^-8,verbose=i_am_main(ranks))
 
   state_map = NonlinearFEStateMap(
@@ -179,17 +179,25 @@ end
 with_mpi() do distribute
   mesh_partition = (2,2,2)
   el_size = (43,43,43)
-  hilb_solver_options = "-pc_type gamg -ksp_type cg -ksp_error_if_not_converged true 
-    -ksp_converged_reason -ksp_rtol 1.0e-12 -mat_block_size 3
-    -mg_levels_ksp_type chebyshev -mg_levels_esteig_ksp_type cg -mg_coarse_sub_pc_type cholesky"
+  # solver = "-pc_type jacobi -ksp_type cg -ksp_monitor_short 
+    # -ksp_converged_reason -ksp_rtol 1.0e-3 -mat_block_size 3"
+  # solver = "-pc_type mg -mg_levels_ksp_max_it 2 -snes_monitor_short -ksp_monitor_short -npc_snes_type fas 
+    # -npc_fas_levels_snes_type ncg -npc_fas_levels_snes_max_it 3 -npc_snes_monitor_short -snes_max_it 2"
+  # solver = "-snes_type aspin -snes_monitor_short -ksp_monitor_short -npc_sub_snes_rtol 1e-2 -ksp_rtol 1e-2 -ksp_max_it 14 
+  #   -snes_converged_reason -snes_max_linear_solve_fail 100 -snes_max_it 4 -npc_sub_ksp_type preonly -npc_sub_pc_type lu"
+  # solver = "-snes_rtol 1e-05 -snes_monitor_short -snes_converged_reason
+  #   -ksp_type fgmres -ksp_rtol 1e-10 -ksp_monitor_short -ksp_converged_reason
+  #   -pc_type fieldsplit -pc_fieldsplit_type schur -pc_fieldsplit_schur_factorization_type upper
+  #   -fieldsplit_deformation_ksp_type preonly -fieldsplit_deformation_pc_type lu
+  #   -fieldsplit_pressure_ksp_rtol 1e-10 -fieldsplit_pressure_pc_type jacobi"
   
-  GridapPETSc.with(args=split(hilb_solver_options)) do
+  GridapPETSc.with() do #args=split(solver)) do
     # main(mesh_partition,distribute,el_size,0.02)
     # main(mesh_partition,distribute,el_size,0.05)
-    # main(mesh_partition,distribute,el_size,0.1)
+    main(mesh_partition,distribute,el_size,0.1)
     # main_alt(mesh_partition,distribute,el_size,-20)
     # main_alt(mesh_partition,distribute,el_size,-50)
-    main_alt(mesh_partition,distribute,el_size,-100)
+    # main_alt(mesh_partition,distribute,el_size,-100)
     # main_alt(mesh_partition,distribute,el_size,-150)
   end
 end
