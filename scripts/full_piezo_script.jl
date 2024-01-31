@@ -140,59 +140,12 @@ with_mpi() do distribute
 end;
 
 function dh(stuff)
-  C11 = 
-  C12 = 
-  C13 = 
-  C22 = 
-  C23 = 
-  C33 = 
-  C44 = 
-  C55 = 
-  C66 = 
-  e31 = 
-  e32 = 
-  e33 = 
-  e14 = 
-  e15 = 
+  C(M,N) = @notimplemented
+  e(i,M) = @notimplemented
   dh = (C23^2*e31 - C22*C33*e31 + C13^2*e32 + C11*C23*e32 - C11*C33*e32 + 
         C12*C33*(e31 + e32) + C12^2*e33 + C11*(-C22 + C23)*e33 - C12*C23*(e31 + e33) + 
         C13*(-(C23*(e31 + e32)) + C22*(e31 + e33) - C12*(e32 + e33)))/(
-      C13^2*C22 - 2*C12*C13*C23 + C12^2*C33 + C11*(C23^2 - C22*C33)) 
-end
-
-## Gridap helpers
-using Gridap
-using Gridap.CellData: DomainContribution, add_contribution!
-import Base.*, Base./#, Base.one, Base.zero
-using FillArrays
-
-# function Base.zero(a::DomainContribution)
-#   c = copy(a)
-#   for (trian,array) in a.dict
-#     c.dict[trian] = lazy_map(zero,c.dict[trian])
-#   end
-#   c
-# end
-# function Base.one(a::DomainContribution)
-#   c = copy(a)
-#   for (trian,array) in a.dict
-#     c.dict[trian] = lazy_map(one,c.dict[trian])
-#   end
-#   c
-# end
-function (*)(a::DomainContribution,b::DomainContribution)
-  c = copy(a)
-  for (trian,array) in b.dict
-    c.dict[trian] = c.dict[trian]*sum(array)
-  end
-  c
-end
-function (/)(a::DomainContribution,b::DomainContribution)
-  c = copy(a)
-  for (trian,array) in b.dict
-    c.dict[trian] = c.dict[trian]/sum(array)
-  end
-  c
+        C13^2*C22 - 2*C12*C13*C23 + C12^2*C33 + C11*(C23^2 - C22*C33)) 
 end
 
 ## TESTING
