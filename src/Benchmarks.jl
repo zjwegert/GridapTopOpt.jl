@@ -7,7 +7,8 @@ function process_timer(t::PTimer)
 end
 
 function process_timer(t::Vector)
-  return length(t), maximum(t), minimum(t), sum(t)/length(t)
+  # return length(t), maximum(t), minimum(t), sum(t)/length(t)
+  return t
 end
 
 function benchmark(f, args, ranks::Nothing; nreps = 10, reset! = (x...) -> nothing)
