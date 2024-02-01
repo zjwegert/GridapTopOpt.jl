@@ -192,6 +192,9 @@ function Base.iterate(m::HilbertianProjection)
   history, params = m.history, m.params
   φh = m.φ0
 
+  ## Reinitialise as SDF
+  reinit!(m.stencil,φh,params.γ_reinit)
+
   ## Compute FE problem and shape derivatives
   J, C, dJ, dC = Gridap.evaluate!(m.problem,φh)
   uh  = get_state(m.problem)

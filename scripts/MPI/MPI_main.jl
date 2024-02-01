@@ -67,7 +67,6 @@ function main(mesh_partition,distribute)
 
   ## Finite difference solver and level set function
   stencil = AdvectionStencil(FirstOrderStencil(2,Float64),model,V_φ,tol,max_steps)
-  reinit!(stencil,φh,γ_reinit)
 
   ## Setup solver and FE operators
   state_map = AffineFEStateMap(a,l,U,V,V_φ,U_reg,φh,dΩ,dΓ_N)

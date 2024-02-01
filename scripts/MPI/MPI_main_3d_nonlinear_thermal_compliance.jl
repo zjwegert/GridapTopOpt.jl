@@ -71,7 +71,6 @@ function main(mesh_partition,distribute,el_size)
 
   ## Finite difference solver and level set function
   stencil = AdvectionStencil(FirstOrderStencil(3,Float64),model,V_φ,tol,max_steps)
-  reinit!(stencil,φh,γ_reinit)
 
   ## Setup solver and FE operators
   Tm = SparseMatrixCSR{0,PetscScalar,PetscInt}

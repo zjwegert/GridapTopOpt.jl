@@ -2,7 +2,7 @@
 #PBS -P LSTO
 #PBS -N 3D_thermal
 
-#PBS -l select=1:ncpus=125:mpiprocs=125:mem=1000GB:cputype=7702
+#PBS -l select=125:ncpus=1:mpiprocs=1:mem=4GB:cputype=7702
 #PBS -l walltime=200:00:00
 #PBS -j oe
 

@@ -2,7 +2,7 @@ using Gridap, GridapDistributed, GridapPETSc, PartitionedArrays, LSTO_Distribute
 
 function main()
   ## Parameters
-  order = 2
+  order = 1
   xmax = ymax = 1.0
   prop_Γ_N = 0.4
   prop_Γ_D = 0.2
@@ -15,7 +15,6 @@ function main()
   D = 1
   η_coeff = 2
   α_coeff = 4
-  path = dirname(dirname(@__DIR__))*"/results/main"
 
   ## FE Setup
   model = CartesianDiscreteModel(dom,el_size);
@@ -70,7 +69,6 @@ function main()
   vel_ext = VelocityExtension(a_hilb,U_reg,V_reg)
   
   ## Optimiser
-  make_dir(path)
   return AugmentedLagrangian(pcfs,stencil,vel_ext,φh;γ,γ_reinit)
 end
 

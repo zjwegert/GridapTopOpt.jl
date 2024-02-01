@@ -88,7 +88,6 @@ function main(mesh_partition,distribute,el_size)
 
   ## Finite difference solver and level set function
   stencil = AdvectionStencil(FirstOrderStencil(3,Float64),model,V_φ,tol,max_steps)
-  reinit!(stencil,φh,γ_reinit)
 
   ## Setup solver and FE operators
   Tm = SparseMatrixCSR{0,PetscScalar,PetscInt}
@@ -115,7 +114,7 @@ function main(mesh_partition,distribute,el_size)
   
   ## Optimiser
   make_dir(path;ranks=ranks)
-  optimiser = HilbertianProjection(pcfs,stencil,vel_ext,φh;γ,γ_reinit,α_min=0.7,ls_γ_max=0.05,
+  optimiser = HilbertianProjection(pcfs,stencil,vel_ext,φh;γ,γ_reinit,α_min=0.5,#α_min=0.7,ls_γ_max=0.05,
     verbose=i_am_main(ranks),constraint_names=["Vol","UΓ_out"])
   for (it, uh, φh) in optimiser
     write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh)),"uh"=>uh])

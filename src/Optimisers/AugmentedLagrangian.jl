@@ -69,6 +69,9 @@ end
 function Base.iterate(m::AugmentedLagrangian)
   φh, history, params = m.φ0, m.history, m.params
 
+  ## Reinitialise as SDF
+  reinit!(m.stencil,φh,params.γ_reinit)
+
   ## Compute FE problem and shape derivatives
   J, C, dJ, dC = evaluate!(m.problem,φh)
   uh  = get_state(m.problem)

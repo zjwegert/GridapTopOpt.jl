@@ -17,7 +17,13 @@ mpiexec --hostfile $PBS_NODEFILE \
   {{:name}} \
   {{{:write_dir}}} \
   {{:type}} \
+  {{:bmark_type}} \
   {{:n_mesh_partition}} \
   {{:n_el_size}} \
   {{:fe_order}} \
-  {{:verbose}}
+  {{:verbose}} \
+  {{:nreps}}
+
+# read _ _ PBS_WALLTIME  <<< `qstat -f $PBS_JOBID | grep "resources_used.walltime"`
+# PBS_WALLTIME_SECS=$(echo $PBS_WALLTIME | awk -F: '{ print ($1 * 3600) + ($2 * 60) + $3 }')
+# echo $PBS_WALLTIME_SECS >> {{{:write_dir}}}/{{:name}}_walltime.txt

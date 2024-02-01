@@ -1,15 +1,18 @@
 using Gridap, Gridap.MultiField, GridapDistributed, GridapPETSc, GridapSolvers, 
   PartitionedArrays, LSTO_Distributed, SparseMatricesCSR
 
+using LSTO_Distributed: get_deriv_space, get_aux_space
 using GridapSolvers: NewtonSolver
 
 global NAME = ARGS[1]
 global WRITE_DIR = ARGS[2]
 global PROB_TYPE = ARGS[3]
-global N = parse(Int,ARGS[4])
-global N_EL = parse(Int,ARGS[5])
-global ORDER = parse(Int,ARGS[6])
-global VERBOSE = parse(Int,ARGS[7])
+global BMARK_TYPE = ARGS[4]
+global N = parse(Int,ARGS[5])
+global N_EL = parse(Int,ARGS[6])
+global ORDER = parse(Int,ARGS[7])
+global VERBOSE = parse(Int,ARGS[8])
+global NREPS = parse(Int,ARGS[9])
 
 function nl_elast(mesh_partition,ranks,el_size,order,verbose)
   ## Parameters
@@ -19,7 +22,8 @@ function nl_elast(mesh_partition,ranks,el_size,order,verbose)
   γ = 0.1
   γ_reinit = 0.5
   max_steps = floor(Int,minimum(el_size)/3)
-  tol = 1/(10order^2)*prod(inv,minimum(el_size))
+  tol = 1/(2order^2)*prod(inv,minimum(el_size))
+  vf = 0.5
   η_coeff = 2
   α_coeff = 4
 
@@ -58,29 +62,21 @@ function nl_elast(mesh_partition,ranks,el_size,order,verbose)
   nu = 0.3
   μ, λ = _E/(2*(1 + nu)), _E*nu/((1 + nu)*(1 - 2*nu))
   g = VectorValue(0,0,-100)
-  # Deformation gradient
+
+  ## Saint Venant–Kirchhoff law
   F(∇u) = one(∇u) + ∇u'
-  J(F) = sqrt(det(C(F)))
-  # Derivative of green Strain
-  dE(∇du,∇u) = 0.5*( ∇du⋅F(∇u) + (∇du⋅F(∇u))' )
-  # Right Caughy-green deformation tensor
-  C(F) = (F')⋅F
-  # Constitutive law (Neo hookean)
-  function S(∇u)
-    Cinv = inv(C(F(∇u)))
-    μ*(one(∇u)-Cinv) + λ*log(J(F(∇u)))*Cinv
-  end
-  # Cauchy stress tensor
-  σ(∇u) = (1.0/J(F(∇u)))*F(∇u)⋅S(∇u)⋅(F(∇u))'
-  res(u,v,φ,dΩ,dΓ_N) = ∫( (I ∘ φ)*((dE∘(∇(v),∇(u))) ⊙ (S∘∇(u))) )*dΩ - ∫(g⋅v)dΓ_N
+  E(F) = 0.5*( F' ⋅ F - one(F) )
+  Σ(∇u) = λ*tr(E(F(∇u)))*one(∇u)+2*μ*E(F(∇u))
+  T(∇u) = F(∇u) ⋅ Σ(∇u)
+  res(u,v,φ,dΩ,dΓ_N) = ∫((I ∘ φ)*((T ∘ ∇(u)) ⊙ ∇(v)))*dΩ - ∫(g⋅v)dΓ_N
 
   ## Optimisation functionals
-  ξ = 0.5
-  Obj(u,φ,dΩ,dΓ_N) = ∫((I ∘ φ)*((dE∘(∇(u),∇(u))) ⊙ (S∘∇(u))) + ξ*(ρ ∘ φ))dΩ
+  J(u,φ,dΩ,dΓ_N) = ∫((I ∘ φ)*((T ∘ ∇(u)) ⊙ ∇(u)))dΩ
+  Vol(u,φ,dΩ,dΓ_N) = ∫(((ρ ∘ φ) - vf)/vol_D)dΩ
+  dVol(q,u,φ,dΩ,dΓ_N) = ∫(1/vol_D*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
 
-  ## Finite difference solver and level set function
+  ## Finite difference solver
   stencil = AdvectionStencil(FirstOrderStencil(3,Float64),model,V_φ,tol,max_steps)
-  reinit!(stencil,φh,γ_reinit)
 
   ## Setup solver and FE operators
   Tm = SparseMatrixCSR{0,PetscScalar,PetscInt}
@@ -95,7 +91,7 @@ function nl_elast(mesh_partition,ranks,el_size,order,verbose)
     assem_deriv = SparseMatrixAssembler(Tm,Tv,U_reg,U_reg),
     nls = nl_solver, adjoint_ls = lin_solver
   )
-  pcfs = PDEConstrainedFunctionals(Obj,state_map)
+  pcfs = PDEConstrainedFunctionals(J,[Vol],state_map,analytic_dC=[dVol])
 
   ## Hilbertian extension-regularisation problems
   α = α_coeff*maximum(Δ)
@@ -119,7 +115,7 @@ function therm(mesh_partition,ranks,el_size,order,verbose)
   γ = 0.1
   γ_reinit = 0.5
   max_steps = floor(Int,minimum(el_size)/3)
-  tol = 1/(order^2*10)*prod(inv,minimum(el_size))
+  tol = 1/(2order^2)*prod(inv,minimum(el_size))
   D = 1
   η_coeff = 2
   α_coeff = 4
@@ -163,9 +159,8 @@ function therm(mesh_partition,ranks,el_size,order,verbose)
   J(u,φ,dΩ,dΓ_N) = ∫((I ∘ φ)*D*∇(u)⋅∇(u) + ξ*(ρ ∘ φ))dΩ
   dJ(q,u,φ,dΩ,dΓ_N) = ∫((ξ-D*∇(u)⋅∇(u))*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
 
-  ## Finite difference solver and level set function
+  ## Finite difference solver
   stencil = AdvectionStencil(FirstOrderStencil(3,Float64),model,V_φ,tol,max_steps)
-  reinit!(stencil,φh,γ_reinit)
 
   ## Setup solver and FE operators
   Tm = SparseMatrixCSR{0,PetscScalar,PetscInt}
@@ -202,7 +197,7 @@ function elast(mesh_partition,ranks,el_size,order,verbose)
   γ = 0.1
   γ_reinit = 0.5
   max_steps = floor(Int,minimum(el_size)/3)
-  tol = 1/(order^2*10)*prod(inv,minimum(el_size))
+  tol = 1/(2order^2)*prod(inv,minimum(el_size))
   C = isotropic_3d(1.,0.3)
   g = VectorValue(0,0,-1)
   η_coeff = 2
@@ -249,9 +244,8 @@ function elast(mesh_partition,ranks,el_size,order,verbose)
   Vol(u,φ,dΩ,dΓ_N) = ∫(((ρ ∘ φ) - 0.5)/vol_D)dΩ
   dVol(q,u,φ,dΩ,dΓ_N) = ∫(1/vol_D*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
 
-  ## Finite difference solver and level set function
+  ## Finite difference solver
   stencil = AdvectionStencil(FirstOrderStencil(3,Float64),model,V_φ,tol,max_steps)
-  reinit!(stencil,φh,γ_reinit)
 
   ## Setup solver and FE operators
   Tm = SparseMatrixCSR{0,PetscScalar,PetscInt}
@@ -347,9 +341,8 @@ function inverter_HPM(mesh_partition,ranks,el_size,order,verbose)
   dVol(q,u,φ,dΩ,dΓ_in,dΓ_out) = ∫(1/vol_D*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
   UΓ_out(u,φ,dΩ,dΓ_in,dΓ_out) = ∫((u⋅-e₁-δₓ)/vol_Γ_out)dΓ_out
 
-  ## Finite difference solver and level set function
+  ## Finite difference solver
   stencil = AdvectionStencil(FirstOrderStencil(3,Float64),model,V_φ,tol,max_steps)
-  reinit!(stencil,φh,γ_reinit)
 
   ## Setup solver and FE operators
   Tm = SparseMatrixCSR{0,PetscScalar,PetscInt}
@@ -410,34 +403,69 @@ with_mpi() do distribute
   # Output
   i_am_main(ranks) && ~isdir(WRITE_DIR) && mkpath(WRITE_DIR)
   # Run
+  t_start = PTimer(ranks);
   GridapPETSc.with(args=split(options)) do
+    tic!(t_start;barrier=true)
     optim = opt(mesh_partition,ranks,el_size,ORDER,verbose)
+    toc!(t_start,"startup")
+    startup_time = map_main(t_start.data) do data
+      map(x -> x.max,values(data))
+    end |> PartitionedArrays.getany |> first
+    bstart = i_am_main(ranks) && [startup_time; zeros(NREPS-1)]
     ## Benchmark optimiser
-    bopt0 = benchmark_optimizer(optim, 0, ranks)
-    bopt = benchmark_optimizer(optim, 1, ranks)
-    ## Benchmark forward problem
-    bfwd = benchmark_forward_problem(optim.problem.state_map, optim.φ0, ranks)
-    ## Benchmark advection
-    v = get_free_dof_values(interpolate(FEFunction(LSTO_Distributed.get_deriv_space(optim.problem.state_map),
-      optim.problem.dJ),LSTO_Distributed.get_aux_space(optim.problem.state_map)))
-    badv = benchmark_advection(optim.stencil, get_free_dof_values(optim.φ0), v, 0.1, ranks)
+    if occursin("bopt0",BMARK_TYPE)
+      bopt0 = benchmark_optimizer(optim, 0, ranks; nreps=NREPS)
+    else
+      bopt0 = i_am_main(ranks) && zeros(NREPS)
+    end
+    if occursin("bopt1",BMARK_TYPE)
+      bopt1 = benchmark_optimizer(optim, 1, ranks; nreps=NREPS)
+    else
+      bopt1 = i_am_main(ranks) && zeros(NREPS)
+    end
     ## Benchmark reinitialisation
-    brinit = benchmark_reinitialisation(optim.stencil, get_free_dof_values(optim.φ0), 0.1, ranks)
+    if occursin("breinit",BMARK_TYPE)
+      breinit = benchmark_reinitialisation(optim.stencil, get_free_dof_values(optim.φ0), 0.1, ranks; nreps=NREPS)
+    else
+      breinit = i_am_main(ranks) && zeros(NREPS)
+    end
+    ## Benchmark forward problem
+    reinit!(optim.stencil,optim.φ0,optim.params.γ_reinit)
+    if occursin("bfwd",BMARK_TYPE)
+      bfwd = benchmark_forward_problem(optim.problem.state_map, optim.φ0, ranks; nreps=NREPS)
+    else
+      bfwd = i_am_main(ranks) && zeros(NREPS)
+    end
+    ## Benchmark advection
+    if occursin("badv",BMARK_TYPE)
+      vh = interpolate(FEFunction(get_deriv_space(optim.problem.state_map),optim.problem.dJ),
+        get_aux_space(optim.problem.state_map))
+      v = get_free_dof_values(vh)
+      badv = benchmark_advection(optim.stencil, get_free_dof_values(optim.φ0), v, 0.1, ranks; nreps=NREPS)
+    else
+      badv = i_am_main(ranks) && zeros(NREPS)
+    end
     ## Benchmark velocity extension
-    bvelext = benchmark_velocity_extension(optim.vel_ext, optim.problem.dJ, ranks)
+    if occursin("bvelext",BMARK_TYPE)
+      bvelext = benchmark_velocity_extension(optim.vel_ext, optim.problem.dJ, ranks; nreps=NREPS)
+    else
+      bvelext = i_am_main(ranks) && zeros(NREPS)
+    end
     ## HPM
-    if PROB_TYPE == "INVERTER_HPM"
+    if occursin("bhpm",BMARK_TYPE)
+      @assert typeof(optim) <: HilbertianProjection 
       J, C, dJ, dC = Gridap.evaluate!(optim.problem,optim.φ0)
       optim.projector,dJ,C,dC,optim.vel_ext.K
       bhpm = benchmark_hilbertian_projection_map(optim.projector,dJ,C,dC,optim.vel_ext.K,ranks)
     else
-      bhpm = i_am_main(ranks) && zeros(length(bopt))
+      bhpm = i_am_main(ranks) && zeros(NREPS)
     end
+    ## Write results
     if i_am_main(ranks)
       open(WRITE_DIR*NAME*".txt","w") do f
-        bcontent = "bopt(0),bopt(1),bfwd,badv,brinit,bvelext,bhpm\n"
+        bcontent = "startup,bopt(0),bopt(1),bfwd,badv,breinit,bvelext,bhpm\n"
         for i ∈ eachindex(bopt)
-          bcontent *= "$(bopt0[i]),$(bopt[i]),$(bfwd[i]),$(badv[i]),$(brinit[i]),$(bvelext[i]),$(bhpm[i])\n"
+          bcontent *= "$(bstart[i]),$(bopt0[i]),$(bopt1[i]),$(bfwd[i]),$(badv[i]),$(breinit[i]),$(bvelext[i]),$(bhpm[i])\n"
         end
         write(f,bcontent)
       end

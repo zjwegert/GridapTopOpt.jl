@@ -9,9 +9,7 @@ Optimisation problem:
   s.t., ⎡u∈V=H¹(Ω;u(Γ_D)=0),
         ⎣∫ D*∇(u)⋅∇(v) dΩ = ∫ v dΓ_N, ∀v∈V.
 """
-function main(mesh_partition,el_size,distribute)
-  ranks = distribute(LinearIndices((prod(mesh_partition),)))
-
+function main(mesh_partition,el_size,ranks)
   ## Parameters
   order = 1
   xmax=ymax=1.0
@@ -80,31 +78,31 @@ function main(mesh_partition,el_size,distribute)
   return AugmentedLagrangian(pcfs,stencil,vel_ext,φh;γ,γ_reinit)
 end
 
-with_mpi() do distribute
-  mesh_partition = (2,3)
-  el_size = (400,400)
-  opt = main(mesh_partition,el_size,distribute)
+with_debug() do distribute
+  mesh_partition = (2,2)
+  el_size = (50,50)
+  ranks = distribute(LinearIndices((prod(mesh_partition),)))
+  opt = main(mesh_partition,el_size,ranks)
   ## Benchmark optimiser
-  bopt = benchmark_optimizer(opt, 1, nothing)
+  bopt = benchmark_optimizer(opt, 1, ranks)
   ## Benchmark forward problem
-  bfwd = benchmark_forward_problem(opt.problem.state_map, opt.φ0, nothing)
+  bfwd = benchmark_forward_problem(opt.problem.state_map, opt.φ0, ranks)
   ## Benchmark advection
   v = get_free_dof_values(interpolate(FEFunction(LSTO_Distributed.get_deriv_space(opt.problem.state_map),
     opt.problem.dJ),LSTO_Distributed.get_aux_space(opt.problem.state_map)))
-  badv = benchmark_advection(opt.stencil, get_free_dof_values(opt.φ0), v, 0.1, nothing)
+  badv = benchmark_advection(opt.stencil, get_free_dof_values(opt.φ0), v, 0.1, ranks)
   ## Benchmark reinitialisation
-  brinit = benchmark_reinitialisation(opt.stencil, get_free_dof_values(opt.φ0), 0.1, nothing)
+  brinit = benchmark_reinitialisation(opt.stencil, get_free_dof_values(opt.φ0), 0.1, ranks)
   ## Benchmark velocity extension
-  bvelext = benchmark_velocity_extension(opt.vel_ext, opt.problem.dJ, nothing)
+  bvelext = benchmark_velocity_extension(opt.vel_ext, opt.problem.dJ, ranks)
   ## Printing
-  ranks = distribute(LinearIndices((prod(mesh_partition),)))
   if i_am_main(ranks)
-    println("bopt => $bopt")
-    println("bfwd => $bfwd")
-    println("badv => $badv")
-    println("brinit => $brinit")
-    println("bvelext => $bvelext")
+    open("TEST.txt","w") do f
+      bcontent = "bopt,bfwd,badv,brinit,bvelext\n"
+      for i ∈ eachindex(bopt)
+        bcontent *= "$(bopt[i]),$(bfwd[i]),$(badv[i]),$(brinit[i]),$(bvelext[i])\n"
+      end
+      write(f,bcontent)
+    end
   end
-  nothing
-end;
-
+end
