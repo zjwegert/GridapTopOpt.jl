@@ -13,4 +13,4 @@ PROJECT_DIR=$HOME/LSTO_Distributed/
 
 julia --project=$PROJECT_DIR -e "using Pkg; Pkg.precompile()"
 
-mpiexec --hostfile $PBS_NODEFILE julia --project=$PROJECT_DIR --check-bounds no -O3 ./scripts/MPI/3d_inverse_homenisation_ALM.jl
+mpiexec --hostfile $PBS_NODEFILE julia --project=$PROJECT_DIR --check-bounds no -O3 $PROJECT_DIR/scripts/MPI/3d_inverse_homenisation_ALM.jl
