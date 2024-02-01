@@ -20,11 +20,10 @@ function generate(
 
   ncpus = n_mesh_partition^3
   wallhr = occursin("STRONG",name) && n_mesh_partition <= 3 ? 50 : wallhr
-  _mem = occursin("STRONG",name) && n_mesh_partition <= 3^3 ? 256 : ncpus*gb_per_cpu;
+  mem = occursin("STRONG",name) && n_mesh_partition == 1 ? 256 : 
+        occursin("STRONG",name) && n_mesh_partition == 2 ? 32 : gb_per_cpu;
 
-  select = "$ncpus:ncpus=1:mpiprocs=1:mem=$(_mem)GB:cputype=$type"
-
-  settings = (;name,select,type,bmark_type,cputype,wallhr,ncpus,
+  settings = (;name,type,bmark_type,cputype,wallhr,ncpus,mem,
     n_mesh_partition,n_el_size,fe_order,verbose,dir_name,write_dir,nreps)
   Mustache.render(template, settings)
 end
@@ -53,14 +52,14 @@ mkpath(job_output_path);
 
 # SETUP PARAMETERS
 cputype="7702";
-gb_per_cpu = 4 # GB
+gb_per_cpu = 8 # GB
 wallhr = 3 ; # Hours (Note may want to manually change some afterwards)
 
 nreps = 10; # Number of benchmark repetitions
 dofs_per_proc = 32000;
-fe_order=1;
-verbose=1;
-dir_name=splitpath(Base.active_project())[end-1];
+fe_order= 1;
+verbose= 1;
+dir_name= "LSTO_Distributed";
 write_dir = "\$HOME/$dir_name/results/benchmarks/"
 
 N = 1:10; # Number of partitions in x-axis

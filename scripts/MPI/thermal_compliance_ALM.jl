@@ -74,7 +74,7 @@ function main(mesh_partition,distribute)
 
   ## Setup solver and FE operators
   state_map = AffineFEStateMap(a,l,U,V,V_φ,U_reg,φh,dΩ,dΓ_N)
-  pcfs = PDEConstrainedFunctionals(J,state_map,analytic_dJ=dJ)
+  pcfs = PDEConstrainedFunctionals(J,[Vol],state_map,analytic_dJ=dJ)
 
   ## Hilbertian extension-regularisation problems
   α = α_coeff*maximum(Δ)
@@ -89,6 +89,8 @@ function main(mesh_partition,distribute)
     write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh)),"uh"=>uh])
     write_history(path*"/history.txt",optimiser.history;ranks=ranks)
   end
+  it = optimiser.history.niter; uh = get_state(optimiser.problem)
+  write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh)),"uh"=>uh];iter_mod=1)
 end
 
 with_mpi() do distribute

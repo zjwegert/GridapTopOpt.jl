@@ -106,16 +106,17 @@ function main(mesh_partition,distribute,el_size)
     write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh)),"uh"=>uh])
     write_history(path*"/history.txt",optimiser.history;ranks=ranks)
   end
+  it = optimiser.history.niter; uh = get_state(optimiser.problem)
+  write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh)),"uh"=>uh];iter_mod=1)
 end
 
-# RUN: mpiexecjl --project=. -n 9 julia ./scripts/MPI/MPI_main_inverse_homenisation_ALM.jl
 with_mpi() do distribute
   mesh_partition = (3,3)
   el_size = (200,200)
   hilb_solver_options = "-pc_type gamg -ksp_type cg -ksp_error_if_not_converged true 
     -ksp_converged_reason -ksp_rtol 1.0e-12 -mat_block_size 3
     -mg_levels_ksp_type chebyshev -mg_levels_esteig_ksp_type cg -mg_coarse_sub_pc_type cholesky"
-  
+    
   GridapPETSc.with(args=split(hilb_solver_options)) do
     main(mesh_partition,distribute,el_size)
   end

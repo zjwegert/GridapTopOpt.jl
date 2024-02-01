@@ -2,7 +2,7 @@
 
 #PBS -P LSTO
 #PBS -N "{{:name}}"
-#PBS -l select={{:select}}
+#PBS -l select={{:ncpus}}:ncpus=1:mpiprocs=1:ompthreads=1:mem={{:mem}}GB:cputype={{:cputype}}
 #PBS -l walltime={{:wallhr}}:00:00
 #PBS -j oe
 
@@ -11,18 +11,18 @@ PROJECT_DIR=$HOME/{{:dir_name}}/
 
 julia --project=$PROJECT_DIR -e "using Pkg; Pkg.precompile()"
 
-mpiexec --hostfile $PBS_NODEFILE \
+mpirun --hostfile $PBS_NODEFILE -n {{:ncpus}} \ 
   julia --project=$PROJECT_DIR --check-bounds no -O3 \
-  $PROJECT_DIR/scripts/Benchmarks/benchmark.jl \
-  {{:name}} \
-  {{{:write_dir}}} \
-  {{:type}} \
-  {{:bmark_type}} \
-  {{:n_mesh_partition}} \
-  {{:n_el_size}} \
-  {{:fe_order}} \
-  {{:verbose}} \
-  {{:nreps}}
+    $PROJECT_DIR/scripts/Benchmarks/benchmark.jl \
+    {{:name}} \
+    {{{:write_dir}}} \
+    {{:type}} \
+    {{:bmark_type}} \
+    {{:n_mesh_partition}} \
+    {{:n_el_size}} \
+    {{:fe_order}} \
+    {{:verbose}} \
+    {{:nreps}}
 
 # read _ _ PBS_WALLTIME  <<< `qstat -f $PBS_JOBID | grep "resources_used.walltime"`
 # PBS_WALLTIME_SECS=$(echo $PBS_WALLTIME | awk -F: '{ print ($1 * 3600) + ($2 * 60) + $3 }')

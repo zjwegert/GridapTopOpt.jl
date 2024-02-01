@@ -2,7 +2,7 @@
 #PBS -P LSTO
 #PBS -N 3d_inverter_HPM
 
-#PBS -l select=125:ncpus=1:mpiprocs=1:mem=4GB:cputype=7702
+#PBS -l select=125:ncpus=1:mpiprocs=1:ompthreads=1:mem=8GB:cputype=7702
 #PBS -l walltime=200:00:00
 #PBS -j oe
 
@@ -13,4 +13,6 @@ PROJECT_DIR=$HOME/LSTO_Distributed/
 
 julia --project=$PROJECT_DIR -e "using Pkg; Pkg.precompile()"
 
-mpiexec --hostfile $PBS_NODEFILE julia --project=$PROJECT_DIR --check-bounds no -O3 $PROJECT_DIR/scripts/MPI/3d_inverter_HPM.jl
+mpirun --hostfile $PBS_NODEFILE -n 125 \
+ julia --project=$PROJECT_DIR --check-bounds no -O3 \
+  $PROJECT_DIR/scripts/MPI/3d_inverter_HPM.jl
