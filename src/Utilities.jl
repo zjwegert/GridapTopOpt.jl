@@ -153,3 +153,50 @@ function write_vtk(Ω,path,it,entries::Vector{<:Pair};iter_mod=10) # TODO: Renam
     GC.gc() # Garbage collection, due to memory leak in writevtk - TODO
   end 
 end
+
+"""
+  write_vector(dir::String,φ::PVector,delim)
+
+Write a PVector to an array of files corresponding to each partition.
+"""
+function write_vector(dir::String,φ::PVector,delim)
+  i_am_main(get_parts(φ)) && mkpath(dir)
+  map(local_views(φ),get_parts(φ)) do φ,id
+    writedlm(joinpath(dir,basename(dir)*"_$id.txt"),φ,delim)
+  end |> fetch
+end
+
+"""
+  write_vector(dir::String,φ::Vector,delim)
+
+Write a vector to a file.
+"""
+function write_vector(dir::String,φ::Vector,delim)
+  writedlm(joinpath(dir*".txt"),φ,delim)
+end
+
+"""
+  write_file_to_vector!(dir::String,φ::PVector,delim)
+
+Given a group of files, attempt to write data to each partition of a 
+PVector.
+"""
+function write_file_to_vector!(dir::String,φ::PVector,delim)
+  map(local_views(φ),get_parts(φ)) do φ,id
+    file_path = joinpath(dir,basename(dir)*"_$id.txt");
+    write_file_to_vector!(file_path,φ,delim)
+  end
+  consistent!(φ) |> fetch
+end
+
+"""
+  write_file_to_vector!(dir::String,φ::PVector,delim)
+
+Given a file, attempt to write data to a PVector.
+"""
+function write_file_to_vector!(file_path::String,φ::Vector,delim)
+  @check isfile(file_path) "File `$file_path` not found. Check file names and number of partition."
+  file_data = readdlm(file_path,delim);
+  @check isequal(length(file_data),length(φ)) "Vector lengths not consistent. $(size(file_data)) !== $(size(φ))"
+  copyto!(φ,file_data)
+end

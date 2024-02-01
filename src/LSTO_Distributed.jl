@@ -48,6 +48,8 @@ export isotropic_3d
 export make_dir
 export print_history
 export write_vtk
+export write_vector
+export write_file_to_vector!
 
 include("Advection.jl")
 export AdvectionStencil
