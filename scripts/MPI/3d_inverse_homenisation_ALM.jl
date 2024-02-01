@@ -1,6 +1,5 @@
 using Gridap, Gridap.MultiField, GridapDistributed, GridapPETSc, GridapSolvers, 
   PartitionedArrays, LSTO_Distributed, SparseMatricesCSR
-using Gridap.MultiField: BlockMultiFieldStyle
 
 """
   (MPI) Maximum bulk modulus inverse homogenisation with augmented Lagrangian method in 3D.
@@ -8,7 +7,7 @@ using Gridap.MultiField: BlockMultiFieldStyle
   Optimisation problem:
       Min J(Ω) = -κ(Ω)
         Ω
-    s.t., Vol(Ω) = Vf,
+    s.t., Vol(Ω) = vf,
           ⎡For unique εᴹᵢ, find uᵢ∈V=H¹ₚₑᵣ(Ω)ᵈ, 
           ⎣∫ ∑ᵢ C ⊙ ε(uᵢ) ⊙ ε(vᵢ) dΩ = ∫ -∑ᵢ C ⊙ ε⁰ᵢ ⊙ ε(vᵢ) dΩ, ∀v∈V.
 """ 
@@ -26,7 +25,8 @@ function main(mesh_partition,distribute,el_size)
   C = isotropic_3d(1.,0.3)
   η_coeff = 2
   α_coeff = 4
-  path = dirname(dirname(@__DIR__))*"/results/MPI_main_3d_inverse_homenisation_ALM"
+  vf = 0.5
+  path = dirname(dirname(@__DIR__))*"/results/3d_inverse_homenisation_ALM"
 
   ## FE Setup
   model = CartesianDiscreteModel(ranks,mesh_partition,dom,el_size,isperiodic=(true,true,true))
@@ -76,7 +76,7 @@ function main(mesh_partition,distribute,el_size)
 
   J(u,φ,dΩ) = ∫(-(I ∘ φ)*_K(C,u,εᴹ))dΩ
   dJ(q,u,φ,dΩ) = ∫(-_v_K(C,u,εᴹ)*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
-  Vol(u,φ,dΩ) = ∫(((ρ ∘ φ) - 0.5)/vol_D)dΩ;
+  Vol(u,φ,dΩ) = ∫(((ρ ∘ φ) - vf)/vol_D)dΩ;
   dVol(q,u,φ,dΩ) = ∫(1/vol_D*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
 
   ## Finite difference solver and level set function
@@ -107,7 +107,8 @@ function main(mesh_partition,distribute,el_size)
   
   ## Optimiser
   make_dir(path;ranks=ranks)
-  optimiser = AugmentedLagrangian(pcfs,stencil,vel_ext,φh;γ,γ_reinit,verbose=i_am_main(ranks))
+  optimiser = AugmentedLagrangian(pcfs,stencil,vel_ext,φh;
+    γ,γ_reinit,verbose=i_am_main(ranks),constraint_names=[:Vol])
   for (it, uh, φh) in optimiser
     write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh)),"uh"=>uh])
     write_history(path*"/history.txt",optimiser.history;ranks=ranks)

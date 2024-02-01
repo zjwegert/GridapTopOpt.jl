@@ -2,12 +2,13 @@ using Gridap, Gridap.MultiField, GridapDistributed, GridapPETSc, GridapSolvers,
   PartitionedArrays, LSTO_Distributed, SparseMatricesCSR
 
 """
-  (MPI) Minimum elastic compliance with Lagrangian method in 2D.
+  (MPI) Minimum elastic compliance with augmented Lagrangian method in 2D.
 
   Optimisation problem:
       Min J(Ω) = ∫ C ⊙ ε(u) ⊙ ε(v) + ξ dΩ
         Ω
-    s.t., ⎡u∈V=H¹(Ω;u(Γ_D)=0)ᵈ, 
+    s.t., Vol(Ω) = vf,
+          ⎡u∈V=H¹(Ω;u(Γ_D)=0)ᵈ, 
           ⎣∫ C ⊙ ε(u) ⊙ ε(v) dΩ = ∫ v⋅g dΓ_N, ∀v∈V.
 """
 function main(mesh_partition,distribute,el_size)
@@ -21,12 +22,13 @@ function main(mesh_partition,distribute,el_size)
   γ = 0.1
   γ_reinit = 0.5
   max_steps = floor(Int,minimum(el_size)/10)
-  tol = 1/(order^2*10)*prod(inv,minimum(el_size))
+  tol = 1/(10order^2)*prod(inv,minimum(el_size))
   C = isotropic_2d(1.,0.3)
   g = VectorValue(0,-1)
   η_coeff = 2
   α_coeff = 4
-  path = dirname(dirname(@__DIR__))*"/results/MPI_main_minimum_compliance"
+  vf = 0.5
+  path = dirname(dirname(@__DIR__))*"/results/elastic_compliance_ALM"
 
   ## FE Setup
   model = CartesianDiscreteModel(ranks,mesh_partition,dom,el_size)
@@ -41,6 +43,7 @@ function main(mesh_partition,distribute,el_size)
   Γ_N = BoundaryTriangulation(model,tags="Gamma_N")
   dΩ = Measure(Ω,2*order)
   dΓ_N = Measure(Γ_N,2*order)
+  vol_D = sum(∫(1)dΩ)
 
   ## Spaces
   reffe = ReferenceFE(lagrangian,VectorValue{2,Float64},order)
@@ -63,9 +66,10 @@ function main(mesh_partition,distribute,el_size)
   l(v,φ,dΩ,dΓ_N) = ∫(v⋅g)dΓ_N
 
   ## Optimisation functionals
-  ξ = 2
-  J(u,φ,dΩ,dΓ_N) = ∫((I ∘ φ)*(C ⊙ ε(u) ⊙ ε(u)) + ξ*(ρ ∘ φ))dΩ
+  J(u,φ,dΩ,dΓ_N) = ∫((I ∘ φ)*(C ⊙ ε(u) ⊙ ε(u)))dΩ
   dJ(q,u,φ,dΩ,dΓ_N) = ∫((ξ - C ⊙ ε(u) ⊙ ε(u))*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
+  Vol(u,φ,dΩ,dΓ_N) = ∫(((ρ ∘ φ) - vf)/vol_D)dΩ
+  dVol(q,u,φ,dΩ,dΓ_N) = ∫(1/vol_D*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
 
   ## Finite difference solver and level set function
   stencil = AdvectionStencil(FirstOrderStencil(2,Float64),model,V_φ,tol,max_steps)
@@ -82,7 +86,7 @@ function main(mesh_partition,distribute,el_size)
     assem_deriv = SparseMatrixAssembler(Tm,Tv,U_reg,U_reg),
     ls = solver, adjoint_ls = solver
   )
-  pcfs = PDEConstrainedFunctionals(J,state_map;analytic_dJ=dJ)
+  pcfs = PDEConstrainedFunctionals(J,[Vol],state_map,analytic_dJ=dJ,analytic_dC=[dVol])
 
   ## Hilbertian extension-regularisation problems
   α = α_coeff*maximum(Δ)
@@ -93,7 +97,8 @@ function main(mesh_partition,distribute,el_size)
 
   ## Optimiser
   make_dir(path;ranks=ranks)
-  optimiser = AugmentedLagrangian(pcfs,stencil,vel_ext,φh;γ,γ_reinit,verbose=i_am_main(ranks))
+  optimiser = AugmentedLagrangian(pcfs,stencil,vel_ext,φh;
+    γ,γ_reinit,verbose=i_am_main(ranks),constraint_names=[:Vol])
   for (it, uh, φh) in optimiser
     write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh)),"uh"=>uh])
     write_history(path*"/history.txt",optimiser.history;ranks=ranks)

@@ -20,7 +20,7 @@ function main()
   γ = 0.1;
   γ_reinit = 0.5;
   max_steps = floor(Int,minimum(el_size)/10)
-  tol = 1/(order^2*10)*prod(inv,minimum(el_size))
+  tol = 1/(10order^2)*prod(inv,minimum(el_size))
   C = isotropic_2d(1.0,0.3);
   η_coeff = 2;
   α_coeff = 4;

@@ -1,17 +1,17 @@
-using Gridap, GridapDistributed, GridapPETSc, PartitionedArrays, LSTO_Distributed
+using Gridap, LSTO_Distributed
 
 """
   (Serial) Inverter mechanism with Hilbertian projection method in 2D.
 
   Optimisation problem:
-      Min J(Ω) = ηᵢₙ*∫ u⋅e₁ dΓᵢₙ
+      Min J(Ω) = ηᵢₙ*∫ u⋅e₁ dΓᵢₙ/Vol(Γᵢₙ)
         Ω
-    s.t., Vol(Ω) = Vf,
+    s.t., Vol(Ω) = vf,
             C(Ω) = 0, 
           ⎡u∈V=H¹(Ω;u(Γ_D)=0)ᵈ, 
           ⎣∫ C ⊙ ε(u) ⊙ ε(v) dΩ + ∫ kₛv⋅u dΓₒᵤₜ = ∫ v⋅g dΓᵢₙ , ∀v∈V.
         
-    where C(Ω) = ∫ -u⋅e₁-δₓ dΓₒᵤₜ. We assume symmetry in the problem to aid
+    where C(Ω) = ∫ -u⋅e₁-δₓ dΓₒᵤₜ/Vol(Γₒᵤₜ). We assume symmetry in the problem to aid
      convergence.
 """ 
 function main()
@@ -22,15 +22,15 @@ function main()
   γ = 0.05
   γ_reinit = 0.5
   max_steps = floor(Int,minimum(el_size)/10)
-  tol = 1/(order^2*10)*prod(inv,minimum(el_size))
+  tol = 1/(10order^2)*prod(inv,minimum(el_size))
   C = isotropic_2d(1.0,0.3)
   η_coeff = 2
   α_coeff = 4
-  Vf = 0.4
+  vf = 0.4
   δₓ = 0.75
   ks = 0.01
   g = VectorValue(1,0)
-  path = dirname(dirname(@__DIR__))*"/results/main_inverter_mechanism_HPM"
+  path = dirname(dirname(@__DIR__))*"/results/inverter_HPM"
   
   ## FE Setup
   model = CartesianDiscreteModel(dom,el_size)
@@ -79,7 +79,7 @@ function main()
   ## Optimisation functionals
   e₁ = VectorValue(1,0)
   J(u,φ,dΩ,dΓ_in,dΓ_out) = ∫((u⋅e₁)/vol_Γ_in)dΓ_in
-  Vol(u,φ,dΩ,dΓ_in,dΓ_out) = ∫(((ρ ∘ φ) - Vf)/vol_D)dΩ
+  Vol(u,φ,dΩ,dΓ_in,dΓ_out) = ∫(((ρ ∘ φ) - vf)/vol_D)dΩ
   dVol(q,u,φ,dΩ,dΓ_in,dΓ_out) = ∫(1/vol_D*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
   UΓ_out(u,φ,dΩ,dΓ_in,dΓ_out) = ∫((u⋅-e₁-δₓ)/vol_Γ_out)dΓ_out
 
@@ -98,8 +98,8 @@ function main()
   
   ## Optimiser
   make_dir(path)
-  optimiser = HilbertianProjection(pcfs,stencil,vel_ext,φh;γ,γ_reinit,α_min=0.5,
-                                   verbose=true,constraint_names=["Vol","UΓ_out"])
+  optimiser = HilbertianProjection(pcfs,stencil,vel_ext,φh;
+    γ,γ_reinit,α_min=0.5,verbose=true,constraint_names=[:Vol,:UΓ_out])
   for (it,uh,φh) in optimiser
     write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh)),"uh"=>uh])
     write_history(path*"/history.txt",optimiser.history)

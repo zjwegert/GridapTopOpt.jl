@@ -202,6 +202,7 @@ function elast(mesh_partition,ranks,el_size,order,verbose)
   g = VectorValue(0,0,-1)
   η_coeff = 2
   α_coeff = 4
+  vf = 0.5
 
   ## FE Setup
   model = CartesianDiscreteModel(ranks,mesh_partition,dom,el_size);
@@ -241,7 +242,7 @@ function elast(mesh_partition,ranks,el_size,order,verbose)
   ## Optimisation functionals
   J(u,φ,dΩ,dΓ_N) = ∫((I ∘ φ)*(C ⊙ ε(u) ⊙ ε(u)))dΩ
   dJ(q,u,φ,dΩ,dΓ_N) = ∫(( - C ⊙ ε(u) ⊙ ε(u))*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
-  Vol(u,φ,dΩ,dΓ_N) = ∫(((ρ ∘ φ) - 0.5)/vol_D)dΩ
+  Vol(u,φ,dΩ,dΓ_N) = ∫(((ρ ∘ φ) - vf)/vol_D)dΩ
   dVol(q,u,φ,dΩ,dΓ_N) = ∫(1/vol_D*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
 
   ## Finite difference solver
@@ -284,7 +285,7 @@ function inverter_HPM(mesh_partition,ranks,el_size,order,verbose)
   C = isotropic_3d(1.0,0.3)
   η_coeff = 2
   α_coeff = 4
-  Vf=0.4
+  vf=0.4
   δₓ=0.5
   ks = 0.01
   g = VectorValue(1,0,0)
@@ -337,7 +338,7 @@ function inverter_HPM(mesh_partition,ranks,el_size,order,verbose)
   ## Optimisation functionals
   e₁ = VectorValue(1,0,0)
   J(u,φ,dΩ,dΓ_in,dΓ_out) = ∫((u⋅e₁)/vol_Γ_in)dΓ_in
-  Vol(u,φ,dΩ,dΓ_in,dΓ_out) = ∫(((ρ ∘ φ) - Vf)/vol_D)dΩ;
+  Vol(u,φ,dΩ,dΓ_in,dΓ_out) = ∫(((ρ ∘ φ) - vf)/vol_D)dΩ;
   dVol(q,u,φ,dΩ,dΓ_in,dΓ_out) = ∫(1/vol_D*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
   UΓ_out(u,φ,dΩ,dΓ_in,dΓ_out) = ∫((u⋅-e₁-δₓ)/vol_Γ_out)dΓ_out
 

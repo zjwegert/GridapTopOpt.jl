@@ -7,7 +7,7 @@ using Gridap, Gridap.MultiField, GridapDistributed, GridapPETSc, GridapSolvers,
   Optimisation problem:
       Min J(Ω) = ηᵢₙ*∫ u⋅e₁ dΓᵢₙ
         Ω
-    s.t., Vol(Ω) = Vf,
+    s.t., Vol(Ω) = vf,
             C(Ω) = 0, 
           ⎡u∈V=H¹(Ω;u(Γ_D)=0)ᵈ, 
           ⎣∫ C ⊙ ε(u) ⊙ ε(v) dΩ + ∫ kₛv⋅u dΓₒᵤₜ = ∫ v⋅g dΓᵢₙ , ∀v∈V.
@@ -28,11 +28,11 @@ function main(mesh_partition,distribute,el_size)
   C = isotropic_3d(1.0,0.3)
   η_coeff = 2
   α_coeff = 4
-  Vf=0.4
+  vf=0.4
   δₓ=0.75
   ks = 0.01
   g = VectorValue(1,0,0)
-  path = dirname(dirname(@__DIR__))*"/results/MPI_main_3d_inverter_HPM_deltax=$δₓ"
+  path = dirname(dirname(@__DIR__))*"/results/3d_inverter_HPM"
 
   ## FE Setup
   model = CartesianDiscreteModel(ranks,mesh_partition,dom,el_size);
@@ -82,7 +82,7 @@ function main(mesh_partition,distribute,el_size)
   ## Optimisation functionals
   e₁ = VectorValue(1,0,0)
   J(u,φ,dΩ,dΓ_in,dΓ_out) = ∫((u⋅e₁)/vol_Γ_in)dΓ_in
-  Vol(u,φ,dΩ,dΓ_in,dΓ_out) = ∫(((ρ ∘ φ) - Vf)/vol_D)dΩ;
+  Vol(u,φ,dΩ,dΓ_in,dΓ_out) = ∫(((ρ ∘ φ) - vf)/vol_D)dΩ;
   dVol(q,u,φ,dΩ,dΓ_in,dΓ_out) = ∫(1/vol_D*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
   UΓ_out(u,φ,dΩ,dΓ_in,dΓ_out) = ∫((u⋅-e₁-δₓ)/vol_Γ_out)dΓ_out
 
@@ -115,7 +115,7 @@ function main(mesh_partition,distribute,el_size)
   ## Optimiser
   make_dir(path;ranks=ranks)
   optimiser = HilbertianProjection(pcfs,stencil,vel_ext,φh;γ,γ_reinit,α_min=0.5,#α_min=0.7,ls_γ_max=0.05,
-    verbose=i_am_main(ranks),constraint_names=["Vol","UΓ_out"])
+    verbose=i_am_main(ranks),constraint_names=[:Vol,:UΓ_out])
   for (it, uh, φh) in optimiser
     write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh)),"uh"=>uh])
     write_history(path*"/history.txt",optimiser.history;ranks=ranks)
