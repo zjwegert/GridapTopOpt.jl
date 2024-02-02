@@ -47,3 +47,20 @@ end
 function to_local_storage(x::PVector)
   map(PVectorLocalStorage,partition(x),partition(axes(x,1)))
 end
+
+struct PSparseMatrixLocalStorage{A,B,C}
+  values::A
+  rows::B
+  cols::C
+end
+
+function from_local_storage(x::AbstractArray{<:PSparseMatrixLocalStorage})
+  values, rows, cols = map(x) do x
+    x.values, x.rows, x.cols
+  end |> tuple_of_arrays
+  return PSparseMatrix(values,rows,cols)
+end
+
+function to_local_storage(x::PSparseMatrix)
+  map(PSparseMatrixLocalStorage,partition(x),partition(axes(x,1)),partition(axes(x,2)))
+end
