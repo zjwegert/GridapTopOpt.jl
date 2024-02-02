@@ -13,11 +13,11 @@ with_mpi() do distribute
   φ = get_free_dof_values(φh)
   φ0 = copy(get_free_dof_values(φh))
 
-  write_vector("./results/afolder/LSF_Data_1",φ,',')
+  save_object("./results/afolder/LSF_Data_1",φ)
 
   fill!(φ,0.0)
 
-  write_file_to_vector!("./results/afolder/LSF_Data_1",φ,',')
+  load_object!("./results/afolder/LSF_Data_1",φ)
 
   @assert φ == φ0
 end

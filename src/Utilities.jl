@@ -154,49 +154,44 @@ function write_vtk(Ω,path,it,entries::Vector{<:Pair};iter_mod=10) # TODO: Renam
   end 
 end
 
+global PArray = Union{PVector,PSparseMatrix}
 """
-  write_vector(dir::String,φ::PVector,delim)
+  save_object(dir::AbstractString, obj::PArray)
 
-Write a PVector to an array of files corresponding to each partition.
+Creates a folder of JLD2 files at `dir` and store the parititons
+of a PVector or PSparseMatrix `obj` over each file.
 """
-function write_vector(dir::String,φ::PVector,delim)
-  i_am_main(get_parts(φ)) && mkpath(dir)
-  map(local_views(φ),get_parts(φ)) do φ,id
-    writedlm(joinpath(dir,basename(dir)*"_$id.txt"),φ,delim)
+function JLD2.save_object(dir::AbstractString, obj::PArray)
+  i_am_main(get_parts(obj)) && mkpath(dir)
+  map(local_views(obj),get_parts(obj)) do obj,id
+    save_object(joinpath(dir,basename(dir)*"_$id.jdl2"), obj)
   end |> fetch
 end
 
 """
-  write_vector(dir::String,φ::Vector,delim)
+  load_object!(dir::AbstractString, obj::PArray)
 
-Write a vector to a file.
+Load a folder of JLD2 files at `dir` and copy to each local
+parititon of a PVector or PSparseMatrix `obj`
 """
-function write_vector(dir::String,φ::Vector,delim)
-  writedlm(joinpath(dir*".txt"),φ,delim)
-end
-
-"""
-  write_file_to_vector!(dir::String,φ::PVector,delim)
-
-Given a group of files, attempt to write data to each partition of a 
-PVector.
-"""
-function write_file_to_vector!(dir::String,φ::PVector,delim)
-  map(local_views(φ),get_parts(φ)) do φ,id
-    file_path = joinpath(dir,basename(dir)*"_$id.txt");
-    write_file_to_vector!(file_path,φ,delim)
+function load_object!(dir::String,obj::PArray)
+  map(local_views(obj),get_parts(obj)) do obj,id
+    file_path = joinpath(dir,basename(dir)*"_$id.jdl2");
+    load_object!(file_path,obj)
   end
-  consistent!(φ) |> fetch
+  consistent!(obj) |> fetch
 end
 
 """
-  write_file_to_vector!(dir::String,φ::PVector,delim)
+  load_object!(filename::AbstractString, obj::PArray)
 
-Given a file, attempt to write data to a PVector.
+Load a JLD2 object stored at `filename` and attempt to
+copy to `obj`.
 """
-function write_file_to_vector!(file_path::String,φ::Vector,delim)
-  @check isfile(file_path) "File `$file_path` not found. Check file names and number of partition."
-  file_data = readdlm(file_path,delim);
-  @check isequal(length(file_data),length(φ)) "Vector lengths not consistent. $(size(file_data)) !== $(size(φ))"
-  copyto!(φ,file_data)
+function load_object!(filename::String,obj::AbstractArray)
+  @check isfile(filename) "File `$filename` not found. Check file names and number of partition."
+  file_data = load_object(filename)
+  @check isequal(size(file_data),size(obj)) "Object sizes are not consistent. $(size(file_data)) !== $(size(obj))"
+  @check isequal(typeof(file_data),typeof(obj)) "Object types are not consistent. $(typeof(file_data)) !== $(typeof(obj))"
+  copyto!(obj,file_data)
 end

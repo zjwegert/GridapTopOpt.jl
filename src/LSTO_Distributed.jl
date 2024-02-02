@@ -28,6 +28,9 @@ using GridapSolvers
 using GridapSolvers.LinearSolvers, GridapSolvers.NonlinearSolvers, GridapSolvers.BlockSolvers
 using GridapSolvers.SolverInterfaces: SolverVerboseLevel, SOLVER_VERBOSE_NONE, SOLVER_VERBOSE_LOW, SOLVER_VERBOSE_HIGH
 
+using JLD2
+# using JLD2: save_object, load_object
+
 include("GridapExtensions.jl")
 
 include("ChainRules.jl")
@@ -48,8 +51,8 @@ export isotropic_3d
 export make_dir
 export print_history
 export write_vtk
-export write_vector
-export write_file_to_vector!
+export save_object
+export load_object!
 
 include("Advection.jl")
 export AdvectionStencil
