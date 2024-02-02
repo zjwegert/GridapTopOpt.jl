@@ -2,7 +2,7 @@
 #PBS -P LSTO
 #PBS -N 3d_nonlinear_thermal_compliance_ALM
 
-#PBS -l select=125:ncpus=1:mpiprocs=1:ompthreads=1:mem=8GB:cputype=7702
+#PBS -l select=125:ncpus=1:mpiprocs=1:ompthreads=1:mem=8GB:cputype=6140
 #PBS -l walltime=200:00:00
 #PBS -j oe
 
@@ -11,6 +11,6 @@ PROJECT_DIR=$HOME/LSTO_Distributed/
 
 julia --project=$PROJECT_DIR -e "using Pkg; Pkg.precompile()"
 
-mpirun --hostfile $PBS_NODEFILE -n 125 \
+mpirun --hostfile $PBS_NODEFILE \
  julia --project=$PROJECT_DIR --check-bounds no -O3 \
   $PROJECT_DIR/scripts/MPI/3d_nonlinear_thermal_compliance_ALM.jl

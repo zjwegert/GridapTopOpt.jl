@@ -51,7 +51,7 @@ job_output_path = "./scripts/Benchmarks/jobs/";
 mkpath(job_output_path);
 
 # SETUP PARAMETERS
-cputype="7702";
+cputype="6140";
 gb_per_cpu = 8 # GB
 wallhr = 3 ; # Hours (Note may want to manually change some afterwards)
 
