@@ -89,4 +89,6 @@ export benchmark_reinitialisation
 export benchmark_velocity_extension
 export benchmark_hilbertian_projection_map
 
+include("Io.jl")
+
 end
