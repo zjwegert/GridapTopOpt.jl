@@ -57,7 +57,7 @@ function main()
   _E = 1000
   ν = 0.3
   μ, λ = _E/(2*(1 + ν)), _E*ν/((1 + ν)*(1 - ν))
-  g = VectorValue(0,-20)
+  g = VectorValue(0,-5) # TODO: Check, used to be -20.
 
   ## Saint Venant–Kirchhoff law
   F(∇u) = one(∇u) + ∇u'
