@@ -24,6 +24,6 @@ mpirun --hostfile $PBS_NODEFILE \
     {{:verbose}} \
     {{:nreps}}
 
-# read _ _ PBS_WALLTIME  <<< `qstat -f $PBS_JOBID | grep "resources_used.walltime"`
-# PBS_WALLTIME_SECS=$(echo $PBS_WALLTIME | awk -F: '{ print ($1 * 3600) + ($2 * 60) + $3 }')
-# echo $PBS_WALLTIME_SECS >> {{{:write_dir}}}/{{:name}}_walltime.txt
+read _ _ PBS_WALLTIME  <<< `qstat -f $PBS_JOBID | grep "resources_used.walltime"`
+PBS_WALLTIME_SECS=$(echo $PBS_WALLTIME | awk -F: '{ print ($1 * 3600) + ($2 * 60) + $3 }')
+echo $PBS_WALLTIME_SECS >> {{{:write_dir}}}/{{:name}}_walltime.txt

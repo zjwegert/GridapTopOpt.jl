@@ -41,6 +41,7 @@ function nl_elast(mesh_partition,ranks,el_size,order,verbose)
   Γ_N = BoundaryTriangulation(model,tags="Gamma_N")
   dΩ = Measure(Ω,2order)
   dΓ_N = Measure(Γ_N,2order)
+  vol_D = sum(∫(1)dΩ)
 
   ## Spaces
   reffe = ReferenceFE(lagrangian,VectorValue{3,Float64},order)
@@ -465,7 +466,7 @@ with_mpi() do distribute
     if i_am_main(ranks)
       open(WRITE_DIR*NAME*".txt","w") do f
         bcontent = "startup,bopt(0),bopt(1),bfwd,badv,breinit,bvelext,bhpm\n"
-        for i ∈ eachindex(bopt)
+        for i = 1:NREPS
           bcontent *= "$(bstart[i]),$(bopt0[i]),$(bopt1[i]),$(bfwd[i]),$(badv[i]),$(breinit[i]),$(bvelext[i]),$(bhpm[i])\n"
         end
         write(f,bcontent)
