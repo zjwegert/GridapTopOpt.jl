@@ -23,6 +23,7 @@ function main()
   C = isotropic_2d(1.,0.3)
   η_coeff = 2
   α_coeff = 4
+  vf = 0.4
   path = dirname(dirname(@__DIR__))*"/results/inverse_homenisation_ALM"
 
   ## FE Setup

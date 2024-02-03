@@ -27,7 +27,7 @@ function main(mesh_partition,distribute)
   κ = 1
   η_coeff = 2
   α_coeff = 4
-  vf = 0.5
+  vf = 0.4
   path = dirname(dirname(@__DIR__))*"/results/thermal_compliance_ALM"
 
   ## FE Setup

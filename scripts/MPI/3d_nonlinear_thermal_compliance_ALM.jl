@@ -22,13 +22,13 @@ function main(mesh_partition,distribute,el_size)
   prop_Γ_N = 0.4
   prop_Γ_D = 0.2
   dom = (0,xmax,0,ymax,0,zmax)
-  γ = 0.1
+  γ = 0.05
   γ_reinit = 0.5
   max_steps = floor(Int,minimum(el_size)/3)
   tol = 1/(2order^2)*prod(inv,minimum(el_size))
   η_coeff = 2
   α_coeff = 4
-  vf = 0.5
+  vf = 0.4
   path = dirname(dirname(@__DIR__))*"/results/3d_nonlinear_thermal_compliance_ALM"
 
   ## FE Setup

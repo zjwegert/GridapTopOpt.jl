@@ -25,7 +25,7 @@ function main(mesh_partition,distribute,el_size)
   C = isotropic_3d(1.,0.3)
   η_coeff = 2
   α_coeff = 4
-  vf = 0.5
+  vf = 0.4
   path = dirname(dirname(@__DIR__))*"/results/3d_inverse_homenisation_ALM"
 
   ## FE Setup

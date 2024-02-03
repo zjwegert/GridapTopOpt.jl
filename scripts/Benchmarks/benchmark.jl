@@ -19,7 +19,7 @@ function nl_elast(mesh_partition,ranks,el_size,order,verbose)
   xmax=ymax=zmax=1.0
   prop_Γ_N = 0.4
   dom = (0,xmax,0,ymax,0,zmax)
-  γ = 0.1
+  γ = 0.05
   γ_reinit = 0.5
   max_steps = floor(Int,minimum(el_size)/3)
   tol = 1/(2order^2)*prod(inv,minimum(el_size))
@@ -112,7 +112,7 @@ function therm(mesh_partition,ranks,el_size,order,verbose)
   prop_Γ_N = 0.4
   prop_Γ_D = 0.2
   dom = (0,xmax,0,ymax,0,zmax)
-  γ = 0.1
+  γ = 0.05
   γ_reinit = 0.5
   max_steps = floor(Int,minimum(el_size)/3)
   tol = 1/(2order^2)*prod(inv,minimum(el_size))
@@ -194,7 +194,7 @@ function elast(mesh_partition,ranks,el_size,order,verbose)
   xmax=ymax=zmax=1.0
   prop_Γ_N = 0.4
   dom = (0,xmax,0,ymax,0,zmax)
-  γ = 0.1
+  γ = 0.05
   γ_reinit = 0.5
   max_steps = floor(Int,minimum(el_size)/3)
   tol = 1/(2order^2)*prod(inv,minimum(el_size))

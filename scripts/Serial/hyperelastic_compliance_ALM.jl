@@ -19,7 +19,7 @@ function main()
   tol = 1/(10order^2)*prod(inv,minimum(el_size))
   η_coeff = 2
   α_coeff = 4
-  vf = 0.5
+  vf = 0.4
   path = dirname(dirname(@__DIR__))*"/results/hyperelastic_compliance_ALM"
 
   ## FE Setup

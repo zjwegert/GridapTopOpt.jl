@@ -27,7 +27,7 @@ function main(mesh_partition,distribute,el_size)
   g = VectorValue(0,-1)
   η_coeff = 2
   α_coeff = 4
-  vf = 0.5
+  vf = 0.4
   path = dirname(dirname(@__DIR__))*"/results/elastic_compliance_ALM"
 
   ## FE Setup

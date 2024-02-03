@@ -19,7 +19,7 @@ function main(mesh_partition,distribute,el_size)
   xmax,ymax,zmax=(2.0,1.0,1.0)
   prop_Γ_N = 0.4
   dom = (0,xmax,0,ymax,0,zmax)
-  γ = 0.1
+  γ = 0.05
   γ_reinit = 0.5
   max_steps = floor(Int,minimum(el_size)/3)
   tol = 1/(2order^2)*prod(inv,minimum(el_size))
@@ -27,7 +27,7 @@ function main(mesh_partition,distribute,el_size)
   g = VectorValue(0,0,-1)
   η_coeff = 2
   α_coeff = 4
-  vf = 0.5
+  vf = 0.4
   path = dirname(dirname(@__DIR__))*"/results/3d_elastic_compliance_ALM"
 
   ## FE Setup

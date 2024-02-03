@@ -23,7 +23,7 @@ function main()
   max_steps = floor(Int,minimum(el_size)/10)
   tol = 1/(10order^2)*prod(inv,minimum(el_size))
   κ = 1
-  vf = 0.5
+  vf = 0.4
   η_coeff = 2
   α_coeff = 4
   path = dirname(dirname(@__DIR__))*"/results/thermal_compliance_ALM"

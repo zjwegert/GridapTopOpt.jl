@@ -24,7 +24,7 @@ function main()
   C = isotropic_2d(1.,0.3)
   η_coeff = 2
   α_coeff = 4
-  vf = 0.5
+  vf = 0.4
   g = VectorValue(0,-1)
   path = dirname(dirname(@__DIR__))*"/results/elastic_compliance_ALM"
 

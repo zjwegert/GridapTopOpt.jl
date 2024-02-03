@@ -12,5 +12,5 @@ PROJECT_DIR=$HOME/LSTO_Distributed/
 julia --project=$PROJECT_DIR -e "using Pkg; Pkg.precompile()"
 
 mpirun --hostfile $PBS_NODEFILE \
- julia --project=$PROJECT_DIR --check-bounds no -O3 \
+ julia --project=$PROJECT_DIR --check-bounds no -O3 --compiled-modules=no \
   $PROJECT_DIR/scripts/MPI/3d_inverter_HPM.jl
