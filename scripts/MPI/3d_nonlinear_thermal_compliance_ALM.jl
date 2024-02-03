@@ -79,8 +79,8 @@ function main(mesh_partition,distribute,el_size)
   ## Setup solver and FE operators
   Tm = SparseMatrixCSR{0,PetscScalar,PetscInt}
   Tv = Vector{PetscScalar}
-  nl_solver = PETScNonlinearSolver()
   lin_solver = PETScLinearSolver()
+  nl_solver = NewtonSolver(lin_solver;maxiter=50,rtol=10^-8,verbose=i_am_main(ranks))
   
   state_map = NonlinearFEStateMap(
     res,U,V,V_φ,U_reg,φh,dΩ,dΓ_N;
