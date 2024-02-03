@@ -11,6 +11,7 @@ using Gridap.Helpers, Gridap.Algebra, Gridap.TensorValues
 using Gridap.Geometry, Gridap.CellData, Gridap.Fields
 using Gridap.ReferenceFEs, Gridap.FESpaces,  Gridap.MultiField
 using Gridap.Geometry: get_faces
+using Gridap: writevtk
 
 using GridapDistributed
 using GridapDistributed: DistributedDiscreteModel, DistributedTriangulation, 
@@ -40,14 +41,17 @@ export evaluate_functionals!
 export evaluate_derivatives!
 
 include("Utilities.jl")
-export gen_lsf
-export get_Δ
+export SmoothErsatzMaterialInterpolation
 export update_labels!
-export isotropic_2d
-export isotropic_3d
+export initial_lsf
+export get_el_size
+export isotropic_elast_tensor
 export make_dir
-export print_history
 export write_vtk
+export gen_lsf # TODO: Remove
+export get_Δ # TODO: Remove
+export isotropic_2d # TODO: Remove
+export isotropic_3d # TODO: Remove
 
 include("Advection.jl")
 export AdvectionStencil
@@ -63,9 +67,6 @@ export MUMPSSolver
 include("VelocityExtension.jl")
 export VelocityExtension
 export project!
-
-include("MaterialInterpolation.jl")
-export SmoothErsatzMaterialInterpolation
 
 include("Optimisers/Optimisers.jl")
 export Optimiser
