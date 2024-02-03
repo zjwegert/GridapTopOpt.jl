@@ -58,21 +58,35 @@ function main(mesh_partition,distribute,el_size)
   interp = SmoothErsatzMaterialInterpolation(η = η_coeff*maximum(Δ))
   I,H,DH,ρ = interp.I,interp.H,interp.DH,interp.ρ
 
-  ## Material properties and loading
+  ## Material properties
   _E = 1000
   ν = 0.3
   μ, λ = _E/(2*(1 + ν)), _E*ν/((1 + ν)*(1 - 2*ν))
-  g = VectorValue(0,0,-50)
+  g = VectorValue(0,-100)
 
-  ## Saint Venant–Kirchhoff law
+  ## Neohookean hyperelastic material
+  # Deformation gradient
   F(∇u) = one(∇u) + ∇u'
-  E(F) = 0.5*( F' ⋅ F - one(F) )
-  Σ(∇u) = λ*tr(E(F(∇u)))*one(∇u)+2*μ*E(F(∇u))
-  T(∇u) = F(∇u) ⋅ Σ(∇u)
-  res(u,v,φ,dΩ,dΓ_N) = ∫((I ∘ φ)*((T ∘ ∇(u)) ⊙ ∇(v)))*dΩ - ∫(g⋅v)dΓ_N
+  J(F) = sqrt(det(C(F)))
+
+  # Derivative of green Strain
+  dE(∇du,∇u) = 0.5*( ∇du⋅F(∇u) + (∇du⋅F(∇u))' )
+
+  # Right Caughy-green deformation tensor
+  C(F) = (F')⋅F
+
+  # Constitutive law (Neo hookean)
+  function S(∇u)
+    Cinv = inv(C(F(∇u)))
+    μ*(one(∇u)-Cinv) + λ*log(J(F(∇u)))*Cinv
+  end
+
+  # Cauchy stress tensor and residual
+  σ(∇u) = (1.0/J(F(∇u)))*F(∇u)⋅S(∇u)⋅(F(∇u))'
+  res(u,v,φ,dΩ,dΓ_N) = ∫( (I ∘ φ)*((dE∘(∇(v),∇(u))) ⊙ (S∘∇(u))) )*dΩ - ∫(g⋅v)dΓ_N
 
   ## Optimisation functionals
-  J(u,φ,dΩ,dΓ_N) = ∫((I ∘ φ)*((T ∘ ∇(u)) ⊙ ∇(u)))dΩ
+  Obj(u,φ,dΩ,dΓ_N) = ∫((I ∘ φ)*((dE∘(∇(u),∇(u))) ⊙ (S∘∇(u))))dΩ
   Vol(u,φ,dΩ,dΓ_N) = ∫(((ρ ∘ φ) - vf)/vol_D)dΩ
   dVol(q,u,φ,dΩ,dΓ_N) = ∫(1/vol_D*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
 
@@ -92,7 +106,7 @@ function main(mesh_partition,distribute,el_size)
     assem_deriv = SparseMatrixAssembler(Tm,Tv,U_reg,U_reg),
     nls = nl_solver, adjoint_ls = lin_solver
   )
-  pcfs = PDEConstrainedFunctionals(J,[Vol],state_map,analytic_dC=[dVol])
+  pcfs = PDEConstrainedFunctionals(Obj,[Vol],state_map,analytic_dC=[dVol])
 
   ## Hilbertian extension-regularisation problems
   α = α_coeff*maximum(Δ)

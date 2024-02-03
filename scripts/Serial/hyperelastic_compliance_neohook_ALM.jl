@@ -57,7 +57,7 @@ function main()
   _E = 1000
   ν = 0.3
   μ, λ = _E/(2*(1 + ν)), _E*ν/((1 + ν)*(1 - 2*ν))
-  g = VectorValue(0,-20) # TODO: need to check this
+  g = VectorValue(0,-20)
 
   ## Neohookean hyperelastic material
   # Deformation gradient
@@ -91,7 +91,7 @@ function main()
 
   ## Setup solver and FE operators
   state_map = NonlinearFEStateMap(res,U,V,V_φ,U_reg,φh,dΩ,dΓ_N)
-  pcfs = PDEConstrainedFunctionals(J,[Vol],state_map,analytic_dC=[dVol])
+  pcfs = PDEConstrainedFunctionals(Obj,[Vol],state_map,analytic_dC=[dVol])
 
   ## Hilbertian extension-regularisation problems
   α = α_coeff*maximum(Δ)
