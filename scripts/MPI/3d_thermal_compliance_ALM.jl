@@ -1,6 +1,8 @@
 using Gridap, Gridap.MultiField, GridapDistributed, GridapPETSc, GridapSolvers, 
   PartitionedArrays, LSTO_Distributed, SparseMatricesCSR
 
+using GridapSolvers: NewtonSolver
+
 """
   (MPI) Minimum thermal compliance with augmented Lagrangian method in 3D.
 
