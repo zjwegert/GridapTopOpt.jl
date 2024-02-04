@@ -41,7 +41,7 @@ function default_has_oscillations(m::AugmentedLagrangian;tol=1.e-4,reps=4)
   end
 
   L = h[:L]
-  return all(k -> abs(L[it+1] - L[k+1]) < tol, it .- (2:2:2reps))
+  return all(k -> abs(L[it+1] - L[k+1]) < tol*L[it+1], it .- (2:2:2reps))
 end
 
 function converged(m::AugmentedLagrangian)
@@ -50,7 +50,7 @@ end
 
 function default_al_converged(
   m::AugmentedLagrangian;
-  L_tol = 0.2*maximum(m.stencil.params.Δ),
+  L_tol = 0.01*maximum(m.stencil.params.Δ),
   C_tol = 0.001
 )
   h  = m.history
