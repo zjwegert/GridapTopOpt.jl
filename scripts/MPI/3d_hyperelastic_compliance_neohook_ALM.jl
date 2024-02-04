@@ -4,7 +4,7 @@ using Gridap, Gridap.MultiField, GridapDistributed, GridapPETSc, GridapSolvers,
 using GridapSolvers: NewtonSolver
 
 """
-  (MPI) Minimum hyperelastic compliance with Lagrangian method in 3D.
+  (MPI) Minimum hyperelastic compliance with augmented Lagrangian method in 3D.
 
   Optimisation problem:
     ...

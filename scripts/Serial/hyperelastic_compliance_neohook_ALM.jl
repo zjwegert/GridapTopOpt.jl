@@ -1,10 +1,7 @@
 using Gridap, LSTO_Distributed
 
 """
-  (Serial) Minimum hyperelastic (neohookean) compliance with Lagrangian method in 2D.
-
-  Optimisation problem:
-    ...
+  (Serial) Minimum hyperelastic (neohookean) compliance with augmented Lagrangian method in 2D.
 """ 
 function main()
   ## Parameters
@@ -13,13 +10,13 @@ function main()
   prop_Γ_N = 0.4
   dom = (0,xmax,0,ymax)
   el_size = (200,200)
-  γ = 0.03
+  γ = 0.1
   γ_reinit = 0.5
   max_steps = floor(Int,minimum(el_size)/10)
   tol = 1/(10order^2)*prod(inv,minimum(el_size))
   η_coeff = 2
   α_coeff = 4
-  vf = 0.4
+  vf = 0.6
   path = dirname(dirname(@__DIR__))*"/results/hyperelastic_compliance_neohook_ALM"
 
   ## FE Setup

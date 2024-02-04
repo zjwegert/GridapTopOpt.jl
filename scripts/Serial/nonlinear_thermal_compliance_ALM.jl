@@ -1,7 +1,7 @@
 using Gridap, LSTO_Distributed
 
 """
-  (Serial) Minimum thermal compliance with Lagrangian method in 2D with nonlinear diffusivity.
+  (Serial) Minimum thermal compliance with augmented Lagrangian method in 2D with nonlinear diffusivity.
 
   Optimisation problem:
       Min J(Ω) = ∫ κ(u)*∇(u)⋅∇(u) dΩ
