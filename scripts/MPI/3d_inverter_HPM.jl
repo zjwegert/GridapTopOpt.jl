@@ -29,7 +29,7 @@ function main(mesh_partition,distribute,el_size)
   η_coeff = 2
   α_coeff = 4
   vf=0.4
-  δₓ=0.75
+  δₓ=0.5
   ks = 0.01
   g = VectorValue(1,0,0)
   path = dirname(dirname(@__DIR__))*"/results/3d_inverter_HPM"
