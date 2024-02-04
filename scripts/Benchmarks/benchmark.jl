@@ -63,7 +63,7 @@ function nl_elast(mesh_partition,ranks,el_size,order,verbose)
   _E = 1000
   nu = 0.3
   μ, λ = _E/(2*(1 + nu)), _E*nu/((1 + nu)*(1 - 2*nu))
-  g = VectorValue(0,-100)
+  g = VectorValue(0,0,-100)
 
   ## Neohookean hyperelastic material
   # Deformation gradient
