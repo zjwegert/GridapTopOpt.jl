@@ -31,9 +31,9 @@ function main()
   ## FE Setup
   model = CartesianDiscreteModel(dom,el_size)
   Δ = get_Δ(model)
-  f_Γ_D(x) = (x[1] ≈ 0.0) ? true : false
+  f_Γ_D(x) = (x[1] ≈ 0.0)
   f_Γ_N(x) = (x[1] ≈ xmax && ymax/2-ymax*prop_Γ_N/4 - eps() <= x[2] <= 
-    ymax/2+ymax*prop_Γ_N/4 + eps()) ? true : false
+    ymax/2+ymax*prop_Γ_N/4 + eps())
   update_labels!(1,model,f_Γ_D,"Gamma_D")
   update_labels!(2,model,f_Γ_N,"Gamma_N")
 

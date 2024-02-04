@@ -10,7 +10,7 @@ function main()
   prop_Γ_N = 0.4
   dom = (0,xmax,0,ymax)
   el_size = (200,200)
-  γ = 0.1
+  γ = 0.05
   γ_reinit = 0.5
   max_steps = floor(Int,minimum(el_size)/10)
   tol = 1/(10order^2)*prod(inv,minimum(el_size))
