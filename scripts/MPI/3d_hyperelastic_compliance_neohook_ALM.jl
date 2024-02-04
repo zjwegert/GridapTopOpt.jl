@@ -62,7 +62,7 @@ function main(mesh_partition,distribute,el_size)
   _E = 1000
   ν = 0.3
   μ, λ = _E/(2*(1 + ν)), _E*ν/((1 + ν)*(1 - 2*ν))
-  g = VectorValue(0,-100)
+  g = VectorValue(0,0,-100)
 
   ## Neohookean hyperelastic material
   # Deformation gradient
