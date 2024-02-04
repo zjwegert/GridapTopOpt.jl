@@ -427,7 +427,7 @@ with_mpi() do distribute
     toc!(t_start,"startup")
     startup_time = map_main(t_start.data) do data
       map(x -> x.max,values(data))
-    end |> PartitionedArrays.getany |> first
+    end |> PartitionedArrays.getany
     bstart = i_am_main(ranks) && [startup_time; zeros(NREPS-1)]
     ## Benchmark optimiser
     if occursin("bopt0",BMARK_TYPE)
