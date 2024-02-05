@@ -25,7 +25,7 @@ function main(mesh_partition,distribute,el_size)
   C = isotropic_3d(1.,0.3)
   η_coeff = 2
   α_coeff = 4
-  vf = 0.4
+  vf = 0.5
   path = dirname(dirname(@__DIR__))*"/results/3d_inverse_homenisation_ALM"
 
   ## FE Setup
@@ -110,11 +110,11 @@ function main(mesh_partition,distribute,el_size)
   optimiser = AugmentedLagrangian(pcfs,stencil,vel_ext,φh;
     γ,γ_reinit,verbose=i_am_main(ranks),constraint_names=[:Vol])
   for (it, uh, φh) in optimiser
-    write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh)),"uh"=>uh])
+    write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh))])
     write_history(path*"/history.txt",optimiser.history;ranks=ranks)
   end
   it = optimiser.history.niter; uh = get_state(optimiser.problem)
-  write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh)),"uh"=>uh];iter_mod=1)
+  write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh))];iter_mod=1)
 end
 
 with_mpi() do distribute

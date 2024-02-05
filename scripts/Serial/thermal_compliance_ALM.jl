@@ -32,9 +32,9 @@ function main()
   model = CartesianDiscreteModel(dom,el_size);
   Δ = get_Δ(model)
   f_Γ_D(x) = (x[1] ≈ 0.0 && (x[2] <= ymax*prop_Γ_D + eps() || 
-      x[2] >= ymax-ymax*prop_Γ_D - eps())) ? true : false;
+      x[2] >= ymax-ymax*prop_Γ_D - eps()))
   f_Γ_N(x) = (x[1] ≈ xmax && ymax/2-ymax*prop_Γ_N/4 - eps() <= x[2] <= 
-      ymax/2+ymax*prop_Γ_N/4 + eps()) ? true : false;
+      ymax/2+ymax*prop_Γ_N/4 + eps())
   update_labels!(1,model,f_Γ_D,"Gamma_D")
   update_labels!(2,model,f_Γ_N,"Gamma_N")
 
@@ -84,6 +84,7 @@ function main()
   
   ## Optimiser
   make_dir(path)
+  # converged = m -> LSTO_Distributed.default_al_converged(m;L_tol = 0.01*maximum(Δ))
   optimiser = AugmentedLagrangian(pcfs,stencil,vel_ext,φh;
     γ,γ_reinit,verbose=true,constraint_names=[:Vol])
   for (it,uh,φh) in optimiser

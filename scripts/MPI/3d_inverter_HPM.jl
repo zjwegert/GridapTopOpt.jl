@@ -29,7 +29,7 @@ function main(mesh_partition,distribute,el_size)
   η_coeff = 2
   α_coeff = 4
   vf=0.4
-  δₓ=0.75
+  δₓ=0.5
   ks = 0.01
   g = VectorValue(1,0,0)
   path = dirname(dirname(@__DIR__))*"/results/3d_inverter_HPM"
@@ -70,7 +70,10 @@ function main(mesh_partition,distribute,el_size)
   U_reg = TrialFESpace(V_reg,[0,0,0])
 
   ## Create FE functions
-  φh = interpolate(gen_lsf(4,0.1),V_φ);
+  sphere(x,(xc,yc,zc)) = -sqrt((x[1]-xc)^2+(x[2]-yc)^2+(x[3]-zc)^2) + 0.2
+  lsf_fn(x) = max(gen_lsf(4,0.2)(x),sphere(x,(1,0,0)),
+    sphere(x,(1,0,1)),sphere(x,(1,1,0)),sphere(x,(1,1,1)))
+  φh = interpolate(lsf_fn,V_φ);
 
   ## Interpolation and weak form
   interp = SmoothErsatzMaterialInterpolation(η = η_coeff*maximum(Δ))
@@ -114,7 +117,7 @@ function main(mesh_partition,distribute,el_size)
   
   ## Optimiser
   make_dir(path;ranks=ranks)
-  optimiser = HilbertianProjection(pcfs,stencil,vel_ext,φh;γ,γ_reinit,α_min=0.5,#α_min=0.7,ls_γ_max=0.05,
+  optimiser = HilbertianProjection(pcfs,stencil,vel_ext,φh;γ,γ_reinit,α_min=0.7,ls_γ_max=0.05,
     verbose=i_am_main(ranks),constraint_names=[:Vol,:UΓ_out])
   for (it, uh, φh) in optimiser
     write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh)),"uh"=>uh])

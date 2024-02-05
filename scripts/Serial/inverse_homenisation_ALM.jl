@@ -12,7 +12,7 @@ using Gridap, LSTO_Distributed
 """ 
 function main()
   ## Parameters
-  order = 2
+  order = 1
   xmax,ymax=(1.0,1.0)
   dom = (0,xmax,0,ymax)
   el_size = (200,200)
@@ -23,7 +23,7 @@ function main()
   C = isotropic_2d(1.,0.3)
   η_coeff = 2
   α_coeff = 4
-  vf = 0.4
+  vf = 0.5
   path = dirname(dirname(@__DIR__))*"/results/inverse_homenisation_ALM"
 
   ## FE Setup
@@ -88,11 +88,11 @@ function main()
   optimiser = AugmentedLagrangian(pcfs,stencil,vel_ext,φh;
     γ,γ_reinit,verbose=true,constraint_names=[:Vol])
   for (it,uh,φh) in optimiser
-    write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh)),"uh"=>uh])
+    write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh))])
     write_history(path*"/history.txt",optimiser.history)
   end
   it = optimiser.history.niter; uh = get_state(optimiser.problem)
-  write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh)),"uh"=>uh];iter_mod=1)
+  write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh))];iter_mod=1)
 end
 
 main()

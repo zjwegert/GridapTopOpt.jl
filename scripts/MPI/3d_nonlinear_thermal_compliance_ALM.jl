@@ -1,6 +1,8 @@
 using Gridap, Gridap.MultiField, GridapDistributed, GridapPETSc, GridapSolvers, 
   PartitionedArrays, LSTO_Distributed, SparseMatricesCSR
 
+using GridapSolvers: NewtonSolver
+
 """
   (MPI) Minimum thermal compliance with augmented Lagrangian method in 3D with nonlinear diffusivity.
 
@@ -22,7 +24,7 @@ function main(mesh_partition,distribute,el_size)
   prop_Γ_N = 0.4
   prop_Γ_D = 0.2
   dom = (0,xmax,0,ymax,0,zmax)
-  γ = 0.05
+  γ = 0.1
   γ_reinit = 0.5
   max_steps = floor(Int,minimum(el_size)/3)
   tol = 1/(2order^2)*prod(inv,minimum(el_size))
@@ -35,9 +37,9 @@ function main(mesh_partition,distribute,el_size)
   model = CartesianDiscreteModel(ranks,mesh_partition,dom,el_size);
   Δ = get_Δ(model)
   f_Γ_D(x) = (x[1] ≈ 0.0 && (x[2] <= ymax*prop_Γ_D + eps() || x[2] >= ymax-ymax*prop_Γ_D - eps()) &&
-    (x[3] <= zmax*prop_Γ_D + eps() || x[3] >= zmax-zmax*prop_Γ_D - eps())) ? true : false;
+    (x[3] <= zmax*prop_Γ_D + eps() || x[3] >= zmax-zmax*prop_Γ_D - eps()))
   f_Γ_N(x) = (x[1] ≈ xmax && ymax/2-ymax*prop_Γ_N/4 - eps() <= x[2] <= ymax/2+ymax*prop_Γ_N/4 + eps() &&
-    zmax/2-zmax*prop_Γ_N/4 - eps() <= x[3] <= zmax/2+zmax*prop_Γ_N/4 + eps()) ? true : false;
+    zmax/2-zmax*prop_Γ_N/4 - eps() <= x[3] <= zmax/2+zmax*prop_Γ_N/4 + eps())
   update_labels!(1,model,f_Γ_D,"Gamma_D")
   update_labels!(2,model,f_Γ_N,"Gamma_N")
 
@@ -79,8 +81,8 @@ function main(mesh_partition,distribute,el_size)
   ## Setup solver and FE operators
   Tm = SparseMatrixCSR{0,PetscScalar,PetscInt}
   Tv = Vector{PetscScalar}
-  nl_solver = PETScNonlinearSolver()
   lin_solver = PETScLinearSolver()
+  nl_solver = NewtonSolver(lin_solver;maxiter=50,rtol=10^-8,verbose=i_am_main(ranks))
   
   state_map = NonlinearFEStateMap(
     res,U,V,V_φ,U_reg,φh,dΩ,dΓ_N;

@@ -4,7 +4,7 @@ using Gridap, Gridap.MultiField, GridapDistributed, GridapPETSc, GridapSolvers,
 using GridapSolvers: NewtonSolver
 
 """
-  (MPI) Minimum hyperelastic compliance with Lagrangian method in 3D.
+  (MPI) Minimum hyperelastic compliance with augmented Lagrangian method in 3D.
 
   Optimisation problem:
     ...
@@ -62,7 +62,7 @@ function main(mesh_partition,distribute,el_size)
   _E = 1000
   ν = 0.3
   μ, λ = _E/(2*(1 + ν)), _E*ν/((1 + ν)*(1 - 2*ν))
-  g = VectorValue(0,0,-100)
+  g = VectorValue(0,0,-25)
 
   ## Saint Venant–Kirchhoff law
   F(∇u) = one(∇u) + ∇u'
@@ -83,7 +83,7 @@ function main(mesh_partition,distribute,el_size)
   Tm = SparseMatrixCSR{0,PetscScalar,PetscInt}
   Tv = Vector{PetscScalar}
   lin_solver = ElasticitySolver(V)
-  nl_solver = NewtonSolver(lin_solver;maxiter=50,rtol=10^-8,verbose=verbose)
+  nl_solver = NewtonSolver(lin_solver;maxiter=50,rtol=10^-8,verbose=i_am_main(ranks))
 
   state_map = NonlinearFEStateMap(
     res,U,V,V_φ,U_reg,φh,dΩ,dΓ_N;
