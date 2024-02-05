@@ -85,9 +85,8 @@ function main()
   
   ## Optimiser
   make_dir(path)
-  converged = m -> LSTO_Distributed.default_al_converged(m;L_tol = 0.2*maximum(Δ))
   optimiser = AugmentedLagrangian(pcfs,stencil,vel_ext,φh;
-    γ,γ_reinit,converged,verbose=true,constraint_names=[:Vol])
+    γ,γ_reinit,verbose=true,constraint_names=[:Vol])
   for (it,uh,φh) in optimiser
     write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh))])
     write_history(path*"/history.txt",optimiser.history)

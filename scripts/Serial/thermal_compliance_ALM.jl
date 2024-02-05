@@ -84,6 +84,7 @@ function main()
   
   ## Optimiser
   make_dir(path)
+  # converged = m -> LSTO_Distributed.default_al_converged(m;L_tol = 0.01*maximum(Δ))
   optimiser = AugmentedLagrangian(pcfs,stencil,vel_ext,φh;
     γ,γ_reinit,verbose=true,constraint_names=[:Vol])
   for (it,uh,φh) in optimiser

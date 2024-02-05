@@ -33,16 +33,15 @@ end
 
 get_history(m::AugmentedLagrangian) = m.history
 
-function default_has_oscillations(m::AugmentedLagrangian;tol=1.e-4,reps=4)
+function default_has_oscillations(m::AugmentedLagrangian,os_it;itlength=25,algo=:zerocrossing)
   h  = m.history
   it = get_last_iteration(h)
-  if it < 10
+  if it < 2itlength || it < os_it + itlength + 1
     return false
   end
 
   L = h[:L]
-  # return all(k -> abs(L[it+1] - L[k+1]) < tol*L[it+1], it .- (2:2:2reps))
-  return all(k -> abs(L[it+1] - L[k+1]) < tol, it .- (2:2:2reps))
+  return ~isnan(estimate_period(L[it-itlength+1:it+1],algo))
 end
 
 function converged(m::AugmentedLagrangian)
@@ -51,7 +50,7 @@ end
 
 function default_al_converged(
   m::AugmentedLagrangian;
-  L_tol = 0.2*maximum(m.stencil.params.Δ), # 0.01*maximum(m.stencil.params.Δ),
+  L_tol = 0.05*maximum(m.stencil.params.Δ),
   C_tol = 0.001
 )
   h  = m.history
@@ -95,13 +94,13 @@ function Base.iterate(m::AugmentedLagrangian)
 
   # Update history and build state
   push!(history,(L,J,C...,params.γ))
-  state = (;it=1,L,J,C,dL,dJ,dC,uh,φh,vel,λ,Λ,params.γ)
+  state = (;it=1,L,J,C,dL,dJ,dC,uh,φh,vel,λ,Λ,params.γ,os_it=-1)
   vars  = params.debug ? (0,uh,φh,state) : (0,uh,φh)
   return vars, state
 end
 
 function Base.iterate(m::AugmentedLagrangian,state)
-  it, L, J, C, dL, dJ, dC, uh, φh, vel, λ, Λ, γ = state
+  it, L, J, C, dL, dJ, dC, uh, φh, vel, λ, Λ, γ, os_it = state
   params, history = m.params, m.history
   update_mod, ζ, Λ_max, γ_reinit = params.update_mod, params.ζ, params.Λ_max, params.γ_reinit
 
@@ -110,8 +109,9 @@ function Base.iterate(m::AugmentedLagrangian,state)
   end
 
   ## Advect & Reinitialise
-  if (γ > 0.001) && m.has_oscillations(m)
-    γ *= 3/4
+  if (γ > 0.001) && m.has_oscillations(m,os_it)
+    os_it = it + 1
+    γ    *= 3/4
     print_msg(m.history,"   Oscillations detected, reducing γ to $(γ)\n",color=:yellow)
   end
 
@@ -144,7 +144,7 @@ function Base.iterate(m::AugmentedLagrangian,state)
 
   ## Update history and build state
   push!(history,(L,J,C...,γ))
-  state = (it+1,L,J,C,dL,dJ,dC,uh,φh,vel,λ,Λ,γ)
+  state = (it+1,L,J,C,dL,dJ,dC,uh,φh,vel,λ,Λ,γ,os_it)
   vars  = params.debug ? (it,uh,φh,state) : (it,uh,φh)
   return vars, state
 end

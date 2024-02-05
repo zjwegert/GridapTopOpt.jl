@@ -70,7 +70,10 @@ function main(mesh_partition,distribute,el_size)
   U_reg = TrialFESpace(V_reg,[0,0,0])
 
   ## Create FE functions
-  φh = interpolate(gen_lsf(4,0.1),V_φ);
+  sphere(x,(xc,yc,zc)) = -sqrt((x[1]-xc)^2+(x[2]-yc)^2+(x[3]-zc)^2) + 0.2
+  lsf_fn(x) = max(gen_lsf(4,0.2)(x),sphere(x,(1,0,0)),
+    sphere(x,(1,0,1)),sphere(x,(1,1,0)),sphere(x,(1,1,1)))
+  φh = interpolate(lsf_fn,V_φ);
 
   ## Interpolation and weak form
   interp = SmoothErsatzMaterialInterpolation(η = η_coeff*maximum(Δ))
