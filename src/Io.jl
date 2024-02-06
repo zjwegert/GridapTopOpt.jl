@@ -1,8 +1,8 @@
-function LSTO_Distributed.save(filename::AbstractString, x)
+function save(filename::AbstractString, x)
   JLD2.save_object(filename,x)
 end
 
-function LSTO_Distributed.load(filename::AbstractString)
+function load(filename::AbstractString)
   JLD2.load_object(filename)
 end
 

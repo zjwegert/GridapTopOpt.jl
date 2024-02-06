@@ -28,7 +28,7 @@ using GridapSolvers
 using GridapSolvers.LinearSolvers, GridapSolvers.NonlinearSolvers, GridapSolvers.BlockSolvers
 using GridapSolvers.SolverInterfaces: SolverVerboseLevel, SOLVER_VERBOSE_NONE, SOLVER_VERBOSE_LOW, SOLVER_VERBOSE_HIGH
 
-using JLD2
+using JLD2: save_object, load_object
 
 include("GridapExtensions.jl")
 
@@ -89,5 +89,7 @@ export benchmark_velocity_extension
 export benchmark_hilbertian_projection_map
 
 include("Io.jl")
+export save, load, load!
+export psave, pload, pload!
 
 end

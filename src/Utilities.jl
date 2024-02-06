@@ -4,15 +4,12 @@ gen_lsf(ξ,a;b=0) = x::VectorValue -> -1/4*prod(cos.(get_array(@.(ξ*pi*(x-b))))
 ## Get element size Δ
 function get_Δ(model::CartesianDiscreteModel)
   desc = get_cartesian_descriptor(model)
-  desc.sizes
+  return desc.sizes
 end
 
 function get_Δ(model::DistributedDiscreteModel)
-  local_Δ = map(local_views(model)) do model
-    desc = get_cartesian_descriptor(model)
-    desc.sizes
-  end
-  getany(local_Δ)
+  local_Δ = map(get_Δ,local_views(model))
+  return getany(local_Δ)
 end
 
 ## Create label given function f_Γ. e is a count of added tags. TODO: Can this go in GridapExtensions.jl? @Jordi
@@ -48,7 +45,7 @@ function _update_labels_locally!(e,model::CartesianDiscreteModel{2},mask,name)
   labels.d_to_dface_to_entity[1][vtxs_Γ] .= entity
   labels.d_to_dface_to_entity[2][edge_Γ] .= entity
   add_tag!(labels,name,[entity])
-  cell_to_entity
+  return cell_to_entity
 end
 
 function _update_labels_locally!(e,model::CartesianDiscreteModel{3},mask,name)
@@ -72,15 +69,12 @@ function _update_labels_locally!(e,model::CartesianDiscreteModel{3},mask,name)
   labels.d_to_dface_to_entity[2][edge_Γ] .= entity
   labels.d_to_dface_to_entity[3][face_Γ] .= entity
   add_tag!(labels,name,[entity])
-  cell_to_entity
+  return cell_to_entity
 end
 
 function mark_nodes(f,model::DistributedDiscreteModel)
   local_masks = map(local_views(model)) do model
-    topo   = get_grid_topology(model)
-    coords = get_vertex_coordinates(topo)
-    mask = map(f,coords)
-    return mask
+    mark_nodes(f,model)
   end
   gids = get_face_gids(model,0)
   mask = PVector(local_masks,partition(gids))
@@ -89,7 +83,7 @@ function mark_nodes(f,model::DistributedDiscreteModel)
   return mask
 end
 
-function mark_nodes(f,model::CartesianDiscreteModel)
+function mark_nodes(f,model::DiscreteModel)
   topo   = get_grid_topology(model)
   coords = get_vertex_coordinates(topo)
   mask = map(f,coords)
@@ -103,9 +97,10 @@ function isotropic_2d(E::M,ν::M) where M<:AbstractFloat
         λ    λ+2μ   0
         0     0     μ];
   SymFourthOrderTensorValue(
-      C[1,1], C[3,1], C[2,1],
-      C[1,3], C[3,3], C[2,3],
-      C[1,2], C[3,2], C[2,2])
+    C[1,1], C[3,1], C[2,1],
+    C[1,3], C[3,3], C[2,3],
+    C[1,2], C[3,2], C[2,2]
+  )
 end
 
 function isotropic_3d(E::M,ν::M) where M<:AbstractFloat
@@ -122,7 +117,8 @@ function isotropic_3d(E::M,ν::M) where M<:AbstractFloat
       C[1,5], C[6,5], C[5,5], C[2,5], C[4,5], C[3,5],
       C[1,2], C[6,2], C[5,2], C[2,2], C[4,2], C[3,2],
       C[1,4], C[6,4], C[5,4], C[2,4], C[4,4], C[3,4],
-      C[1,3], C[6,3], C[5,3], C[2,3], C[4,3], C[3,3])
+      C[1,3], C[6,3], C[5,3], C[2,3], C[4,3], C[3,3]
+  )
 end
 
 # Logging
@@ -152,46 +148,4 @@ function write_vtk(Ω,path,it,entries::Vector{<:Pair};iter_mod=10) # TODO: Renam
   if iszero(it % 10*iter_mod)
     GC.gc() # Garbage collection, due to memory leak in writevtk - TODO
   end 
-end
-
-global PArray = Union{PVector,PSparseMatrix}
-"""
-  save_object(dir::AbstractString, obj::PArray)
-
-Creates a folder of JLD2 files at `dir` and store the parititons
-of a PVector or PSparseMatrix `obj` over each file.
-"""
-function JLD2.save_object(dir::AbstractString, obj::PArray)
-  i_am_main(get_parts(obj)) && mkpath(dir)
-  map(local_views(obj),get_parts(obj)) do obj,id
-    save_object(joinpath(dir,basename(dir)*"_$id.jdl2"), obj)
-  end |> fetch
-end
-
-"""
-  load_object!(dir::AbstractString, obj::PArray)
-
-Load a folder of JLD2 files at `dir` and copy to each local
-parititon of a PVector or PSparseMatrix `obj`
-"""
-function load_object!(dir::String,obj::PArray)
-  map(local_views(obj),get_parts(obj)) do obj,id
-    file_path = joinpath(dir,basename(dir)*"_$id.jdl2");
-    load_object!(file_path,obj)
-  end
-  consistent!(obj) |> fetch
-end
-
-"""
-  load_object!(filename::AbstractString, obj::PArray)
-
-Load a JLD2 object stored at `filename` and attempt to
-copy to `obj`.
-"""
-function load_object!(filename::String,obj::AbstractArray)
-  @check isfile(filename) "File `$filename` not found. Check file names and number of partition."
-  file_data = load_object(filename)
-  @check isequal(size(file_data),size(obj)) "Object sizes are not consistent. $(size(file_data)) !== $(size(obj))"
-  @check isequal(typeof(file_data),typeof(obj)) "Object types are not consistent. $(typeof(file_data)) !== $(typeof(obj))"
-  copyto!(obj,file_data)
 end
