@@ -6,7 +6,7 @@ F via `Gridap.gradient`.
 
 # Properties
 - `F  :: A`: A function that returns a `DomainContribution` or `DistributedDomainContribution`.
-- `dΩ :: B`: A tuple of measures
+- `dΩ :: B`: A tuple of measures.
 """
 struct IntegrandWithMeasure{A,B<:Tuple}
   F  :: A
@@ -412,10 +412,17 @@ end
 """
   struct AffineFEStateMap{A,B,C,D,E,F} <: AbstractFEStateMap
 
-...
+A structure to enable the forward problem and pullback for affine finite
+element operators `AffineFEOperator`.
 
 # Parameters
-- 
+
+- `biform::A`: `IntegrandWithMeasure` defining the bilinear form.
+- `liform::B`: `IntegrandWithMeasure` defining the linear form.
+- `spaces::C`: `Tuple` of finite element spaces.
+- `plb_caches::D`: A cache for the pullback operator.
+- `fwd_caches::E`: A cache for the forward problem.
+- `adj_caches::F`: A cache for the adjoint problem.
 """
 struct AffineFEStateMap{A,B,C,D,E,F} <: AbstractFEStateMap
   biform     :: A
@@ -425,6 +432,23 @@ struct AffineFEStateMap{A,B,C,D,E,F} <: AbstractFEStateMap
   fwd_caches :: E
   adj_caches :: F
 
+  @doc"""
+    AffineFEStateMap(
+      a::Function,l::Function,
+      U,V,V_φ,U_reg,φh,dΩ...;
+      assem_U = SparseMatrixAssembler(U,V),
+      assem_adjoint = SparseMatrixAssembler(V,U),
+      assem_deriv = SparseMatrixAssembler(U_reg,U_reg),
+      ls::LinearSolver = LUSolver(),
+      adjoint_ls::LinearSolver = LUSolver()
+    )
+
+  Create an instance of `AffineFEStateMap` given the bilinear form `a` and linear
+  form `l` as `Function` types, trial and test spaces `U` and `V`, the FE space `V_φ`
+  for `φh`, the FE space `U_reg` for derivatives, and the measures as additional arguments. 
+
+  Optional arguments enable specification of assemblers and linear solvers.
+  """
   function AffineFEStateMap(
     a::Function,l::Function,
     U,V,V_φ,U_reg,φh,dΩ...;
@@ -506,10 +530,17 @@ end
 """
   struct NonlinearFEStateMap{A,B,C,D,E,F} <: AbstractFEStateMap
 
-...
+A structure to enable the forward problem and pullback for nonlinear finite
+element operators.
 
 # Parameters
-- 
+
+- `res::A`: an `IntegrandWithMeasure` defining the residual of the problem.
+- `jac::B`: a `Function` defining Jacobian of the residual.
+- `spaces::C`: `Tuple` of finite element spaces.
+- `plb_caches::D`: A cache for the pullback operator.
+- `fwd_caches::E`: A cache for the forward problem.
+- `adj_caches::F`: A cache for the adjoint problem.
 """
 struct NonlinearFEStateMap{A,B,C,D,E,F} <: AbstractFEStateMap
   res        :: A
@@ -519,6 +550,22 @@ struct NonlinearFEStateMap{A,B,C,D,E,F} <: AbstractFEStateMap
   fwd_caches :: E
   adj_caches :: F
 
+  @doc"""
+    NonlinearFEStateMap(
+      res::Function,U,V,V_φ,U_reg,φh,dΩ...;
+      assem_U = SparseMatrixAssembler(U,V),
+      assem_adjoint = SparseMatrixAssembler(V,U),
+      assem_deriv = SparseMatrixAssembler(U_reg,U_reg),
+      nls::NonlinearSolver = NewtonSolver(LUSolver();maxiter=50,rtol=1.e-8,verbose=true),
+      adjoint_ls::LinearSolver = LUSolver()
+    )
+
+  Create an instance of `NonlinearFEStateMap` given the residual `res` as a `Function` type, 
+  trial and test spaces `U` and `V`, the FE space `V_φ` for `φh`, the FE space `U_reg` 
+  for derivatives, and the measures as additional arguments. 
+
+  Optional arguments enable specification of assemblers, nonlinear solver, and adjoint (linear) solver.
+  """
   function NonlinearFEStateMap(
     res::Function,U,V,V_φ,U_reg,φh,dΩ...;
     assem_U = SparseMatrixAssembler(U,V),
@@ -597,10 +644,18 @@ end
 """
   struct RepeatingAffineFEStateMap{A,B,C,D,E,F} <: AbstractFEStateMap
 
-...
+A structure to enable the forward problem and pullback for affine finite
+element operators `AffineFEOperator` with multiple linear forms but only
+a single bilinear form.
 
 # Parameters
-- 
+
+- `biform::A`: `IntegrandWithMeasure` defining the bilinear form.
+- `liform::B`: A vector of `IntegrandWithMeasure` defining the linear forms.
+- `spaces::C`: `Tuple` of finite element spaces.
+- `plb_caches::D`: A cache for the pullback operator.
+- `fwd_caches::E`: A cache for the forward problem.
+- `adj_caches::F`: A cache for the adjoint problem.
 """
 struct RepeatingAffineFEStateMap{A,B,C,D,E,F} <: AbstractFEStateMap
   biform     :: A
@@ -610,6 +665,29 @@ struct RepeatingAffineFEStateMap{A,B,C,D,E,F} <: AbstractFEStateMap
   fwd_caches :: E
   adj_caches :: F
 
+  @doc"""
+    RepeatingAffineFEStateMap(
+      nblocks::Int,a::Function,l::Vector{<:Function},
+      U0,V0,V_φ,U_reg,φh,dΩ...;
+      assem_U = SparseMatrixAssembler(U0,V0),
+      assem_adjoint = SparseMatrixAssembler(V0,U0),
+      assem_deriv = SparseMatrixAssembler(U_reg,U_reg),
+      ls::LinearSolver = LUSolver(),
+      adjoint_ls::LinearSolver = LUSolver()
+    )
+
+  Create an instance of `RepeatingAffineFEStateMap` given the number of blocks `nblocks`, 
+  a bilinear form `a`, a vector of linear form `l` as `Function` types, the trial and test 
+  spaces `U` and `V`, the FE space `V_φ` for `φh`, the FE space `U_reg` for derivatives, 
+  and the measures as additional arguments. 
+
+  Optional arguments enable specification of assemblers and linear solvers.
+
+  # Note
+
+  - The resulting `FEFunction` will be a `MultiFieldFEFunction` (or GridapDistributed equivalent) 
+  where each field corresponds to an entry in the vector of linear forms
+  """
   function RepeatingAffineFEStateMap(
     nblocks::Int,a::Function,l::Vector{<:Function},
     U0,V0,V_φ,U_reg,φh,dΩ...;
@@ -715,10 +793,22 @@ end
 """
   struct PDEConstrainedFunctionals{N,A}
 
-...
+An object that computes the objective, constraints, and their derivatives.
 
 # Parameters
-- 
+
+- `J`: A `StateParamIntegrandWithMeasure` corresponding to the objective.
+- `C`: A vector of `StateParamIntegrandWithMeasure` corresponding to the constraints.
+- `dJ`: The DoFs for the objective sensitivity.
+- `dC`: The DoFs for each constraint sensitivity.
+- `analytic_dJ`: a `Function` for computing the analytic objective sensitivity.
+- `analytic_dC`: A vector of `Function` for computing the analytic objective sensitivities.
+- `state_map::A`: The state map for the problem.
+
+# Note
+
+- If `analytic_dJ = nothing` automatic differentiation will be used.
+- If `analytic_dC[i] = nothing` automatic differentiation will be used for `C[i]`.
 """
 struct PDEConstrainedFunctionals{N,A}
   J
@@ -733,7 +823,11 @@ struct PDEConstrainedFunctionals{N,A}
     PDEConstrainedFunctionals(objective::Function,constraints::Vector{<:Function},
       state_map::AbstractFEStateMap;analytic_dJ;analytic_dC)
 
-  ...
+  Create an instance of `PDEConstrainedFunctionals`. The arguments for the objective
+  and constraints must follow the specification in [`StateParamIntegrandWithMeasure`](@ref).
+  By default we use automatic differentation for the objective and all constraints. This 
+  can be disabled by passing the shape derivative as a type `Function` to `analytic_dJ`
+  and/or entires in `analytic_dC`.
   """
   function PDEConstrainedFunctionals(
       objective   :: Function,
@@ -759,7 +853,7 @@ end
 """
   PDEConstrainedFunctionals(objective,state_map;analytic_dJ)
 
-...
+Create an instance of `PDEConstrainedFunctionals` when the problem has no constraints.
 """
 PDEConstrainedFunctionals(J::Function,state_map::AbstractFEStateMap;analytic_dJ=nothing) = 
   PDEConstrainedFunctionals(J,Function[],state_map;analytic_dJ = analytic_dJ,analytic_dC = Nothing[])
@@ -769,7 +863,7 @@ get_state(m::PDEConstrainedFunctionals) = get_state(m.state_map)
 """
   evaluate_functionals!(pcf::PDEConstrainedFunctionals,φh)
 
-...
+Evaluate the objective and constraints at `φh`.
 """
 function evaluate_functionals!(pcf::PDEConstrainedFunctionals,φh)
   u  = pcf.state_map(φh)
@@ -787,7 +881,7 @@ end
 """
   evaluate_derivatives!(pcf::PDEConstrainedFunctionals,φh)
 
-...
+Evaluate the derivatives of the objective and constraints at `φh`.
 """
 function evaluate_derivatives!(pcf::PDEConstrainedFunctionals,φh)
   _,_,dJ,dC = evaluate!(pcf,φh)
@@ -803,7 +897,8 @@ end
 """
   Fields.evaluate!(pcf::PDEConstrainedFunctionals,φh)
 
-...
+Evaluate the objective and constraints, and their derivatives at
+`φh`. 
 """
 function Fields.evaluate!(pcf::PDEConstrainedFunctionals,φh)
   J, C, dJ, dC = pcf.J,pcf.C,pcf.dJ,pcf.dC
