@@ -1,3 +1,16 @@
+function LSTO_Distributed.save(filename::AbstractString, x)
+  JLD2.save_object(filename,x)
+end
+
+function LSTO_Distributed.load(filename::AbstractString)
+  JLD2.load_object(filename)
+end
+
+function load!(filename::AbstractString, x)
+  y = load(filename)
+  copyto!(x,y)
+  return x
+end
 
 function psave(dir::AbstractString, x)
   ranks = get_parts(x)
