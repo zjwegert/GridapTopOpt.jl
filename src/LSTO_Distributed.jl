@@ -30,6 +30,8 @@ using GridapSolvers
 using GridapSolvers.LinearSolvers, GridapSolvers.NonlinearSolvers, GridapSolvers.BlockSolvers
 using GridapSolvers.SolverInterfaces: SolverVerboseLevel, SOLVER_VERBOSE_NONE, SOLVER_VERBOSE_LOW, SOLVER_VERBOSE_HIGH
 
+using JLD2: save_object, load_object
+
 include("GridapExtensions.jl")
 
 include("ChainRules.jl")
@@ -85,5 +87,9 @@ export benchmark_advection # TODO: Remove from exports
 export benchmark_reinitialisation # TODO: Remove from exports
 export benchmark_velocity_extension # TODO: Remove from exports
 export benchmark_hilbertian_projection_ma # TODO: Remove from exports
+
+include("Io.jl")
+export save, load, load!
+export psave, pload, pload!
 
 end
