@@ -70,20 +70,20 @@ export VelocityExtension
 export project!
 
 include("Optimisers/Optimisers.jl")
-export Optimiser
-export OptimiserHistory
-export get_history
+export Optimiser # TODO: Remove from exports
+export OptimiserHistory # TODO: Remove from exports
+export get_history # TODO: Add get_niter
 export write_history
 export AugmentedLagrangian
 export HilbertianProjection
-export HPModifiedGramSchmidt
+export HPModifiedGramSchmidt # TODO: Remove from exports
 
 include("Benchmarks.jl")
-export benchmark_optimizer
-export benchmark_forward_problem
-export benchmark_advection
-export benchmark_reinitialisation
-export benchmark_velocity_extension
-export benchmark_hilbertian_projection_map
+export benchmark_optimizer # TODO: Remove from exports
+export benchmark_forward_problem # TODO: Remove from exports
+export benchmark_advection # TODO: Remove from exports
+export benchmark_reinitialisation # TODO: Remove from exports
+export benchmark_velocity_extension # TODO: Remove from exports
+export benchmark_hilbertian_projection_ma # TODO: Remove from exports
 
 end
