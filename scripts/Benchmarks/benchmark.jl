@@ -1,7 +1,10 @@
 using Gridap, Gridap.MultiField, GridapDistributed, GridapPETSc, GridapSolvers, 
   PartitionedArrays, LSTO_Distributed, SparseMatricesCSR
 
-using LSTO_Distributed: get_deriv_space, get_aux_space
+using LSTO_Distributed: get_deriv_space, get_aux_space,benchmark_optimizer,
+  benchmark_forward_problem,benchmark_advection,benchmark_reinitialisation,
+  benchmark_velocity_extension,benchmark_hilbertian_projection_map
+
 using GridapSolvers: NewtonSolver
 
 global NAME = ARGS[1]
@@ -29,7 +32,7 @@ function nl_elast(mesh_partition,ranks,el_size,order,verbose)
 
   ## FE Setup
   model = CartesianDiscreteModel(ranks,mesh_partition,dom,el_size)
-  Δ = get_Δ(model)
+  el_size = get_el_size(model)
   f_Γ_D(x) = (x[1] ≈ 0.0)
   f_Γ_N(x) = (x[1] ≈ xmax) && (ymax/2-ymax*prop_Γ_N/4 - eps() <= x[2] <= ymax/2+ymax*prop_Γ_N/4 + eps()) &&
       (zmax/2-zmax*prop_Γ_N/4 - eps() <= x[3] <= zmax/2+zmax*prop_Γ_N/4 + eps())
@@ -53,10 +56,10 @@ function nl_elast(mesh_partition,ranks,el_size,order,verbose)
   U_reg = TrialFESpace(V_reg,0)
 
   ## Create FE functions
-  φh = interpolate(gen_lsf(4,0.2),V_φ)
+  φh = interpolate(initial_lsf(4,0.2),V_φ)
 
   ## Interpolation and weak form
-  interp = SmoothErsatzMaterialInterpolation(η = η_coeff*maximum(Δ))
+  interp = SmoothErsatzMaterialInterpolation(η = η_coeff*maximum(el_size))
   I,H,DH,ρ = interp.I,interp.H,interp.DH,interp.ρ
 
   ## Material properties
@@ -110,7 +113,7 @@ function nl_elast(mesh_partition,ranks,el_size,order,verbose)
   pcfs = PDEConstrainedFunctionals(Obj,[Vol],state_map,analytic_dC=[dVol])
 
   ## Hilbertian extension-regularisation problems
-  α = α_coeff*maximum(Δ)
+  α = α_coeff*maximum(el_size)
   a_hilb(p,q) = ∫(α^2*∇(p)⋅∇(q) + p*q)dΩ;
   vel_ext = VelocityExtension(
     a_hilb,U_reg,V_reg;
@@ -138,7 +141,7 @@ function therm(mesh_partition,ranks,el_size,order,verbose)
 
   ## FE Setup
   model = CartesianDiscreteModel(ranks,mesh_partition,dom,el_size);
-  Δ = get_Δ(model)
+  el_size = get_el_size(model)
   f_Γ_D(x) = (x[1] ≈ 0.0) && (x[2] <= ymax*prop_Γ_D + eps() || x[2] >= ymax-ymax*prop_Γ_D - eps()) &&
     (x[3] <= zmax*prop_Γ_D + eps() || x[3] >= zmax-zmax*prop_Γ_D - eps())
   f_Γ_N(x) = (x[1] ≈ xmax) && (ymax/2-ymax*prop_Γ_N/4 - eps() <= x[2] <= ymax/2+ymax*prop_Γ_N/4 + eps()) &&
@@ -161,10 +164,10 @@ function therm(mesh_partition,ranks,el_size,order,verbose)
   U_reg = TrialFESpace(V_reg,0)
 
   ## Create FE functions
-  φh = interpolate(gen_lsf(4,0.2),V_φ);
+  φh = interpolate(initial_lsf(4,0.2),V_φ);
 
   ## Interpolation and weak form
-  interp = SmoothErsatzMaterialInterpolation(η = η_coeff*maximum(Δ))
+  interp = SmoothErsatzMaterialInterpolation(η = η_coeff*maximum(el_size))
   I,H,DH,ρ = interp.I,interp.H,interp.DH,interp.ρ
 
   a(u,v,φ,dΩ,dΓ_N) = ∫((I ∘ φ)*D*∇(u)⋅∇(v))dΩ
@@ -193,7 +196,7 @@ function therm(mesh_partition,ranks,el_size,order,verbose)
   pcfs = PDEConstrainedFunctionals(J,state_map,analytic_dJ=dJ)
 
   ## Hilbertian extension-regularisation problems
-  α = α_coeff*maximum(Δ)
+  α = α_coeff*maximum(el_size)
   a_hilb(p,q) = ∫(α^2*∇(p)⋅∇(q) + p*q)dΩ;
   vel_ext = VelocityExtension(
     a_hilb, U_reg, V_reg;
@@ -214,7 +217,7 @@ function elast(mesh_partition,ranks,el_size,order,verbose)
   γ_reinit = 0.5
   max_steps = floor(Int,minimum(el_size)/3)
   tol = 1/(2order^2)*prod(inv,minimum(el_size))
-  C = isotropic_3d(1.,0.3)
+  C = isotropic_elast_tensor(3,1.,0.3)
   g = VectorValue(0,0,-1)
   η_coeff = 2
   α_coeff = 4
@@ -222,7 +225,7 @@ function elast(mesh_partition,ranks,el_size,order,verbose)
 
   ## FE Setup
   model = CartesianDiscreteModel(ranks,mesh_partition,dom,el_size);
-  Δ = get_Δ(model)
+  el_size = get_el_size(model)
   f_Γ_D(x) = (x[1] ≈ 0.0)
   f_Γ_N(x) = (x[1] ≈ xmax) && (ymax/2-ymax*prop_Γ_N/4 - eps() <= x[2] <= ymax/2+ymax*prop_Γ_N/4 + eps()) &&
       (zmax/2-zmax*prop_Γ_N/4 - eps() <= x[3] <= zmax/2+zmax*prop_Γ_N/4 + eps())
@@ -246,10 +249,10 @@ function elast(mesh_partition,ranks,el_size,order,verbose)
   U_reg = TrialFESpace(V_reg,0)
 
   ## Create FE functions
-  φh = interpolate(gen_lsf(4,0.2),V_φ)
+  φh = interpolate(initial_lsf(4,0.2),V_φ)
 
   ## Interpolation and weak form
-  interp = SmoothErsatzMaterialInterpolation(η = η_coeff*maximum(Δ))
+  interp = SmoothErsatzMaterialInterpolation(η = η_coeff*maximum(el_size))
   I,H,DH,ρ = interp.I,interp.H,interp.DH,interp.ρ
 
   a(u,v,φ,dΩ,dΓ_N) = ∫((I ∘ φ)*(C ⊙ ε(u) ⊙ ε(v)))dΩ
@@ -279,7 +282,7 @@ function elast(mesh_partition,ranks,el_size,order,verbose)
   pcfs = PDEConstrainedFunctionals(J,[Vol],state_map;analytic_dJ=dJ,analytic_dC=[dVol])
 
   ## Hilbertian extension-regularisation problems
-  α = α_coeff*maximum(Δ)
+  α = α_coeff*maximum(el_size)
   a_hilb(p,q) = ∫(α^2*∇(p)⋅∇(q) + p*q)dΩ;
   vel_ext = VelocityExtension(
     a_hilb,U_reg,V_reg;
@@ -298,7 +301,7 @@ function inverter_HPM(mesh_partition,ranks,el_size,order,verbose)
   γ_reinit = 0.5
   max_steps = floor(Int,minimum(el_size)/3)
   tol = 1/(2order^2)*prod(inv,minimum(el_size))
-  C = isotropic_3d(1.0,0.3)
+  C = isotropic_elast_tensor(3,1.0,0.3)
   η_coeff = 2
   α_coeff = 4
   vf=0.4
@@ -308,7 +311,7 @@ function inverter_HPM(mesh_partition,ranks,el_size,order,verbose)
 
   ## FE Setup
   model = CartesianDiscreteModel(ranks,mesh_partition,dom,el_size);
-  Δ = get_Δ(model)
+  el_size = get_el_size(model)
   f_Γ_in(x) = (x[1] ≈ 0.0) && (0.4 - eps() <= x[2] <= 0.6 + eps()) && 
     (0.4 - eps() <= x[3] <= 0.6 + eps())
   f_Γ_out(x) = (x[1] ≈ 1.0) && (0.4 - eps() <= x[2] <= 0.6 + eps()) && 
@@ -342,10 +345,10 @@ function inverter_HPM(mesh_partition,ranks,el_size,order,verbose)
   U_reg = TrialFESpace(V_reg,[0,0,0])
 
   ## Create FE functions
-  φh = interpolate(gen_lsf(4,0.1),V_φ);
+  φh = interpolate(initial_lsf(4,0.1),V_φ);
 
   ## Interpolation and weak form
-  interp = SmoothErsatzMaterialInterpolation(η = η_coeff*maximum(Δ))
+  interp = SmoothErsatzMaterialInterpolation(η = η_coeff*maximum(el_size))
   I,H,DH,ρ = interp.I,interp.H,interp.DH,interp.ρ
 
   a(u,v,φ,dΩ,dΓ_in,dΓ_out) = ∫((I ∘ φ)*(C ⊙ ε(u) ⊙ ε(v)))dΩ + ∫(ks*(u⋅v))dΓ_out
@@ -376,7 +379,7 @@ function inverter_HPM(mesh_partition,ranks,el_size,order,verbose)
   pcfs = PDEConstrainedFunctionals(J,[Vol,UΓ_out],state_map,analytic_dC=[dVol,nothing])
 
   ## Hilbertian extension-regularisation problems
-  α = α_coeff*maximum(Δ)
+  α = α_coeff*maximum(el_size)
   a_hilb(p,q) =∫(α^2*∇(p)⋅∇(q) + p*q)dΩ;
   vel_ext = VelocityExtension(
     a_hilb,U_reg,V_reg;

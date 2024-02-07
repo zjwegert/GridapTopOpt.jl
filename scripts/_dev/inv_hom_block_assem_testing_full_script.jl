@@ -22,14 +22,14 @@ function main(diag_block)
   γ_reinit = 0.5;
   max_steps = floor(Int,minimum(el_size)/10)
   tol = 1/(order^2*10)*prod(inv,minimum(el_size))
-  C = isotropic_2d(1.,0.3);
+  C = isotropic_elast_tensor(2,1.,0.3);
   η_coeff = 2;
   α_coeff = 4;
   path = dirname(dirname(@__DIR__))*"/results/main_inverse_homogenisation_ALM"
 
   ## FE Setup
   model = CartesianDiscreteModel(dom,el_size,isperiodic=(true,true));
-  Δ = get_Δ(model)
+  el_size = get_el_size(model)
   f_Γ_D(x) = iszero(x)
   update_labels!(1,model,f_Γ_D,"origin")
 
@@ -50,12 +50,12 @@ function main(diag_block)
   U_reg = TrialFESpace(V_reg)
 
   ## Create FE functions
-  lsf_fn = x->max(gen_lsf(2,0.4)(x),gen_lsf(2,0.4;b=VectorValue(0,0.5))(x));
+  lsf_fn = x->max(initial_lsf(2,0.4)(x),initial_lsf(2,0.4;b=VectorValue(0,0.5))(x));
   φh = interpolate(lsf_fn,V_φ);
   φ = get_free_dof_values(φh)
 
   ## Interpolation and weak form
-  interp = SmoothErsatzMaterialInterpolation(η = η_coeff*maximum(Δ))
+  interp = SmoothErsatzMaterialInterpolation(η = η_coeff*maximum(el_size))
   I,H,DH,ρ = interp.I,interp.H,interp.DH,interp.ρ
 
   εᴹ = (TensorValue(1.,0.,0.,0.),     # ϵᵢⱼ⁽¹¹⁾≡ϵᵢⱼ⁽¹⁾
@@ -77,7 +77,7 @@ function main(diag_block)
   dVol = (q,u,φ,dΩ) -> ∫(1/vol_D*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
 
   ## Finite difference solver and level set function
-  stencil = AdvectionStencil(FirstOrderStencil(2,Float64),model,V_φ,Δ./order,max_steps,tol)
+  stencil = AdvectionStencil(FirstOrderStencil(2,Float64),model,V_φ,el_size./order,max_steps,tol)
   reinit!(stencil,φ,γ_reinit)
 
   ## Setup solver and FE operators
@@ -103,7 +103,7 @@ function main(diag_block)
   return pcfs,[J_init,C_init,dJ,dC],u_vec
 
   ## Hilbertian extension-regularisation problems
-  α = α_coeff*maximum(Δ)
+  α = α_coeff*maximum(el_size)
   a_hilb(p,q) =∫(α^2*∇(p)⋅∇(q) + p*q)dΩ;
   vel_ext = VelocityExtension(a_hilb,U_reg,V_reg)
   

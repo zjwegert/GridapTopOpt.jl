@@ -25,7 +25,7 @@ function main(mesh_partition,distribute,el_size)
   γ_reinit = 0.5
   max_steps = floor(Int,minimum(el_size)/3)
   tol = 1/(2order^2)*prod(inv,minimum(el_size))
-  C = isotropic_3d(1.0,0.3)
+  C = isotropic_elast_tensor(3,1.0,0.3)
   η_coeff = 2
   α_coeff = 4
   vf=0.4
@@ -36,7 +36,7 @@ function main(mesh_partition,distribute,el_size)
 
   ## FE Setup
   model = CartesianDiscreteModel(ranks,mesh_partition,dom,el_size);
-  Δ = get_Δ(model)
+  el_size = get_el_size(model)
   f_Γ_in(x) = (x[1] ≈ 0.0) && (0.4 - eps() <= x[2] <= 0.6 + eps()) && 
     (0.4 - eps() <= x[3] <= 0.6 + eps())
   f_Γ_out(x) = (x[1] ≈ 1.0) && (0.4 - eps() <= x[2] <= 0.6 + eps()) && 
@@ -71,12 +71,12 @@ function main(mesh_partition,distribute,el_size)
 
   ## Create FE functions
   sphere(x,(xc,yc,zc)) = -sqrt((x[1]-xc)^2+(x[2]-yc)^2+(x[3]-zc)^2) + 0.2
-  lsf_fn(x) = max(gen_lsf(4,0.2)(x),sphere(x,(1,0,0)),
+  lsf_fn(x) = max(initial_lsf(4,0.2)(x),sphere(x,(1,0,0)),
     sphere(x,(1,0,1)),sphere(x,(1,1,0)),sphere(x,(1,1,1)))
   φh = interpolate(lsf_fn,V_φ);
 
   ## Interpolation and weak form
-  interp = SmoothErsatzMaterialInterpolation(η = η_coeff*maximum(Δ))
+  interp = SmoothErsatzMaterialInterpolation(η = η_coeff*maximum(el_size))
   I,H,DH,ρ = interp.I,interp.H,interp.DH,interp.ρ
 
   a(u,v,φ,dΩ,dΓ_in,dΓ_out) = ∫((I ∘ φ)*(C ⊙ ε(u) ⊙ ε(v)))dΩ + ∫(ks*(u⋅v))dΓ_out
@@ -107,7 +107,7 @@ function main(mesh_partition,distribute,el_size)
   pcfs = PDEConstrainedFunctionals(J,[Vol,UΓ_out],state_map,analytic_dC=[dVol,nothing])
 
   ## Hilbertian extension-regularisation problems
-  α = α_coeff*maximum(Δ)
+  α = α_coeff*maximum(el_size)
   a_hilb(p,q) =∫(α^2*∇(p)⋅∇(q) + p*q)dΩ;
   vel_ext = VelocityExtension(
     a_hilb,U_reg,V_reg;
@@ -116,7 +116,7 @@ function main(mesh_partition,distribute,el_size)
   )
   
   ## Optimiser
-  make_dir(path;ranks=ranks)
+  i_am_main(ranks) && mkdir(path)
   optimiser = HilbertianProjection(pcfs,stencil,vel_ext,φh;γ,γ_reinit,α_min=0.7,ls_γ_max=0.05,
     verbose=i_am_main(ranks),constraint_names=[:Vol,:UΓ_out])
   for (it, uh, φh) in optimiser

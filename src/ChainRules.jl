@@ -432,7 +432,7 @@ struct AffineFEStateMap{A,B,C,D,E,F} <: AbstractFEStateMap
   fwd_caches :: E
   adj_caches :: F
 
-  @doc"""
+  @doc """
     AffineFEStateMap(
       a::Function,l::Function,
       U,V,V_φ,U_reg,φh,dΩ...;
@@ -550,7 +550,7 @@ struct NonlinearFEStateMap{A,B,C,D,E,F} <: AbstractFEStateMap
   fwd_caches :: E
   adj_caches :: F
 
-  @doc"""
+  @doc """
     NonlinearFEStateMap(
       res::Function,U,V,V_φ,U_reg,φh,dΩ...;
       assem_U = SparseMatrixAssembler(U,V),
@@ -665,7 +665,7 @@ struct RepeatingAffineFEStateMap{A,B,C,D,E,F} <: AbstractFEStateMap
   fwd_caches :: E
   adj_caches :: F
 
-  @doc"""
+  @doc """
     RepeatingAffineFEStateMap(
       nblocks::Int,a::Function,l::Vector{<:Function},
       U0,V0,V_φ,U_reg,φh,dΩ...;
@@ -819,7 +819,7 @@ struct PDEConstrainedFunctionals{N,A}
   analytic_dC
   state_map :: A
 
-  @doc"""
+  @doc """
     PDEConstrainedFunctionals(objective::Function,constraints::Vector{<:Function},
       state_map::AbstractFEStateMap;analytic_dJ;analytic_dC)
 

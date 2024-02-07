@@ -31,7 +31,7 @@ function main()
 
   ## FE Setup
   model = CartesianDiscreteModel(dom,el_size);
-  Δ = get_Δ(model)
+  el_size = get_el_size(model)
   f_Γ_D(x) = (x[1] ≈ 0.0 && (x[2] <= ymax*prop_Γ_D + eps() || 
       x[2] >= ymax-ymax*prop_Γ_D - eps()));
   f_Γ_N(x) = (x[1] ≈ xmax && ymax/2-ymax*prop_Γ_N/4 - eps() <= x[2] <= 
@@ -55,10 +55,10 @@ function main()
   U_reg = TrialFESpace(V_reg,0)
 
   ## Create FE functions
-  φh = interpolate(gen_lsf(4,0.2),V_φ)
+  φh = interpolate(initial_lsf(4,0.2),V_φ)
 
   ## Interpolation and weak form
-  interp = SmoothErsatzMaterialInterpolation(η = η_coeff*maximum(Δ))
+  interp = SmoothErsatzMaterialInterpolation(η = η_coeff*maximum(el_size))
   I,H,DH,ρ = interp.I,interp.H,interp.DH,interp.ρ
 
   κ0 = 1
@@ -80,12 +80,12 @@ function main()
   pcfs = PDEConstrainedFunctionals(J,[Vol],state_map,analytic_dC=[dVol])
 
   ## Hilbertian extension-regularisation problems
-  α = α_coeff*maximum(Δ)
+  α = α_coeff*maximum(el_size)
   a_hilb(p,q) =∫(α^2*∇(p)⋅∇(q) + p*q)dΩ
   vel_ext = VelocityExtension(a_hilb,U_reg,V_reg)
   
   ## Optimiser
-  make_dir(path)
+  mkdir(path)
   optimiser = AugmentedLagrangian(pcfs,stencil,vel_ext,φh;
     γ,γ_reinit,verbose=true,constraint_names=[:Vol])
   for (it, uh, φh) in optimiser

@@ -30,7 +30,7 @@ function main(mesh_partition,distribute)
 
   ## FE Setup
   model = CartesianDiscreteModel(ranks,mesh_partition,dom,el_size);
-  Δ = get_Δ(model)
+  Δ = get_el_size(model)
   f_Γ_D(x) = (x[1] ≈ 0.0 && (x[2] <= ymax*prop_Γ_D + eps() ||
     x[2] >= ymax-ymax*prop_Γ_D - eps())) ? true : false;
   f_Γ_N(x) = (x[1] ≈ xmax && ymax/2-ymax*prop_Γ_N/4 - eps() <= x[2] <=
@@ -53,7 +53,7 @@ function main(mesh_partition,distribute)
   U_reg = TrialFESpace(V_reg,0)
 
   ## Create FE functions
-  φh = interpolate(gen_lsf(4,0.2),V_φ);
+  φh = interpolate(initial_lsf(4,0.2),V_φ);
   φ = get_free_dof_values(φh)
 
   ## Interpolation and weak form

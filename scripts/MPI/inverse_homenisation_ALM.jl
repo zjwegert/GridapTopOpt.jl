@@ -22,7 +22,7 @@ function main(mesh_partition,distribute,el_size)
   γ_reinit = 0.5
   max_steps = floor(Int,minimum(el_size)/10)
   tol = 1/(10order^2)*prod(inv,minimum(el_size))
-  C = isotropic_2d(1.,0.3)
+  C = isotropic_elast_tensor(2,1.,0.3)
   η_coeff = 2
   α_coeff = 4
   vf = 0.5
@@ -30,7 +30,7 @@ function main(mesh_partition,distribute,el_size)
 
   ## FE Setup
   model = CartesianDiscreteModel(ranks,mesh_partition,dom,el_size,isperiodic=(true,true));
-  Δ = get_Δ(model)
+  el_size = get_el_size(model)
   f_Γ_D(x) = iszero(x)
   update_labels!(1,model,f_Γ_D,"origin")
 
@@ -48,11 +48,11 @@ function main(mesh_partition,distribute,el_size)
   U_reg = TrialFESpace(V_reg)
 
   ## Create FE functions
-  lsf_fn(x) = max(gen_lsf(2,0.4)(x),gen_lsf(2,0.4;b=VectorValue(0,0.5))(x));
+  lsf_fn(x) = max(initial_lsf(2,0.4)(x),initial_lsf(2,0.4;b=VectorValue(0,0.5))(x));
   φh = interpolate(lsf_fn,V_φ)
 
   ## Interpolation and weak form
-  interp = SmoothErsatzMaterialInterpolation(η = η_coeff*maximum(Δ))
+  interp = SmoothErsatzMaterialInterpolation(η = η_coeff*maximum(el_size))
   I,H,DH,ρ = interp.I,interp.H,interp.DH,interp.ρ
 
   εᴹ = (TensorValue(1.,0.,0.,0.),     # ϵᵢⱼ⁽¹¹⁾≡ϵᵢⱼ⁽¹⁾
@@ -90,7 +90,7 @@ function main(mesh_partition,distribute,el_size)
   pcfs = PDEConstrainedFunctionals(J,[Vol],state_map;analytic_dJ=dJ,analytic_dC=[dVol])
 
   ## Hilbertian extension-regularisation problems
-  α = α_coeff*maximum(Δ)
+  α = α_coeff*maximum(el_size)
   a_hilb(p,q) =∫(α^2*∇(p)⋅∇(q) + p*q)dΩ
   vel_ext = VelocityExtension(
     a_hilb,U_reg,V_reg,
@@ -99,7 +99,7 @@ function main(mesh_partition,distribute,el_size)
   )
   
   ## Optimiser
-  make_dir(path;ranks=ranks)
+  i_am_main(ranks) && mkdir(path)
   optimiser = AugmentedLagrangian(pcfs,stencil,vel_ext,φh;
     γ,γ_reinit,verbose=i_am_main(ranks),constraint_names=[:Vol])
   for (it, uh, φh) in optimiser

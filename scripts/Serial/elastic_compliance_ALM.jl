@@ -21,7 +21,7 @@ function main()
   γ_reinit = 0.5
   max_steps = floor(Int,minimum(el_size)/10)
   tol = 1/(10order^2)*prod(inv,minimum(el_size))
-  C = isotropic_2d(1.,0.3)
+  C = isotropic_elast_tensor(2,1.,0.3)
   η_coeff = 2
   α_coeff = 4
   vf = 0.4
@@ -30,7 +30,7 @@ function main()
 
   ## FE Setup
   model = CartesianDiscreteModel(dom,el_size)
-  Δ = get_Δ(model)
+  el_size = get_el_size(model)
   f_Γ_D(x) = (x[1] ≈ 0.0)
   f_Γ_N(x) = (x[1] ≈ xmax && ymax/2-ymax*prop_Γ_N/4 - eps() <= x[2] <= ymax/2+ymax*prop_Γ_N/4 + eps())
   update_labels!(1,model,f_Γ_D,"Gamma_D")
@@ -53,10 +53,10 @@ function main()
   U_reg = TrialFESpace(V_reg,0)
 
   ## Create FE functions
-  φh = interpolate(gen_lsf(4,0.2),V_φ)
+  φh = interpolate(initial_lsf(4,0.2),V_φ)
 
   ## Interpolation and weak form
-  interp = SmoothErsatzMaterialInterpolation(η = η_coeff*maximum(Δ))
+  interp = SmoothErsatzMaterialInterpolation(η = η_coeff*maximum(el_size))
   I,H,DH,ρ = interp.I,interp.H,interp.DH,interp.ρ
 
   a(u,v,φ,dΩ,dΓ_N) = ∫((I ∘ φ)*(C ⊙ ε(u) ⊙ ε(v)))dΩ
@@ -77,12 +77,12 @@ function main()
   pcfs = PDEConstrainedFunctionals(J,[Vol],state_map,analytic_dJ=dJ,analytic_dC=[dVol])
 
   ## Hilbertian extension-regularisation problems
-  α = α_coeff*maximum(Δ)
+  α = α_coeff*maximum(el_size)
   a_hilb(p,q) =∫(α^2*∇(p)⋅∇(q) + p*q)dΩ;
   vel_ext = VelocityExtension(a_hilb,U_reg,V_reg)
   
   ## Optimiser
-  make_dir(path)
+  mkdir(path)
   optimiser = AugmentedLagrangian(pcfs,stencil,vel_ext,φh;
     γ,γ_reinit,verbose=true,constraint_names=[:Vol])
   for (it,uh,φh) in optimiser

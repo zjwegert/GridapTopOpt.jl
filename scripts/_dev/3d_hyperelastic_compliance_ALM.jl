@@ -16,7 +16,7 @@ function main(mesh_partition,distribute,el_size,δₓ)
 
   ## FE Setup
   model = CartesianDiscreteModel(ranks,mesh_partition,dom,el_size)
-  Δ = get_Δ(model)
+  el_size = get_el_size(model)
   f_Γ_D(x) = (x[1] ≈ 0.0)
   f_Γ_N(x) = (x[1] ≈ xmax) && (ymax/2-ymax*prop_Γ_N/4 - eps() <= x[2] <= ymax/2+ymax*prop_Γ_N/4 + eps()) &&
     (zmax/2-zmax*prop_Γ_N/4 - eps() <= x[3] <= zmax/2+zmax*prop_Γ_N/4 + eps())
@@ -37,11 +37,11 @@ function main(mesh_partition,distribute,el_size,δₓ)
   U_reg = TrialFESpace(V_reg,0)
 
   ## Create FE functions
-  # φh = interpolate(gen_lsf(4,0.2),V_φ)
+  # φh = interpolate(initial_lsf(4,0.2),V_φ)
   φh = interpolate(x->-1,V_φ)
 
   ## Interpolation and weak form
-  interp = SmoothErsatzMaterialInterpolation(η = η_coeff*maximum(Δ))
+  interp = SmoothErsatzMaterialInterpolation(η = η_coeff*maximum(el_size))
   I,H,DH,ρ = interp.I,interp.H,interp.DH,interp.ρ
 
   ## Material properties and loading
@@ -93,7 +93,7 @@ function main_alt(mesh_partition,distribute,el_size,gz)
 
   ## FE Setup
   model = CartesianDiscreteModel(ranks,mesh_partition,dom,el_size)
-  Δ = get_Δ(model)
+  el_size = get_el_size(model)
   f_Γ_D(x) = (x[1] ≈ 0.0)
   f_Γ_N(x) = (x[1] ≈ xmax) && (ymax/2-ymax*prop_Γ_N/4 - eps() <= x[2] <= ymax/2+ymax*prop_Γ_N/4 + eps()) &&
     (zmax/2-zmax*prop_Γ_N/4 - eps() <= x[3] <= zmax/2+zmax*prop_Γ_N/4 + eps())
@@ -116,11 +116,11 @@ function main_alt(mesh_partition,distribute,el_size,gz)
   U_reg = TrialFESpace(V_reg,0)
 
   ## Create FE functions
-  # φh = interpolate(gen_lsf(4,0.2),V_φ)
+  # φh = interpolate(initial_lsf(4,0.2),V_φ)
   φh = interpolate(x->-1,V_φ)
 
   ## Interpolation and weak form
-  interp = SmoothErsatzMaterialInterpolation(η = η_coeff*maximum(Δ))
+  interp = SmoothErsatzMaterialInterpolation(η = η_coeff*maximum(el_size))
   I,H,DH,ρ = interp.I,interp.H,interp.DH,interp.ρ
 
   ## Material properties and loading

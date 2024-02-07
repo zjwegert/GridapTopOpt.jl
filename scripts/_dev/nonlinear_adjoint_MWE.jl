@@ -29,7 +29,7 @@ function main()
 
   ## FE Setup
   model = CartesianDiscreteModel(dom,el_size);
-  Δ = get_Δ(model)
+  el_size = get_el_size(model)
   f_Γ_D(x) = (x[1] ≈ 0.0 && (x[2] <= ymax*prop_Γ_D + eps() || 
     x[2] >= ymax-ymax*prop_Γ_D - eps())) ? true : false;
   f_Γ_N(x) = (x[1] ≈ xmax && ymax/2-ymax*prop_Γ_N/4 - eps() <= x[2] <= 
@@ -52,11 +52,11 @@ function main()
   U_reg = TrialFESpace(V_reg,0)
 
   ## Create FE functions
-  φh = interpolate(gen_lsf(4,0.2),V_φ);
+  φh = interpolate(initial_lsf(4,0.2),V_φ);
   φ = get_free_dof_values(φh)
 
   ## Interpolation and weak form
-  interp = SmoothErsatzMaterialInterpolation(η = η_coeff*maximum(Δ))
+  interp = SmoothErsatzMaterialInterpolation(η = η_coeff*maximum(el_size))
   I,H,DH,ρ = interp.I,interp.H,interp.DH,interp.ρ
 
   D0 = 1;
@@ -70,7 +70,7 @@ function main()
   J = (u,φ,dΩ,dΓ_N) -> ∫((I ∘ φ)*(D ∘ u)*∇(u)⋅∇(u) + ξ*(ρ ∘ φ))dΩ
 
   ## Finite difference solver and level set function
-  stencil = AdvectionStencil(FirstOrderStencil(2,Float64),model,V_φ,Δ./order,max_steps,tol)
+  stencil = AdvectionStencil(FirstOrderStencil(2,Float64),model,V_φ,el_size./order,max_steps,tol)
   reinit!(stencil,φ,γ_reinit)
 
   ## Setup solver and FE operators

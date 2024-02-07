@@ -49,12 +49,7 @@ export update_labels!
 export initial_lsf
 export get_el_size
 export isotropic_elast_tensor
-export make_dir
 export write_vtk
-export gen_lsf # TODO: Remove
-export get_Δ # TODO: Remove
-export isotropic_2d # TODO: Remove
-export isotropic_3d # TODO: Remove
 
 include("Advection.jl")
 export AdvectionStencil
@@ -72,21 +67,12 @@ export VelocityExtension
 export project!
 
 include("Optimisers/Optimisers.jl")
-export Optimiser # TODO: Remove from exports
-export OptimiserHistory # TODO: Remove from exports
 export get_history # TODO: Add get_niter
 export write_history
 export AugmentedLagrangian
 export HilbertianProjection
-export HPModifiedGramSchmidt # TODO: Remove from exports
 
 include("Benchmarks.jl")
-export benchmark_optimizer # TODO: Remove from exports
-export benchmark_forward_problem # TODO: Remove from exports
-export benchmark_advection # TODO: Remove from exports
-export benchmark_reinitialisation # TODO: Remove from exports
-export benchmark_velocity_extension # TODO: Remove from exports
-export benchmark_hilbertian_projection_ma # TODO: Remove from exports
 
 include("Io.jl")
 export save, load, load!

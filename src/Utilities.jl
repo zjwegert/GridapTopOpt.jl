@@ -205,13 +205,6 @@ function isotropic_elast_tensor(D::Int,E::M,v::M) where M<:AbstractFloat
   end
 end
 
-function make_dir(path;ranks=nothing) # TODO: Remove and make calls in scripts `i_am_main(ranks) && mkdir(path)`
-  if i_am_main(ranks)
-    !isdir(path) ? mkdir(path) : rm(path,recursive=true);
-    !isdir(path) ? mkdir(path) : 0;
-  end
-end
-
 function write_vtk(Ω,path,it,entries::Vector{<:Pair};iter_mod=10) # TODO: Rename to writevtk?
   if isone(it) || iszero(it % iter_mod) 
     writevtk(Ω,path,cellfields=entries)
@@ -221,9 +214,3 @@ function write_vtk(Ω,path,it,entries::Vector{<:Pair};iter_mod=10) # TODO: Renam
     GC.gc() # TODO: Test in Julia 1.10.0 and check if fixed.
   end 
 end
-
-## Compatibility # Remove after adjusting scripts
-isotropic_2d(E::M,v::M) where M<:AbstractFloat = isotropic_elast_tensor(2,E,v)
-isotropic_3d(E::M,v::M) where M<:AbstractFloat = isotropic_elast_tensor(3,E,v)
-get_Δ = get_el_size
-gen_lsf = initial_lsf

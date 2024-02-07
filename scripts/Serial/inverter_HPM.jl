@@ -23,7 +23,7 @@ function main()
   γ_reinit = 0.5
   max_steps = floor(Int,minimum(el_size)/10)
   tol = 1/(10order^2)*prod(inv,minimum(el_size))
-  C = isotropic_2d(1.0,0.3)
+  C = isotropic_elast_tensor(2,1.0,0.3)
   η_coeff = 2
   α_coeff = 4
   vf = 0.4
@@ -34,7 +34,7 @@ function main()
   
   ## FE Setup
   model = CartesianDiscreteModel(dom,el_size)
-  Δ = get_Δ(model)
+  el_size = get_el_size(model)
   f_Γ_in(x) = (x[1] ≈ 0.0) && (x[2] <= 0.03 + eps())
   f_Γ_out(x) = (x[1] ≈ 1.0) && (x[2] <= 0.07 + eps())
   f_Γ_D(x) = (x[1] ≈ 0.0) && (x[2] >= 0.4)
@@ -66,11 +66,11 @@ function main()
   U_reg = TrialFESpace(V_reg,[0,0])
 
   ## Create FE functions
-  lsf_fn(x) = max(gen_lsf(6,0.2)(x),-sqrt((x[1]-1)^2+(x[2]-0.5)^2)+0.2)
+  lsf_fn(x) = max(initial_lsf(6,0.2)(x),-sqrt((x[1]-1)^2+(x[2]-0.5)^2)+0.2)
   φh = interpolate(lsf_fn,V_φ)
 
   ## Interpolation and weak form
-  interp = SmoothErsatzMaterialInterpolation(η = η_coeff*maximum(Δ))
+  interp = SmoothErsatzMaterialInterpolation(η = η_coeff*maximum(el_size))
   I,H,DH,ρ = interp.I,interp.H,interp.DH,interp.ρ
 
   a(u,v,φ,dΩ,dΓ_in,dΓ_out) = ∫((I ∘ φ)*(C ⊙ ε(u) ⊙ ε(v)))dΩ + ∫(ks*(u⋅v))dΓ_out
@@ -92,12 +92,12 @@ function main()
   pcfs = PDEConstrainedFunctionals(J,[Vol,UΓ_out],state_map,analytic_dC=[dVol,nothing])
 
   ## Hilbertian extension-regularisation problems
-  α = α_coeff*maximum(Δ)
+  α = α_coeff*maximum(el_size)
   a_hilb(p,q) = ∫(α^2*∇(p)⋅∇(q) + p*q)dΩ;
   vel_ext = VelocityExtension(a_hilb,U_reg,V_reg)
   
   ## Optimiser
-  make_dir(path)
+  mkdir(path)
   optimiser = HilbertianProjection(pcfs,stencil,vel_ext,φh;
     γ,γ_reinit,α_min=0.5,verbose=true,constraint_names=[:Vol,:UΓ_out])
   for (it,uh,φh) in optimiser
