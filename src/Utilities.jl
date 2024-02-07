@@ -168,10 +168,10 @@ end
     isotropic_elast_tensor(D::Int,E::M,v::M)
 
 Generate an isotropic `SymFourthOrderTensorValue` given
-a dimension `D`, Young's modulus `E`, and Poisson's ratio `v`.
+a dimension `D`, Young's modulus `E`, and Poisson's ratio `v`. 
 """
 function isotropic_elast_tensor(D::Int,E::M,v::M) where M<:AbstractFloat
-  if D == 1
+  if D == 2
     λ = E*v/((1+v)*(1-v)); μ = E/(2*(1+v))
     C = [
       λ+2μ  λ     0
@@ -183,8 +183,8 @@ function isotropic_elast_tensor(D::Int,E::M,v::M) where M<:AbstractFloat
       C[1,3], C[3,3], C[2,3],
       C[1,2], C[3,2], C[2,2]
     )
-  elseif D == 2
-    λ = E*v/((1+v)*(1-2ν)); μ = E/(2*(1+v))
+  elseif D == 3
+    λ = E*v/((1+v)*(1-2v)); μ = E/(2*(1+v))
     C = [
       λ+2μ   λ      λ      0      0      0
       λ     λ+2μ    λ      0      0      0
