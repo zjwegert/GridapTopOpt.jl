@@ -1,4 +1,4 @@
-module LSTO_Distributed
+module LevelSetTopOpt
 
 using MPI
 using BlockArrays, SparseArrays, CircularArrays
