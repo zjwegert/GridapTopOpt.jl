@@ -2,7 +2,9 @@
   struct AugmentedLagrangian{N,O} <: Optimiser
 
 An augmented Lagrangian method based on Nocedal and Wright, 2006
-([link](https://doi.org/10.1007/978-0-387-40065-5)).
+([link](https://doi.org/10.1007/978-0-387-40065-5)). Note that
+this method will function as a Lagrangian method if no constraints
+are defined in `problem::PDEConstrainedFunctionals`.
 
 # Parameters
 
