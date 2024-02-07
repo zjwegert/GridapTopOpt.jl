@@ -188,9 +188,9 @@ struct HilbertianProjection{T,N} <: Optimiser
   - `converged::Function = default_hp_converged`: Convergence criteria.
   - `debug = false`: Debug flag.
   - `α_min ∈ [0,1] = 0.1`: Controls lower bound on on the projected objective descent coefficent.
-  `α_min = 1` ignores the objective function and instead solves a constraint satisfaction problem. 
+    `α_min = 1` ignores the objective function and instead solves a constraint satisfaction problem. 
   - `α_max ∈ [0,1] = 1.0`: Controls the upper bound on the projected objective descent coeffient.
-  Typically this shouldn't change unless wanting to approach the optimum 'slower'.
+    Typically this shouldn't change unless wanting to approach the optimum 'slower'.
   - `λ = 0.5`: The rate of contraint decrease.
 
   Note that in practice we usually only adjust `α_min` to control the balance between improving the 

@@ -2,10 +2,10 @@
     struct SmoothErsatzMaterialInterpolation{M<:AbstractFloat}
 
 A wrapper holding parameters and methods for interpolating an 
-integrand across a single boundary ∂Ω.
+integrand across a single boundary ``\\partial\\Omega``.
 
-E.g., ∫(f)dΩ = ∫(I(φ)f)dD where Ω⊂D is described by a level-set
-function φ and I is an indicator function.
+E.g., ``\\int f~\\mathrm{d}\\Omega = \\int I(\\varphi)f~\\mathrm{d}D`` where ``\\Omega\\subset D`` is described by a level-set
+function ``\\varphi`` and ``I`` is an indicator function.
 
 # Properties
 
@@ -14,7 +14,8 @@ function φ and I is an indicator function.
 - `H`: a smoothed Heaviside function
 - `DH`: the derivative of `H`
 - `I`: an indicator function
-- `ρ`: a function describing the volume density of Ω (e.g., Vol(Ω) = ∫(ρ(φ))dΩ)
+- `ρ`: a function describing the volume density of ``\\Omega`` 
+  (e.g., ``\\mathrm{Vol}(\\Omega) = \\int \\rho(\\varphi))~\\mathrm{d}D)``
 """
 Base.@kwdef struct SmoothErsatzMaterialInterpolation{M<:AbstractFloat}
   η::M

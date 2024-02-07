@@ -4,12 +4,15 @@
 Finite difference stencil for a single step of the Hamilton-Jacobi 
 evolution equation (Eqn. 1) and reinitialisation equation (Eqn. 2).
 
-Equation 1:
- ∂ϕ/∂t + V|∇ϕ| = 0 for x∈D, t>0
-with ϕ(0,x) = ϕ₀ for x∈D.
-Equation 2:
- ∂ϕ/∂t + Sign(ϕ₀)(|∇ϕ|-1) = 0 for x∈D, t>0
-with ϕ(0,x) = ϕ₀ for x∈D.
+# Hamilton-Jacobi evolution equation (Eqn. 1)
+``\\frac{\\partial\\phi}{\\partial t} + V(\\boldsymbol{x})\\lVert\\boldsymbol{\\nabla}\\phi\\rVert = 0,``
+
+with ``\\phi(0,\\boldsymbol{x})=\\phi_0(\\boldsymbol{x})`` and ``\\boldsymbol{x}\\in D,~t\\in(0,T)``.
+
+# Reinitialisation equation (Eqn. 2)
+``\\frac{\\partial\\phi}{\\partial t} + \\mathrm{sign}(\\phi_0)(\\lVert\\boldsymbol{\\nabla}\\phi\\rVert-1) = 0,``
+
+with ``\\phi(0,\\boldsymbol{x})=\\phi_0(\\boldsymbol{x})`` and ``\\boldsymbol{x}\\in D,~t\\in(0,T)``.
 """
 abstract type Stencil end
 

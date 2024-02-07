@@ -1,18 +1,20 @@
 """
     benchmark(f, args, ranks; nreps, reset!)
 
-Benchmark a function `f` that takes arguments `args`. In MPI mode, 
-benchmark will always return the maximum CPU time across all ranks.
+Benchmark a function `f` that takes arguments `args`. 
+  
+In MPI mode, benchmark will always return the maximum CPU time across all ranks.
 This behaviour can be changed by overwritting `process_timer`.
 
 # Important
 The input `ranks` allows the user to provide the MPI ranks, `benchmark`
-will not function correctly in MPI mode if these are not supplied.
+will not function correctly in MPI mode if these are not supplied. In serial,
+set `ranks = nothing`.
 
 # Optional
 
 - `nreps = 10`: Number of benchmark repetitions
-- `reset!= (x...) -> nothing`: Function for reseting inital data (e.g., level-set function φ). 
+- `reset!= (x...) -> nothing`: Function for resetting inital data (e.g., level-set function ``\\varphi``). 
 """
 function benchmark(f, args, ranks::Nothing; nreps = 10, reset! = (x...) -> nothing)
   t = zeros(Float64,nreps)
