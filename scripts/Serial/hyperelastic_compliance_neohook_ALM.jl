@@ -1,4 +1,4 @@
-using Gridap, LSTO_Distributed
+using Gridap, LevelSetTopOpt
 
 """
   (Serial) Minimum hyperelastic (neohookean) compliance with augmented Lagrangian method in 2D.

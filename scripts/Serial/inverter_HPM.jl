@@ -1,4 +1,4 @@
-using Gridap, LSTO_Distributed
+using Gridap, LevelSetTopOpt
 
 """
   (Serial) Inverter mechanism with Hilbertian projection method in 2D.

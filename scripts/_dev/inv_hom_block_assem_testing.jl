@@ -1,5 +1,5 @@
 using Gridap, Gridap.MultiField, GridapDistributed, GridapPETSc, GridapSolvers, 
-  PartitionedArrays, LSTO_Distributed, SparseMatricesCSR
+  PartitionedArrays, LevelSetTopOpt, SparseMatricesCSR
 
 nothing
   
@@ -91,11 +91,11 @@ assem_adjoint = DiagonalBlockMatrixAssembler(SparseMatrixAssembler(V,U));
 adjoint_K = assemble_matrix((u,v) -> a(v,u,φh,dΩ),assem_adjoint,V,U);
 
 ## Update mat and vec
-LSTO_Distributed._assemble_matrix_and_vector!((u,v) -> a(u,v,φh,dΩ),v -> l(v,φh,dΩ),K,b,assem,U,V,uhd)
+LevelSetTopOpt._assemble_matrix_and_vector!((u,v) -> a(u,v,φh,dΩ),v -> l(v,φh,dΩ),K,b,assem,U,V,uhd)
 # numerical_setup!(...)
 
 ## Update adjoint
-LSTO_Distributed.assemble_matrix!((u,v) -> a(v,u,φh,dΩ),adjoint_K,assem_adjoint,V,U)
+LevelSetTopOpt.assemble_matrix!((u,v) -> a(v,u,φh,dΩ),adjoint_K,assem_adjoint,V,U)
 
 ### Test
 @time op_test = AffineFEOperator((u,v) -> a(u,v,φh,dΩ),v -> l(v,φh,dΩ),U,V,SparseMatrixAssembler(U,V))

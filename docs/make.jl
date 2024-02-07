@@ -1,10 +1,10 @@
 using Documenter
-using LSTO_Distributed
+using LevelSetTopOpt
 
 makedocs(
-    sitename = "LSTO_Distributed",
+    sitename = "LevelSetTopOpt",
     format = Documenter.HTML(),
-    modules = [LSTO_Distributed]
+    modules = [LevelSetTopOpt]
 )
 
 # Documenter can also automatically deploy documentation to gh-pages.

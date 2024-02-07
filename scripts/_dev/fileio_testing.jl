@@ -1,6 +1,6 @@
-using Gridap, GridapDistributed, GridapPETSc, PartitionedArrays, LSTO_Distributed
+using Gridap, GridapDistributed, GridapPETSc, PartitionedArrays, LevelSetTopOpt
 
-using LSTO_Distributed: save, load, load!, psave, pload, pload!
+using LevelSetTopOpt: save, load, load!, psave, pload, pload!
 
 with_debug() do distribute
   mesh_partition = (2,2)

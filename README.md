@@ -1,4 +1,4 @@
-# LSTO_Distributed
+# LevelSetTopOpt
 
 ## To-do for paper:
 
@@ -288,7 +288,7 @@ The following PBS script is provided for setting up `MPI.jl` in conjuction with 
 ```
 #!/bin/bash -l
 
-#PBS -P LSTO_Distributed_Setup
+#PBS -P LevelSetTopOpt_Setup
 #PBS -l ncpus=1
 #PBS -l mem=32GB
 #PBS -l walltime=00:30:00

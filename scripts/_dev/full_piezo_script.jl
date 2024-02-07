@@ -5,7 +5,7 @@ using GridapPETSc: PetscScalar, PetscInt, PETSC,  @check_error_code
 using PartitionedArrays
 using SparseMatricesCSR
 using ChainRulesCore
-using LSTO_Distributed
+using LevelSetTopOpt
 
 using GridapSolvers
 using Gridap.MultiField

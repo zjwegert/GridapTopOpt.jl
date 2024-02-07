@@ -1,7 +1,7 @@
 using Gridap, Gridap.MultiField, GridapDistributed, GridapPETSc, GridapSolvers, 
-  PartitionedArrays, LSTO_Distributed, SparseMatricesCSR
+  PartitionedArrays, LevelSetTopOpt, SparseMatricesCSR
 
-using LSTO_Distributed: get_deriv_space, get_aux_space,benchmark_optimizer,
+using LevelSetTopOpt: get_deriv_space, get_aux_space,benchmark_optimizer,
   benchmark_forward_problem,benchmark_advection,benchmark_reinitialisation,
   benchmark_velocity_extension,benchmark_hilbertian_projection_map
 

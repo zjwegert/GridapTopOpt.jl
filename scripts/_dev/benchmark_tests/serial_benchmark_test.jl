@@ -1,4 +1,4 @@
-using Gridap, GridapDistributed, GridapPETSc, PartitionedArrays, LSTO_Distributed
+using Gridap, GridapDistributed, GridapPETSc, PartitionedArrays, LevelSetTopOpt
 
 function main()
   ## Parameters
@@ -79,8 +79,8 @@ function main_benchmark()
   ## Benchmark forward problem
   bfwd = benchmark_forward_problem(opt.problem.state_map, opt.φ0, nothing)
   ## Benchmark advection
-  v = get_free_dof_values(interpolate(FEFunction(LSTO_Distributed.get_deriv_space(opt.problem.state_map),
-    opt.problem.dJ),LSTO_Distributed.get_aux_space(opt.problem.state_map)))
+  v = get_free_dof_values(interpolate(FEFunction(LevelSetTopOpt.get_deriv_space(opt.problem.state_map),
+    opt.problem.dJ),LevelSetTopOpt.get_aux_space(opt.problem.state_map)))
   badv = benchmark_advection(opt.stencil, get_free_dof_values(opt.φ0), v, 0.1, nothing)
   ## Benchmark reinitialisation
   brinit = benchmark_reinitialisation(opt.stencil, get_free_dof_values(opt.φ0), 0.1, nothing)

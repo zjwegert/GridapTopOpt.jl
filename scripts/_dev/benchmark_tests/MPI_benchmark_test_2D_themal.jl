@@ -1,4 +1,4 @@
-using Gridap, GridapDistributed, GridapPETSc, PartitionedArrays, LSTO_Distributed
+using Gridap, GridapDistributed, GridapPETSc, PartitionedArrays, LevelSetTopOpt
 
 """
 (MPI) Minimum thermal compliance with Lagrangian method in 2D.
@@ -88,8 +88,8 @@ with_debug() do distribute
   ## Benchmark forward problem
   bfwd = benchmark_forward_problem(opt.problem.state_map, opt.φ0, ranks)
   ## Benchmark advection
-  v = get_free_dof_values(interpolate(FEFunction(LSTO_Distributed.get_deriv_space(opt.problem.state_map),
-    opt.problem.dJ),LSTO_Distributed.get_aux_space(opt.problem.state_map)))
+  v = get_free_dof_values(interpolate(FEFunction(LevelSetTopOpt.get_deriv_space(opt.problem.state_map),
+    opt.problem.dJ),LevelSetTopOpt.get_aux_space(opt.problem.state_map)))
   badv = benchmark_advection(opt.stencil, get_free_dof_values(opt.φ0), v, 0.1, ranks)
   ## Benchmark reinitialisation
   brinit = benchmark_reinitialisation(opt.stencil, get_free_dof_values(opt.φ0), 0.1, ranks)

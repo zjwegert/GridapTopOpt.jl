@@ -1,5 +1,5 @@
 using Gridap, Gridap.MultiField, GridapDistributed, GridapPETSc, GridapSolvers, 
-  PartitionedArrays, LSTO_Distributed, SparseMatricesCSR
+  PartitionedArrays, LevelSetTopOpt, SparseMatricesCSR
 using GridapSolvers: NewtonSolver
 
 function main(mesh_partition,distribute,el_size,δₓ)
@@ -71,7 +71,7 @@ function main(mesh_partition,distribute,el_size,δₓ)
   )
 
   ## Optimiser
-  u = LSTO_Distributed.forward_solve(state_map,φh)
+  u = LevelSetTopOpt.forward_solve(state_map,φh)
   uh = FEFunction(U,u)
   write_vtk(Ω,path*"/struc_$δₓ",0,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh)),"uh"=>uh];iter_mod=1)
 end
@@ -171,7 +171,7 @@ function main_alt(mesh_partition,distribute,el_size,gz)
   )
 
   ## Optimiser
-  u = LSTO_Distributed.forward_solve(state_map,φh)
+  u = LevelSetTopOpt.forward_solve(state_map,φh)
   uh = FEFunction(U,u)
   write_vtk(Ω,path*"/struc_neohook_$gz",0,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh)),"uh"=>uh];iter_mod=1)
 end
