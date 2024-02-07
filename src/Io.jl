@@ -1,5 +1,5 @@
 """
-  save(filename::AbstractString, x)
+    save(filename::AbstractString, x)
 
 Save an object `x` to `filename` as a JLD2 file.
 
@@ -10,7 +10,7 @@ function save(filename::AbstractString, x)
 end
 
 """
-  load(filename::AbstractString)
+    load(filename::AbstractString)
 
 Load an object stored in a JLD2 file at `filename`.
 
@@ -21,7 +21,7 @@ function load(filename::AbstractString)
 end
 
 """
-  load!(filename::AbstractString, x)
+    load!(filename::AbstractString, x)
 
 Load an object stored in a JLD2 file at `filename` and copy its
 contents to `x`.
@@ -35,7 +35,7 @@ function load!(filename::AbstractString, x)
 end
 
 """
-  psave(filename::AbstractString, x)
+    psave(filename::AbstractString, x)
 
 Save a partitioned object `x` to a directory `dir` as 
 a set of JLD2 files corresponding to each part.
@@ -51,7 +51,7 @@ function psave(dir::AbstractString, x)
 end
 
 """
-  pload(dir::AbstractString, ranks::AbstractArray{<:Integer})
+    pload(dir::AbstractString, ranks::AbstractArray{<:Integer})
 
 Load a partitioned object stored in a set of JLD2 files in directory `dir`
 indexed by MPI ranks `ranks`.
@@ -65,7 +65,7 @@ function pload(dir::AbstractString, ranks::AbstractArray{<:Integer})
 end
 
 """
-  pload!(dir::AbstractString, x)
+    pload!(dir::AbstractString, x)
 
 Load a partitioned object stored in a set of JLD2 files in directory `dir`
 and copy contents to the equivilent object `x`.

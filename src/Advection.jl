@@ -1,5 +1,5 @@
 """
-  abstract type Stencil
+    abstract type Stencil
 
 Finite difference stencil for a single step of the Hamilton-Jacobi 
 evolution equation (Eqn. 1) and reinitialisation equation (Eqn. 2).
@@ -21,7 +21,7 @@ function allocate_caches(::Stencil,φ,vel)
 end
 
 """
-  reinit!(::Stencil,φ_new,φ,vel,Δt,Δx,isperiodic,caches) -> φ
+    reinit!(::Stencil,φ_new,φ,vel,Δt,Δx,isperiodic,caches) -> φ
 
 Single finite difference step of the reinitialisation equation for a given `Stencil`.
 """
@@ -30,7 +30,7 @@ function reinit!(::Stencil,φ_new,φ,vel,Δt,Δx,isperiodic,caches)
 end
 
 """
-  advect!(::Stencil,φ,vel,Δt,Δx,isperiodic,caches) -> φ
+    advect!(::Stencil,φ,vel,Δt,Δx,isperiodic,caches) -> φ
 
 Single finite difference step of the Hamilton-Jacobi evoluation equation for a given
 `Stencil`. 
@@ -44,7 +44,7 @@ function compute_Δt(::Stencil,φ,vel)
 end
 
 """
-  struct FirstOrderStencil{D,T} <: Stencil end
+    struct FirstOrderStencil{D,T} <: Stencil end
 
 Godunov upwind difference scheme based on Osher and Fedkiw 
 ([link](https://doi.org/10.1007/b98879)).
@@ -161,7 +161,7 @@ function compute_Δt(::FirstOrderStencil{D,T},Δ,γ,φ,vel) where {D,T}
 end
 
 """
-  struct AdvectionStencil{O}
+    struct AdvectionStencil{O}
 
 Wrapper to enable finite differences on order `O` finite elements.
 
@@ -184,7 +184,7 @@ struct AdvectionStencil{O}
 end
 
 """
-  AdvectionStencil(stencil::Stencil,model,space,tol,max_steps,max_steps_reinit)
+    AdvectionStencil(stencil::Stencil,model,space,tol,max_steps,max_steps_reinit)
 
 Create an instance of `AdvectionStencil` given a stencil, model, FE space, and 
 additional optional arguments. This automatically creates the DoF permutation
@@ -235,7 +235,7 @@ end
 Gridap.ReferenceFEs.get_order(f::Gridap.Fields.LinearCombinationFieldVector) = get_order(f.fields)
 
 """
-  create_dof_permutation(
+    create_dof_permutation(
     model::CartesianDiscreteModel{Dc},
     space::UnconstrainedFESpace,
     order::Integer) where Dc -> n2o_dof_map
@@ -346,7 +346,7 @@ function advect!(s::AdvectionStencil,φh,args...)
 end
 
 """
-  advect!(s::AdvectionStencil{O},φ,vel,γ) where O
+    advect!(s::AdvectionStencil{O},φ,vel,γ) where O
 
 Solve the Hamilton-Jacobi evolution equation using the `AdvectionStencil` `s`.
 
@@ -405,7 +405,7 @@ function reinit!(s::AdvectionStencil,φh,args...)
 end
 
 """
-  reinit!(s::AdvectionStencil{O},φ,γ) where O
+    reinit!(s::AdvectionStencil{O},φ,γ) where O
 
 Solve the reinitialisation equation using the `AdvectionStencil` `s`.
 

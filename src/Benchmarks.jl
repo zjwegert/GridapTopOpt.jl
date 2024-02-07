@@ -1,5 +1,5 @@
 """
-  benchmark(f, args, ranks; nreps, reset!)
+    benchmark(f, args, ranks; nreps, reset!)
 
 Benchmark a function `f` that takes arguments `args`. In MPI mode, 
 benchmark will always return the maximum CPU time across all ranks.
@@ -57,7 +57,7 @@ end
 
 ## Standard benchmarks
 """
-  benchmark_optimizer(m::Optimiser, niter, ranks; nreps)
+    benchmark_optimizer(m::Optimiser, niter, ranks; nreps)
 
 Given an optimiser `m`, benchmark `niter` iterations.
 """
@@ -78,7 +78,7 @@ function benchmark_optimizer(m::Optimiser, niter, ranks; nreps = 10)
 end
 
 """
-  benchmark_forward_problem(m::AbstractFEStateMap, φh, ranks; nreps)
+    benchmark_forward_problem(m::AbstractFEStateMap, φh, ranks; nreps)
 
 Benchmark the forward FE solve given `m::AbstractFEStateMap` and a level-set 
 function `φh`. See [`forward_solve`](@ref) for input types.
@@ -95,7 +95,7 @@ function benchmark_forward_problem(m::AbstractFEStateMap, φh, ranks; nreps = 10
 end
 
 """
-  benchmark_advection(stencil::AdvectionStencil, φ0, v0, γ, ranks; nreps)
+    benchmark_advection(stencil::AdvectionStencil, φ0, v0, γ, ranks; nreps)
 
 Benchmark solving the Hamilton-Jacobi evolution equation given a `stencil`,
 level-set function `φ0`, velocity function `v0`, and time step coefficient `γ`. 
@@ -115,7 +115,7 @@ function benchmark_advection(stencil::AdvectionStencil, φ0, v0, γ, ranks; nrep
 end
 
 """
-  benchmark_reinitialisation(stencil::AdvectionStencil, φ0, γ_reinit, ranks; nreps)
+    benchmark_reinitialisation(stencil::AdvectionStencil, φ0, γ_reinit, ranks; nreps)
 
 Benchmark solving the reinitialisation equation given a `stencil`, level-set function
 `φ0`, and time step coefficient `γ`. See [`reinit!`](@ref) for input types.
@@ -132,7 +132,7 @@ function benchmark_reinitialisation(stencil::AdvectionStencil, φ0, γ_reinit, r
 end
 
 """
-  benchmark_velocity_extension(ext::VelocityExtension, v0, ranks; nreps)
+    benchmark_velocity_extension(ext::VelocityExtension, v0, ranks; nreps)
 
 Benchmark the Hilbertian velocity-extension method `ext` given a RHS `v0`.
 See [`project!`](@ref) for input types.
@@ -149,11 +149,11 @@ function benchmark_velocity_extension(ext::VelocityExtension, v0, ranks; nreps =
 end
 
 """
-  benchmark_hilbertian_projection_map(m::HilbertianProjectionMap, dV, C, dC, K, ranks; nreps)
+    benchmark_hilbertian_projection_map(m::HilbertianProjectionMap, dV, C, dC, K, ranks; nreps)
 
-Benchmark the `HilbertianProjectionMap` given a objective sensitivity `dV`, constraint values C,
-constraint sensitivities `dC`, and stiffness matrix `K` for the velocity-extension.
-See [`update_descent_direction!`](@ref) for input types.
+Benchmark `update_descent_direction!` for `HilbertianProjectionMap` given a objective 
+sensitivity `dV`, constraint values C, constraint sensitivities `dC`, and stiffness
+matrix `K` for the velocity-extension.
 """
 function benchmark_hilbertian_projection_map(m::HilbertianProjectionMap, dV, C, dC, K, ranks; nreps = 10)
   function f(m,dV,C,dC,K)

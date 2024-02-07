@@ -1,5 +1,5 @@
 """
-  struct AugmentedLagrangian{N,O} <: Optimiser
+    struct AugmentedLagrangian{N,O} <: Optimiser
 
 An augmented Lagrangian method based on Nocedal and Wright, 2006
 ([link](https://doi.org/10.1007/978-0-387-40065-5)). Note that
@@ -32,16 +32,16 @@ struct AugmentedLagrangian{N,O} <: Optimiser
   φ0 # TODO: Please remove me
   
   @doc """
-    AugmentedLagrangian(
-      problem :: PDEConstrainedFunctionals{N},
-      stencil :: AdvectionStencil{O},
-      vel_ext :: VelocityExtension,
-      φ0;
-      Λ_max = 5.0, ζ = 1.1, update_mod = 5, γ = 0.1, γ_reinit = 0.5, os_γ_mult = 0.75,
-      maxiter = 1000, verbose=false, constraint_names = map(i -> Symbol("C_\$i"),1:N),
-      converged::Function = default_al_converged, debug = false,
-      has_oscillations::Function = default_has_oscillations
-    ) where {N,O}
+      AugmentedLagrangian(
+        problem :: PDEConstrainedFunctionals{N},
+        stencil :: AdvectionStencil{O},
+        vel_ext :: VelocityExtension,
+        φ0;
+        Λ_max = 5.0, ζ = 1.1, update_mod = 5, γ = 0.1, γ_reinit = 0.5, os_γ_mult = 0.75,
+        maxiter = 1000, verbose=false, constraint_names = map(i -> Symbol("C_\$i"),1:N),
+        converged::Function = default_al_converged, debug = false,
+        has_oscillations::Function = default_has_oscillations
+      ) where {N,O}
 
   Create an instance of `AugmentedLagrangian` with several adjustable defaults.
 

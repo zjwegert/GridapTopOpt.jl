@@ -1,7 +1,6 @@
 # LevelSetTopOpt.jl
 
 Documentation for LevelSetTopOpt.jl
-
 ```@autodocs
-Modules = [LevelSetTopOpt,]
+Modules = [LevelSetTopOpt]
 ```

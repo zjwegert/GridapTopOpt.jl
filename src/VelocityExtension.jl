@@ -1,5 +1,5 @@
 """
-  struct VelocityExtension{A,B}
+    struct VelocityExtension{A,B}
 
 Wrapper to hold a stiffness matrix and a cache for
 the Hilbertian extension-regularisation. See Allaire et al. 2022
@@ -16,7 +16,7 @@ struct VelocityExtension{A,B}
 end
 
 """
-  VelocityExtension(biform,U_reg,V_reg;assem,ls)
+    VelocityExtension(biform,U_reg,V_reg;assem,ls)
   
 Create an instance of `VelocityExtension` given a bilinear form `biform`,
 trial space `U_reg`, and test space `V_reg`.
@@ -41,7 +41,7 @@ function VelocityExtension(
 end
 
 """
-  project!(vel_ext::VelocityExtension,dF::AbstractVector) -> dF
+    project!(vel_ext::VelocityExtension,dF::AbstractVector) -> dF
 
 Project shape derivative `dF` onto a function space described
 by the `vel_ext`.

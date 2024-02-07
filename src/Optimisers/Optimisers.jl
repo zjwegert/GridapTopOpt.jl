@@ -1,5 +1,5 @@
 """
-  abstract type Optimiser
+    abstract type Optimiser
 
 Your own optimiser can be implemented by implementing 
 concrete functionality of the below.
@@ -43,7 +43,7 @@ function print_msg(opt::Optimiser,msg::String;kwargs...)
 end
 
 """
-  mutable struct OptimiserHistory{T}
+    mutable struct OptimiserHistory{T}
 
 Track historical information on optimisation problem
 iteration history.
@@ -74,15 +74,15 @@ mutable struct OptimiserHistory{T}
 end
 
 """
-  OptimiserHistory(
-    T::Type{<:Real},
-    keys::Vector{Symbol},
-    bundles::Dict{Symbol,Vector{Symbol}}=Dict{Symbol,Vector{Symbol}}(),
-    maxiter = 200,
-    verbose = SOLVER_VERBOSE_NONE
-  )
+    OptimiserHistory(
+      T::Type{<:Real},
+      keys::Vector{Symbol},
+      bundles::Dict{Symbol,Vector{Symbol}}=Dict{Symbol,Vector{Symbol}}(),
+      maxiter = 200,
+      verbose = SOLVER_VERBOSE_NONE
+    )
 
-Create an instant of Optimiser history with some defaults for
+Create an instance of Optimiser history with some defaults for
 `bundles`, `maxiter`, and `verbose`.
 """
 function OptimiserHistory(
@@ -195,7 +195,7 @@ function print_msg(h::OptimiserHistory,msg::String;kwargs...)
 end
 
 """
-  struct OptimiserHistorySlice{T} end
+    struct OptimiserHistorySlice{T} end
 
 A read-only wrapper of OptimiserHistory for IO display 
 of iteration history at a specific iteration.

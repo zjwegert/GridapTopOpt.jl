@@ -1,6 +1,6 @@
 
 """
-  OrthogonalisationMap
+    OrthogonalisationMap
 """
 abstract type OrthogonalisationMap <: Gridap.Arrays.Map end
 
@@ -8,7 +8,7 @@ Gridap.Arrays.evaluate!(cache,::OrthogonalisationMap,::AbstractArray{<:AbstractA
 Gridap.Arrays.return_cache(::OrthogonalisationMap,::AbstractArray{<:AbstractArray},::AbstractMatrix) = @abstractmethod
 
 """
-  HPModifiedGramSchmidt
+    HPModifiedGramSchmidt
 
 High performance modified Gram-Schmidt. Based on Algorithm 6 in this [paper](https://doi.org/10.1007/s13160-019-00356-4).
 """

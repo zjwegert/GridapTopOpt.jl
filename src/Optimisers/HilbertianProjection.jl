@@ -124,7 +124,7 @@ function compute_α(C,dC_orthog,dC,normsq,K,P,λ,α_min,α_max)
 end
 
 """
-  struct HilbertianProjection{T,N} <: Optimiser
+    struct HilbertianProjection{T,N} <: Optimiser
 
 A Hilbertian projection method as described by Wegert et al., 2023 
 ([link](https://doi.org/10.1007/s00158-023-03663-0)).
@@ -152,19 +152,19 @@ struct HilbertianProjection{T,N} <: Optimiser
   φ0 # TODO: Remove me please
 
   @doc """
-    HilbertianProjection(
-      problem :: PDEConstrainedFunctionals{N},
-      stencil :: AdvectionStencil,
-      vel_ext :: VelocityExtension,
-      φ0;
-      orthog = HPModifiedGramSchmidt(),
-      λ=0.5, α_min=0.1, α_max=1.0, γ=0.1, γ_reinit=0.5,
-      ls_max_iters = 10, ls_δ_inc = 1.1, ls_δ_dec = 0.7,
-      ls_ξ = 0.0025, ls_ξ_reduce_coef = 0.1, ls_ξ_reduce_abs_tol = 0.01,
-      ls_γ_min = 0.001, ls_γ_max = 0.1,
-      maxiter = 1000, verbose=false, constraint_names = map(i -> Symbol("C_\$i"),1:N),
-      converged::Function = default_hp_converged, debug = false
-    ) where {N}
+      HilbertianProjection(
+        problem :: PDEConstrainedFunctionals{N},
+        stencil :: AdvectionStencil,
+        vel_ext :: VelocityExtension,
+        φ0;
+        orthog = HPModifiedGramSchmidt(),
+        λ=0.5, α_min=0.1, α_max=1.0, γ=0.1, γ_reinit=0.5,
+        ls_max_iters = 10, ls_δ_inc = 1.1, ls_δ_dec = 0.7,
+        ls_ξ = 0.0025, ls_ξ_reduce_coef = 0.1, ls_ξ_reduce_abs_tol = 0.01,
+        ls_γ_min = 0.001, ls_γ_max = 0.1,
+        maxiter = 1000, verbose=false, constraint_names = map(i -> Symbol("C_\$i"),1:N),
+        converged::Function = default_hp_converged, debug = false
+      ) where {N}
 
   Create an instance of `HilbertianProjection` with several adjustable defaults
   including the orthogonalisation method. By default the later is [`HPModifiedGramSchmidt`](@ref).
@@ -209,7 +209,7 @@ struct HilbertianProjection{T,N} <: Optimiser
 
   A more concervative evolution of the boundary can be achieved by decreasing `ls_γ_max`.
   """
-  function HilbertianProjection(
+    function HilbertianProjection(
     problem :: PDEConstrainedFunctionals{N},
     stencil :: AdvectionStencil,
     vel_ext :: VelocityExtension,

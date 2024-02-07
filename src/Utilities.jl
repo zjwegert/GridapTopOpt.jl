@@ -1,5 +1,5 @@
 """
-  struct SmoothErsatzMaterialInterpolation{M<:AbstractFloat}
+    struct SmoothErsatzMaterialInterpolation{M<:AbstractFloat}
 
 A wrapper holding parameters and methods for interpolating an 
 integrand across a single boundary ∂Ω.
@@ -50,7 +50,7 @@ end
 ## Helpers
 
 """
-  update_labels!(e::Int,model,f_Γ::Function,name::String)
+    update_labels!(e::Int,model,f_Γ::Function,name::String)
 
 Given a tag number `e`, a `CartesianDiscreteModel` or `DistributedDiscreteModel` model,
 an indicator function `f_Γ`, and a string `name`, label the corresponding vertices, edges, and faces
@@ -136,7 +136,7 @@ function mark_nodes(f,model::DiscreteModel)
 end
 
 """
-  initial_lsf(ξ,a;b)
+    initial_lsf(ξ,a;b)
 
 Generate a function `f` according to
 f(x) = -1/4 ∏ᵢ(cos(ξ*π*(xᵢ-bᵢ))) - a/4
@@ -145,7 +145,7 @@ where x is a vector with components xᵢ.
 initial_lsf(ξ,a;b=0) = x::VectorValue -> -1/4*prod(cos.(get_array(@.(ξ*pi*(x-b))))) - a/4
 
 """
-  get_el_size(model)
+    get_el_size(model)
 
 Given a CartesianDiscreteModel or DistributedDiscreteModel that is
 uniform, return the element size as a tuple. 
@@ -164,7 +164,7 @@ function get_el_size(model::DistributedDiscreteModel)
 end
 
 """
-  isotropic_elast_tensor(D::Int,E::M,v::M)
+    isotropic_elast_tensor(D::Int,E::M,v::M)
 
 Generate an isotropic `SymFourthOrderTensorValue` given
 a dimension `D`, Young's modulus `E`, and Poisson's ratio `v`.

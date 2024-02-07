@@ -3,7 +3,7 @@ using LevelSetTopOpt
 
 makedocs(
     sitename = "LevelSetTopOpt",
-    format = Documenter.HTML(),
+    format = Documenter.HTML(prettyurls = false),
     modules = [LevelSetTopOpt]
 )
 
