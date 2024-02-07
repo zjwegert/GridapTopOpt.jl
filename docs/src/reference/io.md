@@ -1,13 +1,22 @@
 # IO
 
-## Serial
+## Optimiser history and visualisation
+```@docs
+LevelSetTopOpt.write_history
+```
+
+```@docs
+LevelSetTopOpt.write_vtk
+```
+
+## Object IO in serial
 ```@docs
 LevelSetTopOpt.save
 LevelSetTopOpt.load
 LevelSetTopOpt.load!
 ```
 
-## Parallel
+## Object IO in parallel
 ```@docs
 LevelSetTopOpt.psave
 LevelSetTopOpt.pload

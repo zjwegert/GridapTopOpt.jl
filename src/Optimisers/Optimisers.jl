@@ -180,6 +180,12 @@ function Base.write(io::IO,h::OptimiserHistory)
   Base.write(io,content)
 end
 
+"""
+    write_history(path::String,h::OptimiserHistory;ranks=nothing)
+  
+Write the contents of an `OptimiserHistory` object to a `path`.
+Provide MPI `ranks` when running in parallel.
+"""
 function write_history(path::String,h::OptimiserHistory;ranks=nothing)
   if i_am_main(ranks)
     open(path,"w") do f
