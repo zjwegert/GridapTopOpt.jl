@@ -46,7 +46,8 @@ end
 """
   struct FirstOrderStencil{D,T} <: Stencil end
 
-Godunov upwind difference scheme based on Osher and Fedkiw (10.1007/b98879).
+Godunov upwind difference scheme based on Osher and Fedkiw 
+([link](https://doi.org/10.1007/b98879)).
 """
 struct FirstOrderStencil{D,T} <: Stencil
   function FirstOrderStencil(D::Integer,::Type{T}) where T<:Real

@@ -2,8 +2,8 @@
   struct VelocityExtension{A,B}
 
 Wrapper to hold a stiffness matrix and a cache for
-the Hilbertian extension-regularisation. See Allaire et al.
-(10.1016/bs.hna.2020.10.004_978-0-444-64305-6_2021).
+the Hilbertian extension-regularisation. See Allaire et al. 2022
+([link](https://doi.org/10.1016/bs.hna.2020.10.004)).
 
 # Properties
 

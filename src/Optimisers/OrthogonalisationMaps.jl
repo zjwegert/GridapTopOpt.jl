@@ -10,7 +10,7 @@ Gridap.Arrays.return_cache(::OrthogonalisationMap,::AbstractArray{<:AbstractArra
 """
   HPModifiedGramSchmidt
 
-  High performance modified Gram-Schmidt. Based on Algorithm 6 in https://doi.org/10.1007/s13160-019-00356-4.
+High performance modified Gram-Schmidt. Based on Algorithm 6 in this [paper](https://doi.org/10.1007/s13160-019-00356-4).
 """
 struct HPModifiedGramSchmidt <: OrthogonalisationMap end
 
