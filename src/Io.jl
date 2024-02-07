@@ -1,41 +1,83 @@
+"""
+  save(filename::AbstractString, x)
+
+Save an object `x` to `filename` as a JLD2 file.
+
+Note: To `save` in MPI mode, use [`psave`](@ref).
+"""
 function save(filename::AbstractString, x)
-  JLD2.save_object(filename,x)
+  save_object(filename,x)
 end
 
+"""
+  load(filename::AbstractString)
+
+Load an object stored in a JLD2 file at `filename`.
+
+Note: To `load` in MPI mode, use [`pload`](@ref).
+"""
 function load(filename::AbstractString)
-  JLD2.load_object(filename)
+  load_object(filename)
 end
 
+"""
+  load!(filename::AbstractString, x)
+
+Load an object stored in a JLD2 file at `filename` and copy its
+contents to `x`.
+
+Note: To `load!` in MPI mode, use [`pload!`](@ref).
+"""
 function load!(filename::AbstractString, x)
   y = load(filename)
   copyto!(x,y)
   return x
 end
 
+"""
+  psave(filename::AbstractString, x)
+
+Save a partitioned object `x` to a directory `dir` as 
+a set of JLD2 files corresponding to each part.
+"""
 function psave(dir::AbstractString, x)
   ranks = get_parts(x)
   i_am_main(ranks) && mkpath(dir)
   arr = to_local_storage(x)
   map(ranks,arr) do id, arr
     filename = joinpath(dir,basename(dir)*"_$id.jdl2")
-    JLD2.save_object(filename,arr)
+    save_object(filename,arr)
   end
 end
 
+"""
+  pload(dir::AbstractString, ranks::AbstractArray{<:Integer})
+
+Load a partitioned object stored in a set of JLD2 files in directory `dir`
+indexed by MPI ranks `ranks`.
+"""
 function pload(dir::AbstractString, ranks::AbstractArray{<:Integer})
   arr = map(ranks) do id
     filename = joinpath(dir,basename(dir)*"_$id.jdl2")
-    JLD2.load_object(filename)
+    load_object(filename)
   end
   return from_local_storage(arr)
 end
 
+"""
+  pload!(dir::AbstractString, x)
+
+Load a partitioned object stored in a set of JLD2 files in directory `dir`
+and copy contents to the equivilent object `x`.
+"""
 function pload!(dir::AbstractString, x)
   ranks = get_parts(x)
   y = pload(dir,ranks)
   copyto!(x,y)
   return x
 end
+
+## Handle storage of values and indices for `PVector` and PSparseMatrix
 
 function to_local_storage(x)
   x
