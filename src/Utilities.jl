@@ -4,15 +4,12 @@ gen_lsf(ξ,a;b=0) = x::VectorValue -> -1/4*prod(cos.(get_array(@.(ξ*pi*(x-b))))
 ## Get element size Δ
 function get_Δ(model::CartesianDiscreteModel)
   desc = get_cartesian_descriptor(model)
-  desc.sizes
+  return desc.sizes
 end
 
 function get_Δ(model::DistributedDiscreteModel)
-  local_Δ = map(local_views(model)) do model
-    desc = get_cartesian_descriptor(model)
-    desc.sizes
-  end
-  getany(local_Δ)
+  local_Δ = map(get_Δ,local_views(model))
+  return getany(local_Δ)
 end
 
 ## Create label given function f_Γ. e is a count of added tags. TODO: Can this go in GridapExtensions.jl? @Jordi
@@ -48,7 +45,7 @@ function _update_labels_locally!(e,model::CartesianDiscreteModel{2},mask,name)
   labels.d_to_dface_to_entity[1][vtxs_Γ] .= entity
   labels.d_to_dface_to_entity[2][edge_Γ] .= entity
   add_tag!(labels,name,[entity])
-  cell_to_entity
+  return cell_to_entity
 end
 
 function _update_labels_locally!(e,model::CartesianDiscreteModel{3},mask,name)
@@ -72,15 +69,12 @@ function _update_labels_locally!(e,model::CartesianDiscreteModel{3},mask,name)
   labels.d_to_dface_to_entity[2][edge_Γ] .= entity
   labels.d_to_dface_to_entity[3][face_Γ] .= entity
   add_tag!(labels,name,[entity])
-  cell_to_entity
+  return cell_to_entity
 end
 
 function mark_nodes(f,model::DistributedDiscreteModel)
   local_masks = map(local_views(model)) do model
-    topo   = get_grid_topology(model)
-    coords = get_vertex_coordinates(topo)
-    mask = map(f,coords)
-    return mask
+    mark_nodes(f,model)
   end
   gids = get_face_gids(model,0)
   mask = PVector(local_masks,partition(gids))
@@ -89,7 +83,7 @@ function mark_nodes(f,model::DistributedDiscreteModel)
   return mask
 end
 
-function mark_nodes(f,model::CartesianDiscreteModel)
+function mark_nodes(f,model::DiscreteModel)
   topo   = get_grid_topology(model)
   coords = get_vertex_coordinates(topo)
   mask = map(f,coords)
@@ -103,9 +97,10 @@ function isotropic_2d(E::M,ν::M) where M<:AbstractFloat
         λ    λ+2μ   0
         0     0     μ];
   SymFourthOrderTensorValue(
-      C[1,1], C[3,1], C[2,1],
-      C[1,3], C[3,3], C[2,3],
-      C[1,2], C[3,2], C[2,2])
+    C[1,1], C[3,1], C[2,1],
+    C[1,3], C[3,3], C[2,3],
+    C[1,2], C[3,2], C[2,2]
+  )
 end
 
 function isotropic_3d(E::M,ν::M) where M<:AbstractFloat
@@ -122,7 +117,8 @@ function isotropic_3d(E::M,ν::M) where M<:AbstractFloat
       C[1,5], C[6,5], C[5,5], C[2,5], C[4,5], C[3,5],
       C[1,2], C[6,2], C[5,2], C[2,2], C[4,2], C[3,2],
       C[1,4], C[6,4], C[5,4], C[2,4], C[4,4], C[3,4],
-      C[1,3], C[6,3], C[5,3], C[2,3], C[4,3], C[3,3])
+      C[1,3], C[6,3], C[5,3], C[2,3], C[4,3], C[3,3]
+  )
 end
 
 # Logging
