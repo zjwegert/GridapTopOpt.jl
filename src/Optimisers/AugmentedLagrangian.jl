@@ -38,7 +38,7 @@ struct AugmentedLagrangian{N,O} <: Optimiser
       vel_ext :: VelocityExtension,
       φ0;
       Λ_max = 5.0, ζ = 1.1, update_mod = 5, γ = 0.1, γ_reinit = 0.5, os_γ_mult = 0.75,
-      maxiter = 1000, verbose=false, constraint_names = map(i -> Symbol("C_$i"),1:N),
+      maxiter = 1000, verbose=false, constraint_names = map(i -> Symbol("C_\$i"),1:N),
       converged::Function = default_al_converged, debug = false,
       has_oscillations::Function = default_has_oscillations
     ) where {N,O}
