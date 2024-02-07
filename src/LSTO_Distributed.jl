@@ -67,7 +67,7 @@ export VelocityExtension
 export project!
 
 include("Optimisers/Optimisers.jl")
-export get_history # TODO: Add get_niter
+export get_history
 export write_history
 export AugmentedLagrangian
 export HilbertianProjection
