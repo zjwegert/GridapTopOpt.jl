@@ -1,12 +1,11 @@
 """
-  abstract type Optimiser end
+  abstract type Optimiser
 
 Your own optimiser can be implemented by implementing 
- concrete functionality of the below.
+concrete functionality of the below.
 """
 abstract type Optimiser end
 
-# TODO: Add quality of life Base.show for each optimiser which displays extra info
 function Base.show(io::IO,object::Optimiser)
   print(io,typeof(object))
 end
@@ -44,19 +43,26 @@ function print_msg(opt::Optimiser,msg::String;kwargs...)
 end
 
 """
-  mutable struct OptimiserHistory{T} end
+  mutable struct OptimiserHistory{T}
 
 Track historical information on optimisation problem
- iteration history with
-  - keys    -- Vector of symbols associated to values
-  - values  -- Dictionary of vectors associated to keys
-  - bundles -- Groups of symbols (e.g., a group of constraints)
+iteration history.
 
-Behaviour:
- - Indexing at a specific iteration returns an OptimiserHistorySlice.
- - Indexing with a key returns all values of that key
- - Indexing with a key and iteration returns value/s of
-    the key at the iteration.
+# Parameters
+
+- `niter::Int`: Current iteration number
+- `keys::Vector{Symbol}`: Vector of symbols associated to values
+- `values::Dict{Symbol,Vector{T}}`: Dictionary of vectors associated to keys
+- `bundles::Dict{Symbol,Vector{Symbol}}`: Groups of symbols (e.g., a group of constraints)
+- `verbose::SolverVerboseLevel`: Verbosity level
+- `maxiter::Int`: Maximum number of iterations.
+
+# Behaviour
+
+- Indexing at a specific iteration returns an OptimiserHistorySlice.
+- Indexing with a key returns all values of that key
+- Indexing with a key and iteration returns value/s of
+  the key at the iteration.
 """
 mutable struct OptimiserHistory{T}
   niter   :: Int
@@ -67,6 +73,18 @@ mutable struct OptimiserHistory{T}
   maxiter :: Int
 end
 
+"""
+  OptimiserHistory(
+    T::Type{<:Real},
+    keys::Vector{Symbol},
+    bundles::Dict{Symbol,Vector{Symbol}}=Dict{Symbol,Vector{Symbol}}(),
+    maxiter = 200,
+    verbose = SOLVER_VERBOSE_NONE
+  )
+
+Create an instant of Optimiser history with some defaults for
+`bundles`, `maxiter`, and `verbose`.
+"""
 function OptimiserHistory(
   T::Type{<:Real},
   keys::Vector{Symbol},
@@ -180,7 +198,7 @@ end
   struct OptimiserHistorySlice{T} end
 
 A read-only wrapper of OptimiserHistory for IO display 
- of iteration history at a specific iteration.
+of iteration history at a specific iteration.
 """
 struct OptimiserHistorySlice{T}
   it :: Int

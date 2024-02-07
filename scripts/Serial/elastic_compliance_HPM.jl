@@ -27,6 +27,7 @@ function main()
   vf = 0.4
   g = VectorValue(0,-1)
   path = dirname(dirname(@__DIR__))*"/results/elastic_compliance_HPM"
+  mkdir(path)
 
   ## FE Setup
   model = CartesianDiscreteModel(dom,el_size)
@@ -83,14 +84,13 @@ function main()
   vel_ext = VelocityExtension(a_hilb,U_reg,V_reg)
   
   ## Optimiser
-  mkdir(path)
   optimiser = HilbertianProjection(pcfs,stencil,vel_ext,φh;
     γ,γ_reinit,verbose=true,constraint_names=[:Vol])
   for (it,uh,φh) in optimiser
     write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh)),"uh"=>uh])
     write_history(path*"/history.txt",optimiser.history)
   end
-  it = optimiser.history.niter; uh = get_state(optimiser.problem)
+  it = get_history(optimiser).niter; uh = get_state(pcfs)
   write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh)),"uh"=>uh];iter_mod=1)
 end
 

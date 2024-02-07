@@ -208,7 +208,7 @@ function Base.iterate(m::HilbertianProjection)
   
   # Update history and build state
   push!(history,(J,C...,params.γ))
-  state = (0,J,C,θ,dJ,dC,uh,φh,vel,φ_tmp,params.γ) # TODO: it changed to 0 here.
+  state = (0,J,C,θ,dJ,dC,uh,φh,vel,φ_tmp,params.γ)
   vars  = params.debug ? (0,uh,φh,state) : (0,uh,φh)
   return vars, state
 end

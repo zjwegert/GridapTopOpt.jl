@@ -29,6 +29,7 @@ function main(mesh_partition,distribute,el_size)
   α_coeff = 4
   vf = 0.4
   path = dirname(dirname(@__DIR__))*"/results/elastic_compliance_ALM"
+  i_am_main(ranks) && mkdir(path)
 
   ## FE Setup
   model = CartesianDiscreteModel(ranks,mesh_partition,dom,el_size)
@@ -96,14 +97,13 @@ function main(mesh_partition,distribute,el_size)
     ls=PETScLinearSolver())
 
   ## Optimiser
-  i_am_main(ranks) && mkdir(path)
   optimiser = AugmentedLagrangian(pcfs,stencil,vel_ext,φh;
     γ,γ_reinit,verbose=i_am_main(ranks),constraint_names=[:Vol])
   for (it, uh, φh) in optimiser
     write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh)),"uh"=>uh])
     write_history(path*"/history.txt",optimiser.history;ranks=ranks)
   end
-  it = optimiser.history.niter; uh = get_state(optimiser.problem)
+  it = get_history(optimiser).niter; uh = get_state(pcfs)
   write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh)),"uh"=>uh];iter_mod=1)
 end
 

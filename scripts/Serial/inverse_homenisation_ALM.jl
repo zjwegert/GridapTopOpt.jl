@@ -25,6 +25,7 @@ function main()
   α_coeff = 4
   vf = 0.5
   path = dirname(dirname(@__DIR__))*"/results/inverse_homenisation_ALM"
+  mkdir(path)
 
   ## FE Setup
   model = CartesianDiscreteModel(dom,el_size,isperiodic=(true,true))
@@ -84,14 +85,13 @@ function main()
   vel_ext = VelocityExtension(a_hilb,U_reg,V_reg)
   
   ## Optimiser
-  mkdir(path)
   optimiser = AugmentedLagrangian(pcfs,stencil,vel_ext,φh;
     γ,γ_reinit,verbose=true,constraint_names=[:Vol])
   for (it,uh,φh) in optimiser
     write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh))])
     write_history(path*"/history.txt",optimiser.history)
   end
-  it = optimiser.history.niter; uh = get_state(optimiser.problem)
+  it = get_history(optimiser).niter; uh = get_state(pcfs)
   write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh))];iter_mod=1)
 end
 
