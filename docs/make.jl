@@ -3,7 +3,10 @@ using LevelSetTopOpt
 
 makedocs(
     sitename = "LevelSetTopOpt.jl",
-    format = Documenter.HTML(prettyurls = false),
+    format = Documenter.HTML(
+      prettyurls = false,
+      collapselevel = 1,
+    ),
     modules = [LevelSetTopOpt],
     pages = [
       "Home" => "index.md",
