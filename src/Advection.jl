@@ -2,22 +2,16 @@
     abstract type Stencil
 
 Finite difference stencil for a single step of the Hamilton-Jacobi 
-evolution equation (Eqn. 1) and reinitialisation equation (Eqn. 2).
+evolution equation and reinitialisation equation.
 
-# Hamilton-Jacobi evolution equation (Eqn. 1)
-``\\frac{\\partial\\phi}{\\partial t} + V(\\boldsymbol{x})\\lVert\\boldsymbol{\\nabla}\\phi\\rVert = 0,``
-
-with ``\\phi(0,\\boldsymbol{x})=\\phi_0(\\boldsymbol{x})`` and ``\\boldsymbol{x}\\in D,~t\\in(0,T)``.
-
-# Reinitialisation equation (Eqn. 2)
-``\\frac{\\partial\\phi}{\\partial t} + \\mathrm{sign}(\\phi_0)(\\lVert\\boldsymbol{\\nabla}\\phi\\rVert-1) = 0,``
-
-with ``\\phi(0,\\boldsymbol{x})=\\phi_0(\\boldsymbol{x})`` and ``\\boldsymbol{x}\\in D,~t\\in(0,T)``.
+Your own stencil can be implemented by extending the methods below.
 """
 abstract type Stencil end
 
 """
+    allocate_caches(::Stencil,φ,vel)
 
+Allocate caches for a given `Stencil`.
 """
 function allocate_caches(::Stencil,φ,vel)
   nothing # By default, no caches are required.
@@ -42,6 +36,11 @@ function advect!(::Stencil,φ,vel,Δt,Δx,isperiodic,caches)
   @abstractmethod
 end
 
+"""
+    compute_Δt(::Stencil,φ,vel)
+
+Compute the time step for the `Stencil`.
+"""
 function compute_Δt(::Stencil,φ,vel)
   @abstractmethod
 end
@@ -49,7 +48,7 @@ end
 """
     struct FirstOrderStencil{D,T} <: Stencil end
 
-Godunov upwind difference scheme based on Osher and Fedkiw 
+A first order Godunov upwind difference scheme based on Osher and Fedkiw 
 ([link](https://doi.org/10.1007/b98879)).
 """
 struct FirstOrderStencil{D,T} <: Stencil
@@ -166,11 +165,14 @@ end
 """
     struct AdvectionStencil{O}
 
-Wrapper to enable finite differences on order `O` finite elements.
+Wrapper to enable finite differencing to solve the 
+Hamilton-Jacobi evolution equation and reinitialisation equation 
+on order `O` finite elements in serial or parallel.
 
 # Parameters
 
-- `stencil::Stencil`: stencil for a single step HJ equation and reinitialisation equation.
+- `stencil::Stencil`: Finite difference stencil for a single step HJ 
+  equation and reinitialisation equation.
 - `model`: A `CartesianDiscreteModel`.
 - `space`: FE space for level-set function
 - `perm`: A permutation vector
@@ -237,15 +239,8 @@ end
 
 Gridap.ReferenceFEs.get_order(f::Gridap.Fields.LinearCombinationFieldVector) = get_order(f.fields)
 
-"""
-    create_dof_permutation(
-    model::CartesianDiscreteModel{Dc},
-    space::UnconstrainedFESpace,
-    order::Integer) where Dc -> n2o_dof_map
-
-Create dof permutation vector to enable finite differences on
-higher order Lagrangian finite elements on a Cartesian mesh.  
-"""
+# Create dof permutation vector to enable finite differences on 
+#  higher order Lagrangian finite elements on a Cartesian mesh.  
 function create_dof_permutation(model::CartesianDiscreteModel{Dc},
                                 space::UnconstrainedFESpace,
                                 order::Integer) where Dc
@@ -351,7 +346,12 @@ end
 """
     advect!(s::AdvectionStencil{O},φ,vel,γ) where O
 
-Solve the Hamilton-Jacobi evolution equation using the `AdvectionStencil` `s`.
+Solve the Hamilton-Jacobi evolution equation using the `AdvectionStencil`.
+
+# Hamilton-Jacobi evolution equation
+``\\frac{\\partial\\phi}{\\partial t} + V(\\boldsymbol{x})\\lVert\\boldsymbol{\\nabla}\\phi\\rVert = 0,``
+
+with ``\\phi(0,\\boldsymbol{x})=\\phi_0(\\boldsymbol{x})`` and ``\\boldsymbol{x}\\in D,~t\\in(0,T)``.
 
 # Arguments
 
@@ -410,7 +410,12 @@ end
 """
     reinit!(s::AdvectionStencil{O},φ,γ) where O
 
-Solve the reinitialisation equation using the `AdvectionStencil` `s`.
+Solve the reinitialisation equation using the `AdvectionStencil`.
+
+# Reinitialisation equation
+``\\frac{\\partial\\phi}{\\partial t} + \\mathrm{sign}(\\phi_0)(\\lVert\\boldsymbol{\\nabla}\\phi\\rVert-1) = 0,``
+
+with ``\\phi(0,\\boldsymbol{x})=\\phi_0(\\boldsymbol{x})`` and ``\\boldsymbol{x}\\in D,~t\\in(0,T)``.
 
 # Arguments
 

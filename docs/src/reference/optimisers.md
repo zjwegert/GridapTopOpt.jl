@@ -26,4 +26,8 @@ LevelSetTopOpt.OptimiserHistorySlice
 ## Custom optimiser
 ```@docs
 LevelSetTopOpt.Optimiser
+LevelSetTopOpt.iterate(::LevelSetTopOpt.Optimiser)
+LevelSetTopOpt.iterate(::LevelSetTopOpt.Optimiser,state)
+LevelSetTopOpt.get_history(::LevelSetTopOpt.Optimiser)
+LevelSetTopOpt.converged(::LevelSetTopOpt.Optimiser)
 ```

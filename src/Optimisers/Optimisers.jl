@@ -1,6 +1,7 @@
 """
     abstract type Optimiser
 
+Optimisers in LevelSetTopOpt.jl are implemented as iterators.
 Your own optimiser can be implemented by implementing 
 concrete functionality of the below.
 """
@@ -13,19 +14,39 @@ end
 Base.IteratorEltype(::Type{<:Optimiser}) = Base.EltypeUnknown()
 Base.IteratorSize(::Type{<:Optimiser}) = Base.SizeUnknown()
 
-# Return tuple of first iteration state
+"""
+    Base.iterate(::Optimiser)
+
+Return tuple of first iteration state for `Optimiser`.
+"""
 function Base.iterate(::Optimiser)
   @abstractmethod
 end
 
-# Return tuple of next iteration state given current state
+"""
+    Base.iterate(::Optimiser,state)
+
+Return tuple of next iteration state given current state
+for `Optimiser`.
+"""
 function Base.iterate(::Optimiser,state)
   @abstractmethod
 end
 
+"""
+    get_history(::Optimiser) :: OptimiserHistory
+
+Get `OptimiserHistory` from `Optimiser`.
+"""
 get_history(::Optimiser) :: OptimiserHistory = @abstractmethod
 
-function converged(::Optimiser)
+"""
+    converged(::Optimiser)
+
+Return a `Bool` that is true if the `Optimiser` has 
+converged, otherwise false.
+"""
+function converged(::Optimiser) :: Bool
   @abstractmethod
 end
 
@@ -39,7 +60,7 @@ function finished(m::Optimiser) :: Bool
 end
 
 function print_msg(opt::Optimiser,msg::String;kwargs...) 
-  print_msg(get_optimiser_history(opt),msg;kwargs...)
+  print_msg(get_history(opt),msg;kwargs...)
 end
 
 """
