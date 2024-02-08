@@ -83,11 +83,11 @@ end
     benchmark_forward_problem(m::AbstractFEStateMap, φh, ranks; nreps)
 
 Benchmark the forward FE solve given `m::AbstractFEStateMap` and a level-set 
-function `φh`. See [`forward_solve`](@ref) for input types.
+function `φh`. See [`forward_solve!`](@ref) for input types.
 """
 function benchmark_forward_problem(m::AbstractFEStateMap, φh, ranks; nreps = 10)
   function f(m, φh)
-    forward_solve(m,φh)
+    forward_solve!(m,φh)
   end
   function reset!(m,φh)
     u = get_free_dof_values(get_state(m));

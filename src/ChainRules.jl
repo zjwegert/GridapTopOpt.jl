@@ -1,8 +1,9 @@
 """
     struct IntegrandWithMeasure{A,B<:Tuple}
 
-A wrapper to enable partial differentation of an integrand 
-F via `Gridap.gradient`.
+A wrapper to enable serial or parallel partial differentation of an 
+integral `F` using `Gridap.gradient`. This is required to allow automatic 
+differentation with `DistributedMeasure`.
 
 # Properties
 - `F  :: A`: A function that returns a `DomainContribution` or `DistributedDomainContribution`.
@@ -16,7 +17,7 @@ end
 """
     (F::IntegrandWithMeasure)(args...)
 
-Evaluate F.F given args.
+Evaluate `F.F` given arguments `args`.
 """
 (F::IntegrandWithMeasure)(args...) = F.F(args...,F.dΩ...)
 
@@ -26,9 +27,11 @@ Evaluate F.F given args.
 Given an an `IntegrandWithMeasure` `F` and a vector of `FEFunctions` `uh` (excluding measures)
 evaluate the partial derivative of `F.F` with respect to `uh[K]`.
 
-E.g., suppose `uh` and `φh` are FEFunctions with measures `dΩ` and `dΓ_N`.
+# Example
+
+Suppose `uh` and `φh` are FEFunctions with measures `dΩ` and `dΓ_N`.
 Then the partial derivative of a function `J` wrt to `φh` is computed via  
-```
+````
 J(u,φ,dΩ,dΓ_N) = ∫(f(u,φ))dΩ + ∫(g(u,φ))dΓ_N
 J_iwm = IntegrandWithMeasure(J,(dΩ,dΓ_N))
 ∂J∂φh = ∇(J_iwm,[uh,φh],2)
@@ -100,8 +103,8 @@ end
 """
     struct StateParamIntegrandWithMeasure{A<:IntegrandWithMeasure,B,C,D}
 
-A wrapper to handle partial differentation of a `IntegrandWithMeasure`
-in a `ChainRules.jl` compatible way with caching.
+A wrapper to handle partial differentation of an [`IntegrandWithMeasure`](@ref)
+of a specific form (see below) in a `ChainRules.jl` compatible way with caching.
 
 # Assumptions
 
@@ -278,21 +281,21 @@ get_deriv_assembler(m::AbstractFEStateMap) = get_assemblers(m)[2]
 Evaluate the forward problem `u` given `φ`. This should compute the
 FE problem.
 """
-@inline (φ_to_u::AbstractFEStateMap)(φh) = forward_solve(φ_to_u,φh)
+@inline (φ_to_u::AbstractFEStateMap)(φh) = forward_solve!(φ_to_u,φh)
 
 """
-    forward_solve(φ_to_u::AbstractFEStateMap,φh)
+    forward_solve!(φ_to_u::AbstractFEStateMap,φh)
 
 Evaluate the forward problem `u` given `φ`. This should compute the
 FE problem.
 """
-function forward_solve(φ_to_u::AbstractFEStateMap,φh)
+function forward_solve!(φ_to_u::AbstractFEStateMap,φh)
   @abstractmethod
 end
 
-function forward_solve(φ_to_u::AbstractFEStateMap,φ::AbstractVector)
+function forward_solve!(φ_to_u::AbstractFEStateMap,φ::AbstractVector)
   φh = FEFunction(get_aux_space(φ_to_u),φ)
-  return forward_solve(φ_to_u,φh)
+  return forward_solve!(φ_to_u,φh)
 end
 
 """
@@ -314,7 +317,7 @@ end
 """
     adjoint_solve!(φ_to_u::AbstractFEStateMap,du::AbstractVector)
 
-Evaluate the solution to the adjoint problem given a RHS vector ∂F∂u denoted `du`.
+Evaluate the solution to the adjoint problem given a RHS vector `∂F∂u` denoted `du`.
 This should solve the linear problem `dRdφᵀ*λ = ∂F∂uᵀ`.
 """
 function adjoint_solve!(φ_to_u::AbstractFEStateMap,du::AbstractVector)
@@ -379,7 +382,7 @@ a function for evaluating the pullback of `φ_to_u`. This enables
 compatiblity with `ChainRules.jl`
 """
 function ChainRulesCore.rrule(φ_to_u::AbstractFEStateMap,φh)
-  u  = forward_solve(φ_to_u,φh)
+  u  = forward_solve!(φ_to_u,φh)
   uh = FEFunction(get_trial_space(φ_to_u),u)
   update_adjoint_caches!(φ_to_u,uh,φh)
   return u, du -> pullback(φ_to_u,uh,φh,du;updated=true)
@@ -495,7 +498,7 @@ get_measure(m::AffineFEStateMap) = m.biform.dΩ
 get_spaces(m::AffineFEStateMap) = m.spaces
 get_assemblers(m::AffineFEStateMap) = (m.fwd_caches[6],m.plb_caches[2],m.adj_caches[4])
 
-function forward_solve(φ_to_u::AffineFEStateMap,φh)
+function forward_solve!(φ_to_u::AffineFEStateMap,φh)
   biform, liform = φ_to_u.biform, φ_to_u.liform
   U, V, _, _ = φ_to_u.spaces
   ns, K, b, x, uhd, assem_U = φ_to_u.fwd_caches
@@ -566,7 +569,7 @@ struct NonlinearFEStateMap{A,B,C,D,E,F} <: AbstractFEStateMap
 
   Optional arguments enable specification of assemblers, nonlinear solver, and adjoint (linear) solver.
   """
-    function NonlinearFEStateMap(
+  function NonlinearFEStateMap(
     res::Function,U,V,V_φ,U_reg,φh,dΩ...;
     assem_U = SparseMatrixAssembler(U,V),
     assem_adjoint = SparseMatrixAssembler(V,U),
@@ -610,7 +613,7 @@ get_measure(m::NonlinearFEStateMap) = m.res.dΩ
 get_spaces(m::NonlinearFEStateMap) = m.spaces
 get_assemblers(m::NonlinearFEStateMap) = (m.fwd_caches[4],m.plb_caches[2],m.adj_caches[4])
 
-function forward_solve(φ_to_u::NonlinearFEStateMap,φh)
+function forward_solve!(φ_to_u::NonlinearFEStateMap,φh)
   U, V, _, _ = φ_to_u.spaces
   nls, nls_cache, x, assem_U = φ_to_u.fwd_caches
 
@@ -686,7 +689,7 @@ struct RepeatingAffineFEStateMap{A,B,C,D,E,F} <: AbstractFEStateMap
   # Note
 
   - The resulting `FEFunction` will be a `MultiFieldFEFunction` (or GridapDistributed equivalent) 
-  where each field corresponds to an entry in the vector of linear forms
+    where each field corresponds to an entry in the vector of linear forms
   """
     function RepeatingAffineFEStateMap(
     nblocks::Int,a::Function,l::Vector{<:Function},
@@ -739,7 +742,7 @@ get_measure(m::RepeatingAffineFEStateMap) = m.biform.dΩ
 get_spaces(m::RepeatingAffineFEStateMap) = m.spaces
 get_assemblers(m::RepeatingAffineFEStateMap) = (m.fwd_caches[6],m.plb_caches[2],m.adj_caches[4])
 
-function forward_solve(φ_to_u::RepeatingAffineFEStateMap,φh)
+function forward_solve!(φ_to_u::RepeatingAffineFEStateMap,φh)
   biform, liforms = φ_to_u.biform, φ_to_u.liform
   U, V, _, _ = φ_to_u.spaces
   ns, K, b, x, uhd, assem_U, b0 = φ_to_u.fwd_caches
@@ -793,7 +796,38 @@ end
 """
     struct PDEConstrainedFunctionals{N,A}
 
-An object that computes the objective, constraints, and their derivatives.
+An object that computes the objective, constraints, and their derivatives. 
+
+# Implementation
+
+This implementation computes derivatives of a integral quantity 
+
+``F(u(\\varphi),\\varphi,\\mathrm{d}\\Omega_1,\\mathrm{d}\\Omega_2,...) = 
+\\Sigma_{i}\\int_{\\Omega_i} f_i(\\varphi)~\\mathrm{d}\\Omega`` 
+
+with respect to an auxiliary parameter ``\\varphi`` where ``u``
+is the solution to a PDE and implicitly depends on ``\\varphi``. 
+This requires two pieces of information:
+
+ 1) Computation of ``\\frac{\\partial F}{\\partial u}`` and 
+    ``\\frac{\\partial F}{\\partial \\varphi}`` (handled by [`StateParamIntegrandWithMeasure `](@ref)).
+ 2) Computation of ``\\frac{\\partial F}{\\partial u}
+    \\frac{\\partial u}{\\partial \\varphi}`` at ``\\varphi`` and ``u`` 
+    using the adjoint method (handled by [`AbstractFEStateMap`](@ref)). I.e., let 
+    
+    ``\\frac{\\partial F}{\\partial u}
+    \\frac{\\partial u}{\\partial \\varphi} = -\\lambda^\\intercal 
+    \\frac{\\partial \\mathcal{R}}{\\partial \\varphi}``
+
+    where ``\\mathcal{R}`` is the residual and solve the (linear) adjoint 
+    problem:
+    
+    ``\\frac{\\partial \\mathcal{R}}{\\partial \\varphi}^\\intercal\\lambda = 
+    \\frac{\\partial F}{\\partial u}^\\intercal.``
+
+The gradient is then ``\\frac{\\partial F}{\\partial \\varphi} = 
+\\frac{\\partial F}{\\partial \\varphi} - 
+\\frac{\\partial F}{\\partial u}\\frac{\\partial u}{\\partial \\varphi}``.
 
 # Parameters
 
