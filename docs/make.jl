@@ -28,6 +28,9 @@ makedocs(
         "reference/utilities.md",
         "reference/benchmarking.md"
       ],
+      "Developer Notes" => [
+        "dev/shape_der.md",
+      ]
     ],
 )
 
