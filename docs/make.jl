@@ -17,7 +17,10 @@ makedocs(
         "usage/mpi-mode.md",
       ],
       "Tutorials" => [
-        "tutorials/minimum_thermal_compliance.md"
+        "tutorials/minimum_thermal_compliance.md",
+        "tutorials/minimum_elastic_compliance.md",
+        "tutorials/inverter_mechanism.md",
+        "tutorials/inverse_homogenisation.md",
       ],
       "Reference" => [
         "reference/optimisers.md",
