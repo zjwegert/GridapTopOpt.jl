@@ -1,16 +1,40 @@
 # Minimum thermal compliance
 
+The goal of this tutorial is to learn
+- How to formulate a topology optimisation problem
+- How to describe the problem over a fixed computational domain ``D`` via the level-set method.
+- How to setup and solve the problem in LevelSetTopOpt
+
+We consider the following extensions at the end of the tutorial:
+- How to extend the problem to 3D and utilise PETSc solvers
+- How to solver problems with nonlinear state equations
+- How to run in MPI mode
+
 ## Thermal conductivity
+
+The homogeneous steady-state heat equation (equivalently Laplace's equation) is perhaps one of the most well-understood partial differential equations and usually the first introduced to an undergraduate student. For this reason, we will use it to describe the heat transfer through a solid and how one comes to the notion of optimising the shape of that solid.
+
+Consider the geometric conditions outlined in the Figure 1 and suppose that we prescribe the following conditions:
+- *Heat source*: unitary normal heat flow across ``\Gamma_{N}``.
+- *Insulating*: zero normal heat flow across $\partial\Omega\setminus\Gamma_N$,
+- *Heat sink*: zero heat on ``\Gamma_D``.
+
+| ![](2d_min_thermal_comp_setup.png) |
+|:--:|
+|Figure 1: ...|
+
+Physically we can imagine this as describing the transfer of heat through the domain ``\Omega`` from the sources to the sinks. From a mathematical perspective, we can write down the state equations describing this as
 
 ```math
 \begin{aligned}
 -\nabla(\kappa\nabla u) &= 0~\text{in }\Omega,\\
-\kappa\nabla u &= g~\text{on }\Gamma_N,\\
+\kappa\nabla u\cdot\boldsymbol{n} &= g~\text{on }\Gamma_N,\\
+\kappa\nabla u\cdot\boldsymbol{n} &= 0~\text{on }\partial\Omega\setminus\Gamma_N,\\
 u &= 0~\text{on }\Gamma_D.
 \end{aligned}
 ```
 
-...
+where ``\kappa`` is the diffusivity through ``\Omega`` and ``\boldsymbol{n}`` is the unit normal on the boundary.
 
 ## Optimisation problem
 
@@ -142,7 +166,7 @@ V_reg = TestFESpace(model,reffe;dirichlet_tags=["Gamma_N","Gamma_D"])
 U_reg = TrialFESpace(V_reg,0)
 ```
 
-In the above, we first define a scalar-valued Lagrangian reference element. This is then used to define the test space `V` and trial space `U` corresponding to ``H^1_{\Gamma_{D}}(\Omega)``. We then construct an FE space `V_φ` over which the level set function is defined, along with an FE test space `V_reg` and trial space `U_reg` over which derivatives are defined. At this point we set zero Dirichlet boundary conditions over regions where the extended shape sensitivity should be zero.  
+In the above, we first define a scalar-valued Lagrangian reference element. This is then used to define the test space `V` and trial space `U` corresponding to ``H^1_{\Gamma_{D}}(\Omega)``. We then construct an FE space `V_φ` over which the level set function is defined, along with an FE test space `V_reg` and trial space `U_reg` over which derivatives are defined. We require that `V_reg` and `U_reg` have zero Dirichlet boundary conditions over regions where the extended shape sensitivity is zero.  
 
 ### Initial level set function and interpolant
 
@@ -286,7 +310,8 @@ Our final extension considers a nonlinear diffusion problem:
 ```math
 \begin{aligned}
 -\nabla(\kappa(u)\nabla u) &= 0~\text{in }\Omega,\\
-\kappa(u)\nabla u &= g~\text{on }\Gamma_N,\\
+\kappa(u)\nabla u\cdot\boldsymbol{n} &= g~\text{on }\Gamma_N,\\
+\kappa(u)\nabla u\cdot\boldsymbol{n} &= 0~\text{on }\partial\Omega\setminus\Gamma_N,\\
 u &= 0~\text{on }\Gamma_D.
 \end{aligned}
 ```
