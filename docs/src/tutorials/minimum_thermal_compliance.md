@@ -36,7 +36,23 @@ u &= 0~\text{on }\Gamma_D.
 
 where ``\kappa`` is the diffusivity through ``\Omega`` and ``\boldsymbol{n}`` is the unit normal on the boundary.
 
+The weak formulation of this problem can be written as
+
+```math
+\begin{aligned}
+&\textit{Find }u\in H^1_{\Gamma_D}(\Omega)\textit{ such that}\\
+&\int_{\Omega}\kappa\boldsymbol{\nabla}u\cdot\boldsymbol{\nabla}v~\mathrm{d}\boldsymbol{x} = \int_{\Gamma_N}gv~\mathrm{d}s,~\forall v\in H^1_{\Gamma_D}(\Omega)
+\end{aligned}
+```
+
 ## Optimisation problem
+
+For this tutorial, we consider minimising the thermal compliance (or dissipated energy) as discussed in the following papers:
+> *Z. Guo, X. Cheng, and Z. Xia. Least dissipation principle of heat transport potential capacity and its application in heat conduction  optimization. Chinese Science Bulletin, 48(4):406–410, Feb 2003. ISSN 1861-9541. doi: 10.1007/BF03183239.*
+> 
+> *C. Zhuang, Z. Xiong, and H. Ding. A level set method for topology optimization of heat conduction problem under multiple load cases. Computer Methods in Applied Mechanics and Engineering, 196(4–6):1074–1084, Jan 2007. ISSN 00457825. doi: 10.1016/j.cma.2006.08.005.*
+
+The corresponding optimisation problem is
 
 ```math
 \begin{aligned}
@@ -44,8 +60,8 @@ where ``\kappa`` is the diffusivity through ``\Omega`` and ``\boldsymbol{n}`` is
 \text{s.t. }&~\operatorname{Vol}(\Omega)=V_f,\\
 &\left\{
 \begin{aligned}
-&\textit{Find }u\in H^1_{\Gamma_D}(\Omega)\\
-&\int_{\Omega}\kappa\boldsymbol{\nabla}(u)\cdot\boldsymbol{\nabla}(v)~\mathrm{d}\boldsymbol{x} = \int_{\Gamma_N}v~\mathrm{d}s,~\forall v\in H^1_{\Gamma_D}(\Omega)
+&\textit{Find }u\in H^1_{\Gamma_D}(\Omega)\textit{ such that}\\
+&\int_{\Omega}\kappa\boldsymbol{\nabla}u\cdot\boldsymbol{\nabla}v~\mathrm{d}\boldsymbol{x} = \int_{\Gamma_N}gv~\mathrm{d}s,~\forall v\in H^1_{\Gamma_D}(\Omega)
 \end{aligned}
 \right.
 \end{aligned}
