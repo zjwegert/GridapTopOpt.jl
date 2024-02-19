@@ -113,7 +113,7 @@ function main(mesh_partition,distribute)
     path = dirname(dirname(@__DIR__))*"/results/InvHomLE_AutoDiffTesting_Parallel";
     writevtk(Ω,path,cellfields=["phi"=>φh,
         "H(phi)"=>(interp.H ∘ φh),
-        "|nabla(phi))|"=>(norm ∘ ∇(φh)),
+        "|nabla(phi)|"=>(norm ∘ ∇(φh)),
         "uh1"=>uh[1],
         "uh2"=>uh[2],
         "uh3"=>uh[3],

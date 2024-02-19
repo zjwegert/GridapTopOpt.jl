@@ -7,12 +7,14 @@ The goal of this tutorial is to learn
 
 We consider the following extensions at the end of the tutorial:
 - How to extend the problem to 3D and utilise PETSc solvers
-- How to solver problems with nonlinear state equations
+- How to solve problems with nonlinear state equations with automatic differentiation
 - How to run in MPI mode
 
-## Thermal conductivity
+We will first consider formulation of the state equations and a topology optimisation problem in a continuous setting. We will then discretise via a level set function in a fixed computational regime. Note that this approach corresponds to an "optimise-then-discretise" approach [4] where shape derivatives are calculated analytically in the continuous space then relaxed via a level set function ``\varphi``. Automatic differentiation can be used to calculate these quantities and is discussed [here](../usage/ad.md).
 
-The homogeneous steady-state heat equation (equivalently Laplace's equation) is perhaps one of the most well-understood partial differential equations and usually the first introduced to an undergraduate student. For this reason, we will use it to describe the heat transfer through a solid and how one comes to the notion of optimising the shape of that solid.
+## State equations
+
+The homogeneous steady-state heat equation (equivalently Laplace's equation) is perhaps one of the most well-understood partial differential equations and usually the first introduced to an undergraduate student in applied mathematics. For this reason, we will use it to describe the heat transfer through a solid and how one comes to the notion of optimising the shape of that solid.
 
 Consider the geometric conditions outlined in the Figure 1 and suppose that we prescribe the following conditions:
 - *Heat source*: unitary normal heat flow across ``\Gamma_{N}``.
@@ -21,9 +23,9 @@ Consider the geometric conditions outlined in the Figure 1 and suppose that we p
 
 | ![](2d_min_thermal_comp_setup.png) |
 |:--:|
-|Figure 1: ...|
+|Figure 1: The setup for the two-dimensional minimum thermal compliance problem|
 
-Physically we can imagine this as describing the transfer of heat through the domain ``\Omega`` from the sources to the sinks. From a mathematical perspective, we can write down the state equations describing this as
+Physically we can imagine this as describing the transfer of heat through a domain ``\Omega`` from the sources to the sinks. From a mathematical perspective, we can write down the partial differential equations describing this as
 
 ```math
 \begin{aligned}
@@ -34,9 +36,7 @@ u &= 0~\text{on }\Gamma_D.
 \end{aligned}
 ```
 
-where ``\kappa`` is the diffusivity through ``\Omega`` and ``\boldsymbol{n}`` is the unit normal on the boundary.
-
-The weak formulation of this problem can be written as
+where ``\kappa`` is the diffusivity through ``\Omega`` and ``\boldsymbol{n}`` is the unit normal on the boundary. The weak formulation of the above strong formulation can be found by multiplying by a test function $v$ and applying integration by parts. This gives
 
 ```math
 \begin{aligned}
@@ -45,14 +45,11 @@ The weak formulation of this problem can be written as
 \end{aligned}
 ```
 
+where ``H^1_{\Gamma_D}(\Omega)=\{v\in H^1(\Omega):~v=0\text{ on }\Gamma_D\}``.
+
 ## Optimisation problem
 
-For this tutorial, we consider minimising the thermal compliance (or dissipated energy) as discussed in the following papers:
-> *Z. Guo, X. Cheng, and Z. Xia. Least dissipation principle of heat transport potential capacity and its application in heat conduction  optimization. Chinese Science Bulletin, 48(4):406–410, Feb 2003. ISSN 1861-9541. doi: 10.1007/BF03183239.*
-> 
-> *C. Zhuang, Z. Xiong, and H. Ding. A level set method for topology optimization of heat conduction problem under multiple load cases. Computer Methods in Applied Mechanics and Engineering, 196(4–6):1074–1084, Jan 2007. ISSN 00457825. doi: 10.1016/j.cma.2006.08.005.*
-
-The corresponding optimisation problem is
+For this tutorial, we consider minimising the thermal compliance (or dissipated energy) as discussed in [1,2]. The corresponding optimisation problem is
 
 ```math
 \begin{aligned}
@@ -66,11 +63,21 @@ The corresponding optimisation problem is
 \right.
 \end{aligned}
 ```
-where ``\operatorname{Vol}(\Omega)=\int_\Omega1~\mathrm{d}\boldsymbol{x}``.
+where ``\operatorname{Vol}(\Omega)=\int_\Omega1~\mathrm{d}\boldsymbol{x}``. This objective is equivalent to equivalent to maximising the heat transfer efficiency through ``\Omega``. 
 
-Figure, discussion.
+## Shape differentiation
 
-As per ... we define a shape derivative as ...
+We consider the change in quantities under the variation of the domain using *shape derivatives*. For the purpose of this tutorial we will give the mathematical description of a shape derivative along with the shape derivatives of the functionals ``J`` and ``\operatorname{Vol}``. Further discussion can be found in [3,4].
+
+Suppose that we consider smooth variations of the domain ``\Omega`` of the form ``\Omega_{\boldsymbol{\theta}} =(\boldsymbol{I}+\boldsymbol{\theta})(\Omega)``, where ``\boldsymbol{\theta} \in W^{1,\infty}(\mathbb{R}^d,\mathbb{R}^d)``. Then the following definition and lemma follow:
+
+!!! note "Definition [3]"
+    The shape derivative of ``J(\Omega)`` at ``\Omega`` is defined as the Fréchet derivative in ``W^{1, \infty}(\mathbb{R}^d, \mathbb{R}^d)`` at ``\boldsymbol{\theta}`` of the application ``\boldsymbol{\theta} \rightarrow J(\Omega_{\boldsymbol{\theta}})``, i.e.,
+    ```math
+    J(\Omega_{\boldsymbol{\theta}})(\Omega)=J(\Omega)+J^{\prime}(\Omega)(\boldsymbol{\theta})+\mathrm{o}(\boldsymbol{\theta})  
+    ```
+    with ``\lim _{\boldsymbol{\theta} \rightarrow 0} \frac{\lvert\mathrm{o}(\boldsymbol{\theta})\rvert}{\|\boldsymbol{\theta}\|}=0,`` where the shape derivative ``J^{\prime}(\Omega)`` is a continuous linear form on ``W^{1, \infty}(\mathbb{R}^d, \mathbb{R}^d)``
+
 
 The shape derivatives of ``J`` and ``\operatorname{Vol}`` are then
 
@@ -81,18 +88,23 @@ and
 ```math
 \operatorname{Vol}'(\Omega)(\boldsymbol{\theta}) = \int_{\Gamma}\boldsymbol{\theta}\cdot\boldsymbol{n}~\mathrm{d}s
 ```
-where ``\Gamma = \partial\Omega\setminus(\Gamma_D\cup\Gamma_N)``. These follow from ...
+where ``\Gamma = \partial\Omega\setminus(\Gamma_D\cup\Gamma_N)``. The first of these follows from Céa's formal method (see discussion in [3,4]), while the latter result follows from application of Lemma 4 of [3]. Finally, taking a deformation field according to ``\boldsymbol{\theta}=-q\boldsymbol{n}`` amounts to a descent direction according to the definition above. This gives
+```math
+J'(\Omega)(-q\boldsymbol{n}) = \int_{\Gamma}q\kappa\boldsymbol{\nabla}(u)\cdot\boldsymbol{\nabla}(u)~\mathrm{d}s
+```
+and
+```math
+\operatorname{Vol}'(\Omega)(-q\boldsymbol{n}) = -\int_{\Gamma}q~\mathrm{d}s.
+```
 
-## The level-set method 
+## Discretisation via a level set 
 
-Suppose that we attribute a level set function ``\varphi:D\rightarrow\mathbb{R}`` to our domain ``\Omega\subset D`` with ``\bar{\Omega}=\lbrace \boldsymbol{x}:\varphi(\boldsymbol{x})\leq0\rbrace`` and ``\Omega^\complement=\lbrace \boldsymbol{x}:\varphi(\boldsymbol{x})>0\rbrace``. We can then define a smooth characteristic function ``I:\mathbb{R}\rightarrow[\epsilon,1]`` as ``I(\varphi)=(1-H(\varphi))+\epsilon H(\varphi)`` where ``H`` is a smoothed Heaviside function with smoothing radius ``\eta``, and ``\epsilon\ll1`` allows for an ersatz material approximation. Of course, ``\epsilon`` can be taken as zero depending on the computational regime. 
-
-Over the fixed computational domain we may relax integrals to be over all of ``D`` via ``\mathrm{d}\boldsymbol{x}\approx H(\varphi)~\mathrm{d}\boldsymbol{x}`` and ``\mathrm{d}s \approx H'(\varphi)\lvert\nabla\varphi\rvert~\mathrm{d}\boldsymbol{x}``. The above optimisation problem then rewrites as
+Suppose that we attribute a level set function ``\varphi:D\rightarrow\mathbb{R}`` to our domain ``\Omega\subset D`` with ``\bar{\Omega}=\lbrace \boldsymbol{x}:\varphi(\boldsymbol{x})\leq0\rbrace`` and ``\Omega^\complement=\lbrace \boldsymbol{x}:\varphi(\boldsymbol{x})>0\rbrace``. We can then define a smooth characteristic function ``I:\mathbb{R}\rightarrow[\epsilon,1]`` as ``I(\varphi)=(1-H(\varphi))+\epsilon H(\varphi)`` where ``H`` is a smoothed Heaviside function with smoothing radius ``\eta``, and ``\epsilon\ll1`` allows for an ersatz material approximation. Of course, ``\epsilon`` can be taken as zero depending on the computational regime. Over the fixed computational domain we may relax integrals to be over all of ``D`` via ``\mathrm{d}\boldsymbol{x}= H(\varphi)~\mathrm{d}\boldsymbol{x}`` and ``\mathrm{d}s = H'(\varphi)\lvert\nabla\varphi\rvert~\mathrm{d}\boldsymbol{x}``. The above optimisation problem then rewrites in terms of ``\varphi`` as
 
 ```math
 \begin{aligned}
-\min_{\Omega\in\mathcal{U}}&~J(\Omega)=\int_{D}I(\varphi)\kappa\lvert\boldsymbol{\nabla}u\rvert^2~\mathrm{d}\boldsymbol{x}\\
-\text{s.t. }&~C(\Omega)=0,\\
+\min_{\varphi}&~J(\varphi)=\int_{D}I(\varphi)\kappa\lvert\boldsymbol{\nabla}u\rvert^2~\mathrm{d}\boldsymbol{x}\\
+\text{s.t. }&~C(\varphi)=0,\\
 &\left\{
 \begin{aligned}
 &\textit{Find }u\in H^1_{\Gamma_D}(D)\\
@@ -105,15 +117,27 @@ Over the fixed computational domain we may relax integrals to be over all of ``D
 where we retain an exact triangulation and measure of  ``\Gamma_N`` as this is a fixed boundary. In addition, we have rewritten the volume constraint as
 
 ```math
-C(\Omega)=\int_D (\rho(\varphi) - V_f)/\operatorname{Vol}(D)~\mathrm{d}\boldsymbol{x}
+\begin{aligned}
+C(\varphi)&=\int_D (\rho(\varphi) - V_f)/\operatorname{Vol}(D)~\mathrm{d}\boldsymbol{x}\\
+&=\int_D \rho(\varphi)~\mathrm{d}\boldsymbol{x}/\operatorname{Vol}(D) - V_f\\
+&=\int_\Omega~\mathrm{d}\boldsymbol{x}-V_f = \operatorname{Vol}(\Omega)-V_f
+\end{aligned}
 ``` 
 
-where ``\rho(\varphi)=(1-H(\varphi))`` is the smoothed volume density function.
+where ``\rho(\varphi)=1-H(\varphi)`` is the smoothed volume density function.
 
 !!! note
     In LevelSetTopOpt we assume constraints are of the integral form above.
 
-Relaxing the the shape derivatives from the previous section ...
+The shape derivatives from the previous section can be relaxed over the computational domain as 
+
+```math
+J'(\varphi)(-q\boldsymbol{n}) = \int_{D}q\kappa\boldsymbol{\nabla}(u)\cdot\boldsymbol{\nabla}(u)H'(\varphi)\lvert\nabla\varphi\rvert~\mathrm{d}\boldsymbol{x}
+```
+and
+```math
+C'(\varphi)(-q\boldsymbol{n}) = -\int_{D}wH'(\varphi)\lvert\nabla\varphi\rvert~\mathrm{d}\boldsymbol{x}/\operatorname{Vol}(D).
+```
 
 ## Computational method
 
@@ -138,8 +162,8 @@ f_Γ_D(x) = (x[1] ≈ 0.0 &&                       # Γ_D indicator function
   (x[2] <= ymax*prop_Γ_D + eps() || x[2] >= ymax-ymax*prop_Γ_D - eps()))
 
 # FD parameters
-γ = 0.1                                         # HJ equation time step coefficent
-γ_reinit = 0.5                                  # Reinit. equation time step coefficent
+γ = 0.1                                         # HJ equation time step coefficient
+γ_reinit = 0.5                                  # Reinit. equation time step coefficient
 max_steps = floor(Int,minimum(el_size)/10)      # Max steps for advection
 tol = 1/(10order^2)*prod(inv,minimum(el_size))  # Advection tolerance
 
@@ -152,16 +176,17 @@ tol = 1/(10order^2)*prod(inv,minimum(el_size))  # Advection tolerance
 g = 1                                           # Heat flow in
 vf = 0.4                                        # Volume fraction constraint
 lsf_func = initial_lsf(4,0.2)                   # Initial level set function
+iter_mod = 10                                   # Output VTK files every 10th iteration
 ```
 
 ### Finite element setup
-We first create a Cartesian mesh over ``[0,x_{\max}]\times[0,y_{\max}]`` with partition size `el_size` by creating an object `CartesianDiscreteModel`. In addition, we label the boundaries ``\Gamma_D`` and ``\Gamma_N`` using the `update_labels!` function.
+We first create a Cartesian mesh over ``[0,x_{\max}]\times[0,y_{\max}]`` with partition size `el_size` by creating an object `CartesianDiscreteModel`. In addition, we label the boundaries ``\Gamma_D`` and ``\Gamma_N`` using the [`update_labels!`](@ref) function.
 ```
 model = CartesianDiscreteModel((0,xmax,0,ymax),el_size);
 update_labels!(1,model,f_Γ_D,"Gamma_D")
 update_labels!(2,model,f_Γ_N,"Gamma_N")
 ```
-The first argument of `update_labels` indicates the label number associated to the region as indicated by the functions `f_Γ_D` and `f_Γ_N`. These functions should take a vector `x` and return `true` or `false` depending on whether a point is present in this region.
+The first argument of [`update_labels!`](@ref) indicates the label number associated to the region as indicated by the functions `f_Γ_D` and `f_Γ_N`. These functions should take a vector `x` and return `true` or `false` depending on whether a point is present in this region.
 
 Once the model is defined we create an integration mesh and measure for both ``\Omega`` and ``\Gamma_N``. These are built using
 ```
@@ -182,18 +207,39 @@ V_reg = TestFESpace(model,reffe;dirichlet_tags=["Gamma_N","Gamma_D"])
 U_reg = TrialFESpace(V_reg,0)
 ```
 
-In the above, we first define a scalar-valued Lagrangian reference element. This is then used to define the test space `V` and trial space `U` corresponding to ``H^1_{\Gamma_{D}}(\Omega)``. We then construct an FE space `V_φ` over which the level set function is defined, along with an FE test space `V_reg` and trial space `U_reg` over which derivatives are defined. We require that `V_reg` and `U_reg` have zero Dirichlet boundary conditions over regions where the extended shape sensitivity is zero.  
+In the above, we first define a scalar-valued Lagrangian reference element. This is then used to define the test space `V` and trial space `U` corresponding to ``H^1_{\Gamma_{D}}(\Omega)``. We then construct an FE space `V_φ` over which the level set function is defined, along with an FE test space `V_reg` and trial space `U_reg` over which derivatives are defined. We require that `V_reg` and `U_reg` have zero Dirichlet boundary conditions over regions where the extended shape sensitivity is zero.
 
 ### Initial level set function and interpolant
 
+We interpolate an initial level set function onto `V_φ` given a function `lsf_func` using the `interpolate` provided by Gridap.
 ```
 φh = interpolate(lsf_func,V_φ)
 ```
+For this problem we set `lsf_func` using the function [`initial_lsf`](@ref) in the problem parameters. This generates an initial level set according to
+```math
+\varphi_{\xi,a}(\boldsymbol{x})=-\frac{1}{4} \prod_i^D(\cos(\xi\pi x_i)) - a/4
+```
+with ``\xi,a=(4,0.2)`` and ``D=2`` in two dimensions. 
+
+We also generate a smooth characteristic function of radius ``\eta`` using:
 
 ```
 interp = SmoothErsatzMaterialInterpolation(η)
 I,H,DH,ρ = interp.I,interp.H,interp.DH,interp.ρ
 ```
+
+This the [`SmoothErsatzMaterialInterpolation`](@ref) structure defines the characteristic or interpolator `I`, the smoothed Heaviside function `H` and it's derivative `DH`, and the smoothed density function `ρ`. Below we visualise `φh` and the smoothed density function `ρ` at `φh`:
+
+| ![](2d_min_thermal_comp_initial_lsf_combined.png) |
+|:--:|
+|Figure 2: A visualisation of the initial level set function and the interpolated density function ``\rho`` for ``\Omega``.|
+
+Note that we generate a VTK file for visualisation this in Paraview via 
+```
+writevtk(Ω,"initial_lsf",cellfields=["phi"=>φh,
+  "ρ(phi)"=>(ρ ∘ φh),"|nabla(phi)|"=>(norm ∘ ∇(φh))])
+```
+Note that the operator `∘` is used to compose other Julia `Functions` with Gridap `FEFunctions`. This will be used extensively as we progress through the tutorial.
 
 ### Weak formulation and the state map
 The weak formulation for the problem above can be written as
@@ -207,8 +253,8 @@ where the `∘` operator composes the interpolator `I` with the level set functi
     The measures must be included as arguments at the end of all functionals.
     This ensures compatibility with Gridap's automatic differentiation.
 
-At this point we can build an `AffineFEStateMap`. This structure is designed to
-1) Enable the forward problem that solves an `AffineFEOperator`; and
+At this point we can build an [`AffineFEStateMap`](@ref). This structure is designed to
+1) Enable the forward problem that solves a Gridap `AffineFEOperator`; and
 2) Encode the implicit dependence of the solution `u` on the level set function `φ` to enable the differentiation of `u`.
 
 ```
@@ -232,20 +278,20 @@ C(u,φ,dΩ,dΓ_N) = ∫(((ρ ∘ φ) - vf)/vol_D)dΩ
 dC(q,u,φ,dΩ,dΓ_N) = ∫(1/vol_D*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
 ```
 
-We can now create an object `PDEConstrainedFunctionals` that handles the objective and constrations, and their analytic or automatic differentiation.
+We can now create an object [`PDEConstrainedFunctionals`](@ref) that handles the objective and constraints, and their analytic or automatic differentiation.
 ```
 pcfs = PDEConstrainedFunctionals(J,[C],state_map,analytic_dJ=dJ,analytic_dC=[dC])
 ```
-In this case, the analytic shape derivatives are passed as optional arguments. When these are not given, automatic differentiation is used.
+In this case, the analytic shape derivatives are passed as optional arguments. When these are not given, automatic differentiation in ``φ`` is used.
 
 ### Velocity extension-regularisation method
 
-The Hilbertian extension-regularisation CITATION method involves solving an 
+The Hilbertian extension-regularisation [4] method involves solving an 
 identification problem over a Hilbert space ``H`` on ``D`` with 
 inner product ``\langle\cdot,\cdot\rangle_H``: 
-*Find* ``g_\Omega\in H`` *such that* ``\langle g_\Omega,w\rangle_H
-=-J^{\prime}(\Omega)(w\boldsymbol{n})~
-\forall w\in H.``
+*Find* ``g_\Omega\in H`` *such that* ``\langle g_\Omega,q\rangle_H
+=-J^{\prime}(\Omega)(q\boldsymbol{n})~
+\forall q\in H.``
 
 This provides two benefits: 
  1) It naturally extends the shape sensitivity from ``\partial\Omega`` 
@@ -259,12 +305,12 @@ For our problem above we take the inner product
 \langle p,q\rangle_H=\int_{D}\alpha^2\nabla(p)\nabla(q)+pq~\mathrm{d}\boldsymbol{x},
 ```
 
-or equivilantly in our script:
+or equivalently in our script:
 ```
 a_hilb(p,q) =∫(α^2*∇(p)⋅∇(q) + p*q)dΩ
 ```
 
-We then build an object `VelocityExtension`. This object provides a method `project!` that applyies the Hilbertian velocity-extension method to a given shape derivative. 
+We then build an object [`VelocityExtension`](@ref). This object provides a method [`project!`](@ref) that applies the Hilbertian velocity-extension method to a given shape derivative. 
 
 ```
 vel_ext = VelocityExtension(a_hilb,U_reg,V_reg)
@@ -272,7 +318,7 @@ vel_ext = VelocityExtension(a_hilb,U_reg,V_reg)
 
 ### Advection and reinitialisation
 
-To advect the level set function, we solve the Hamilton-Jacobi evolution equation CITATION. This is given by
+To advect the level set function, we solve the Hamilton-Jacobi evolution equation [3,4,5]. This is given by
 
 ```math
 \frac{\partial\phi}{\partial t} + V(\boldsymbol{x})\lVert\boldsymbol{\nabla}\phi\rVert = 0,
@@ -280,7 +326,7 @@ To advect the level set function, we solve the Hamilton-Jacobi evolution equatio
 
 with ``\phi(0,\boldsymbol{x})=\phi_0(\boldsymbol{x})`` and ``\boldsymbol{x}\in D,~t\in(0,T)``.
 
-After advection of the interface, we solve the reinitialisation equation to find an equivilant signed distance function for the given level set function. This is given by
+After advection of the interface, we solve the reinitialisation equation to find an equivalent signed distance function for the given level set function. This is given by
 
 ```math
 \frac{\partial\phi}{\partial t} + \mathrm{sign}(\phi_0)(\lVert\boldsymbol{\nabla}\phi\rVert-1) = 0,
@@ -288,36 +334,54 @@ After advection of the interface, we solve the reinitialisation equation to find
 
 with ``\phi(0,\boldsymbol{x})=\phi_0(\boldsymbol{x})`` and ``\boldsymbol{x}\in D,~t\in(0,T)``.
 
-Both of these equations can be solved numerically on a Cartesian mesh using a first order Godunov upwind difference scheme based on Osher and Fedkiw 
-([link](https://doi.org/10.1007/b98879)). We first build an object `FirstOrderStencil` that represents a finite difference stencil for a single step of the Hamilton-Jacobi evolution equation and reinitialisation equation.
+Both of these equations can be solved numerically on a Cartesian mesh using a first order Godunov upwind difference scheme based on [5]. This functionality is provided by the following objects:
 
 ```
 scheme = FirstOrderStencil(2,Float64)
 stencil = AdvectionStencil(scheme,model,V_φ,tol,max_steps)
 ```
 
+In the above we first build an object [`FirstOrderStencil`](@ref) that represents a finite difference stencil for a single step of the Hamilton-Jacobi evolution equation and reinitialisation equation. We then create an [`AdvectionStencil`](@ref) which enables finite differencing on order `O` finite elements in serial or parallel. The [`AdvectionStencil`](@ref) object provides two important methods [`advect!`](@ref) and [`reinit!`](@ref) that correspond to solving the Hamilton-Jacobi evolution equation and reinitialisation equation, respectively.
+
 ### Optimiser, visualisation and IO
+
+We may now create the optimiser object. This structure holds all information regarding the optimisation problem that we wish to solve and implements an optimisation algorithm as a Julia [iterator](https://docs.julialang.org/en/v1/manual/interfaces/). For the purpose of this tutorial we use a standard augmented Lagrangian method based on [6]. In our script, we create an instance of the [`AugmentedLagrangian`](@ref) via
 
 ```
 optimiser = AugmentedLagrangian(pcfs,stencil,vel_ext,φh;
-    γ,γ_reinit,verbose=true,constraint_names=[:Vol])
-for (it,uh,φh) in optimiser 
-    write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh)),"uh"=>uh])
-    write_history(path*"/history.txt",get_history(optimiser))
+  γ,γ_reinit,verbose=true,constraint_names=[:Vol])
+```
+
+As optimisers inheriting from [`LevelSetTopOpt.Optimiser`](@ref) implement Julia's iterator functionality, we can solve the optimisation problem to convergence by iterating over the optimiser:
+
+```
+for (it,uh,φh) in optimiser end
+```
+
+This allows the user to inject code between iterations. For example, we can write VTK files for visualisation and save the history using the following:
+
+```
+for (it,uh,φh) in optimiser
+  data = ["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi)|"=>(norm ∘ ∇(φh)),"uh"=>uh]
+  iszero(it-1 % iter_mod) && writevtk(Ω,path*"_$it",cellfields=data)
+  write_history(path*"/history.txt",get_history(optimiser))
 end
 ```
 
-We output a VTK file for the final structure via 
+Depending on the use of `iszero(it-1 % iter_mod)`, the VTK file for the final structure
+may need to be saved using
 
 ```
 it = get_history(optimiser).niter; uh = get_state(pcfs)
-write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh)),"uh"=>uh];iter_mod=1)
-### ARE WE MISSING A write_history CALL HERE??
+writevtk(Ω,path*"_$it",cellfields=["phi"=>φh,
+  "H(phi)"=>(H ∘ φh),"|nabla(phi)|"=>(norm ∘ ∇(φh)),"uh"=>uh])
 ```
 
 ## Extensions
 
-### 3D with PETSc
+### 3D
+
+### PETSc
 
 ### Nonlinear diffusion
 
@@ -358,3 +422,16 @@ state_map = NonlinearFEStateMap(
 In addition, the objective functional for this problem rewrites as ...
 
 ### Serial to MPI
+
+## References
+> 1. *Z. Guo, X. Cheng, and Z. Xia. Least dissipation principle of heat transport potential capacity and its application in heat conduction  optimization. Chinese Science Bulletin, 48(4):406–410, Feb 2003. ISSN 1861-9541. doi: 10.1007/BF03183239.*
+> 
+> 2. *C. Zhuang, Z. Xiong, and H. Ding. A level set method for topology optimization of heat conduction problem under multiple load cases. Computer Methods in Applied Mechanics and Engineering, 196(4–6):1074–1084, Jan 2007. ISSN 00457825. doi: 10.1016/j.cma.2006.08.005.*
+>
+> 3. *Allaire G, Jouve F, Toader AM (2004) Structural optimization using sensitivity analysis and a level-set method. Journal of Computational Physics 194(1):363–393. doi: 10.1016/j.jcp.2003.09.032*
+> 
+> 4. *Allaire G, Dapogny C, Jouve F (2021) Shape and topology optimization, vol 22, Elsevier, p 1–132. doi: 10.1016/bs.hna.2020.10.004*
+>
+> 5. *Osher S, Fedkiw R (2006) Level Set Methods and Dynamic Implicit Surfaces, 1st edn. Applied Mathematical Sciences, Springer Science & Business Media. doi: 10.1007/b98879*
+>
+> 6. *Nocedal J, Wright SJ (2006) Numerical optimization, 2nd edn. Springer series in operations research, Springer, New York. doi: 10.1007/978-0-387-40065-5*

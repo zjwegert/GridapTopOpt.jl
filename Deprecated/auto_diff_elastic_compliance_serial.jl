@@ -200,7 +200,7 @@ hilb_rel_error = (abs(dϕh_Ω-v_J_Ω))/abs(v_J_Ω)
 path = dirname(dirname(@__DIR__))*"/results/AutoDiffTesting";
 writevtk(Ω,path,cellfields=["phi"=>φh,
     "H(phi)"=>(interp.H ∘ φh),
-    "|nabla(phi))|"=>(norm ∘ ∇(φh)),
+    "|nabla(phi)|"=>(norm ∘ ∇(φh)),
     "uh"=>uh,
     "J′_abs_error"=>abs_error,
     "J′_rel_error"=>rel_error,

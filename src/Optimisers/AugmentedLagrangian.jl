@@ -19,7 +19,8 @@ are defined in `problem::PDEConstrainedFunctionals`.
 - `params::NamedTuple`: Optimisation parameters.
 
 The `has_oscillations` function has been added to avoid oscillations in the 
-iteration history. This can be disabled by taking `has_oscillations = (args...) -> false`.
+iteration history. By default this uses a mean zero crossing algorithm as implemented
+in ChaosTools. Oscillations checking can be disabled by taking `has_oscillations = (args...) -> false`.
 """
 struct AugmentedLagrangian{N,O} <: Optimiser
   problem           :: PDEConstrainedFunctionals{N}

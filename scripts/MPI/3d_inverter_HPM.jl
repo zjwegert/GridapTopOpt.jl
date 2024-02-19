@@ -121,11 +121,11 @@ function main(mesh_partition,distribute,el_size)
   optimiser = HilbertianProjection(pcfs,stencil,vel_ext,φh;γ,γ_reinit,α_min=0.7,ls_γ_max=0.05,
     verbose=i_am_main(ranks),constraint_names=[:Vol,:UΓ_out])
   for (it, uh, φh) in optimiser
-    write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh)),"uh"=>uh])
+    write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi)|"=>(norm ∘ ∇(φh)),"uh"=>uh])
     write_history(path*"/history.txt",optimiser.history;ranks=ranks)
   end
   it = get_history(optimiser).niter; uh = get_state(pcfs)
-  write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh)),"uh"=>uh];iter_mod=1)
+  write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi)|"=>(norm ∘ ∇(φh)),"uh"=>uh];iter_mod=1)
 end
 
 with_mpi() do distribute

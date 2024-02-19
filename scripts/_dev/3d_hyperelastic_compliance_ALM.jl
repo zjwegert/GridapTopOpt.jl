@@ -73,7 +73,7 @@ function main(mesh_partition,distribute,el_size,δₓ)
   ## Optimiser
   u = LevelSetTopOpt.forward_solve!(state_map,φh)
   uh = FEFunction(U,u)
-  write_vtk(Ω,path*"/struc_$δₓ",0,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh)),"uh"=>uh];iter_mod=1)
+  write_vtk(Ω,path*"/struc_$δₓ",0,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi)|"=>(norm ∘ ∇(φh)),"uh"=>uh];iter_mod=1)
 end
 
 function main_alt(mesh_partition,distribute,el_size,gz)
@@ -173,7 +173,7 @@ function main_alt(mesh_partition,distribute,el_size,gz)
   ## Optimiser
   u = LevelSetTopOpt.forward_solve!(state_map,φh)
   uh = FEFunction(U,u)
-  write_vtk(Ω,path*"/struc_neohook_$gz",0,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh)),"uh"=>uh];iter_mod=1)
+  write_vtk(Ω,path*"/struc_neohook_$gz",0,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi)|"=>(norm ∘ ∇(φh)),"uh"=>uh];iter_mod=1)
 end
 
 with_mpi() do distribute

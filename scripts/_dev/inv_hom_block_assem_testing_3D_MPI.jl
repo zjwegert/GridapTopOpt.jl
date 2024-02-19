@@ -136,13 +136,13 @@ function main(mesh_partition,distribute,el_size,diag_assem::Bool)
     λi = optimiser.λ; Λi = optimiser.Λ
     print_history(it,["J"=>Ji,"C"=>Ci,"L"=>Li,"λ"=>λi,"Λ"=>Λi];ranks=ranks)
     write_history(history,path*"/history.csv";ranks=ranks)
-    write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh))])
+    write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi)|"=>(norm ∘ ∇(φh))])
   end
   it,Ji,Ci,Li = last(optimiser.history)
   λi = optimiser.λ; Λi = optimiser.Λ
   print_history(it,["J"=>Ji,"C"=>Ci,"L"=>Li,"λ"=>λi,"Λ"=>Λi];ranks=ranks)
   write_history(optimiser.history,path*"/history.csv";ranks=ranks)
-  write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh))];iter_mod=1)
+  write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi)|"=>(norm ∘ ∇(φh))];iter_mod=1)
 end
 
 # RUN: mpiexecjl --project=. -n 8 julia ./scripts/inv_hom_block_assem_testing_3D_MPI.jl

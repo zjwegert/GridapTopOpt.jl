@@ -219,7 +219,7 @@ Gridap's `writevtk` function except we
 
     or 
     
-    ```iszero(it % iter_mod) && writevtk(Ω,path,cellfields=entries)```
+    ```iszero(it-1 % iter_mod) && writevtk(Ω,path,cellfields=entries)```
 """
 function write_vtk(Ω,path,it,entries::Vector{<:Pair};iter_mod=10) # TODO: Rename to writevtk?
   if isone(it) || iszero(it % iter_mod) 

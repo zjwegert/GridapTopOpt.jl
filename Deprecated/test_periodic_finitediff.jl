@@ -157,4 +157,4 @@ v = get_free_dof_values(vh)
 advect!(φ,v,model,Δ,γ,50)
 reinit!(φ,model,Δ,0.5,2000,reinit_tol)
 
-writevtk(Ω,(@__DIR__)*"\\Results\\test_reinit_2d_plus_advect",cellfields=["phi"=>φh,"H(phi)"=>(interp.H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh))]);
+writevtk(Ω,(@__DIR__)*"\\Results\\test_reinit_2d_plus_advect",cellfields=["phi"=>φh,"H(phi)"=>(interp.H ∘ φh),"|nabla(phi)|"=>(norm ∘ ∇(φh))]);
