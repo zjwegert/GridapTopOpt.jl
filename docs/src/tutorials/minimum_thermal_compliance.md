@@ -141,9 +141,12 @@ C'(\varphi)(-q\boldsymbol{n}) = -\int_{D}wH'(\varphi)\lvert\nabla\varphi\rvert~\
 
 ## Computational method
 
-This problem can be solved using the methodologies available in LevelSetTopOpt. 
-For the purpose of this tutorial we break the computational formulation down
-into chunks. 
+In the following, we discuss the implementation of the above optimisation problem in LevelSetTopOpt. For the purpose of this tutorial we break the computational formulation into chunks.
+
+The first step in creating our script is to load any packages required:
+```julia
+using LevelSetTopOpt, Gridap
+```
 
 ### Parameters
 The following are user defined parameters for the problem. 
@@ -160,28 +163,25 @@ f_Γ_N(x) = (x[1] ≈ xmax &&                      # Γ_N indicator function
   ymax/2-ymax*prop_Γ_N/4 - eps() <= x[2] <= ymax/2+ymax*prop_Γ_N/4 + eps())
 f_Γ_D(x) = (x[1] ≈ 0.0 &&                       # Γ_D indicator function
   (x[2] <= ymax*prop_Γ_D + eps() || x[2] >= ymax-ymax*prop_Γ_D - eps()))
-
 # FD parameters
 γ = 0.1                                         # HJ equation time step coefficient
 γ_reinit = 0.5                                  # Reinit. equation time step coefficient
 max_steps = floor(Int,minimum(el_size)/10)      # Max steps for advection
 tol = 1/(10order^2)*prod(inv,minimum(el_size))  # Advection tolerance
-
-# Interpolation & extension-regularisation parameters
-η = 2*maximum(el_size)                          # Interpolation band radius
-α = 4*maximum(el_size)                          # Smoothing length scale
-
 # Problem parameters
 κ = 1                                           # Diffusivity
 g = 1                                           # Heat flow in
 vf = 0.4                                        # Volume fraction constraint
 lsf_func = initial_lsf(4,0.2)                   # Initial level set function
 iter_mod = 10                                   # Output VTK files every 10th iteration
+path = "./results/min_thermal_compliance_tut"   # Output path
+mkpath(path)                                    # Create path
 ```
 
 ### Finite element setup
 We first create a Cartesian mesh over ``[0,x_{\max}]\times[0,y_{\max}]`` with partition size `el_size` by creating an object `CartesianDiscreteModel`. In addition, we label the boundaries ``\Gamma_D`` and ``\Gamma_N`` using the [`update_labels!`](@ref) function.
 ```julia
+# Model
 model = CartesianDiscreteModel((0,xmax,0,ymax),el_size);
 update_labels!(1,model,f_Γ_D,"Gamma_D")
 update_labels!(2,model,f_Γ_N,"Gamma_N")
@@ -190,6 +190,7 @@ The first argument of [`update_labels!`](@ref) indicates the label number associ
 
 Once the model is defined we create an integration mesh and measure for both ``\Omega`` and ``\Gamma_N``. These are built using
 ```julia
+# Triangulation and measures
 Ω = Triangulation(model)
 Γ_N = BoundaryTriangulation(model,tags="Gamma_N")
 dΩ = Measure(Ω,2*order)
@@ -199,6 +200,7 @@ where `2*order` indicates the quadrature degree for numerical integration.
 
 The final stage of the finite element setup is the approximation of the finite element spaces. This is given as follows: 
 ```julia
+# Spaces
 reffe = ReferenceFE(lagrangian,Float64,order)
 V = TestFESpace(model,reffe;dirichlet_tags=["Gamma_D"])
 U = TrialFESpace(V,0.0)
@@ -213,6 +215,7 @@ In the above, we first define a scalar-valued Lagrangian reference element. This
 
 We interpolate an initial level set function onto `V_φ` given a function `lsf_func` using the `interpolate` provided by Gridap.
 ```julia
+# Level set and interpolator
 φh = interpolate(lsf_func,V_φ)
 ```
 For this problem we set `lsf_func` using the function [`initial_lsf`](@ref) in the problem parameters. This generates an initial level set according to
@@ -224,7 +227,7 @@ with ``\xi,a=(4,0.2)`` and ``D=2`` in two dimensions.
 We also generate a smooth characteristic function of radius ``\eta`` using:
 
 ```julia
-interp = SmoothErsatzMaterialInterpolation(η)
+interp = SmoothErsatzMaterialInterpolation(η = 2*maximum(get_el_Δ(model)))
 I,H,DH,ρ = interp.I,interp.H,interp.DH,interp.ρ
 ```
 
@@ -234,7 +237,7 @@ This the [`SmoothErsatzMaterialInterpolation`](@ref) structure defines the chara
 |:--:|
 |Figure 2: A visualisation of the initial level set function and the interpolated density function ``\rho`` for ``\Omega``.|
 
-Note that we generate a VTK file for visualisation this in Paraview via 
+Optional: we can generate a VTK file for visualisation in Paraview via 
 ```julia
 writevtk(Ω,"initial_lsf",cellfields=["phi"=>φh,
   "ρ(phi)"=>(ρ ∘ φh),"|nabla(phi)|"=>(norm ∘ ∇(φh))])
@@ -244,6 +247,7 @@ Note that the operator `∘` is used to compose other Julia `Functions` with Gri
 ### Weak formulation and the state map
 The weak formulation for the problem above can be written as
 ```julia
+# Weak formulation
 a(u,v,φ,dΩ,dΓ_N) = ∫((I ∘ φ)*κ*∇(u)⋅∇(v))dΩ
 l(v,φ,dΩ,dΓ_N) = ∫(g*v)dΓ_N
 ```
@@ -266,6 +270,7 @@ state_map = AffineFEStateMap(a,l,U,V,V_φ,U_reg,φh,dΩ,dΓ_N)
 The objective functional ``J`` and it's shape derivative is given by
 
 ```julia
+# Objective and constraints
 J(u,φ,dΩ,dΓ_N) = ∫((I ∘ φ)*κ*∇(u)⋅∇(u))dΩ
 dJ(q,u,φ,dΩ,dΓ_N) = ∫(-κ*∇(u)⋅∇(u)*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
 ```
@@ -304,9 +309,10 @@ For our problem above we take the inner product
 ```math
 \langle p,q\rangle_H=\int_{D}\alpha^2\nabla(p)\nabla(q)+pq~\mathrm{d}\boldsymbol{x},
 ```
-
-or equivalently in our script:
+where ``\alpha`` is the smoothing length scale. Equivalently in our script we have
 ```julia
+# Velocity extension
+α = 4*maximum(get_el_Δ(model))
 a_hilb(p,q) =∫(α^2*∇(p)⋅∇(q) + p*q)dΩ
 ```
 
@@ -337,6 +343,7 @@ with ``\phi(0,\boldsymbol{x})=\phi_0(\boldsymbol{x})`` and ``\boldsymbol{x}\in D
 Both of these equations can be solved numerically on a Cartesian mesh using a first order Godunov upwind difference scheme based on [5]. This functionality is provided by the following objects:
 
 ```julia
+# Finite difference scheme
 scheme = FirstOrderStencil(2,Float64)
 stencil = AdvectionStencil(scheme,model,V_φ,tol,max_steps)
 ```
@@ -348,30 +355,33 @@ In the above we first build an object [`FirstOrderStencil`](@ref) that represent
 We may now create the optimiser object. This structure holds all information regarding the optimisation problem that we wish to solve and implements an optimisation algorithm as a Julia [iterator](https://docs.julialang.org/en/v1/manual/interfaces/). For the purpose of this tutorial we use a standard augmented Lagrangian method based on [6]. In our script, we create an instance of the [`AugmentedLagrangian`](@ref) via
 
 ```julia
-optimiser = AugmentedLagrangian(pcfs,stencil,vel_ext,φh;
-  γ,γ_reinit,verbose=true,constraint_names=[:Vol])
+# Optimiser
+optimiser = AugmentedLagrangian(pcfs,stencil,vel_ext,φh;γ,γ_reinit,verbose=true,constraint_names=[:Vol])
 ```
 
 As optimisers inheriting from [`LevelSetTopOpt.Optimiser`](@ref) implement Julia's iterator functionality, we can solve the optimisation problem to convergence by iterating over the optimiser:
 
 ```julia
+# Solve
 for (it,uh,φh) in optimiser end
 ```
 
 This allows the user to inject code between iterations. For example, we can write VTK files for visualisation and save the history using the following:
 
 ```julia
+# Solve
 for (it,uh,φh) in optimiser
   data = ["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi)|"=>(norm ∘ ∇(φh)),"uh"=>uh]
-  iszero(it-1 % iter_mod) && writevtk(Ω,path*"_$it",cellfields=data)
+  iszero((it-1) % iter_mod) && writevtk(Ω,path*"_$it",cellfields=data)
   write_history(path*"/history.txt",get_history(optimiser))
 end
 ```
 
-Depending on the use of `iszero(it-1 % iter_mod)`, the VTK file for the final structure
+Depending on the use of `iszero((it-1) % iter_mod)`, the VTK file for the final structure
 may need to be saved using
 
 ```julia
+# Final structure
 it = get_history(optimiser).niter; uh = get_state(pcfs)
 writevtk(Ω,path*"_$it",cellfields=["phi"=>φh,
   "H(phi)"=>(H ∘ φh),"|nabla(phi)|"=>(norm ∘ ∇(φh)),"uh"=>uh])
@@ -379,16 +389,101 @@ writevtk(Ω,path*"_$it",cellfields=["phi"=>φh,
 
 ### The full script
 
-Combining the above into a full script gives
-
-```julia
-...
-asdasd
+```@raw html
+<details><summary>Combining the above gives (click me!)</summary>
 ```
 
-Running this solution until convergence gives an value for the Lagrangian of ``\mathcal{L}=...`` and a final stucture
+```julia
+using Gridap, LevelSetTopOpt
+
+# FE parameters
+order = 1                                       # Finite element order
+xmax=ymax=1.0                                   # Domain size
+el_size = (200,200)                             # Mesh partition size
+prop_Γ_N = 0.4                                  # Γ_N size parameter
+prop_Γ_D = 0.2                                  # Γ_D size parameter
+f_Γ_N(x) = (x[1] ≈ xmax &&                      # Γ_N indicator function
+  ymax/2-ymax*prop_Γ_N/4 - eps() <= x[2] <= ymax/2+ymax*prop_Γ_N/4 + eps())
+f_Γ_D(x) = (x[1] ≈ 0.0 &&                       # Γ_D indicator function
+  (x[2] <= ymax*prop_Γ_D + eps() || x[2] >= ymax-ymax*prop_Γ_D - eps()))
+# FD parameters
+γ = 0.1                                         # HJ equation time step coefficient
+γ_reinit = 0.5                                  # Reinit. equation time step coefficient
+max_steps = floor(Int,minimum(el_size)/10)      # Max steps for advection
+tol = 1/(10order^2)*prod(inv,minimum(el_size))  # Advection tolerance
+# Problem parameters
+κ = 1                                           # Diffusivity
+g = 1                                           # Heat flow in
+vf = 0.4                                        # Volume fraction constraint
+lsf_func = initial_lsf(4,0.2)                   # Initial level set function
+iter_mod = 10                                   # Output VTK files every 10th iteration
+path = "./results/min_thermal_compliance_tut/"  # Output path
+mkpath(path)                                    # Create path
+# Model
+model = CartesianDiscreteModel((0,xmax,0,ymax),el_size);
+update_labels!(1,model,f_Γ_D,"Gamma_D")
+update_labels!(2,model,f_Γ_N,"Gamma_N")
+# Triangulation and measures
+Ω = Triangulation(model)
+Γ_N = BoundaryTriangulation(model,tags="Gamma_N")
+dΩ = Measure(Ω,2*order)
+dΓ_N = Measure(Γ_N,2*order)
+# Spaces
+reffe = ReferenceFE(lagrangian,Float64,order)
+V = TestFESpace(model,reffe;dirichlet_tags=["Gamma_D"])
+U = TrialFESpace(V,0.0)
+V_φ = TestFESpace(model,reffe)
+V_reg = TestFESpace(model,reffe;dirichlet_tags=["Gamma_N","Gamma_D"])
+U_reg = TrialFESpace(V_reg,0)
+# Level set and interpolator
+φh = interpolate(lsf_func,V_φ)
+interp = SmoothErsatzMaterialInterpolation(η = 2*maximum(get_el_Δ(model)))
+I,H,DH,ρ = interp.I,interp.H,interp.DH,interp.ρ
+# Weak formulation
+a(u,v,φ,dΩ,dΓ_N) = ∫((I ∘ φ)*κ*∇(u)⋅∇(v))dΩ
+l(v,φ,dΩ,dΓ_N) = ∫(g*v)dΓ_N
+state_map = AffineFEStateMap(a,l,U,V,V_φ,U_reg,φh,dΩ,dΓ_N)
+# Objective and constraints
+J(u,φ,dΩ,dΓ_N) = ∫((I ∘ φ)*κ*∇(u)⋅∇(u))dΩ
+dJ(q,u,φ,dΩ,dΓ_N) = ∫(-κ*∇(u)⋅∇(u)*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
+vol_D = sum(∫(1)dΩ)
+C(u,φ,dΩ,dΓ_N) = ∫(((ρ ∘ φ) - vf)/vol_D)dΩ
+dC(q,u,φ,dΩ,dΓ_N) = ∫(1/vol_D*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
+pcfs = PDEConstrainedFunctionals(J,[C],state_map,analytic_dJ=dJ,analytic_dC=[dC])
+# Velocity extension
+α = 4*maximum(get_el_Δ(model))
+a_hilb(p,q) =∫(α^2*∇(p)⋅∇(q) + p*q)dΩ
+vel_ext = VelocityExtension(a_hilb,U_reg,V_reg)
+# Finite difference scheme
+scheme = FirstOrderStencil(2,Float64)
+stencil = AdvectionStencil(scheme,model,V_φ,tol,max_steps)
+# Optimiser
+optimiser = AugmentedLagrangian(pcfs,stencil,vel_ext,φh;γ,γ_reinit,verbose=true,constraint_names=[:Vol])
+# Solve
+for (it,uh,φh) in optimiser
+  data = ["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi)|"=>(norm ∘ ∇(φh)),"uh"=>uh]
+  iszero((it-1) % iter_mod) && writevtk(Ω,path*"struc_$it",cellfields=data)
+  write_history(path*"/history.txt",get_history(optimiser))
+end
+# Final structure
+it = get_history(optimiser).niter; uh = get_state(pcfs)
+writevtk(Ω,path*"_$it",cellfields=["phi"=>φh,
+  "H(phi)"=>(H ∘ φh),"|nabla(phi)|"=>(norm ∘ ∇(φh)),"uh"=>uh])
+```
+
+```@raw html
+</details>
+```
+
+Running this problem until convergence gives 
+```
+Iteration: ... | L=...
+```
+with ``\Omega`` given by
 
 ...
+
+
 
 ## Extensions
 

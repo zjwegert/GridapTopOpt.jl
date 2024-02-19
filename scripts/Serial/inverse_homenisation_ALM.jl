@@ -29,7 +29,7 @@ function main()
 
   ## FE Setup
   model = CartesianDiscreteModel(dom,el_size,isperiodic=(true,true))
-  el_size = get_el_size(model)
+  el_Δ = get_el_Δ(model)
   f_Γ_D(x) = iszero(x)
   update_labels!(1,model,f_Γ_D,"origin")
 
@@ -51,7 +51,7 @@ function main()
   φh = interpolate(lsf_fn,V_φ)
 
   ## Interpolation and weak form
-  interp = SmoothErsatzMaterialInterpolation(η = η_coeff*maximum(el_size))
+  interp = SmoothErsatzMaterialInterpolation(η = η_coeff*maximum(el_Δ))
   I,H,DH,ρ = interp.I,interp.H,interp.DH,interp.ρ
 
   εᴹ = (TensorValue(1.,0.,0.,0.),     # ϵᵢⱼ⁽¹¹⁾≡ϵᵢⱼ⁽¹⁾
@@ -73,14 +73,13 @@ function main()
 
   ## Finite difference solver and level set function
   stencil = AdvectionStencil(FirstOrderStencil(2,Float64),model,V_φ,tol,max_steps)
-  reinit!(stencil,φh,γ_reinit)
 
   ## Setup solver and FE operators
   state_map = RepeatingAffineFEStateMap(3,a,l,U,V,V_φ,U_reg,φh,dΩ)
   pcfs = PDEConstrainedFunctionals(J,[Vol],state_map;analytic_dJ=dJ,analytic_dC=[dVol])
 
   ## Hilbertian extension-regularisation problems
-  α = α_coeff*maximum(el_size)
+  α = α_coeff*maximum(el_Δ)
   a_hilb(p,q) =∫(α^2*∇(p)⋅∇(q) + p*q)dΩ
   vel_ext = VelocityExtension(a_hilb,U_reg,V_reg)
   

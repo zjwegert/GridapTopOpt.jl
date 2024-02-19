@@ -33,7 +33,7 @@ function main(mesh_partition,distribute)
 
   ## FE Setup
   model = CartesianDiscreteModel(ranks,mesh_partition,dom,el_size);
-  el_size = get_el_size(model)
+  el_Δ = get_el_Δ(model)
   f_Γ_D(x) = (x[1] ≈ 0.0) && ((x[2] <= ymax*prop_Γ_D + eps()) || (x[2] >= ymax-ymax*prop_Γ_D - eps()))
   f_Γ_N(x) = (x[1] ≈ xmax) && (ymax/2-ymax*prop_Γ_N/4 - eps() <= x[2] <= ymax/2+ymax*prop_Γ_N/4 + eps())
   update_labels!(1,model,f_Γ_D,"Gamma_D")
@@ -58,7 +58,7 @@ function main(mesh_partition,distribute)
   φh = interpolate(initial_lsf(4,0.2),V_φ)
 
   ## Interpolation and weak form
-  interp = SmoothErsatzMaterialInterpolation(η = η_coeff*maximum(el_size))
+  interp = SmoothErsatzMaterialInterpolation(η = η_coeff*maximum(el_Δ))
   I,H,DH,ρ = interp.I,interp.H,interp.DH,interp.ρ
 
   a(u,v,φ,dΩ,dΓ_N) = ∫((I ∘ φ)*κ*∇(u)⋅∇(v))dΩ
@@ -78,7 +78,7 @@ function main(mesh_partition,distribute)
   pcfs = PDEConstrainedFunctionals(J,[Vol],state_map,analytic_dJ=dJ)
 
   ## Hilbertian extension-regularisation problems
-  α = α_coeff*maximum(el_size)
+  α = α_coeff*maximum(el_Δ)
   a_hilb(p,q) =∫(α^2*∇(p)⋅∇(q) + p*q)dΩ;
   vel_ext = VelocityExtension(a_hilb,U_reg,V_reg)
 

@@ -146,17 +146,17 @@ where x is a vector with components xᵢ.
 initial_lsf(ξ,a;b=0) = x::VectorValue -> -1/4*prod(cos.(get_array(@.(ξ*pi*(x-b))))) - a/4
 
 """
-    get_el_size(model)
+    get_el_Δ(model)
 
 Given a CartesianDiscreteModel or DistributedDiscreteModel that is
 uniform, return the element size as a tuple. 
 """
-function get_el_size(model::CartesianDiscreteModel)
+function get_el_Δ(model::CartesianDiscreteModel)
   desc = get_cartesian_descriptor(model)
   return desc.sizes
 end
 
-function get_el_size(model::DistributedDiscreteModel)
+function get_el_Δ(model::DistributedDiscreteModel)
   local_Δ = map(local_views(model)) do model
     desc = get_cartesian_descriptor(model)
     desc.sizes

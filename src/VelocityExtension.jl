@@ -68,3 +68,7 @@ function project!(vel_ext::VelocityExtension,dF::AbstractVector)
 end
 
 project!(vel_ext::VelocityExtension,dF_vec::Vector{<:AbstractVector}) = broadcast(dF -> project!(vel_ext,dF),dF_vec)
+
+function Base.show(io::IO,object::VelocityExtension)
+  print(io,"$(nameof(typeof(object)))")
+end

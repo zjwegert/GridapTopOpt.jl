@@ -47,7 +47,7 @@ include("Utilities.jl")
 export SmoothErsatzMaterialInterpolation
 export update_labels!
 export initial_lsf
-export get_el_size
+export get_el_Δ
 export isotropic_elast_tensor
 export write_vtk
 

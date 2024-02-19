@@ -31,7 +31,7 @@ function main(mesh_partition,distribute,el_size)
 
   ## FE Setup
   model = CartesianDiscreteModel(ranks,mesh_partition,dom,el_size,isperiodic=(true,true,true))
-  el_size = get_el_size(model)
+  el_Δ = get_el_Δ(model)
   f_Γ_D(x) = iszero(x)
   update_labels!(1,model,f_Γ_D,"origin")
 
@@ -53,7 +53,7 @@ function main(mesh_partition,distribute,el_size)
   φh = interpolate(lsf_fn,V_φ)
 
   ## Interpolation and weak form
-  interp = SmoothErsatzMaterialInterpolation(η = η_coeff*maximum(el_size))
+  interp = SmoothErsatzMaterialInterpolation(η = η_coeff*maximum(el_Δ))
   I,H,DH,ρ = interp.I,interp.H,interp.DH,interp.ρ
 
   εᴹ = (TensorValue(1.,0.,0.,0.,0.,0.,0.,0.,0.),           # ϵᵢⱼ⁽¹¹⁾≡ϵᵢⱼ⁽¹⁾
@@ -98,7 +98,7 @@ function main(mesh_partition,distribute,el_size)
   pcfs = PDEConstrainedFunctionals(J,[Vol],state_map;analytic_dJ=dJ,analytic_dC=[dVol])
 
   ## Hilbertian extension-regularisation problems
-  α = α_coeff*maximum(el_size)
+  α = α_coeff*maximum(el_Δ)
   a_hilb(p,q) = ∫(α^2*∇(p)⋅∇(q) + p*q)dΩ;
   vel_ext = VelocityExtension(
     a_hilb,U_reg,V_reg,

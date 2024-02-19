@@ -29,7 +29,7 @@ function main()
 
   ## FE Setup
   model = CartesianDiscreteModel(dom,el_size);
-  el_size = get_el_size(model)
+  el_Δ = get_el_Δ(model)
   f_Γ_D(x) = (x[1] ≈ 0.0 && (x[2] <= ymax*prop_Γ_D + eps() || 
     x[2] >= ymax-ymax*prop_Γ_D - eps())) ? true : false;
   f_Γ_N(x) = (x[1] ≈ xmax && ymax/2-ymax*prop_Γ_N/4 - eps() <= x[2] <= 
@@ -56,7 +56,7 @@ function main()
   φ = get_free_dof_values(φh)
 
   ## Interpolation and weak form
-  interp = SmoothErsatzMaterialInterpolation(η = η_coeff*maximum(el_size))
+  interp = SmoothErsatzMaterialInterpolation(η = η_coeff*maximum(el_Δ))
   I,H,DH,ρ = interp.I,interp.H,interp.DH,interp.ρ
 
   D0 = 1;

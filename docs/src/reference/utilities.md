@@ -15,5 +15,5 @@ LevelSetTopOpt.update_labels!
 ```@docs
 LevelSetTopOpt.initial_lsf
 LevelSetTopOpt.isotropic_elast_tensor
-LevelSetTopOpt.get_el_size
+LevelSetTopOpt.get_el_Δ
 ```

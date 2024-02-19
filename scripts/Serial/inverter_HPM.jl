@@ -35,7 +35,7 @@ function main()
   
   ## FE Setup
   model = CartesianDiscreteModel(dom,el_size)
-  el_size = get_el_size(model)
+  el_Δ = get_el_Δ(model)
   f_Γ_in(x) = (x[1] ≈ 0.0) && (x[2] <= 0.03 + eps())
   f_Γ_out(x) = (x[1] ≈ 1.0) && (x[2] <= 0.07 + eps())
   f_Γ_D(x) = (x[1] ≈ 0.0) && (x[2] >= 0.4)
@@ -71,7 +71,7 @@ function main()
   φh = interpolate(lsf_fn,V_φ)
 
   ## Interpolation and weak form
-  interp = SmoothErsatzMaterialInterpolation(η = η_coeff*maximum(el_size))
+  interp = SmoothErsatzMaterialInterpolation(η = η_coeff*maximum(el_Δ))
   I,H,DH,ρ = interp.I,interp.H,interp.DH,interp.ρ
 
   a(u,v,φ,dΩ,dΓ_in,dΓ_out) = ∫((I ∘ φ)*(C ⊙ ε(u) ⊙ ε(v)))dΩ + ∫(ks*(u⋅v))dΓ_out
@@ -86,14 +86,13 @@ function main()
 
   ## Finite difference solver and level set function
   stencil = AdvectionStencil(FirstOrderStencil(2,Float64),model,V_φ,tol,max_steps)
-  reinit!(stencil,φh,γ_reinit)
 
   ## Setup solver and FE operators
   state_map = AffineFEStateMap(a,l,U,V,V_φ,U_reg,φh,dΩ,dΓ_in,dΓ_out)
   pcfs = PDEConstrainedFunctionals(J,[Vol,UΓ_out],state_map,analytic_dC=[dVol,nothing])
 
   ## Hilbertian extension-regularisation problems
-  α = α_coeff*maximum(el_size)
+  α = α_coeff*maximum(el_Δ)
   a_hilb(p,q) = ∫(α^2*∇(p)⋅∇(q) + p*q)dΩ;
   vel_ext = VelocityExtension(a_hilb,U_reg,V_reg)
   

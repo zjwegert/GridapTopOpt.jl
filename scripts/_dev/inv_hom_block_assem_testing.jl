@@ -26,7 +26,7 @@ path = dirname(dirname(@__DIR__))*"/results/block_testing"
 ## FE Setup
 model = CartesianDiscreteModel(ranks,(2,3),dom,el_size,isperiodic=(true,true));
 # model = CartesianDiscreteModel(dom,el_size,isperiodic=(true,true));
-el_size = get_el_size(model)
+el_Δ = get_el_Δ(model)
 f_Γ_D(x) = iszero(x)
 update_labels!(1,model,f_Γ_D,"origin")
 
@@ -52,7 +52,7 @@ lsf_fn = x->max(initial_lsf(2,0.4)(x),initial_lsf(2,0.4;b=VectorValue(0,0.5))(x)
 φ = get_free_dof_values(φh)
 
 ## Interpolation and weak form
-interp = SmoothErsatzMaterialInterpolation(η = η_coeff*maximum(el_size))
+interp = SmoothErsatzMaterialInterpolation(η = η_coeff*maximum(el_Δ))
 I,H,DH,ρ = interp.I,interp.H,interp.DH,interp.ρ
 
 εᴹ = (TensorValue(1.,0.,0.,0.),     # ϵᵢⱼ⁽¹¹⁾≡ϵᵢⱼ⁽¹⁾
