@@ -111,7 +111,7 @@ end
 
 function default_al_converged(
   m::AugmentedLagrangian;
-  L_tol = 0.05*maximum(m.stencil.params.Δ),
+  L_tol = 0.01*maximum(m.stencil.params.Δ),
   C_tol = 0.001
 )
   h  = m.history
