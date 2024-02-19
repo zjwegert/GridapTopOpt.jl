@@ -67,8 +67,7 @@ function main(mesh_partition,distribute,el_size)
   V = TestFESpace(model,reffe;dirichlet_tags=["Gamma_D"])
   U = TrialFESpace(V,VectorValue(0.0,0.0,0.0))
   V_φ = TestFESpace(model,reffe_scalar)
-  V_reg = TestFESpace(model,reffe_scalar;dirichlet_tags=[
-    "Gamma_in","Gamma_out","Gamma_out_ext","Gamma_D"])
+  V_reg = TestFESpace(model,reffe_scalar;dirichlet_tags=["Gamma_in","Gamma_out","Gamma_out_ext"])
   U_reg = TrialFESpace(V_reg,[0,0,0])
 
   ## Create FE functions

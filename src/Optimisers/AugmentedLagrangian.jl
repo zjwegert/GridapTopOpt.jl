@@ -111,7 +111,7 @@ end
 
 function default_al_converged(
   m::AugmentedLagrangian;
-  L_tol = 0.01*maximum(m.stencil.params.Δ),
+  L_tol = 0.05*maximum(m.stencil.params.Δ),
   C_tol = 0.001
 )
   h  = m.history
@@ -121,7 +121,7 @@ function default_al_converged(
   end
 
   Li, Ci = h[:L,it], h[:C,it]
-  L_prev = h[:L,it-5:it-1]
+  L_prev = h[:L,it-10:it-1]
   A = all(L -> abs(Li - L)/abs(Li) < L_tol, L_prev)
   B = all(C -> abs(C) < C_tol,Ci)
   return A && B

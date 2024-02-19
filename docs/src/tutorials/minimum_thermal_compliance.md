@@ -205,11 +205,11 @@ reffe = ReferenceFE(lagrangian,Float64,order)
 V = TestFESpace(model,reffe;dirichlet_tags=["Gamma_D"])
 U = TrialFESpace(V,0.0)
 V_φ = TestFESpace(model,reffe)
-V_reg = TestFESpace(model,reffe;dirichlet_tags=["Gamma_N","Gamma_D"])
+V_reg = TestFESpace(model,reffe;dirichlet_tags=["Gamma_N"])
 U_reg = TrialFESpace(V_reg,0)
 ```
 
-In the above, we first define a scalar-valued Lagrangian reference element. This is then used to define the test space `V` and trial space `U` corresponding to ``H^1_{\Gamma_{D}}(\Omega)``. We then construct an FE space `V_φ` over which the level set function is defined, along with an FE test space `V_reg` and trial space `U_reg` over which derivatives are defined. We require that `V_reg` and `U_reg` have zero Dirichlet boundary conditions over regions where the extended shape sensitivity is zero.
+In the above, we first define a scalar-valued Lagrangian reference element. This is then used to define the test space `V` and trial space `U` corresponding to ``H^1_{\Gamma_{D}}(\Omega)``. We then construct an FE space `V_φ` over which the level set function is defined, along with an FE test space `V_reg` and trial space `U_reg` over which derivatives are defined. We require that `V_reg` and `U_reg` have zero Dirichlet boundary conditions over regions where the extended shape sensitivity is zero. In general, we allow Dirichlet boundaries to have non-zero shape sensitivity.
 
 ### Initial level set function and interpolant
 
@@ -433,7 +433,7 @@ reffe = ReferenceFE(lagrangian,Float64,order)
 V = TestFESpace(model,reffe;dirichlet_tags=["Gamma_D"])
 U = TrialFESpace(V,0.0)
 V_φ = TestFESpace(model,reffe)
-V_reg = TestFESpace(model,reffe;dirichlet_tags=["Gamma_N","Gamma_D"])
+V_reg = TestFESpace(model,reffe;dirichlet_tags=["Gamma_N"])
 U_reg = TrialFESpace(V_reg,0)
 # Level set and interpolator
 φh = interpolate(lsf_func,V_φ)

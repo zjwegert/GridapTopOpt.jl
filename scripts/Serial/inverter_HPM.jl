@@ -63,7 +63,7 @@ function main()
     dirichlet_masks=[(true,true),(false,true)])
   U = TrialFESpace(V,[VectorValue(0.0,0.0),VectorValue(0.0,0.0)])
   V_φ = TestFESpace(model,reffe_scalar)
-  V_reg = TestFESpace(model,reffe_scalar;dirichlet_tags=["Gamma_in","Gamma_out","Gamma_D"])
+  V_reg = TestFESpace(model,reffe_scalar;dirichlet_tags=["Gamma_in","Gamma_out"])
   U_reg = TrialFESpace(V_reg,[0,0])
 
   ## Create FE functions
