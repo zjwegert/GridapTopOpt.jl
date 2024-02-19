@@ -149,7 +149,7 @@ into chunks.
 The following are user defined parameters for the problem. 
 These parameters will be discussed over the course of this tutorial. 
 
-```
+```julia
 # FE parameters
 order = 1                                       # Finite element order
 xmax=ymax=1.0                                   # Domain size
@@ -181,7 +181,7 @@ iter_mod = 10                                   # Output VTK files every 10th it
 
 ### Finite element setup
 We first create a Cartesian mesh over ``[0,x_{\max}]\times[0,y_{\max}]`` with partition size `el_size` by creating an object `CartesianDiscreteModel`. In addition, we label the boundaries ``\Gamma_D`` and ``\Gamma_N`` using the [`update_labels!`](@ref) function.
-```
+```julia
 model = CartesianDiscreteModel((0,xmax,0,ymax),el_size);
 update_labels!(1,model,f_Γ_D,"Gamma_D")
 update_labels!(2,model,f_Γ_N,"Gamma_N")
@@ -189,7 +189,7 @@ update_labels!(2,model,f_Γ_N,"Gamma_N")
 The first argument of [`update_labels!`](@ref) indicates the label number associated to the region as indicated by the functions `f_Γ_D` and `f_Γ_N`. These functions should take a vector `x` and return `true` or `false` depending on whether a point is present in this region.
 
 Once the model is defined we create an integration mesh and measure for both ``\Omega`` and ``\Gamma_N``. These are built using
-```
+```julia
 Ω = Triangulation(model)
 Γ_N = BoundaryTriangulation(model,tags="Gamma_N")
 dΩ = Measure(Ω,2*order)
@@ -198,7 +198,7 @@ dΓ_N = Measure(Γ_N,2*order)
 where `2*order` indicates the quadrature degree for numerical integration.
 
 The final stage of the finite element setup is the approximation of the finite element spaces. This is given as follows: 
-```
+```julia
 reffe = ReferenceFE(lagrangian,Float64,order)
 V = TestFESpace(model,reffe;dirichlet_tags=["Gamma_D"])
 U = TrialFESpace(V,0.0)
@@ -212,7 +212,7 @@ In the above, we first define a scalar-valued Lagrangian reference element. This
 ### Initial level set function and interpolant
 
 We interpolate an initial level set function onto `V_φ` given a function `lsf_func` using the `interpolate` provided by Gridap.
-```
+```julia
 φh = interpolate(lsf_func,V_φ)
 ```
 For this problem we set `lsf_func` using the function [`initial_lsf`](@ref) in the problem parameters. This generates an initial level set according to
@@ -223,7 +223,7 @@ with ``\xi,a=(4,0.2)`` and ``D=2`` in two dimensions.
 
 We also generate a smooth characteristic function of radius ``\eta`` using:
 
-```
+```julia
 interp = SmoothErsatzMaterialInterpolation(η)
 I,H,DH,ρ = interp.I,interp.H,interp.DH,interp.ρ
 ```
@@ -235,7 +235,7 @@ This the [`SmoothErsatzMaterialInterpolation`](@ref) structure defines the chara
 |Figure 2: A visualisation of the initial level set function and the interpolated density function ``\rho`` for ``\Omega``.|
 
 Note that we generate a VTK file for visualisation this in Paraview via 
-```
+```julia
 writevtk(Ω,"initial_lsf",cellfields=["phi"=>φh,
   "ρ(phi)"=>(ρ ∘ φh),"|nabla(phi)|"=>(norm ∘ ∇(φh))])
 ```
@@ -243,7 +243,7 @@ Note that the operator `∘` is used to compose other Julia `Functions` with Gri
 
 ### Weak formulation and the state map
 The weak formulation for the problem above can be written as
-```
+```julia
 a(u,v,φ,dΩ,dΓ_N) = ∫((I ∘ φ)*κ*∇(u)⋅∇(v))dΩ
 l(v,φ,dΩ,dΓ_N) = ∫(g*v)dΓ_N
 ```
@@ -265,21 +265,21 @@ state_map = AffineFEStateMap(a,l,U,V,V_φ,U_reg,φh,dΩ,dΓ_N)
 
 The objective functional ``J`` and it's shape derivative is given by
 
-```
+```julia
 J(u,φ,dΩ,dΓ_N) = ∫((I ∘ φ)*κ*∇(u)⋅∇(u))dΩ
 dJ(q,u,φ,dΩ,dΓ_N) = ∫(-κ*∇(u)⋅∇(u)*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
 ```
 
 while the constraint on the volume and its derivative is
 
-```
+```julia
 vol_D = sum(∫(1)dΩ)
 C(u,φ,dΩ,dΓ_N) = ∫(((ρ ∘ φ) - vf)/vol_D)dΩ
 dC(q,u,φ,dΩ,dΓ_N) = ∫(1/vol_D*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
 ```
 
 We can now create an object [`PDEConstrainedFunctionals`](@ref) that handles the objective and constraints, and their analytic or automatic differentiation.
-```
+```julia
 pcfs = PDEConstrainedFunctionals(J,[C],state_map,analytic_dJ=dJ,analytic_dC=[dC])
 ```
 In this case, the analytic shape derivatives are passed as optional arguments. When these are not given, automatic differentiation in ``φ`` is used.
@@ -306,13 +306,13 @@ For our problem above we take the inner product
 ```
 
 or equivalently in our script:
-```
+```julia
 a_hilb(p,q) =∫(α^2*∇(p)⋅∇(q) + p*q)dΩ
 ```
 
 We then build an object [`VelocityExtension`](@ref). This object provides a method [`project!`](@ref) that applies the Hilbertian velocity-extension method to a given shape derivative. 
 
-```
+```julia
 vel_ext = VelocityExtension(a_hilb,U_reg,V_reg)
 ```
 
@@ -336,7 +336,7 @@ with ``\phi(0,\boldsymbol{x})=\phi_0(\boldsymbol{x})`` and ``\boldsymbol{x}\in D
 
 Both of these equations can be solved numerically on a Cartesian mesh using a first order Godunov upwind difference scheme based on [5]. This functionality is provided by the following objects:
 
-```
+```julia
 scheme = FirstOrderStencil(2,Float64)
 stencil = AdvectionStencil(scheme,model,V_φ,tol,max_steps)
 ```
@@ -347,20 +347,20 @@ In the above we first build an object [`FirstOrderStencil`](@ref) that represent
 
 We may now create the optimiser object. This structure holds all information regarding the optimisation problem that we wish to solve and implements an optimisation algorithm as a Julia [iterator](https://docs.julialang.org/en/v1/manual/interfaces/). For the purpose of this tutorial we use a standard augmented Lagrangian method based on [6]. In our script, we create an instance of the [`AugmentedLagrangian`](@ref) via
 
-```
+```julia
 optimiser = AugmentedLagrangian(pcfs,stencil,vel_ext,φh;
   γ,γ_reinit,verbose=true,constraint_names=[:Vol])
 ```
 
 As optimisers inheriting from [`LevelSetTopOpt.Optimiser`](@ref) implement Julia's iterator functionality, we can solve the optimisation problem to convergence by iterating over the optimiser:
 
-```
+```julia
 for (it,uh,φh) in optimiser end
 ```
 
 This allows the user to inject code between iterations. For example, we can write VTK files for visualisation and save the history using the following:
 
-```
+```julia
 for (it,uh,φh) in optimiser
   data = ["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi)|"=>(norm ∘ ∇(φh)),"uh"=>uh]
   iszero(it-1 % iter_mod) && writevtk(Ω,path*"_$it",cellfields=data)
@@ -371,17 +371,34 @@ end
 Depending on the use of `iszero(it-1 % iter_mod)`, the VTK file for the final structure
 may need to be saved using
 
-```
+```julia
 it = get_history(optimiser).niter; uh = get_state(pcfs)
 writevtk(Ω,path*"_$it",cellfields=["phi"=>φh,
   "H(phi)"=>(H ∘ φh),"|nabla(phi)|"=>(norm ∘ ∇(φh)),"uh"=>uh])
 ```
 
+### The full script
+
+Combining the above into a full script gives
+
+```julia
+...
+asdasd
+```
+
+Running this solution until convergence gives an value for the Lagrangian of ``\mathcal{L}=...`` and a final stucture
+
+...
+
 ## Extensions
 
+In the following we outline several extensions to the avoid optimisation problem. These can be considered as destict changes or implemented together. A script containing all extensions can be found under `/scripts/MPI/3d_nonlinear_thermal_compliance_ALM.jl`.
+
 ### 3D
+The first, and most straightforward in terms of programatic changes is extending the problem to 3D.
 
 ### PETSc
+To utilise PETSc, we rely on the GridapPETSc satalite package. This provides the neccessary structures to efficently interface with the linear and nonlinear solvers provided by the PETSc library.
 
 ### Nonlinear diffusion
 
@@ -399,15 +416,19 @@ u &= 0~\text{on }\Gamma_D.
 where ``\kappa(u)=\kappa_0\exp{\xi u}``. The weak formulation for this problem with relaxation over the computational domain is: *Find* ``u\in H^1_{\Gamma_D}(D)`` *such that* ``R(u,v;\varphi)=0`` for all ``v\in H^1_{\Gamma_D}(D)`` where
 
 ```math
-R(u,v;\varphi) = \int_{D}I(\varphi)\kappa(u)\boldsymbol{\nabla}(u)\cdot\boldsymbol{\nabla}(v)~\mathrm{d}\boldsymbol{x} - \int_{\Gamma_N}v~\mathrm{d}\boldsymbol{x}.
+R(u,v;\varphi) = \int_{D}I(\varphi)\kappa(u)\boldsymbol{\nabla}u\cdot\boldsymbol{\nabla}v~\mathrm{d}\boldsymbol{x} - \int_{\Gamma_N}gv~\mathrm{d}\boldsymbol{x}.
 ```
 
-To handle a nonlinear problem we replace `a`, `l`, and `state_map` in our script with
+To handle a nonlinear finite element problem we first replace `a` and `l` by
 
-```
+```julia
 κ(u) = κ0*(exp(ξ*u))
-R(u,v,φ,dΩ,dΓ_N) = ∫((I ∘ φ)*(κ ∘ u)*∇(u)⋅∇(v))dΩ - ∫(v)dΓ_N
+R(u,v,φ,dΩ,dΓ_N) = ∫((I ∘ φ)*(κ ∘ u)*∇(u)⋅∇(v))dΩ - ∫(g*v)dΓ_N
+```
 
+In addition we replace the `AffineFEStateMap` with a [`NonlinearFEStateMap`](@ref). This enables automatic differentiation when the forward problem is nonlinear.
+
+```julia
 lin_solver = PETScLinearSolver()
 nl_solver = NewtonSolver(lin_solver;maxiter=50,rtol=10^-8,verbose=i_am_main(ranks))
 state_map = NonlinearFEStateMap(
@@ -418,8 +439,9 @@ state_map = NonlinearFEStateMap(
     nls = nl_solver, adjoint_ls = lin_solver
 )
 ```
+The `state_map` above implements a standard `NewtonSolver` from GridapSolvers while utilising the `PETScLinearSolver` for intermediate linear solves involving the Jacobian.
 
-In addition, the objective functional for this problem rewrites as ...
+In addition, the objective functional for this problem is rewritten as ...
 
 ### Serial to MPI
 
