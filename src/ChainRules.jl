@@ -962,7 +962,6 @@ function Fields.evaluate!(pcf::PDEConstrainedFunctionals,φh)
     j_val = F(uh,φh)
     _dF(q) = dF_analytic(q,uh,φh,dΩ...)
     assemble_vector!(_dF,dF,deriv_assem,U_reg)
-    dF .*= -1 # <- Take θ=-vn # TODO: Perhaps remove this and sign on derivatives flip. 
     return j_val
   end
   j = ∇!(J,dJ,analytic_dJ)

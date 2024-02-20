@@ -76,9 +76,9 @@ function main(mesh_partition,distribute,el_size)
                 2(_C(C,ε(u[1])+εᴹ[1],ε(u[2])+εᴹ[2]) + _C(C,ε(u[1])+εᴹ[1],ε(u[3])+εᴹ[3]) + _C(C,ε(u[2])+εᴹ[2],ε(u[3])+εᴹ[3])))/9 
 
   J(u,φ,dΩ) = ∫(-(I ∘ φ)*_K(C,u,εᴹ))dΩ
-  dJ(q,u,φ,dΩ) = ∫(-_v_K(C,u,εᴹ)*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
+  dJ(q,u,φ,dΩ) = ∫(_v_K(C,u,εᴹ)*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
   Vol(u,φ,dΩ) = ∫(((ρ ∘ φ) - vf)/vol_D)dΩ;
-  dVol(q,u,φ,dΩ) = ∫(1/vol_D*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
+  dVol(q,u,φ,dΩ) = ∫(-1/vol_D*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
 
   ## Finite difference solver and level set function
   stencil = AdvectionStencil(FirstOrderStencil(3,Float64),model,V_φ,tol,max_steps)

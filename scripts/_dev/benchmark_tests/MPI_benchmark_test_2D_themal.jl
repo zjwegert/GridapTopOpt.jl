@@ -59,7 +59,7 @@ function main(mesh_partition,el_size,ranks)
   ## Optimisation functionals
   ξ = 0.3
   J(u,φ,dΩ,dΓ_N) = ∫((I ∘ φ)*D*∇(u)⋅∇(u) + ξ*(ρ ∘ φ))dΩ
-  dJ(q,u,φ,dΩ,dΓ_N) = ∫((ξ-D*∇(u)⋅∇(u))*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ;
+  dJ(q,u,φ,dΩ,dΓ_N) = ∫((-ξ+D*∇(u)⋅∇(u))*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ;
 
   ## Finite difference solver and level set function
   stencil = AdvectionStencil(FirstOrderStencil(2,Float64),model,V_φ,tol,max_steps)

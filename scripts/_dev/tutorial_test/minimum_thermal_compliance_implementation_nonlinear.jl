@@ -51,7 +51,7 @@ state_map = NonlinearFEStateMap(R,U,V,V_φ,U_reg,φh,dΩ,dΓ_N)
 J(u,φ,dΩ,dΓ_N) = ∫((I ∘ φ)*(κ ∘ u)*∇(u)⋅∇(u))dΩ
 vol_D = sum(∫(1)dΩ)
 C(u,φ,dΩ,dΓ_N) = ∫(((ρ ∘ φ) - vf)/vol_D)dΩ
-dC(q,u,φ,dΩ,dΓ_N) = ∫(1/vol_D*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
+dC(q,u,φ,dΩ,dΓ_N) = ∫(-1/vol_D*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
 pcfs = PDEConstrainedFunctionals(J,[C],state_map,analytic_dC=[dC])
 # Velocity extension
 α = 4*maximum(get_el_Δ(model))
