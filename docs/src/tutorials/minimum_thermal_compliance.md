@@ -6,9 +6,9 @@ The goal of this tutorial is to learn
 - How to setup and solve the problem in LevelSetTopOpt
 
 We consider the following extensions at the end of the tutorial:
-- How to extend the problem to 3D and utilise PETSc solvers
-- How to solve problems with nonlinear state equations with automatic differentiation
-- How to run in MPI mode
+- How to extend problems to 3D and utilise PETSc solvers
+- How to solve problems with nonlinear state equations and use automatic differentiation
+- How to run problems in MPI mode
 
 We will first consider formulation of the state equations and a topology optimisation problem in a continuous setting. We will then discretise via a level set function in a fixed computational regime. Note that this approach corresponds to an "optimise-then-discretise" approach [4] where shape derivatives are calculated analytically in the continuous space then relaxed via a level set function ``\varphi``. Automatic differentiation can be used to calculate these quantities and is discussed [here](../usage/ad.md).
 
@@ -498,7 +498,7 @@ In the following we outline several extensions to the avoid optimisation problem
     We assume that PETSc and MPI have been installed correctly. Please see [PETSc instructions](../usage/petsc.md) and [MPI instructions](../usage/mpi-mode.md) for additional information.
 
 ### 3D with PETSc
-The first and most straightforward in terms of programatic changes is extending the problem to 3D. For this extension, we consider the following setup for the boundary conditions:
+The first and most straightforward in terms of programmatic changes is extending the problem to 3D. For this extension, we consider the following setup for the boundary conditions:
 
 | ![](3d_min_thermal_comp.png) |
 |:--:|
@@ -623,7 +623,7 @@ writevtk(Ω,path*"struc_$it",cellfields=["phi"=>φh,
 </details>
 ```
 
-At this stage the problem will not be possible to run as we're using a standard LU solver. For this reason we now consider adjusting Script 2 to use an iterative solver provided by PETSc. We rely on the GridapPETSc satalite package to utilise PETSc. This provides the neccessary structures to efficently interface with the linear and nonlinear solvers provided by the PETSc library. To call GridapPETSc we change line 1 of Script 2 to 
+At this stage the problem will not be possible to run as we're using a standard LU solver. For this reason we now consider adjusting Script 2 to use an iterative solver provided by PETSc. We rely on the GridapPETSc satellite package to utilise PETSc. This provides the necessary structures to efficiently interface with the linear and nonlinear solvers provided by the PETSc library. To call GridapPETSc we change line 1 of Script 2 to 
 
 ```julia
 using Gridap, GridapPETSc, SparseMatricesCSR, LevelSetTopOpt
@@ -653,7 +653,7 @@ vel_ext = VelocityExtension(
 ```
 respectively. Here we specify that the `SparseMatrixAssembler` should be based on the `SparseMatrixCSR` datatype along with the globals `PetscScalar` and `PetscInt`. We then set the linear solver, adjoint solver, and linear solver for the velocity extension to be the `PETScLinearSolver()`. The `PETScLinearSolver` is a wrapper for the PETSc solver as specified by the solver options (see below).
 
-Finally, we wrap the entire script in a function and call it inside a `GridapPETSc.with` block. This ensures that PETSc is safetly initialised. This should take the form
+Finally, we wrap the entire script in a function and call it inside a `GridapPETSc.with` block. This ensures that PETSc is safely initialised. This should take the form
 ```Julia
 using Gridap, GridapPETSc, SparseMatricesCSR, LevelSetTopOpt
 
@@ -831,7 +831,7 @@ optimiser = AugmentedLagrangian(pcfs,stencil,vel_ext,φh;
   γ,γ_reinit,verbose=i_am_main(ranks),constraint_names=[:Vol])
 ```
 
-That's it! These are the only changes that are neccessary to run your application using MPI.
+That's it! These are the only changes that are necessary to run your application using MPI.
 
 ```@raw html
 <details><summary>Script 4: combining the above gives (click me!)</summary>
