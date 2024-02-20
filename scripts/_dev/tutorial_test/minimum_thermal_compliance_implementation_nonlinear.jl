@@ -17,12 +17,12 @@ f_Γ_D(x) = (x[1] ≈ 0.0 &&                               # Γ_D indicator func
 max_steps = floor(Int,minimum(el_size)/10)              # Max steps for advection
 tol = 1/(10order^2)*prod(inv,minimum(el_size))          # Advection tolerance
 # Problem parameters
-κ = 1                                                   # Diffusivity
+κ(u) = exp(-u)                                          # Diffusivity
 g = 1                                                   # Heat flow in
 vf = 0.4                                                # Volume fraction constraint
 lsf_func = initial_lsf(4,0.2)                           # Initial level set function
 iter_mod = 10                                           # Output VTK files every 10th iteration
-path = "./results/tut1/"                                # Output path
+path = "./results/tut1_nonlinear/"                      # Output path
 mkpath(path)                                            # Create path
 # Model
 model = CartesianDiscreteModel(dom,el_size);
@@ -45,16 +45,14 @@ U_reg = TrialFESpace(V_reg,0)
 interp = SmoothErsatzMaterialInterpolation(η = 2*maximum(get_el_Δ(model)))
 I,H,DH,ρ = interp.I,interp.H,interp.DH,interp.ρ
 # Weak formulation
-a(u,v,φ,dΩ,dΓ_N) = ∫((I ∘ φ)*κ*∇(u)⋅∇(v))dΩ
-l(v,φ,dΩ,dΓ_N) = ∫(g*v)dΓ_N
-state_map = AffineFEStateMap(a,l,U,V,V_φ,U_reg,φh,dΩ,dΓ_N)
+R(u,v,φ,dΩ,dΓ_N) = ∫((I ∘ φ)*(κ ∘ u)*∇(u)⋅∇(v))dΩ - ∫(g*v)dΓ_N
+state_map = NonlinearFEStateMap(R,U,V,V_φ,U_reg,φh,dΩ,dΓ_N)
 # Objective and constraints
-J(u,φ,dΩ,dΓ_N) = ∫((I ∘ φ)*κ*∇(u)⋅∇(u))dΩ
-dJ(q,u,φ,dΩ,dΓ_N) = ∫(-κ*∇(u)⋅∇(u)*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
+J(u,φ,dΩ,dΓ_N) = ∫((I ∘ φ)*(κ ∘ u)*∇(u)⋅∇(u))dΩ
 vol_D = sum(∫(1)dΩ)
 C(u,φ,dΩ,dΓ_N) = ∫(((ρ ∘ φ) - vf)/vol_D)dΩ
 dC(q,u,φ,dΩ,dΓ_N) = ∫(1/vol_D*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
-pcfs = PDEConstrainedFunctionals(J,[C],state_map,analytic_dJ=dJ,analytic_dC=[dC])
+pcfs = PDEConstrainedFunctionals(J,[C],state_map,analytic_dC=[dC])
 # Velocity extension
 α = 4*maximum(get_el_Δ(model))
 a_hilb(p,q) =∫(α^2*∇(p)⋅∇(q) + p*q)dΩ

@@ -154,35 +154,36 @@ These parameters will be discussed over the course of this tutorial.
 
 ```julia
 # FE parameters
-order = 1                                       # Finite element order
-xmax=ymax=1.0                                   # Domain size
-el_size = (200,200)                             # Mesh partition size
-prop_Γ_N = 0.4                                  # Γ_N size parameter
-prop_Γ_D = 0.2                                  # Γ_D size parameter
-f_Γ_N(x) = (x[1] ≈ xmax &&                      # Γ_N indicator function
+order = 1                                               # Finite element order
+xmax = ymax = 1.0                                       # Domain size
+dom = (0,xmax,0,ymax)                                   # Bounding domain
+el_size = (200,200)                                     # Mesh partition size
+prop_Γ_N = 0.4                                          # Γ_N size parameter
+prop_Γ_D = 0.2                                          # Γ_D size parameter
+f_Γ_N(x) = (x[1] ≈ xmax &&                              # Γ_N indicator function
   ymax/2-ymax*prop_Γ_N/4 - eps() <= x[2] <= ymax/2+ymax*prop_Γ_N/4 + eps())
-f_Γ_D(x) = (x[1] ≈ 0.0 &&                       # Γ_D indicator function
+f_Γ_D(x) = (x[1] ≈ 0.0 &&                               # Γ_D indicator function
   (x[2] <= ymax*prop_Γ_D + eps() || x[2] >= ymax-ymax*prop_Γ_D - eps()))
 # FD parameters
-γ = 0.1                                         # HJ equation time step coefficient
-γ_reinit = 0.5                                  # Reinit. equation time step coefficient
-max_steps = floor(Int,minimum(el_size)/10)      # Max steps for advection
-tol = 1/(10order^2)*prod(inv,minimum(el_size))  # Advection tolerance
+γ = 0.1                                                 # HJ equation time step coefficient
+γ_reinit = 0.5                                          # Reinit. equation time step coefficient
+max_steps = floor(Int,minimum(el_size)/10)              # Max steps for advection
+tol = 1/(10order^2)*prod(inv,minimum(el_size))          # Advection tolerance
 # Problem parameters
-κ = 1                                           # Diffusivity
-g = 1                                           # Heat flow in
-vf = 0.4                                        # Volume fraction constraint
-lsf_func = initial_lsf(4,0.2)                   # Initial level set function
-iter_mod = 10                                   # Output VTK files every 10th iteration
-path = "./results/min_thermal_compliance_tut"   # Output path
-mkpath(path)                                    # Create path
+κ = 1                                                   # Diffusivity
+g = 1                                                   # Heat flow in
+vf = 0.4                                                # Volume fraction constraint
+lsf_func = initial_lsf(4,0.2)                           # Initial level set function
+iter_mod = 10                                           # Output VTK files every 10th iteration
+path = "./results/tut1/"                                # Output path
+mkpath(path)                                            # Create path
 ```
 
 ### Finite element setup
 We first create a Cartesian mesh over ``[0,x_{\max}]\times[0,y_{\max}]`` with partition size `el_size` by creating an object `CartesianDiscreteModel`. In addition, we label the boundaries ``\Gamma_D`` and ``\Gamma_N`` using the [`update_labels!`](@ref) function.
 ```julia
 # Model
-model = CartesianDiscreteModel((0,xmax,0,ymax),el_size);
+model = CartesianDiscreteModel(dom,el_size);
 update_labels!(1,model,f_Γ_D,"Gamma_D")
 update_labels!(2,model,f_Γ_N,"Gamma_N")
 ```
@@ -344,11 +345,11 @@ Both of these equations can be solved numerically on a Cartesian mesh using a fi
 
 ```julia
 # Finite difference scheme
-scheme = FirstOrderStencil(2,Float64)
+scheme = FirstOrderStencil(length(el_size),Float64)
 stencil = AdvectionStencil(scheme,model,V_φ,tol,max_steps)
 ```
 
-In the above we first build an object [`FirstOrderStencil`](@ref) that represents a finite difference stencil for a single step of the Hamilton-Jacobi evolution equation and reinitialisation equation. We then create an [`AdvectionStencil`](@ref) which enables finite differencing on order `O` finite elements in serial or parallel. The [`AdvectionStencil`](@ref) object provides two important methods [`advect!`](@ref) and [`reinit!`](@ref) that correspond to solving the Hamilton-Jacobi evolution equation and reinitialisation equation, respectively.
+In the above we first build an object [`FirstOrderStencil`](@ref) that represents a finite difference stencil for a single step of the Hamilton-Jacobi evolution equation and reinitialisation equation. We use `length(el_size)` to indicate the dimension of the problem. We then create an [`AdvectionStencil`](@ref) which enables finite differencing on order `O` finite elements in serial or parallel. The [`AdvectionStencil`](@ref) object provides two important methods [`advect!`](@ref) and [`reinit!`](@ref) that correspond to solving the Hamilton-Jacobi evolution equation and reinitialisation equation, respectively.
 
 ### Optimiser, visualisation and IO
 
@@ -372,12 +373,15 @@ This allows the user to inject code between iterations. For example, we can writ
 # Solve
 for (it,uh,φh) in optimiser
   data = ["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi)|"=>(norm ∘ ∇(φh)),"uh"=>uh]
-  iszero((it-1) % iter_mod) && writevtk(Ω,path*"_$it",cellfields=data)
+  iszero(it % iter_mod) && (writevtk(Ω,path*"struc_$it",cellfields=data);GC.gc())
   write_history(path*"/history.txt",get_history(optimiser))
 end
 ```
 
-Depending on the use of `iszero((it-1) % iter_mod)`, the VTK file for the final structure
+!!! warning
+    Due to a possible memory leak in Julia 1.9.* IO, we include a call to the garbage collector using `GC.gc()`. 
+
+Depending on whether we use `iszero(it % iter_mod)`, the VTK file for the final structure
 may need to be saved using
 
 ```julia
@@ -390,37 +394,38 @@ writevtk(Ω,path*"_$it",cellfields=["phi"=>φh,
 ### The full script
 
 ```@raw html
-<details><summary>Combining the above gives (click me!)</summary>
+<details><summary>Script 1: combining the above gives (click me!)</summary>
 ```
 
 ```julia
 using Gridap, LevelSetTopOpt
 
 # FE parameters
-order = 1                                       # Finite element order
-xmax=ymax=1.0                                   # Domain size
-el_size = (200,200)                             # Mesh partition size
-prop_Γ_N = 0.4                                  # Γ_N size parameter
-prop_Γ_D = 0.2                                  # Γ_D size parameter
-f_Γ_N(x) = (x[1] ≈ xmax &&                      # Γ_N indicator function
+order = 1                                               # Finite element order
+xmax = ymax = 1.0                                       # Domain size
+dom = (0,xmax,0,ymax)                                   # Bounding domain
+el_size = (200,200)                                     # Mesh partition size
+prop_Γ_N = 0.4                                          # Γ_N size parameter
+prop_Γ_D = 0.2                                          # Γ_D size parameter
+f_Γ_N(x) = (x[1] ≈ xmax &&                              # Γ_N indicator function
   ymax/2-ymax*prop_Γ_N/4 - eps() <= x[2] <= ymax/2+ymax*prop_Γ_N/4 + eps())
-f_Γ_D(x) = (x[1] ≈ 0.0 &&                       # Γ_D indicator function
+f_Γ_D(x) = (x[1] ≈ 0.0 &&                               # Γ_D indicator function
   (x[2] <= ymax*prop_Γ_D + eps() || x[2] >= ymax-ymax*prop_Γ_D - eps()))
 # FD parameters
-γ = 0.1                                         # HJ equation time step coefficient
-γ_reinit = 0.5                                  # Reinit. equation time step coefficient
-max_steps = floor(Int,minimum(el_size)/10)      # Max steps for advection
-tol = 1/(10order^2)*prod(inv,minimum(el_size))  # Advection tolerance
+γ = 0.1                                                 # HJ equation time step coefficient
+γ_reinit = 0.5                                          # Reinit. equation time step coefficient
+max_steps = floor(Int,minimum(el_size)/10)              # Max steps for advection
+tol = 1/(10order^2)*prod(inv,minimum(el_size))          # Advection tolerance
 # Problem parameters
-κ = 1                                           # Diffusivity
-g = 1                                           # Heat flow in
-vf = 0.4                                        # Volume fraction constraint
-lsf_func = initial_lsf(4,0.2)                   # Initial level set function
-iter_mod = 10                                   # Output VTK files every 10th iteration
-path = "./results/min_thermal_compliance_tut/"  # Output path
-mkpath(path)                                    # Create path
+κ = 1                                                   # Diffusivity
+g = 1                                                   # Heat flow in
+vf = 0.4                                                # Volume fraction constraint
+lsf_func = initial_lsf(4,0.2)                           # Initial level set function
+iter_mod = 10                                           # Output VTK files every 10th iteration
+path = "./results/tut1/"                                # Output path
+mkpath(path)                                            # Create path
 # Model
-model = CartesianDiscreteModel((0,xmax,0,ymax),el_size);
+model = CartesianDiscreteModel(dom,el_size);
 update_labels!(1,model,f_Γ_D,"Gamma_D")
 update_labels!(2,model,f_Γ_N,"Gamma_N")
 # Triangulation and measures
@@ -455,19 +460,19 @@ pcfs = PDEConstrainedFunctionals(J,[C],state_map,analytic_dJ=dJ,analytic_dC=[dC]
 a_hilb(p,q) =∫(α^2*∇(p)⋅∇(q) + p*q)dΩ
 vel_ext = VelocityExtension(a_hilb,U_reg,V_reg)
 # Finite difference scheme
-scheme = FirstOrderStencil(2,Float64)
+scheme = FirstOrderStencil(length(el_size),Float64)
 stencil = AdvectionStencil(scheme,model,V_φ,tol,max_steps)
 # Optimiser
 optimiser = AugmentedLagrangian(pcfs,stencil,vel_ext,φh;γ,γ_reinit,verbose=true,constraint_names=[:Vol])
 # Solve
 for (it,uh,φh) in optimiser
   data = ["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi)|"=>(norm ∘ ∇(φh)),"uh"=>uh]
-  iszero((it-1) % iter_mod) && writevtk(Ω,path*"struc_$it",cellfields=data)
+  iszero(it % iter_mod) && (writevtk(Ω,path*"struc_$it",cellfields=data);GC.gc())
   write_history(path*"/history.txt",get_history(optimiser))
 end
 # Final structure
 it = get_history(optimiser).niter; uh = get_state(pcfs)
-writevtk(Ω,path*"_$it",cellfields=["phi"=>φh,
+writevtk(Ω,path*"struc_$it",cellfields=["phi"=>φh,
   "H(phi)"=>(H ∘ φh),"|nabla(phi)|"=>(norm ∘ ∇(φh)),"uh"=>uh])
 ```
 
@@ -475,29 +480,485 @@ writevtk(Ω,path*"_$it",cellfields=["phi"=>φh,
 </details>
 ```
 
-Running this problem until convergence gives 
+Running this problem until convergence gives a final result of
 ```
-Iteration: ... | L=...
+Iteration: 102 | L=1.1256e-01, J=1.1264e-01, Vol=-3.6281e-04, γ=5.6250e-02
 ```
-with ``\Omega`` given by
+with the optimised domain ``\Omega`` given by
 
-...
-
-
+| ![](2d_min_thermal_comp_final_struc.png) |
+|:--:|
+|Figure 3: Visualisation of ``\Omega`` using the isovolume with ``\varphi\leq0``.|
 
 ## Extensions
 
-In the following we outline several extensions to the avoid optimisation problem. These can be considered as destict changes or implemented together. A script containing all extensions can be found under `/scripts/MPI/3d_nonlinear_thermal_compliance_ALM.jl`.
+In the following we outline several extensions to the avoid optimisation problem.
 
-### 3D
-The first, and most straightforward in terms of programatic changes is extending the problem to 3D.
+!!! note
+    We assume that PETSc and MPI have been installed correctly. Please see [PETSc instructions](../usage/petsc.md) and [MPI instructions](../usage/mpi-mode.md) for additional information.
 
-### PETSc
-To utilise PETSc, we rely on the GridapPETSc satalite package. This provides the neccessary structures to efficently interface with the linear and nonlinear solvers provided by the PETSc library.
+### 3D with PETSc
+The first and most straightforward in terms of programatic changes is extending the problem to 3D. For this extension, we consider the following setup for the boundary conditions:
 
-### Nonlinear diffusion
+| ![](3d_min_thermal_comp.png) |
+|:--:|
+|Figure 4: The setup for the three-dimensional minimum thermal compliance problem.|
 
-Our final extension considers a nonlinear diffusion problem:
+We use a unit cube for the bounding domain ``D`` with ``50^3`` elements. This corresponds to changing lines 5-7 in the above script to  
+
+```julia
+xmax=ymax=zmax=1.0                                      # Domain size
+dom = (0,xmax,0,ymax,0,zmax)                            # Bounding domain
+el_size = (100,100,100)                                 # Mesh partition size
+```
+
+To apply the boundary conditions per Figure 4, we also adjust the boundary indicator functions on lines 10-13 to
+
+```julia
+f_Γ_N(x) = (x[1] ≈ xmax) &&                             # Γ_N indicator function
+  (ymax/2-ymax*prop_Γ_N/4 - eps() <= x[2] <= ymax/2+ymax*prop_Γ_N/4 + eps()) &&
+  (zmax/2-zmax*prop_Γ_N/4 - eps() <= x[3] <= zmax/2+zmax*prop_Γ_N/4 + eps())
+f_Γ_D(x) = (x[1] ≈ 0.0) &&                              # Γ_D indicator function
+  (x[2] <= ymax*prop_Γ_D + eps() || x[2] >= ymax-ymax*prop_Γ_D - eps()) &&
+  (x[3] <= zmax*prop_Γ_D + eps() || x[3] >= zmax-zmax*prop_Γ_D - eps())
+```
+
+We adjust the output path on line 25 to be
+```julia
+path = "./results/tut1_3d/"                             # Output path
+```
+
+Finally, we adjust the finite difference parameters on lines 17-18 to
+```julia
+max_steps = floor(Int,minimum(el_size)/3)               # Max steps for advection
+tol = 1/(2order^2)*prod(inv,minimum(el_size))           # Advection tolerance
+```
+
+```@raw html
+<details><summary>Script 2: combining the above gives (click me!)</summary>
+```
+
+```julia
+using Gridap, LevelSetTopOpt
+
+# FE parameters
+order = 1                                               # Finite element order
+xmax=ymax=zmax=1.0                                      # Domain size
+dom = (0,xmax,0,ymax,0,zmax)                            # Bounding domain
+el_size = (100,100,100)                                 # Mesh partition size
+prop_Γ_N = 0.4                                          # Γ_N size parameter
+prop_Γ_D = 0.2                                          # Γ_D size parameter
+f_Γ_N(x) = (x[1] ≈ xmax) &&                             # Γ_N indicator function
+  (ymax/2-ymax*prop_Γ_N/4 - eps() <= x[2] <= ymax/2+ymax*prop_Γ_N/4 + eps()) &&
+  (zmax/2-zmax*prop_Γ_N/4 - eps() <= x[3] <= zmax/2+zmax*prop_Γ_N/4 + eps())
+f_Γ_D(x) = (x[1] ≈ 0.0) &&                              # Γ_D indicator function
+  (x[2] <= ymax*prop_Γ_D + eps() || x[2] >= ymax-ymax*prop_Γ_D - eps()) &&
+  (x[3] <= zmax*prop_Γ_D + eps() || x[3] >= zmax-zmax*prop_Γ_D - eps())
+# FD parameters
+γ = 0.1                                                 # HJ equation time step coefficient
+γ_reinit = 0.5                                          # Reinit. equation time step coefficient
+max_steps = floor(Int,minimum(el_size)/3)               # Max steps for advection
+tol = 1/(2order^2)*prod(inv,minimum(el_size))           # Advection tolerance
+# Problem parameters
+κ = 1                                                   # Diffusivity
+g = 1                                                   # Heat flow in
+vf = 0.4                                                # Volume fraction constraint
+lsf_func = initial_lsf(4,0.2)                           # Initial level set function
+iter_mod = 10                                           # Output VTK files every 10th iteration
+path = "./results/tut1_3d/"                             # Output path
+mkpath(path)                                            # Create path
+# Model
+model = CartesianDiscreteModel(dom,el_size);
+update_labels!(1,model,f_Γ_D,"Gamma_D")
+update_labels!(2,model,f_Γ_N,"Gamma_N")
+# Triangulation and measures
+Ω = Triangulation(model)
+Γ_N = BoundaryTriangulation(model,tags="Gamma_N")
+dΩ = Measure(Ω,2*order)
+dΓ_N = Measure(Γ_N,2*order)
+# Spaces
+reffe = ReferenceFE(lagrangian,Float64,order)
+V = TestFESpace(model,reffe;dirichlet_tags=["Gamma_D"])
+U = TrialFESpace(V,0.0)
+V_φ = TestFESpace(model,reffe)
+V_reg = TestFESpace(model,reffe;dirichlet_tags=["Gamma_N"])
+U_reg = TrialFESpace(V_reg,0)
+# Level set and interpolator
+φh = interpolate(lsf_func,V_φ)
+interp = SmoothErsatzMaterialInterpolation(η = 2*maximum(get_el_Δ(model)))
+I,H,DH,ρ = interp.I,interp.H,interp.DH,interp.ρ
+# Weak formulation
+a(u,v,φ,dΩ,dΓ_N) = ∫((I ∘ φ)*κ*∇(u)⋅∇(v))dΩ
+l(v,φ,dΩ,dΓ_N) = ∫(g*v)dΓ_N
+state_map = AffineFEStateMap(a,l,U,V,V_φ,U_reg,φh,dΩ,dΓ_N)
+# Objective and constraints
+J(u,φ,dΩ,dΓ_N) = ∫((I ∘ φ)*κ*∇(u)⋅∇(u))dΩ
+dJ(q,u,φ,dΩ,dΓ_N) = ∫(-κ*∇(u)⋅∇(u)*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
+vol_D = sum(∫(1)dΩ)
+C(u,φ,dΩ,dΓ_N) = ∫(((ρ ∘ φ) - vf)/vol_D)dΩ
+dC(q,u,φ,dΩ,dΓ_N) = ∫(1/vol_D*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
+pcfs = PDEConstrainedFunctionals(J,[C],state_map,analytic_dJ=dJ,analytic_dC=[dC])
+# Velocity extension
+α = 4*maximum(get_el_Δ(model))
+a_hilb(p,q) =∫(α^2*∇(p)⋅∇(q) + p*q)dΩ
+vel_ext = VelocityExtension(a_hilb,U_reg,V_reg)
+# Finite difference scheme
+scheme = FirstOrderStencil(length(el_size),Float64)
+stencil = AdvectionStencil(scheme,model,V_φ,tol,max_steps)
+# Optimiser
+optimiser = AugmentedLagrangian(pcfs,stencil,vel_ext,φh;γ,γ_reinit,verbose=true,constraint_names=[:Vol])
+# Solve
+for (it,uh,φh) in optimiser
+  data = ["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi)|"=>(norm ∘ ∇(φh)),"uh"=>uh]
+  iszero(it % iter_mod) && (writevtk(Ω,path*"struc_$it",cellfields=data);GC.gc())
+  write_history(path*"/history.txt",get_history(optimiser))
+end
+# Final structure
+it = get_history(optimiser).niter; uh = get_state(pcfs)
+writevtk(Ω,path*"struc_$it",cellfields=["phi"=>φh,
+  "H(phi)"=>(H ∘ φh),"|nabla(phi)|"=>(norm ∘ ∇(φh)),"uh"=>uh])
+```
+
+```@raw html
+</details>
+```
+
+At this stage the problem will not be possible to run as we're using a standard LU solver. For this reason we now consider adjusting Script 2 to use an iterative solver provided by PETSc. We rely on the GridapPETSc satalite package to utilise PETSc. This provides the neccessary structures to efficently interface with the linear and nonlinear solvers provided by the PETSc library. To call GridapPETSc we change line 1 of Script 2 to 
+
+```julia
+using Gridap, GridapPETSc, SparseMatricesCSR, LevelSetTopOpt
+```
+
+We also use `SparseMatricesCSR` as PETSc is based on the `SparseMatrixCSR` datatype. We then replace line 52 and 63 with
+
+```julia
+# State map
+Tm = SparseMatrixCSR{0,PetscScalar,PetscInt}
+Tv = Vector{PetscScalar}
+state_map = AffineFEStateMap(
+  a,l,U,V,V_φ,U_reg,φh,dΩ,dΓ_N;
+  assem_U = SparseMatrixAssembler(Tm,Tv,U,V),
+  assem_adjoint = SparseMatrixAssembler(Tm,Tv,V,U),
+  assem_deriv = SparseMatrixAssembler(Tm,Tv,U_reg,U_reg),
+  ls = PETScLinearSolver(),adjoint_ls = PETScLinearSolver()
+)
+```
+and
+```julia
+vel_ext = VelocityExtension(
+    a_hilb, U_reg, V_reg;
+    assem = SparseMatrixAssembler(Tm,Tv,U_reg,V_reg),
+    ls = PETScLinearSolver()
+  )
+```
+respectively. Here we specify that the `SparseMatrixAssembler` should be based on the `SparseMatrixCSR` datatype along with the globals `PetscScalar` and `PetscInt`. We then set the linear solver, adjoint solver, and linear solver for the velocity extension to be the `PETScLinearSolver()`. The `PETScLinearSolver` is a wrapper for the PETSc solver as specified by the solver options (see below).
+
+Finally, we wrap the entire script in a function and call it inside a `GridapPETSc.with` block. This ensures that PETSc is safetly initialised. This should take the form
+```Julia
+using Gridap, GridapPETSc, SparseMatricesCSR, LevelSetTopOpt
+
+function main()
+  ...
+end
+
+solver_options = "-pc_type gamg -ksp_type cg -ksp_error_if_not_converged true 
+  -ksp_converged_reason -ksp_rtol 1.0e-12"
+GridapPETSc.with(args=split(solver_options)) do
+  main()
+end
+```
+
+We utilise a conjugate gradient method with geometric algebraic multigrid preconditioner using the `solver_options` string. This should match the PETSc database keys (see [documentation](https://petsc.org/release/manual/ksp/#ch-ksp)).
+
+```@raw html
+<details><summary>Script 3: combining the above gives (click me!)</summary>
+```
+
+```julia
+using Gridap, GridapPETSc, SparseMatricesCSR, LevelSetTopOpt
+
+function main()
+  # FE parameters
+  order = 1                                               # Finite element order
+  xmax=ymax=zmax=1.0                                      # Domain size
+  dom = (0,xmax,0,ymax,0,zmax)                            # Bounding domain
+  el_size = (100,100,100)                                 # Mesh partition size
+  prop_Γ_N = 0.4                                          # Γ_N size parameter
+  prop_Γ_D = 0.2                                          # Γ_D size parameter
+  f_Γ_N(x) = (x[1] ≈ xmax) &&                             # Γ_N indicator function
+    (ymax/2-ymax*prop_Γ_N/4 - eps() <= x[2] <= ymax/2+ymax*prop_Γ_N/4 + eps()) &&
+    (zmax/2-zmax*prop_Γ_N/4 - eps() <= x[3] <= zmax/2+zmax*prop_Γ_N/4 + eps())
+  f_Γ_D(x) = (x[1] ≈ 0.0) &&                              # Γ_D indicator function
+    (x[2] <= ymax*prop_Γ_D + eps() || x[2] >= ymax-ymax*prop_Γ_D - eps()) &&
+    (x[3] <= zmax*prop_Γ_D + eps() || x[3] >= zmax-zmax*prop_Γ_D - eps())
+  # FD parameters
+  γ = 0.1                                                 # HJ equation time step coefficient
+  γ_reinit = 0.5                                          # Reinit. equation time step coefficient
+  max_steps = floor(Int,minimum(el_size)/3)               # Max steps for advection
+  tol = 1/(2order^2)*prod(inv,minimum(el_size))           # Advection tolerance
+  # Problem parameters
+  κ = 1                                                   # Diffusivity
+  g = 1                                                   # Heat flow in
+  vf = 0.4                                                # Volume fraction constraint
+  lsf_func = initial_lsf(4,0.2)                           # Initial level set function
+  iter_mod = 10                                           # Output VTK files every 10th iteration
+  path = "./results/tut1_3d_petsc/"                       # Output path
+  mkpath(path)                                            # Create path
+  # Model
+  model = CartesianDiscreteModel(dom,el_size);
+  update_labels!(1,model,f_Γ_D,"Gamma_D")
+  update_labels!(2,model,f_Γ_N,"Gamma_N")
+  # Triangulation and measures
+  Ω = Triangulation(model)
+  Γ_N = BoundaryTriangulation(model,tags="Gamma_N")
+  dΩ = Measure(Ω,2*order)
+  dΓ_N = Measure(Γ_N,2*order)
+  # Spaces
+  reffe = ReferenceFE(lagrangian,Float64,order)
+  V = TestFESpace(model,reffe;dirichlet_tags=["Gamma_D"])
+  U = TrialFESpace(V,0.0)
+  V_φ = TestFESpace(model,reffe)
+  V_reg = TestFESpace(model,reffe;dirichlet_tags=["Gamma_N"])
+  U_reg = TrialFESpace(V_reg,0)
+  # Level set and interpolator
+  φh = interpolate(lsf_func,V_φ)
+  interp = SmoothErsatzMaterialInterpolation(η = 2*maximum(get_el_Δ(model)))
+  I,H,DH,ρ = interp.I,interp.H,interp.DH,interp.ρ
+  # Weak formulation
+  a(u,v,φ,dΩ,dΓ_N) = ∫((I ∘ φ)*κ*∇(u)⋅∇(v))dΩ
+  l(v,φ,dΩ,dΓ_N) = ∫(g*v)dΓ_N
+  # State map
+  Tm = SparseMatrixCSR{0,PetscScalar,PetscInt}
+  Tv = Vector{PetscScalar}
+  state_map = AffineFEStateMap(
+    a,l,U,V,V_φ,U_reg,φh,dΩ,dΓ_N;
+    assem_U = SparseMatrixAssembler(Tm,Tv,U,V),
+    assem_adjoint = SparseMatrixAssembler(Tm,Tv,V,U),
+    assem_deriv = SparseMatrixAssembler(Tm,Tv,U_reg,U_reg),
+    ls = PETScLinearSolver(),adjoint_ls = PETScLinearSolver()
+  )
+  # Objective and constraints
+  J(u,φ,dΩ,dΓ_N) = ∫((I ∘ φ)*κ*∇(u)⋅∇(u))dΩ
+  dJ(q,u,φ,dΩ,dΓ_N) = ∫(-κ*∇(u)⋅∇(u)*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
+  vol_D = sum(∫(1)dΩ)
+  C(u,φ,dΩ,dΓ_N) = ∫(((ρ ∘ φ) - vf)/vol_D)dΩ
+  dC(q,u,φ,dΩ,dΓ_N) = ∫(1/vol_D*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
+  pcfs = PDEConstrainedFunctionals(J,[C],state_map,analytic_dJ=dJ,analytic_dC=[dC])
+  # Velocity extension
+  α = 4*maximum(get_el_Δ(model))
+  a_hilb(p,q) =∫(α^2*∇(p)⋅∇(q) + p*q)dΩ
+  vel_ext = VelocityExtension(
+    a_hilb, U_reg, V_reg;
+    assem = SparseMatrixAssembler(Tm,Tv,U_reg,V_reg),
+    ls = PETScLinearSolver()
+  )
+  # Finite difference scheme
+  scheme = FirstOrderStencil(length(el_size),Float64)
+  stencil = AdvectionStencil(scheme,model,V_φ,tol,max_steps)
+  # Optimiser
+  optimiser = AugmentedLagrangian(pcfs,stencil,vel_ext,φh;γ,γ_reinit,verbose=true,constraint_names=[:Vol])
+  # Solve
+  for (it,uh,φh) in optimiser
+    data = ["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi)|"=>(norm ∘ ∇(φh)),"uh"=>uh]
+    iszero(it % iter_mod) && (writevtk(Ω,path*"struc_$it",cellfields=data);GC.gc())
+    write_history(path*"/history.txt",get_history(optimiser))
+  end
+  # Final structure
+  it = get_history(optimiser).niter; uh = get_state(pcfs)
+  writevtk(Ω,path*"struc_$it",cellfields=["phi"=>φh,
+    "H(phi)"=>(H ∘ φh),"|nabla(phi)|"=>(norm ∘ ∇(φh)),"uh"=>uh])
+end
+
+solver_options = "-pc_type gamg -ksp_type cg -ksp_error_if_not_converged true 
+  -ksp_converged_reason -ksp_rtol 1.0e-12"
+GridapPETSc.with(args=split(solver_options)) do
+  main()
+end
+```
+
+```@raw html
+</details>
+```
+
+We can run this script and visualise the initial and final structures using Paraview:
+
+| ![](3d_min_thermal_combined.png) |
+|:--:|
+|Figure 5: Visualisation of initial structure (left) and final structure (right) for Script 3 using the isovolume with ``\varphi\leq0``.|
+
+### Serial to MPI
+
+Script 3 contains no parallelism to enable further speedup or scalability. To enable MPI-based computing we rely on the tools implemented in PartitionedArrays and GridapDistributed. Further information regarding these packages and how they interface with LevelSetTopOpt can be found [here](../usage/mpi-mode.md). To add these packages we adjust the first line of our script: 
+
+```julia
+using Gridap, GridapPETSc, GridapDistributed, PartitionedArrays, SparseMatricesCSR, LevelSetTopOpt
+```
+
+Before we change any parts of the function `main`, we adjust the end of the script to safely launch MPI inside a Julia `do` block. We replace lines 95-99 in Script 3 with
+
+```julia
+with_mpi() do distribute
+  mesh_partition = (2,2,2)
+  solver_options = "-pc_type gamg -ksp_type cg -ksp_error_if_not_converged true 
+    -ksp_converged_reason -ksp_rtol 1.0e-12"
+  GridapPETSc.with(args=split(solver_options)) do
+    main(mesh_partition,distribute)
+  end
+end
+```
+
+We use `mesh_partition = (2,2,2)` to set the number of partitions of the Cartesian mesh in each axial direction. For this example we end up with a total of 8 partitions. We then pass `main` two arguments: `mesh_partition` and `distribute`. We use these to to create MPI ranks at the start of `main`:
+
+```julia
+function main(mesh_partition,distribute)
+  ranks = distribute(LinearIndices((prod(mesh_partition),)))
+  ...
+```
+
+We then adjust lines 28-31 as follows:
+
+```julia
+  path = "./results/tut1_3d_petsc_mpi/"                   # Output path
+  i_am_main(ranks) && mkpath(path)                        # Create path
+  # Model
+  model = CartesianDiscreteModel(ranks,mesh_partition,dom,el_size);
+```
+
+The function `i_am_main` returns true only on the first processor. This function is useful for ensuring certain operations only happen once instead of several times across each executable. In addition, we now create a partitioned Cartesian model using `CartesianDiscreteModel(ranks,mesh_partition,dom,el_size)`. Finally, we adjust line 82 to ensure that verbosity only happens on the first processors:
+
+```julia
+optimiser = AugmentedLagrangian(pcfs,stencil,vel_ext,φh;
+  γ,γ_reinit,verbose=i_am_main(ranks),constraint_names=[:Vol])
+```
+
+That's it! These are the only changes that are neccessary to run your application using MPI.
+
+```@raw html
+<details><summary>Script 4: combining the above gives (click me!)</summary>
+```
+
+```julia
+using Gridap, GridapPETSc, GridapDistributed, PartitionedArrays, SparseMatricesCSR, LevelSetTopOpt
+
+function main(mesh_partition,distribute)
+  ranks = distribute(LinearIndices((prod(mesh_partition),)))
+  # FE parameters
+  order = 1                                               # Finite element order
+  xmax=ymax=zmax=1.0                                      # Domain size
+  dom = (0,xmax,0,ymax,0,zmax)                            # Bounding domain
+  el_size = (100,100,100)                                 # Mesh partition size
+  prop_Γ_N = 0.4                                          # Γ_N size parameter
+  prop_Γ_D = 0.2                                          # Γ_D size parameter
+  f_Γ_N(x) = (x[1] ≈ xmax) &&                             # Γ_N indicator function
+    (ymax/2-ymax*prop_Γ_N/4 - eps() <= x[2] <= ymax/2+ymax*prop_Γ_N/4 + eps()) &&
+    (zmax/2-zmax*prop_Γ_N/4 - eps() <= x[3] <= zmax/2+zmax*prop_Γ_N/4 + eps())
+  f_Γ_D(x) = (x[1] ≈ 0.0) &&                              # Γ_D indicator function
+    (x[2] <= ymax*prop_Γ_D + eps() || x[2] >= ymax-ymax*prop_Γ_D - eps()) &&
+    (x[3] <= zmax*prop_Γ_D + eps() || x[3] >= zmax-zmax*prop_Γ_D - eps())
+  # FD parameters
+  γ = 0.1                                                 # HJ equation time step coefficient
+  γ_reinit = 0.5                                          # Reinit. equation time step coefficient
+  max_steps = floor(Int,minimum(el_size)/3)               # Max steps for advection
+  tol = 1/(2order^2)*prod(inv,minimum(el_size))           # Advection tolerance
+  # Problem parameters
+  κ = 1                                                   # Diffusivity
+  g = 1                                                   # Heat flow in
+  vf = 0.4                                                # Volume fraction constraint
+  lsf_func = initial_lsf(4,0.2)                           # Initial level set function
+  iter_mod = 10                                           # Output VTK files every 10th iteration
+  path = "./results/tut1_3d_petsc_mpi/"                   # Output path
+  i_am_main(ranks) && mkpath(path)                        # Create path
+  # Model
+  model = CartesianDiscreteModel(ranks,mesh_partition,dom,el_size);
+  update_labels!(1,model,f_Γ_D,"Gamma_D")
+  update_labels!(2,model,f_Γ_N,"Gamma_N")
+  # Triangulation and measures
+  Ω = Triangulation(model)
+  Γ_N = BoundaryTriangulation(model,tags="Gamma_N")
+  dΩ = Measure(Ω,2*order)
+  dΓ_N = Measure(Γ_N,2*order)
+  # Spaces
+  reffe = ReferenceFE(lagrangian,Float64,order)
+  V = TestFESpace(model,reffe;dirichlet_tags=["Gamma_D"])
+  U = TrialFESpace(V,0.0)
+  V_φ = TestFESpace(model,reffe)
+  V_reg = TestFESpace(model,reffe;dirichlet_tags=["Gamma_N"])
+  U_reg = TrialFESpace(V_reg,0)
+  # Level set and interpolator
+  φh = interpolate(lsf_func,V_φ)
+  interp = SmoothErsatzMaterialInterpolation(η = 2*maximum(get_el_Δ(model)))
+  I,H,DH,ρ = interp.I,interp.H,interp.DH,interp.ρ
+  # Weak formulation
+  a(u,v,φ,dΩ,dΓ_N) = ∫((I ∘ φ)*κ*∇(u)⋅∇(v))dΩ
+  l(v,φ,dΩ,dΓ_N) = ∫(g*v)dΓ_N
+  # State map
+  Tm = SparseMatrixCSR{0,PetscScalar,PetscInt}
+  Tv = Vector{PetscScalar}
+  state_map = AffineFEStateMap(
+    a,l,U,V,V_φ,U_reg,φh,dΩ,dΓ_N;
+    assem_U = SparseMatrixAssembler(Tm,Tv,U,V),
+    assem_adjoint = SparseMatrixAssembler(Tm,Tv,V,U),
+    assem_deriv = SparseMatrixAssembler(Tm,Tv,U_reg,U_reg),
+    ls = PETScLinearSolver(),adjoint_ls = PETScLinearSolver()
+  )
+  # Objective and constraints
+  J(u,φ,dΩ,dΓ_N) = ∫((I ∘ φ)*κ*∇(u)⋅∇(u))dΩ
+  dJ(q,u,φ,dΩ,dΓ_N) = ∫(-κ*∇(u)⋅∇(u)*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
+  vol_D = sum(∫(1)dΩ)
+  C(u,φ,dΩ,dΓ_N) = ∫(((ρ ∘ φ) - vf)/vol_D)dΩ
+  dC(q,u,φ,dΩ,dΓ_N) = ∫(1/vol_D*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
+  pcfs = PDEConstrainedFunctionals(J,[C],state_map,analytic_dJ=dJ,analytic_dC=[dC])
+  # Velocity extension
+  α = 4*maximum(get_el_Δ(model))
+  a_hilb(p,q) =∫(α^2*∇(p)⋅∇(q) + p*q)dΩ
+  vel_ext = VelocityExtension(
+    a_hilb, U_reg, V_reg;
+    assem = SparseMatrixAssembler(Tm,Tv,U_reg,V_reg),
+    ls = PETScLinearSolver()
+  )
+  # Finite difference scheme
+  scheme = FirstOrderStencil(length(el_size),Float64)
+  stencil = AdvectionStencil(scheme,model,V_φ,tol,max_steps)
+  # Optimiser
+  optimiser = AugmentedLagrangian(pcfs,stencil,vel_ext,φh;
+    γ,γ_reinit,verbose=i_am_main(ranks),constraint_names=[:Vol])
+  # Solve
+  for (it,uh,φh) in optimiser
+    data = ["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi)|"=>(norm ∘ ∇(φh)),"uh"=>uh]
+    iszero(it % iter_mod) && (writevtk(Ω,path*"struc_$it",cellfields=data);GC.gc())
+    write_history(path*"/history.txt",get_history(optimiser))
+  end
+  # Final structure
+  it = get_history(optimiser).niter; uh = get_state(pcfs)
+  writevtk(Ω,path*"struc_$it",cellfields=["phi"=>φh,
+    "H(phi)"=>(H ∘ φh),"|nabla(phi)|"=>(norm ∘ ∇(φh)),"uh"=>uh])
+end
+
+with_mpi() do distribute
+  mesh_partition = (2,2,2)
+  solver_options = "-pc_type gamg -ksp_type cg -ksp_error_if_not_converged true 
+    -ksp_converged_reason -ksp_rtol 1.0e-12"
+  GridapPETSc.with(args=split(solver_options)) do
+    main(mesh_partition,distribute)
+  end
+end
+```
+
+```@raw html
+</details>
+```
+
+We can then run this script by calling [`mpiexecjl`](https://juliaparallel.org/MPI.jl/stable/usage/#Julia-wrapper-for-mpiexec) using bash:
+
+```bash
+mpiexecjl -n 8 julia tut1_3d_petsc_mpi.jl
+```
+
+This gives the same final result as the previous script.
+
+### Nonlinear thermal conductivity
+
+Our final extension considers two-dimensional nonlinear thermal conductivity problem:
 
 ```math
 \begin{aligned}
@@ -514,31 +975,131 @@ where ``\kappa(u)=\kappa_0\exp{\xi u}``. The weak formulation for this problem w
 R(u,v;\varphi) = \int_{D}I(\varphi)\kappa(u)\boldsymbol{\nabla}u\cdot\boldsymbol{\nabla}v~\mathrm{d}\boldsymbol{x} - \int_{\Gamma_N}gv~\mathrm{d}\boldsymbol{x}.
 ```
 
-To handle a nonlinear finite element problem we first replace `a` and `l` by
-
+As we're considering a 2D problem, we consider modifications of Script 1 as follows. First, we introduce a nonlinear diffusivity by replacing line 20 with
 ```julia
-κ(u) = κ0*(exp(ξ*u))
+κ(u) = exp(-u)                                          # Diffusivity
+```
+
+We then replace the `a` and `l` on line 48 and 49 by the residual `R` given by 
+```julia
 R(u,v,φ,dΩ,dΓ_N) = ∫((I ∘ φ)*(κ ∘ u)*∇(u)⋅∇(v))dΩ - ∫(g*v)dΓ_N
 ```
 
-In addition we replace the `AffineFEStateMap` with a [`NonlinearFEStateMap`](@ref). This enables automatic differentiation when the forward problem is nonlinear.
+In addition we replace the `AffineFEStateMap` on line 50 with a [`NonlinearFEStateMap`](@ref). This enables automatic differentiation when the forward problem is nonlinear.
+```julia
+state_map = NonlinearFEStateMap(R,U,V,V_φ,U_reg,φh,dΩ,dΓ_N)
+```
+This by default implements a standard `NewtonSolver` from GridapSolvers while utilising an LU solver for intermediate linear solves involving the Jacobian. As with other `FEStateMap` types, this constructor can optionally take assemblers and different solvers (e.g., PETSc solvers).
+
+Next, we replace the objective functional on line 52 with 
 
 ```julia
-lin_solver = PETScLinearSolver()
-nl_solver = NewtonSolver(lin_solver;maxiter=50,rtol=10^-8,verbose=i_am_main(ranks))
-state_map = NonlinearFEStateMap(
-    res,U,V,V_φ,U_reg,φh,dΩ,dΓ_N;
-    assem_U = SparseMatrixAssembler(Tm,Tv,U,V),
-    assem_adjoint = SparseMatrixAssembler(Tm,Tv,V,U),
-    assem_deriv = SparseMatrixAssembler(Tm,Tv,U_reg,U_reg),
-    nls = nl_solver, adjoint_ls = lin_solver
-)
+J(u,φ,dΩ,dΓ_N) = ∫((I ∘ φ)*(κ ∘ u)*∇(u)⋅∇(u))dΩ
 ```
-The `state_map` above implements a standard `NewtonSolver` from GridapSolvers while utilising the `PETScLinearSolver` for intermediate linear solves involving the Jacobian.
 
-In addition, the objective functional for this problem is rewritten as ...
+For this problem we utilise automatic differentiation as the analytic calculation of the sensitivity is somewhat involved. We therefore remove line 53 and replace line 57 with
+```julia
+pcfs = PDEConstrainedFunctionals(J,[C],state_map,analytic_dC=[dC])
+```
 
-### Serial to MPI
+Notice that the argument `analytic_dJ=...` has been removed, this enables the AD capability. We now have everything we need to run a nonlinear problem.
+
+```@raw html
+<details><summary>Script 5: combining the above gives (click me!)</summary>
+```
+
+```julia
+using Gridap, LevelSetTopOpt
+
+# FE parameters
+order = 1                                               # Finite element order
+xmax = ymax = 1.0                                       # Domain size
+dom = (0,xmax,0,ymax)                                   # Bounding domain
+el_size = (200,200)                                     # Mesh partition size
+prop_Γ_N = 0.4                                          # Γ_N size parameter
+prop_Γ_D = 0.2                                          # Γ_D size parameter
+f_Γ_N(x) = (x[1] ≈ xmax &&                              # Γ_N indicator function
+  ymax/2-ymax*prop_Γ_N/4 - eps() <= x[2] <= ymax/2+ymax*prop_Γ_N/4 + eps())
+f_Γ_D(x) = (x[1] ≈ 0.0 &&                               # Γ_D indicator function
+  (x[2] <= ymax*prop_Γ_D + eps() || x[2] >= ymax-ymax*prop_Γ_D - eps()))
+# FD parameters
+γ = 0.1                                                 # HJ equation time step coefficient
+γ_reinit = 0.5                                          # Reinit. equation time step coefficient
+max_steps = floor(Int,minimum(el_size)/10)              # Max steps for advection
+tol = 1/(10order^2)*prod(inv,minimum(el_size))          # Advection tolerance
+# Problem parameters
+κ(u) = exp(-u)                                          # Diffusivity
+g = 1                                                   # Heat flow in
+vf = 0.4                                                # Volume fraction constraint
+lsf_func = initial_lsf(4,0.2)                           # Initial level set function
+iter_mod = 10                                           # Output VTK files every 10th iteration
+path = "./results/tut1_nonlinear/"                      # Output path
+mkpath(path)                                            # Create path
+# Model
+model = CartesianDiscreteModel(dom,el_size);
+update_labels!(1,model,f_Γ_D,"Gamma_D")
+update_labels!(2,model,f_Γ_N,"Gamma_N")
+# Triangulation and measures
+Ω = Triangulation(model)
+Γ_N = BoundaryTriangulation(model,tags="Gamma_N")
+dΩ = Measure(Ω,2*order)
+dΓ_N = Measure(Γ_N,2*order)
+# Spaces
+reffe = ReferenceFE(lagrangian,Float64,order)
+V = TestFESpace(model,reffe;dirichlet_tags=["Gamma_D"])
+U = TrialFESpace(V,0.0)
+V_φ = TestFESpace(model,reffe)
+V_reg = TestFESpace(model,reffe;dirichlet_tags=["Gamma_N"])
+U_reg = TrialFESpace(V_reg,0)
+# Level set and interpolator
+φh = interpolate(lsf_func,V_φ)
+interp = SmoothErsatzMaterialInterpolation(η = 2*maximum(get_el_Δ(model)))
+I,H,DH,ρ = interp.I,interp.H,interp.DH,interp.ρ
+# Weak formulation
+R(u,v,φ,dΩ,dΓ_N) = ∫((I ∘ φ)*(κ ∘ u)*∇(u)⋅∇(v))dΩ - ∫(g*v)dΓ_N
+state_map = NonlinearFEStateMap(R,U,V,V_φ,U_reg,φh,dΩ,dΓ_N)
+# Objective and constraints
+J(u,φ,dΩ,dΓ_N) = ∫((I ∘ φ)*(κ ∘ u)*∇(u)⋅∇(u))dΩ
+vol_D = sum(∫(1)dΩ)
+C(u,φ,dΩ,dΓ_N) = ∫(((ρ ∘ φ) - vf)/vol_D)dΩ
+dC(q,u,φ,dΩ,dΓ_N) = ∫(1/vol_D*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
+pcfs = PDEConstrainedFunctionals(J,[C],state_map,analytic_dC=[dC])
+# Velocity extension
+α = 4*maximum(get_el_Δ(model))
+a_hilb(p,q) =∫(α^2*∇(p)⋅∇(q) + p*q)dΩ
+vel_ext = VelocityExtension(a_hilb,U_reg,V_reg)
+# Finite difference scheme
+scheme = FirstOrderStencil(length(el_size),Float64)
+stencil = AdvectionStencil(scheme,model,V_φ,tol,max_steps)
+# Optimiser
+optimiser = AugmentedLagrangian(pcfs,stencil,vel_ext,φh;γ,γ_reinit,verbose=true,constraint_names=[:Vol])
+# Solve
+for (it,uh,φh) in optimiser
+  data = ["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi)|"=>(norm ∘ ∇(φh)),"uh"=>uh]
+  iszero(it % iter_mod) && (writevtk(Ω,path*"struc_$it",cellfields=data);GC.gc())
+  write_history(path*"/history.txt",get_history(optimiser))
+end
+# Final structure
+it = get_history(optimiser).niter; uh = get_state(pcfs)
+writevtk(Ω,path*"struc_$it",cellfields=["phi"=>φh,
+  "H(phi)"=>(H ∘ φh),"|nabla(phi)|"=>(norm ∘ ∇(φh)),"uh"=>uh])
+```
+
+```@raw html
+</details>
+```
+
+Running this problem until convergence gives a final result of
+```
+Iteration:  95 | L=1.6554e-01, J=1.6570e-01, Vol=-2.8836e-04, γ=7.5000e-02
+```
+with the optimised domain ``\Omega`` given by
+
+| ![](2d_min_thermal_nl_final_struc.png) |
+|:--:|
+|Figure 6: Visualisation of ``\Omega`` using the isovolume with ``\varphi\leq0``.|
+
+A 3D example of a nonlinear thermal conductivity problem can be found under `scripts/MPI/3d_nonlinear_thermal_compliance_ALM.jl`.
 
 ## References
 > 1. *Z. Guo, X. Cheng, and Z. Xia. Least dissipation principle of heat transport potential capacity and its application in heat conduction  optimization. Chinese Science Bulletin, 48(4):406–410, Feb 2003. ISSN 1861-9541. doi: 10.1007/BF03183239.*

@@ -118,10 +118,8 @@ end
 with_mpi() do distribute
   mesh_partition = (5,5,5)
   el_size = (150,150,150)
-  options = "-snes_type newtonls -snes_linesearch_type basic  -snes_linesearch_damping 1.0"*
-    " -snes_rtol 1.0e-14 -snes_atol 0.0 -snes_monitor -pc_type gamg -ksp_type cg"*
-    " -snes_converged_reason -ksp_converged_reason -ksp_error_if_not_converged true -ksp_rtol 1.0e-12"*
-    " -mat_block_size 3 -mg_levels_ksp_type chebyshev -mg_levels_esteig_ksp_type cg -mg_coarse_sub_pc_type cholesky"
+  options = "-pc_type gamg -ksp_type cg -ksp_error_if_not_converged true 
+    -ksp_converged_reason -ksp_rtol 1.0e-12"
   
   GridapPETSc.with(args=split(options)) do
     main(mesh_partition,distribute,el_size)

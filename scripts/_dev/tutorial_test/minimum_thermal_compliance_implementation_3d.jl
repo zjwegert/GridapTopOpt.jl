@@ -2,27 +2,29 @@ using Gridap, LevelSetTopOpt
 
 # FE parameters
 order = 1                                               # Finite element order
-xmax = ymax = 1.0                                       # Domain size
-dom = (0,xmax,0,ymax)                                   # Bounding domain
-el_size = (200,200)                                     # Mesh partition size
+xmax=ymax=zmax=1.0                                      # Domain size
+dom = (0,xmax,0,ymax,0,zmax)                            # Bounding domain
+el_size = (40,40,40)                                    # Mesh partition size
 prop_Γ_N = 0.4                                          # Γ_N size parameter
 prop_Γ_D = 0.2                                          # Γ_D size parameter
-f_Γ_N(x) = (x[1] ≈ xmax &&                              # Γ_N indicator function
-  ymax/2-ymax*prop_Γ_N/4 - eps() <= x[2] <= ymax/2+ymax*prop_Γ_N/4 + eps())
-f_Γ_D(x) = (x[1] ≈ 0.0 &&                               # Γ_D indicator function
-  (x[2] <= ymax*prop_Γ_D + eps() || x[2] >= ymax-ymax*prop_Γ_D - eps()))
+f_Γ_N(x) = (x[1] ≈ xmax) &&                             # Γ_N indicator function
+  (ymax/2-ymax*prop_Γ_N/4 - eps() <= x[2] <= ymax/2+ymax*prop_Γ_N/4 + eps()) &&
+  (zmax/2-zmax*prop_Γ_N/4 - eps() <= x[3] <= zmax/2+zmax*prop_Γ_N/4 + eps())
+f_Γ_D(x) = (x[1] ≈ 0.0) &&                              # Γ_D indicator function
+  (x[2] <= ymax*prop_Γ_D + eps() || x[2] >= ymax-ymax*prop_Γ_D - eps()) &&
+  (x[3] <= zmax*prop_Γ_D + eps() || x[3] >= zmax-zmax*prop_Γ_D - eps())
 # FD parameters
 γ = 0.1                                                 # HJ equation time step coefficient
 γ_reinit = 0.5                                          # Reinit. equation time step coefficient
-max_steps = floor(Int,minimum(el_size)/10)              # Max steps for advection
-tol = 1/(10order^2)*prod(inv,minimum(el_size))          # Advection tolerance
+max_steps = floor(Int,minimum(el_size)/3)               # Max steps for advection
+tol = 1/(2order^2)*prod(inv,minimum(el_size))           # Advection tolerance
 # Problem parameters
 κ = 1                                                   # Diffusivity
 g = 1                                                   # Heat flow in
 vf = 0.4                                                # Volume fraction constraint
 lsf_func = initial_lsf(4,0.2)                           # Initial level set function
 iter_mod = 10                                           # Output VTK files every 10th iteration
-path = "./results/tut1/"                                # Output path
+path = "./results/tut1_3d/"                             # Output path
 mkpath(path)                                            # Create path
 # Model
 model = CartesianDiscreteModel(dom,el_size);
