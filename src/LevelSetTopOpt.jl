@@ -1,5 +1,8 @@
 module LevelSetTopOpt
 
+using GridapPETSc, GridapPETSc.PETSC
+using GridapPETSc: PetscScalar, PetscInt, PETSC,  @check_error_code
+
 using MPI
 using BlockArrays, SparseArrays, CircularArrays
 using LinearAlgebra, SparseMatricesCSR
@@ -19,9 +22,6 @@ using GridapDistributed: DistributedDiscreteModel, DistributedTriangulation,
   DistributedFESpace, DistributedDomainContribution, to_parray_of_arrays,
   allocate_in_domain, DistributedCellField, DistributedMultiFieldFEBasis,
   BlockPMatrix, BlockPVector, change_ghost
-
-using GridapPETSc, GridapPETSc.PETSC
-using GridapPETSc: PetscScalar, PetscInt, PETSC,  @check_error_code
 
 using PartitionedArrays
 using PartitionedArrays: getany, tuple_of_arrays, matching_ghost_indices

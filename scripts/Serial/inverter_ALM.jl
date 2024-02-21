@@ -30,7 +30,7 @@ function main()
   δₓ = 0.2
   ks = 0.1
   g = VectorValue(0.5,0)
-  path = dirname(dirname(@__DIR__))*"/results/inverter_HPM_osc"
+  path = dirname(dirname(@__DIR__))*"/results/inverter_ALM_alt"
   mkdir(path)
   
   ## FE Setup
@@ -67,8 +67,7 @@ function main()
   U_reg = TrialFESpace(V_reg,[0,0])
 
   ## Create FE functions
-  lsf_fn(x) = min(max(initial_lsf(6,0.2)(x),-sqrt((x[1]-1)^2+(x[2]-0.5)^2)+0.2),
-    sqrt((x[1])^2+(x[2]-0.5)^2)-0.1)
+  lsf_fn(x) = min(max(initial_lsf(6,0.2)(x),-sqrt((x[1]-1)^2+(x[2]-0.5)^2)+0.2),sqrt((x[1])^2+(x[2]-0.5)^2)-0.1)
   φh = interpolate(lsf_fn,V_φ)
 
   ## Interpolation and weak form
@@ -79,11 +78,14 @@ function main()
   l(v,φ,dΩ,dΓ_in,dΓ_out) = ∫(v⋅g)dΓ_in
 
   ## Optimisation functionals
+  β_vol = 0.1
+  β_UΓ_out = 10
+
   e₁ = VectorValue(1,0)
   J(u,φ,dΩ,dΓ_in,dΓ_out) = ∫((u⋅e₁)/vol_Γ_in)dΓ_in
   Vol(u,φ,dΩ,dΓ_in,dΓ_out) = ∫(((ρ ∘ φ) - vf)/vol_D)dΩ
-  dVol(q,u,φ,dΩ,dΓ_in,dΓ_out) = ∫(-1/vol_D*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
-  UΓ_out(u,φ,dΩ,dΓ_in,dΓ_out) = ∫((u⋅-e₁-δₓ)/vol_Γ_out)dΓ_out
+  dVol(q,u,φ,dΩ,dΓ_in,dΓ_out) = ∫(-β_vol/vol_D*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
+  UΓ_out(u,φ,dΩ,dΓ_in,dΓ_out) = ∫(β_UΓ_out*(u⋅-e₁-δₓ)/vol_Γ_out)dΓ_out
 
   ## Finite difference solver and level set function
   stencil = AdvectionStencil(FirstOrderStencil(2,Float64),model,V_φ,tol,max_steps)
@@ -98,9 +100,8 @@ function main()
   vel_ext = VelocityExtension(a_hilb,U_reg,V_reg)
   
   ## Optimiser
-  ls_enabled=false # Setting to true will use a line search instead of oscillation detection
-  optimiser = HilbertianProjection(pcfs,stencil,vel_ext,φh;
-    γ,γ_reinit,α_min=0.4,ls_enabled,verbose=true,constraint_names=[:Vol,:UΓ_out])
+  optimiser = AugmentedLagrangian(pcfs,stencil,vel_ext,φh;
+    γ,γ_reinit,verbose=true,constraint_names=[:Vol,:UΓ_out])
   for (it,uh,φh) in optimiser
     write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi)|"=>(norm ∘ ∇(φh)),"uh"=>uh])
     write_history(path*"/history.txt",optimiser.history)
