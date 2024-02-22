@@ -54,7 +54,7 @@ function main()
   ## Material properties
   _E = 1000
   ν = 0.3
-  μ, λ = _E/(2*(1 + ν)), _E*ν/((1 + ν)*(1 - 2*ν))
+  μ, λ = _E/(2*(1 + ν)), _E*ν/((1 + ν)*(1 - ν))
   g = VectorValue(0,-20)
 
   ## Neohookean hyperelastic material
