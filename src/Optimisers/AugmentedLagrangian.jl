@@ -66,7 +66,9 @@ struct AugmentedLagrangian{N,O} <: Optimiser
   - `verbose=false`: Verbosity flag.
   - `constraint_names = map(i -> Symbol("C_\$i"),1:N)`: Constraint names for history output.
   - `has_oscillations::Function = default_has_oscillations`: Function to check for oscillations 
-  in the history.
+    in the history.
+  - `initial_parameters::Function = default_al_init_params`: Function to generate initial λ, Λ.
+    This can be replaced to inject different λ and Λ, for example.
   - `os_γ_mult = 0.75`: Decrease multiplier for `γ` when `has_oscillations` returns true
   - `converged::Function = default_hp_converged`: Convergence criteria.
   - `debug = false`: Debug flag.
@@ -79,15 +81,18 @@ struct AugmentedLagrangian{N,O} <: Optimiser
     Λ_max = 5.0, ζ = 1.1, update_mod = 5, γ = 0.1, γ_reinit = 0.5, os_γ_mult = 0.75,
     maxiter = 1000, verbose=false, constraint_names = map(i -> Symbol("C_$i"),1:N),
     converged::Function = default_al_converged, debug = false,
-    has_oscillations::Function = default_has_oscillations
+    has_oscillations::Function = default_has_oscillations,
+    initial_parameters::Function = default_al_init_params
   ) where {N,O}
 
     constraint_names = map(Symbol,constraint_names)
-    al_keys = [:L,:J,constraint_names...,:γ]
-    al_bundles = Dict(:C => constraint_names)
+    λ_names = map(i -> Symbol("λ$i"),1:N)
+    Λ_names = map(i -> Symbol("Λ$i"),1:N)
+    al_keys = [:L,:J,constraint_names...,:γ,λ_names...,Λ_names...]
+    al_bundles = Dict(:C => constraint_names, :λ => λ_names, :Λ => Λ_names)
     history = OptimiserHistory(Float64,al_keys,al_bundles,maxiter,verbose)
 
-    params = (;Λ_max,ζ,update_mod,γ,γ_reinit,os_γ_mult,debug)
+    params = (;Λ_max,ζ,update_mod,γ,γ_reinit,os_γ_mult,debug,initial_parameters)
     new{N,O}(problem,stencil,vel_ext,history,converged,has_oscillations,params,φ0)
   end
 end
@@ -103,6 +108,13 @@ function default_has_oscillations(m::AugmentedLagrangian,os_it;itlength=25,algo=
 
   L = h[:L]
   return ~isnan(estimate_period(L[it-itlength+1:it+1],algo))
+end
+
+function default_al_init_params(J,C)
+  λ = zeros(eltype(J),length(C))
+  Λ = @. 0.1*abs(J)/abs(C)^1.5
+
+  return λ,Λ 
 end
 
 function converged(m::AugmentedLagrangian)
@@ -139,8 +151,7 @@ function Base.iterate(m::AugmentedLagrangian)
   vel = copy(get_free_dof_values(φh))
 
   ## Compute initial lagrangian
-  λ = zeros(eltype(J),length(C))
-  Λ = convert(Vector{eltype(J)},map(Ci -> 0.1*abs(J)/abs(Ci)^1.5,C))
+  λ,Λ = params.initial_parameters(J,C)
   L = J
   for (λi,Λi,Ci) in zip(λ,Λ,C)
     L += -λi*Ci + 0.5*Λi*Ci^2
@@ -154,7 +165,7 @@ function Base.iterate(m::AugmentedLagrangian)
   project!(m.vel_ext,dL)
 
   # Update history and build state
-  push!(history,(L,J,C...,params.γ))
+  push!(history,(L,J,C...,params.γ,λ...,Λ...))
   state = (;it=1,L,J,C,dL,dJ,dC,uh,φh,vel,λ,Λ,params.γ,os_it=-1)
   vars  = params.debug ? (0,uh,φh,state) : (0,uh,φh)
   return vars, state
@@ -205,7 +216,7 @@ function Base.iterate(m::AugmentedLagrangian,state)
   project!(m.vel_ext,dL)
 
   ## Update history and build state
-  push!(history,(L,J,C...,γ))
+  push!(history,(L,J,C...,γ,λ...,Λ...))
   state = (it+1,L,J,C,dL,dJ,dC,uh,φh,vel,λ,Λ,γ,os_it)
   vars  = params.debug ? (it,uh,φh,state) : (it,uh,φh)
   return vars, state
