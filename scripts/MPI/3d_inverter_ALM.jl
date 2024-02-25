@@ -29,10 +29,10 @@ function main(mesh_partition,distribute,el_size)
   η_coeff = 2
   α_coeff = 4
   vf=0.4
-  δₓ=0.2
-  ks = 0.1
-  g = VectorValue(0.5,0,0)
-  path = dirname(dirname(@__DIR__))*"/results/3d_inverter_HPM"
+  δₓ=0.5
+  ks = 0.01
+  g = VectorValue(1,0,0)
+  path = dirname(dirname(@__DIR__))*"/results/3d_inverter_ALM"
   i_am_main(ranks) && mkdir(path)
 
   ## FE Setup
@@ -84,8 +84,8 @@ function main(mesh_partition,distribute,el_size)
   l(v,φ,dΩ,dΓ_in,dΓ_out) = ∫(v⋅g)dΓ_in
 
   ## Optimisation functionals
-  β_vol = 0.1
-  β_UΓ_out = 10
+  β_vol = 1
+  β_UΓ_out = 1
   
   e₁ = VectorValue(1,0,0)
   J(u,φ,dΩ,dΓ_in,dΓ_out) = ∫((u⋅e₁)/vol_Γ_in)dΓ_in

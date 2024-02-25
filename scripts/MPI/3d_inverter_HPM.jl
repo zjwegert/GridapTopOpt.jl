@@ -21,7 +21,7 @@ function main(mesh_partition,distribute,el_size)
   ## Parameters
   order = 1
   dom = (0,1,0,1,0,1)
-  γ = 0.05
+  γ = 0.1
   γ_reinit = 0.5
   max_steps = floor(Int,minimum(el_size)/3)
   tol = 1/(2order^2)*prod(inv,minimum(el_size))
@@ -117,8 +117,9 @@ function main(mesh_partition,distribute,el_size)
   )
   
   ## Optimiser
-  optimiser = HilbertianProjection(pcfs,stencil,vel_ext,φh;γ,γ_reinit,α_min=0.7,ls_γ_max=0.05,
-    verbose=i_am_main(ranks),constraint_names=[:Vol,:UΓ_out])
+  ls_enabled=false # Setting to true will use a line search instead of oscillation detection
+  optimiser = HilbertianProjection(pcfs,stencil,vel_ext,φh;γ,γ_reinit,ls_enabled,α_min=0.7,
+    ls_γ_max=0.05,verbose=i_am_main(ranks),constraint_names=[:Vol,:UΓ_out])
   for (it, uh, φh) in optimiser
     write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi)|"=>(norm ∘ ∇(φh)),"uh"=>uh])
     write_history(path*"/history.txt",optimiser.history;ranks=ranks)
