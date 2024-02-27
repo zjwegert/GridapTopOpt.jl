@@ -1,5 +1,11 @@
 # Shape derivative versus Gâteaux derivative in ``\varphi``
 
+There are mistakes here that need to be fixed:
+- Forcing terms should be ``(1-H(\phi))`` not ``\chi_\epsilon(\varphi)``
+- Some integrals that are relaxed over ``D`` still have domain as ``\Omega``
+
+----
+
 The shape derivative of ``J^\prime(\Omega)`` can be defined as the Fréchet derivative under a mapping ``\tilde\Omega = (\boldsymbol{I}+\boldsymbol{\theta})(\Omega)`` at ``\boldsymbol{0}`` with
 
 ```math
@@ -14,7 +20,7 @@ J_1(\tilde{\Omega})=\int_{\tilde{\Omega}}f(\tilde{\boldsymbol{x}})~\mathrm{d}\bo
 
 So, for this simple case ``J_1^\prime(\Omega)(\boldsymbol{\theta})=\int_{\partial\Omega}f(\boldsymbol{x})~\boldsymbol{\theta}\cdot\boldsymbol{n}~\mathrm{d}s~~(\star).`` For a surface integral ``J_2(\Omega)=\int_{\partial\Omega} f(\boldsymbol{x})~\mathrm{d}s``, one finds in a similar way ``J_2^\prime(\Omega)(\boldsymbol{\theta})=\int_{\partial\Omega}(f\nabla\cdot\boldsymbol{n}+\nabla f\cdot\boldsymbol{n})~\boldsymbol{\theta}\cdot\boldsymbol{n}~\mathrm{d}s.``
 
-Suppose that we attribute a signed distance function ``\varphi:D\rightarrow\mathbb{R}`` to our domain ``\Omega\subset D`` with ``\bar{\Omega}=\lbrace \boldsymbol{x}:\varphi(\boldsymbol{x})\leq0\rbrace`` and ``\Omega^\complement=\lbrace \boldsymbol{x}:\varphi(\boldsymbol{x})>0\rbrace``. We can then define a smooth characteristic function ``\chi_\epsilon:\mathbb{R}\rightarrow[\epsilon,1]`` as ``\chi_\epsilon(\varphi)=(1-H(\varphi))+\epsilon H(\varphi)`` where ``H`` is a smoothed Heaviside function with smoothing radius ``\eta``, and ``\epsilon\ll1`` allows for an ersatz material approximation. Of course, ``\epsilon`` can be taken as zero depending on the computational regime. We can now rewrite ``J_1`` over the computational domain ``D`` as ``J_{1\Omega}(\varphi)=\int_D \chi_\epsilon(\varphi)f(\boldsymbol{x})~\mathrm{d}\boldsymbol{x}``. Considering the directional derivative of ``J_{1\Omega}`` under a variation ``\tilde{\varphi}=\varphi+sv`` gives
+Suppose that we attribute a signed distance function ``\varphi:D\rightarrow\mathbb{R}`` to our domain ``\Omega\subset D`` with ``\bar{\Omega}=\lbrace \boldsymbol{x}:\varphi(\boldsymbol{x})\leq0\rbrace`` and ``\Omega^\complement=\lbrace \boldsymbol{x}:\varphi(\boldsymbol{x})>0\rbrace``. We can then define a smooth characteristic function ``\chi_\epsilon:\mathbb{R}\rightarrow[\epsilon,1]`` as ``\chi_\epsilon(\varphi)=(1-H(\varphi))+\epsilon H(\varphi)`` where ``H`` is a smoothed Heaviside function with smoothing radius ``\eta``, and ``\epsilon\ll1`` allows for an ersatz material approximation. Of course, ``\epsilon`` can be taken as zero depending on the considered integral and/or computational regime. We can now rewrite ``J_1`` over the computational domain ``D`` as ``J_{1\Omega}(\varphi)=\int_D \chi_\epsilon(\varphi)f(\boldsymbol{x})~\mathrm{d}\boldsymbol{x}``. Considering the directional derivative of ``J_{1\Omega}`` under a variation ``\tilde{\varphi}=\varphi+sv`` gives
 
 ```math
 J_{1\Omega}^\prime(\varphi)(v)=\frac{\mathrm{d}}{\mathrm{d}s} J_{1\Omega}(\varphi+sv)\rvert_{s=0}=\int_D v\chi_\epsilon^\prime(\varphi)f(\boldsymbol{x})~\mathrm{d}\boldsymbol{x}
@@ -29,7 +35,7 @@ J_{1\Omega}^\prime(\varphi)(v)=\int_D (\epsilon-1)vH^\prime(\varphi)f(\boldsymbo
 The final result of course does not yet match ``(\star)``. Over a fixed computational domain we may relax integrals to be over all of ``D`` via ``\mathrm{d}s = H'(\varphi)\lvert\nabla\varphi\rvert~\mathrm{d}\boldsymbol{x}``. In addition suppose we take ``\boldsymbol{\theta}=-v\boldsymbol{n}``. Then ``(\star)`` can be rewritten as
 
 ```math
-J_1^\prime(\Omega)(v\boldsymbol{n})=-\int_{D}vf(\boldsymbol{x})H'(\varphi)\lvert\nabla\varphi\rvert~\mathrm{d}s.
+J_1^\prime(\Omega)(-v\boldsymbol{n})=-\int_{D}vf(\boldsymbol{x})H'(\varphi)\lvert\nabla\varphi\rvert~\mathrm{d}s.
 ```
 
 As ``\varphi`` is a signed distance function we have ``\lvert\nabla\varphi\rvert=1`` for ``D\setminus\Sigma`` where ``\Sigma`` is the skeleton of ``\Omega`` and ``\Omega^\complement``. Furthermore, ``H'(\varphi)`` provides support only within a band of ``\partial\Omega``. 
@@ -38,7 +44,7 @@ As ``\varphi`` is a signed distance function we have ``\lvert\nabla\varphi\rvert
     Therefore, we have that almost everywhere
 
     ```math
-    {\huge{|}} J_1^\prime(\Omega)(v\boldsymbol{n}) - J_{1\Omega}^\prime(\varphi)(v){\huge{|}}=O(\epsilon),
+    {\huge{|}} J_1^\prime(\Omega)(-v\boldsymbol{n}) - J_{1\Omega}^\prime(\varphi)(v){\huge{|}}=O(\epsilon),
     ```
 
     with equaility as ``\epsilon\rightarrow0``.
