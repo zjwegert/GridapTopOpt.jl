@@ -318,7 +318,7 @@ end
     adjoint_solve!(φ_to_u::AbstractFEStateMap,du::AbstractVector)
 
 Evaluate the solution to the adjoint problem given a RHS vector `∂F∂u` denoted `du`.
-This should solve the linear problem `dRdφᵀ*λ = ∂F∂uᵀ`.
+This should solve the linear problem `dRduᵀ*λ = ∂F∂uᵀ`.
 """
 function adjoint_solve!(φ_to_u::AbstractFEStateMap,du::AbstractVector)
   @abstractmethod
@@ -347,7 +347,7 @@ Compute `∂F∂u*dudφ` at `φh` and `uh` using the adjoint method. I.e., let
 
 `∂F∂u*dudφ = -λᵀ*dRdφ`
 
-and solve the adjoint problem `dRdφᵀ*λ = ∂F∂uᵀ` using [`adjoint_solve!`](@ref).
+and solve the adjoint problem `dRduᵀ*λ = ∂F∂uᵀ` using [`adjoint_solve!`](@ref).
 """
 function pullback(φ_to_u::AbstractFEStateMap,uh,φh,du;updated=false)
   dudφ_vec, assem_deriv = φ_to_u.plb_caches
@@ -822,7 +822,7 @@ This requires two pieces of information:
     where ``\\mathcal{R}`` is the residual and solve the (linear) adjoint 
     problem:
     
-    ``\\frac{\\partial \\mathcal{R}}{\\partial \\varphi}^\\intercal\\lambda = 
+    ``\\frac{\\partial \\mathcal{R}}{\\partial u}^\\intercal\\lambda = 
     \\frac{\\partial F}{\\partial u}^\\intercal.``
 
 The gradient is then ``\\frac{\\partial F}{\\partial \\varphi} = 
