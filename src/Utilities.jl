@@ -158,8 +158,7 @@ end
 
 function get_el_Δ(model::DistributedDiscreteModel)
   local_Δ = map(local_views(model)) do model
-    desc = get_cartesian_descriptor(model)
-    desc.sizes
+    get_el_Δ(model)
   end
   return getany(local_Δ)
 end
