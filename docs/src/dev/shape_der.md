@@ -1,11 +1,5 @@
 # Shape derivative versus Gâteaux derivative in ``\varphi``
 
-There are mistakes here that need to be fixed:
-- Forcing terms should be ``(1-H(\phi))`` not ``\chi_\epsilon(\varphi)``
-- Some integrals that are relaxed over ``D`` still have domain as ``\Omega``
-
-----
-
 The shape derivative of ``J^\prime(\Omega)`` can be defined as the Fréchet derivative under a mapping ``\tilde\Omega = (\boldsymbol{I}+\boldsymbol{\theta})(\Omega)`` at ``\boldsymbol{0}`` with
 
 ```math
@@ -111,9 +105,9 @@ after applying integration by parts. Under a suitable variations of ``\boldsymbo
 ```math
 \begin{aligned}
 0=\frac{\partial\mathcal{L}}{\partial\boldsymbol{v}}(\boldsymbol{\phi})&=\int_\Omega \boldsymbol{\phi}\cdot j^\prime(\boldsymbol{v})~\mathrm{d}\boldsymbol{x}+\int_{\Gamma_N} \boldsymbol{\phi}\cdot l_1^\prime(\boldsymbol{v})~\mathrm{d}s+\int_{\Gamma_R} \boldsymbol{\phi}\cdot l_2^\prime(\boldsymbol{v})~\mathrm{d}s+\int_{\Omega} \boldsymbol{C\varepsilon}(\boldsymbol{\phi})\boldsymbol{\varepsilon}(\boldsymbol{q})~\mathrm{d}\boldsymbol{x}\\
-&\quad+\int_{\Gamma_R}\boldsymbol{\phi}\cdot J_{\boldsymbol{w}}(\boldsymbol{v})\cdot\boldsymbol{q}~\mathrm{d}s-\int_{\Gamma_D}\boldsymbol{q}\cdot\boldsymbol{C\varepsilon}(\boldsymbol{\phi})\boldsymbol{n}+\boldsymbol{\phi}\cdot\boldsymbol{C\varepsilon}(\boldsymbol{q})\boldsymbol{n}~\mathrm{d}s\\
+&\quad+\int_{\Gamma_R}\boldsymbol{\phi}\cdot w^\prime(\boldsymbol{v})\cdot\boldsymbol{q}~\mathrm{d}s-\int_{\Gamma_D}\boldsymbol{q}\cdot\boldsymbol{C\varepsilon}(\boldsymbol{\phi})\boldsymbol{n}+\boldsymbol{\phi}\cdot\boldsymbol{C\varepsilon}(\boldsymbol{q})\boldsymbol{n}~\mathrm{d}s\\
 &=\int_{\Omega} \boldsymbol{\phi}\cdot(-\mathrm{div}(\boldsymbol{C\varepsilon}(\boldsymbol{q}))-j^\prime(\boldsymbol{v}))~\mathrm{d}\boldsymbol{x}+\int_{\Gamma_N} \boldsymbol{\phi}\cdot (\boldsymbol{C\varepsilon}(\boldsymbol{q})\boldsymbol{n}+l_1^\prime(\boldsymbol{v}))~\mathrm{d}s\\
-&\quad+\int_{\Gamma_R} \boldsymbol{\phi}\cdot (\boldsymbol{C\varepsilon}(\boldsymbol{q})\boldsymbol{n}+J_{\boldsymbol{w}}(\boldsymbol{v})\cdot\boldsymbol{q}+l_2^\prime(\boldsymbol{v}))~\mathrm{d}s-\int_{\Gamma_D}\boldsymbol{q}\cdot\boldsymbol{C\varepsilon}(\boldsymbol{\phi})\boldsymbol{n}~\mathrm{d}s\\
+&\quad+\int_{\Gamma_R} \boldsymbol{\phi}\cdot (\boldsymbol{C\varepsilon}(\boldsymbol{q})\boldsymbol{n}+w^\prime(\boldsymbol{v})\cdot\boldsymbol{q}+l_2^\prime(\boldsymbol{v}))~\mathrm{d}s-\int_{\Gamma_D}\boldsymbol{q}\cdot\boldsymbol{C\varepsilon}(\boldsymbol{\phi})\boldsymbol{n}~\mathrm{d}s\\
 &\quad+\int_{\Gamma_0}\boldsymbol{\phi}\cdot\boldsymbol{C\varepsilon}(\boldsymbol{q})\boldsymbol{n}~\mathrm{d}s
 \end{aligned}
 ```
@@ -126,7 +120,7 @@ where integration by parts has been applied. The adjoint equations are then gene
 \boldsymbol{\lambda} &= \boldsymbol{0}\text{ on }\Gamma_D,\\
 \boldsymbol{C\varepsilon}(\boldsymbol{\lambda})\boldsymbol{n} &= \boldsymbol{0} \text{ on }\Gamma_0,\\
 \boldsymbol{C\varepsilon}(\boldsymbol{\lambda})\boldsymbol{n} &= -l_1^\prime(\boldsymbol{u})\text{ on }\Gamma_N,\\
-\boldsymbol{C\varepsilon}(\boldsymbol{\lambda})\boldsymbol{n} &= -J_{\boldsymbol{w}}(\boldsymbol{u})\cdot\boldsymbol{\lambda}-l_2^\prime(\boldsymbol{u}) \text{ on }\Gamma_R.\\
+\boldsymbol{C\varepsilon}(\boldsymbol{\lambda})\boldsymbol{n} &= -w^\prime(\boldsymbol{u})\cdot\boldsymbol{\lambda}-l_2^\prime(\boldsymbol{u}) \text{ on }\Gamma_R.\\
 \end{aligned}
 ```
 
@@ -146,14 +140,14 @@ As required. Note that in the above, we have used that ``\boldsymbol{\theta}\cdo
 Let us now return to derivatives of ``J`` with respect to ``\varphi`` over the whole computational domain. As previously, suppose that we rewrite ``J`` as 
 
 ```math
-\hat{\mathcal{J}}(\varphi)=\int_D \chi_\epsilon(\varphi)j(\boldsymbol{u})~\mathrm{d}\boldsymbol{x}+\int_{\Gamma_N} l_1(\boldsymbol{u})~\mathrm{d}s+\int_{\Gamma_R} l_2(\boldsymbol{u})~\mathrm{d}s
+\hat{\mathcal{J}}(\varphi)=\int_D (1-H(\varphi))j(\boldsymbol{u})~\mathrm{d}\boldsymbol{x}+\int_{\Gamma_N} l_1(\boldsymbol{u})~\mathrm{d}s+\int_{\Gamma_R} l_2(\boldsymbol{u})~\mathrm{d}s
 ```
 
 where ``\boldsymbol{u}`` satisfies the state equations as previously with relaxation over the whole computational domain ``D`` as
 
 ```math
 \begin{aligned}
--\mathrm{div}(\chi_\epsilon(\varphi)\boldsymbol{C\varepsilon}(\boldsymbol{u})) &= \chi_\epsilon(\varphi)\boldsymbol{f}\text{ on }D, \\
+-\mathrm{div}(\chi_\epsilon(\varphi)\boldsymbol{C\varepsilon}(\boldsymbol{u})) &= (1-H(\varphi))\boldsymbol{f}\text{ on }D, \\
 \boldsymbol{u} &= \boldsymbol{0}\text{ on }\Gamma_D,\\
 \chi_\epsilon(\varphi)\boldsymbol{C\varepsilon}(\boldsymbol{u})\boldsymbol{n} &= \boldsymbol{0}\text{ on }\Gamma_0,\\
 \chi_\epsilon(\varphi)\boldsymbol{C\varepsilon}(\boldsymbol{u})\boldsymbol{n} &= \boldsymbol{g}\text{ on }\Gamma_N,\\
@@ -164,24 +158,24 @@ where ``\boldsymbol{u}`` satisfies the state equations as previously with relaxa
 and admits a weak form: *Find* ``\boldsymbol{u}\in H^1_{\Gamma_D}(\Omega)^d`` *such that*
 
 ```math
-\int_{\Omega} \chi_\epsilon(\varphi)\boldsymbol{C\varepsilon}(\boldsymbol{u})\boldsymbol{\varepsilon}(\boldsymbol{v})~\mathrm{d}\boldsymbol{x}+\int_{\Gamma_R}\boldsymbol{w}(\boldsymbol{u})\cdot\boldsymbol{v}~\mathrm{d}s=\int_D\chi_\epsilon(\varphi)\boldsymbol{f}\cdot\boldsymbol{v}~\mathrm{d}\boldsymbol{x}+\int_{\Gamma_N}\boldsymbol{g}\cdot\boldsymbol{v}~\mathrm{d}s,~\forall \boldsymbol{v}\in H^1_{\Gamma_D}(\Omega)^d.
+\int_D \chi_\epsilon(\varphi)\boldsymbol{C\varepsilon}(\boldsymbol{u})\boldsymbol{\varepsilon}(\boldsymbol{v})~\mathrm{d}\boldsymbol{x}+\int_{\Gamma_R}\boldsymbol{w}(\boldsymbol{u})\cdot\boldsymbol{v}~\mathrm{d}s=\int_D(1-H(\varphi))\boldsymbol{f}\cdot\boldsymbol{v}~\mathrm{d}\boldsymbol{x}+\int_{\Gamma_N}\boldsymbol{g}\cdot\boldsymbol{v}~\mathrm{d}s,~\forall \boldsymbol{v}\in H^1_{\Gamma_D}(\Omega)^d.
 ```
 
 At this stage it is important to note that this is almost verbatim as the case without relaxation over ``D``. Indeed, we may follow Céa's method as previously with only a minor adjustment to the Lagrangian that relaxes it over ``D``:
 
 ```math
 \begin{aligned}
-\hat{\mathcal{L}}(\varphi,\boldsymbol{v},\boldsymbol{q})=&\int_D \chi_\epsilon(\varphi)j(\boldsymbol{v})~\mathrm{d}\boldsymbol{x}+\int_{\Gamma_N} l_1(\boldsymbol{v})~\mathrm{d}s+\int_{\Gamma_R} l_2(\boldsymbol{v})~\mathrm{d}s+\int_{D}\chi_\epsilon(\varphi)\boldsymbol{C\varepsilon}(\boldsymbol{v})\boldsymbol{\varepsilon}(\boldsymbol{q})~\mathrm{d}\boldsymbol{x}\\
-&+\int_{\Gamma_R}\boldsymbol{w}(\boldsymbol{v})\cdot\boldsymbol{q}~\mathrm{d}s-\int_D \chi_\epsilon(\varphi) \boldsymbol{f}\cdot\boldsymbol{q}~\mathrm{d}\boldsymbol{x}-\int_{\Gamma_N}\boldsymbol{g}\cdot\boldsymbol{q}~\mathrm{d}s\\
+\hat{\mathcal{L}}(\varphi,\boldsymbol{v},\boldsymbol{q})=&\int_D (1-H(\varphi))j(\boldsymbol{v})~\mathrm{d}\boldsymbol{x}+\int_{\Gamma_N} l_1(\boldsymbol{v})~\mathrm{d}s+\int_{\Gamma_R} l_2(\boldsymbol{v})~\mathrm{d}s+\int_{D}\chi_\epsilon(\varphi)\boldsymbol{C\varepsilon}(\boldsymbol{v})\boldsymbol{\varepsilon}(\boldsymbol{q})~\mathrm{d}\boldsymbol{x}\\
+&+\int_{\Gamma_R}\boldsymbol{w}(\boldsymbol{v})\cdot\boldsymbol{q}~\mathrm{d}s-\int_D (1-H(\varphi)) \boldsymbol{f}\cdot\boldsymbol{q}~\mathrm{d}\boldsymbol{x}-\int_{\Gamma_N}\boldsymbol{g}\cdot\boldsymbol{q}~\mathrm{d}s\\
 &-\int_{\Gamma_D}\boldsymbol{q}\cdot\chi_\epsilon(\varphi)\boldsymbol{C\varepsilon}(\boldsymbol{v})\boldsymbol{n}+\boldsymbol{v}\cdot\chi_\epsilon(\varphi)\boldsymbol{C\varepsilon}(\boldsymbol{q})\boldsymbol{n}~\mathrm{d}s.\\
 \end{aligned}
 ```
 
-As a result the partial derivatives of ``\hat{\mathcal{L}}`` in ``\boldsymbol{v}`` and ``\boldsymbol{q}`` are the same as previously up to relaxation of ``D`` with ``\chi_\epsilon(\varphi)``, i.e.,
+As a result the partial derivatives of ``\hat{\mathcal{L}}`` in ``\boldsymbol{v}`` and ``\boldsymbol{q}`` are the same as previously up to relaxation over ``D``, i.e.,
 
 ```math
 \begin{aligned}
-0=\frac{\partial\hat{\mathcal{L}}}{\partial\boldsymbol{q}}(\boldsymbol{\phi})&=\int_\Omega\boldsymbol{\phi}\cdot(-\mathrm{div}(\chi_\epsilon(\varphi)\boldsymbol{C\varepsilon}(\boldsymbol{u}))-\chi_\epsilon(\varphi)\boldsymbol{f})~\mathrm{d}\boldsymbol{x}+\int_{\Gamma_R}\boldsymbol{\phi}\cdot(\chi_\epsilon(\varphi)\boldsymbol{C\varepsilon}(\boldsymbol{v})\boldsymbol{n}+\boldsymbol{w}(\boldsymbol{v}))~\mathrm{d}s\\
+0=\frac{\partial\hat{\mathcal{L}}}{\partial\boldsymbol{q}}(\boldsymbol{\phi})&=\int_D\boldsymbol{\phi}\cdot(-\mathrm{div}(\chi_\epsilon(\varphi)\boldsymbol{C\varepsilon}(\boldsymbol{u}))-(1-H(\varphi))\boldsymbol{f})~\mathrm{d}\boldsymbol{x}+\int_{\Gamma_R}\boldsymbol{\phi}\cdot(\chi_\epsilon(\varphi)\boldsymbol{C\varepsilon}(\boldsymbol{v})\boldsymbol{n}+\boldsymbol{w}(\boldsymbol{v}))~\mathrm{d}s\\
 &\quad+\int_{\Gamma_N}\boldsymbol{\phi}\cdot(\chi_\epsilon(\varphi)\boldsymbol{C\varepsilon}(\boldsymbol{v})\boldsymbol{n}-\boldsymbol{g})~\mathrm{d}s-\int_{\Gamma_D}\boldsymbol{v}\cdot\chi_\epsilon(\varphi)\boldsymbol{C\varepsilon}(\boldsymbol{\phi})\boldsymbol{n}~\mathrm{d}s+\int_{\Gamma_0}\boldsymbol{\phi}\cdot\chi_\epsilon(\varphi)\boldsymbol{C\varepsilon}(\boldsymbol{v})\boldsymbol{n}~\mathrm{d}s
 \end{aligned}
 ```
@@ -190,8 +184,8 @@ and
 
 ```math
 \begin{aligned}
-0=\frac{\partial\hat{\mathcal{L}}}{\partial\boldsymbol{v}}(\boldsymbol{\phi})&=\int_{\Omega} \boldsymbol{\phi}\cdot(-\mathrm{div}(\chi_\epsilon(\varphi)\boldsymbol{C\varepsilon}(\boldsymbol{q}))-\chi_\epsilon(\varphi)j^\prime(\boldsymbol{v}))~\mathrm{d}\boldsymbol{x}+\int_{\Gamma_N} \boldsymbol{\phi}\cdot (\chi_\epsilon(\varphi)\boldsymbol{C\varepsilon}(\boldsymbol{q})\boldsymbol{n}+l_1^\prime(\boldsymbol{v}))~\mathrm{d}s\\
-&\quad+\int_{\Gamma_R} \boldsymbol{\phi}\cdot (\chi_\epsilon(\varphi)\boldsymbol{C\varepsilon}(\boldsymbol{q})\boldsymbol{n}+J_{\boldsymbol{w}}(\boldsymbol{v})\cdot\boldsymbol{q}+l_2^\prime(\boldsymbol{v}))~\mathrm{d}s-\int_{\Gamma_D}\boldsymbol{q}\cdot\chi_\epsilon(\varphi)\boldsymbol{C\varepsilon}(\boldsymbol{\phi})\boldsymbol{n}~\mathrm{d}s\\
+0=\frac{\partial\hat{\mathcal{L}}}{\partial\boldsymbol{v}}(\boldsymbol{\phi})&=\int_D \boldsymbol{\phi}\cdot(-\mathrm{div}(\chi_\epsilon(\varphi)\boldsymbol{C\varepsilon}(\boldsymbol{q}))-(1-H(\varphi))j^\prime(\boldsymbol{v}))~\mathrm{d}\boldsymbol{x}+\int_{\Gamma_N} \boldsymbol{\phi}\cdot (\chi_\epsilon(\varphi)\boldsymbol{C\varepsilon}(\boldsymbol{q})\boldsymbol{n}+l_1^\prime(\boldsymbol{v}))~\mathrm{d}s\\
+&\quad+\int_{\Gamma_R} \boldsymbol{\phi}\cdot (\chi_\epsilon(\varphi)\boldsymbol{C\varepsilon}(\boldsymbol{q})\boldsymbol{n}+w^\prime(\boldsymbol{v})\cdot\boldsymbol{q}+l_2^\prime(\boldsymbol{v}))~\mathrm{d}s-\int_{\Gamma_D}\boldsymbol{q}\cdot\chi_\epsilon(\varphi)\boldsymbol{C\varepsilon}(\boldsymbol{\phi})\boldsymbol{n}~\mathrm{d}s\\
 &\quad+\int_{\Gamma_0}\boldsymbol{\phi}\cdot\chi_\epsilon(\varphi)\boldsymbol{C\varepsilon}(\boldsymbol{q})\boldsymbol{n}~\mathrm{d}s.
 \end{aligned}
 ```
@@ -200,11 +194,11 @@ Therefore, we may identify ``\boldsymbol{v}=\boldsymbol{u}`` and ``\boldsymbol{q
 
 ```math
 \begin{aligned}
--\mathrm{div}(\chi_\epsilon(\varphi)\boldsymbol{C\varepsilon}(\boldsymbol{\lambda})) &= \chi_\epsilon(\varphi)j^\prime(\boldsymbol{u})\text{ on }\Omega, \\
+-\mathrm{div}(\chi_\epsilon(\varphi)\boldsymbol{C\varepsilon}(\boldsymbol{\lambda})) &= (1-H(\varphi))j^\prime(\boldsymbol{u})\text{ on }\Omega, \\
 \boldsymbol{\lambda} &= \boldsymbol{0}\text{ on }\Gamma_D,\\
 \chi_\epsilon(\varphi)\boldsymbol{C\varepsilon}(\boldsymbol{\lambda})\boldsymbol{n} &= \boldsymbol{0} \text{ on }\Gamma_0,\\
 \chi_\epsilon(\varphi)\boldsymbol{C\varepsilon}(\boldsymbol{\lambda})\boldsymbol{n} &= -l_1^\prime(\boldsymbol{u})\text{ on }\Gamma_N,\\
-\chi_\epsilon(\varphi)\boldsymbol{C\varepsilon}(\boldsymbol{\lambda})\boldsymbol{n} &= -J_{\boldsymbol{w}}(\boldsymbol{u})\cdot\boldsymbol{\lambda}-l_2^\prime(\boldsymbol{u}) \text{ on }\Gamma_R.\\
+\chi_\epsilon(\varphi)\boldsymbol{C\varepsilon}(\boldsymbol{\lambda})\boldsymbol{n} &= -w^\prime(\boldsymbol{u})\cdot\boldsymbol{\lambda}-l_2^\prime(\boldsymbol{u}) \text{ on }\Gamma_R.\\
 \end{aligned}
 ```
 
@@ -213,8 +207,8 @@ This exactly as previously up to relaxation over ``D``. Finally, The derivative 
 ```math
 \begin{aligned}
 \hat{J}^\prime(\varphi)(v)&=\frac{\partial\hat{\mathcal{L}}}{\partial\varphi}(\varphi,\boldsymbol{u},\boldsymbol{\lambda})(v)+\cancel{\frac{\partial\hat{\mathcal{L}}}{\partial\boldsymbol{v}}(\varphi,\boldsymbol{u},\boldsymbol{\lambda})}(\boldsymbol{u}^\prime(v))+\cancel{\frac{\partial\hat{\mathcal{L}}}{\partial\boldsymbol{q}}(\varphi,\boldsymbol{u},\boldsymbol{\lambda})}(\boldsymbol{\lambda}^\prime(v))\\
-&=\int_D v(\boldsymbol{C\varepsilon}(\boldsymbol{u})\boldsymbol{\varepsilon}(\boldsymbol{\lambda})+j(\boldsymbol{u})- \boldsymbol{f}\cdot\boldsymbol{\lambda})\chi^\prime_\epsilon(\varphi)~\mathrm{d}\boldsymbol{x}\\
-&=\int_D v(\epsilon-1)(\boldsymbol{C\varepsilon}(\boldsymbol{u})\boldsymbol{\varepsilon}(\boldsymbol{\lambda})+j(\boldsymbol{u})- \boldsymbol{f}\cdot\boldsymbol{\lambda})H^\prime(\varphi)~\mathrm{d}\boldsymbol{x}
+&=\int_D v(\chi^\prime_\epsilon(\varphi)\boldsymbol{C\varepsilon}(\boldsymbol{u})\boldsymbol{\varepsilon}(\boldsymbol{\lambda})+(-H^\prime(\varphi))j(\boldsymbol{u})- (-H^\prime(\varphi))\boldsymbol{f}\cdot\boldsymbol{\lambda})~\mathrm{d}\boldsymbol{x}\\
+&=-\int_D v(\boldsymbol{C\varepsilon}(\boldsymbol{u})\boldsymbol{\varepsilon}(\boldsymbol{\lambda})+j(\boldsymbol{u})- \boldsymbol{f}\cdot\boldsymbol{\lambda})H^\prime(\varphi)~\mathrm{d}\boldsymbol{x}+\epsilon\int_D v\boldsymbol{C\varepsilon}(\boldsymbol{u})\boldsymbol{\varepsilon}(\boldsymbol{\lambda})H^\prime(\varphi)~\mathrm{d}\boldsymbol{x}
 \end{aligned}
 ```
 
