@@ -26,6 +26,10 @@ function instantiate_caches(x,nls::NewtonSolver,op::NonlinearOperator)
   return GridapSolvers.NonlinearSolvers.NewtonCache(A,b,dx,ns)
 end
 
+function instantiate_caches(x,nls::PETScNonlinearSolver,op::NonlinearOperator)
+  return GridapPETSc._setup_cache(x,nls,op)
+end
+
 # Transpose contributions before assembly
 
 transpose_contributions(b::DistributedDomainContribution) = 
@@ -74,3 +78,11 @@ function Gridap.FESpaces.assemble_matrix_and_vector!(
   assemble_matrix_and_vector!(A,b,assem,collect_cell_matrix_and_vector(U,V,a(u,v),l(v),uhd))
 end
 
+# PETScNonlinearSolver override
+
+function Gridap.Algebra.solve!(x::T,nls::PETScNonlinearSolver,op::Gridap.Algebra.NonlinearOperator,
+    cache::GridapPETSc.PETScNonlinearSolverCache{<:T}) where T <: AbstractVector
+  @check_error_code GridapPETSc.PETSC.SNESSolve(cache.snes[],C_NULL,cache.x_petsc.vec[])
+  copy!(x,cache.x_petsc)
+  cache
+end
