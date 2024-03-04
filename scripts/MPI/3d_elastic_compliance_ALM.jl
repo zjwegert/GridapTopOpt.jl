@@ -17,7 +17,7 @@ function main(mesh_partition,distribute,el_size)
   ## Parameters
   order = 1
   xmax,ymax,zmax=(2.0,1.0,1.0)
-  prop_Γ_N = 0.4
+  prop_Γ_N = 0.2
   dom = (0,xmax,0,ymax,0,zmax)
   γ = 0.05
   γ_reinit = 0.5
@@ -34,8 +34,8 @@ function main(mesh_partition,distribute,el_size)
   model = CartesianDiscreteModel(ranks,mesh_partition,dom,el_size);
   el_Δ = get_el_Δ(model)
   f_Γ_D(x) = (x[1] ≈ 0.0)
-  f_Γ_N(x) = (x[1] ≈ xmax) && (ymax/2-ymax*prop_Γ_N/4 - eps() <= x[2] <= ymax/2+ymax*prop_Γ_N/4 + eps()) &&
-      (zmax/2-zmax*prop_Γ_N/4 - eps() <= x[3] <= zmax/2+zmax*prop_Γ_N/4 + eps())
+  f_Γ_N(x) = (x[1] ≈ xmax) && (ymax/2-ymax*prop_Γ_N/2 - eps() <= x[2] <= ymax/2+ymax*prop_Γ_N/2 + eps()) &&
+      (zmax/2-zmax*prop_Γ_N/2 - eps() <= x[3] <= zmax/2+zmax*prop_Γ_N/2 + eps())
   update_labels!(1,model,f_Γ_D,"Gamma_D")
   update_labels!(2,model,f_Γ_N,"Gamma_N")
 

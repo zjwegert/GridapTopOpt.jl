@@ -13,7 +13,7 @@ function main()
   ## Parameters
   order = 1
   xmax,ymax=(2.0,1.0)
-  prop_Γ_N = 0.4
+  prop_Γ_N = 0.2
   dom = (0,xmax,0,ymax)
   el_size = (200,200)
   γ = 0.1
@@ -31,8 +31,8 @@ function main()
   model = CartesianDiscreteModel(dom,el_size)
   el_Δ = get_el_Δ(model)
   f_Γ_D(x) = iszero(x[1])
-  f_Γ_N(x) = (x[1] ≈ xmax && ymax/2-ymax*prop_Γ_N/4 - eps() <= x[2] <= 
-    ymax/2+ymax*prop_Γ_N/4 + eps())
+  f_Γ_N(x) = (x[1] ≈ xmax && ymax/2-ymax*prop_Γ_N/2 - eps() <= x[2] <= 
+    ymax/2+ymax*prop_Γ_N/2 + eps())
   update_labels!(1,model,f_Γ_D,"Gamma_D")
   update_labels!(2,model,f_Γ_N,"Gamma_N")
 

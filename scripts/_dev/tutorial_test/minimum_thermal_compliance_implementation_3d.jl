@@ -5,11 +5,11 @@ order = 1                                               # Finite element order
 xmax=ymax=zmax=1.0                                      # Domain size
 dom = (0,xmax,0,ymax,0,zmax)                            # Bounding domain
 el_size = (40,40,40)                                    # Mesh partition size
-prop_Γ_N = 0.4                                          # Γ_N size parameter
+prop_Γ_N = 0.2                                          # Γ_N size parameter
 prop_Γ_D = 0.2                                          # Γ_D size parameter
 f_Γ_N(x) = (x[1] ≈ xmax) &&                             # Γ_N indicator function
-  (ymax/2-ymax*prop_Γ_N/4 - eps() <= x[2] <= ymax/2+ymax*prop_Γ_N/4 + eps()) &&
-  (zmax/2-zmax*prop_Γ_N/4 - eps() <= x[3] <= zmax/2+zmax*prop_Γ_N/4 + eps())
+  (ymax/2-ymax*prop_Γ_N/2 - eps() <= x[2] <= ymax/2+ymax*prop_Γ_N/2 + eps()) &&
+  (zmax/2-zmax*prop_Γ_N/2 - eps() <= x[3] <= zmax/2+zmax*prop_Γ_N/2 + eps())
 f_Γ_D(x) = (x[1] ≈ 0.0) &&                              # Γ_D indicator function
   (x[2] <= ymax*prop_Γ_D + eps() || x[2] >= ymax-ymax*prop_Γ_D - eps()) &&
   (x[3] <= zmax*prop_Γ_D + eps() || x[3] >= zmax-zmax*prop_Γ_D - eps())

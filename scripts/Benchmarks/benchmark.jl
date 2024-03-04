@@ -20,7 +20,7 @@ global NREPS = parse(Int,ARGS[9])
 function nl_elast(mesh_partition,ranks,el_size,order,verbose)
   ## Parameters
   xmax=ymax=zmax=1.0
-  prop_Γ_N = 0.4
+  prop_Γ_N = 0.2
   dom = (0,xmax,0,ymax,0,zmax)
   γ = 0.05
   γ_reinit = 0.5
@@ -34,8 +34,8 @@ function nl_elast(mesh_partition,ranks,el_size,order,verbose)
   model = CartesianDiscreteModel(ranks,mesh_partition,dom,el_size)
   el_Δ = get_el_Δ(model)
   f_Γ_D(x) = (x[1] ≈ 0.0)
-  f_Γ_N(x) = (x[1] ≈ xmax) && (ymax/2-ymax*prop_Γ_N/4 - eps() <= x[2] <= ymax/2+ymax*prop_Γ_N/4 + eps()) &&
-      (zmax/2-zmax*prop_Γ_N/4 - eps() <= x[3] <= zmax/2+zmax*prop_Γ_N/4 + eps())
+  f_Γ_N(x) = (x[1] ≈ xmax) && (ymax/2-ymax*prop_Γ_N/2 - eps() <= x[2] <= ymax/2+ymax*prop_Γ_N/2 + eps()) &&
+      (zmax/2-zmax*prop_Γ_N/2 - eps() <= x[3] <= zmax/2+zmax*prop_Γ_N/2 + eps())
   update_labels!(1,model,f_Γ_D,"Gamma_D")
   update_labels!(2,model,f_Γ_N,"Gamma_N")
 
@@ -128,7 +128,7 @@ end
 function therm(mesh_partition,ranks,el_size,order,verbose)
   ## Parameters
   xmax=ymax=zmax=1.0
-  prop_Γ_N = 0.4
+  prop_Γ_N = 0.2
   prop_Γ_D = 0.2
   dom = (0,xmax,0,ymax,0,zmax)
   γ = 0.05
@@ -144,8 +144,8 @@ function therm(mesh_partition,ranks,el_size,order,verbose)
   el_Δ = get_el_Δ(model)
   f_Γ_D(x) = (x[1] ≈ 0.0) && (x[2] <= ymax*prop_Γ_D + eps() || x[2] >= ymax-ymax*prop_Γ_D - eps()) &&
     (x[3] <= zmax*prop_Γ_D + eps() || x[3] >= zmax-zmax*prop_Γ_D - eps())
-  f_Γ_N(x) = (x[1] ≈ xmax) && (ymax/2-ymax*prop_Γ_N/4 - eps() <= x[2] <= ymax/2+ymax*prop_Γ_N/4 + eps()) &&
-    (zmax/2-zmax*prop_Γ_N/4 - eps() <= x[3] <= zmax/2+zmax*prop_Γ_N/4 + eps())
+  f_Γ_N(x) = (x[1] ≈ xmax) && (ymax/2-ymax*prop_Γ_N/2 - eps() <= x[2] <= ymax/2+ymax*prop_Γ_N/2 + eps()) &&
+    (zmax/2-zmax*prop_Γ_N/2 - eps() <= x[3] <= zmax/2+zmax*prop_Γ_N/2 + eps())
   update_labels!(1,model,f_Γ_D,"Gamma_D")
   update_labels!(2,model,f_Γ_N,"Gamma_N")
 
@@ -211,7 +211,7 @@ end
 function elast(mesh_partition,ranks,el_size,order,verbose)
   ## Parameters
   xmax=ymax=zmax=1.0
-  prop_Γ_N = 0.4
+  prop_Γ_N = 0.2
   dom = (0,xmax,0,ymax,0,zmax)
   γ = 0.05
   γ_reinit = 0.5
@@ -227,8 +227,8 @@ function elast(mesh_partition,ranks,el_size,order,verbose)
   model = CartesianDiscreteModel(ranks,mesh_partition,dom,el_size);
   el_Δ = get_el_Δ(model)
   f_Γ_D(x) = (x[1] ≈ 0.0)
-  f_Γ_N(x) = (x[1] ≈ xmax) && (ymax/2-ymax*prop_Γ_N/4 - eps() <= x[2] <= ymax/2+ymax*prop_Γ_N/4 + eps()) &&
-      (zmax/2-zmax*prop_Γ_N/4 - eps() <= x[3] <= zmax/2+zmax*prop_Γ_N/4 + eps())
+  f_Γ_N(x) = (x[1] ≈ xmax) && (ymax/2-ymax*prop_Γ_N/2 - eps() <= x[2] <= ymax/2+ymax*prop_Γ_N/2 + eps()) &&
+      (zmax/2-zmax*prop_Γ_N/2 - eps() <= x[3] <= zmax/2+zmax*prop_Γ_N/2 + eps())
   update_labels!(1,model,f_Γ_D,"Gamma_D")
   update_labels!(2,model,f_Γ_N,"Gamma_N")
 
