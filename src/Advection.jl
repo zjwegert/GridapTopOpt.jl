@@ -431,7 +431,7 @@ function reinit!(s::AdvectionStencil{O},φ::PVector,γ) where O
   _φ = (O >= 2) ? permute!(perm_caches[1],φ,s.perm) : φ
 
   # Compute approx sign function S
-  vel_tmp = _φ ./ sqrt.(_φ .* _φ .+ prod(Δ))
+  vel_tmp = _φ ./ sqrt.(_φ .* _φ .+ minimum(Δ)^2)
 
   ## CFL Condition (requires γ≤0.5). Note inform(vel_tmp) = 1.0
   Δt = compute_Δt(s.stencil,Δ,γ,_φ,1.0)
@@ -468,7 +468,7 @@ function reinit!(s::AdvectionStencil{O},φ::Vector,γ) where O
   _φ = (O >= 2) ? permute!(perm_caches[1],φ,s.perm) : φ
 
   # Compute approx sign function S
-  vel_tmp .= _φ ./ sqrt.(_φ .* _φ .+ prod(Δ))
+  vel_tmp .= _φ ./ sqrt.(_φ .* _φ .+ minimum(Δ)^2)
 
   ## CFL Condition (requires γ≤0.5)
   Δt = compute_Δt(s.stencil,Δ,γ,_φ,1.0)
