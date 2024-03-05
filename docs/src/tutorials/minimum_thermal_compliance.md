@@ -120,7 +120,7 @@ where we retain an exact triangulation and measure of  ``\Gamma_N`` as this is a
 \begin{aligned}
 C(\varphi)&=\int_D (\rho(\varphi) - V_f)/\operatorname{Vol}(D)~\mathrm{d}\boldsymbol{x}\\
 &=\int_D \rho(\varphi)~\mathrm{d}\boldsymbol{x}/\operatorname{Vol}(D) - V_f\\
-&=\int_\Omega~\mathrm{d}\boldsymbol{x}-V_f = \operatorname{Vol}(\Omega)-V_f
+&=\int_\Omega~\mathrm{d}\boldsymbol{x}/\operatorname{Vol}(D)-V_f = \operatorname{Vol}(\Omega)/\operatorname{Vol}(D)-V_f
 \end{aligned}
 ``` 
 
