@@ -11,7 +11,7 @@ function main()
   γ = 0.1
   γ_reinit = 0.5
   max_steps = floor(Int,minimum(el_size)/10)
-  tol = 1/(order^2*10)*prod(inv,minimum(el_size)) # <- We can do better than this I think
+  tol = 1/(order^2*10)/minimum(el_size) # <- We can do better than this I think
   D = 1
   η_coeff = 2
   α_coeff = 4

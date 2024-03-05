@@ -168,7 +168,7 @@ f_Γ_D(x) = (x[1] ≈ 0.0 &&                               # Γ_D indicator func
 γ = 0.1                                                 # HJ equation time step coefficient
 γ_reinit = 0.5                                          # Reinit. equation time step coefficient
 max_steps = floor(Int,minimum(el_size)/10)              # Max steps for advection
-tol = 1/(10order^2)*prod(inv,minimum(el_size))          # Advection tolerance
+tol = 1/(10order^2)/minimum(el_size)          # Advection tolerance
 # Problem parameters
 κ = 1                                                   # Diffusivity
 g = 1                                                   # Heat flow in
@@ -415,7 +415,7 @@ f_Γ_D(x) = (x[1] ≈ 0.0 &&                               # Γ_D indicator func
 γ = 0.1                                                 # HJ equation time step coefficient
 γ_reinit = 0.5                                          # Reinit. equation time step coefficient
 max_steps = floor(Int,minimum(el_size)/10)              # Max steps for advection
-tol = 1/(10order^2)*prod(inv,minimum(el_size))          # Advection tolerance
+tol = 1/(10order^2)/minimum(el_size)          # Advection tolerance
 # Problem parameters
 κ = 1                                                   # Diffusivity
 g = 1                                                   # Heat flow in
@@ -531,7 +531,7 @@ path = "./results/tut1_3d/"                             # Output path
 Finally, we adjust the finite difference parameters on lines 17-18 to
 ```julia
 max_steps = floor(Int,minimum(el_size)/3)               # Max steps for advection
-tol = 1/(2order^2)*prod(inv,minimum(el_size))           # Advection tolerance
+tol = 1/(2order^2)/minimum(el_size)           # Advection tolerance
 ```
 
 ```@raw html
@@ -558,7 +558,7 @@ f_Γ_D(x) = (x[1] ≈ 0.0) &&                              # Γ_D indicator func
 γ = 0.1                                                 # HJ equation time step coefficient
 γ_reinit = 0.5                                          # Reinit. equation time step coefficient
 max_steps = floor(Int,minimum(el_size)/3)               # Max steps for advection
-tol = 1/(2order^2)*prod(inv,minimum(el_size))           # Advection tolerance
+tol = 1/(2order^2)/minimum(el_size)           # Advection tolerance
 # Problem parameters
 κ = 1                                                   # Diffusivity
 g = 1                                                   # Heat flow in
@@ -695,7 +695,7 @@ function main()
   γ = 0.1                                                 # HJ equation time step coefficient
   γ_reinit = 0.5                                          # Reinit. equation time step coefficient
   max_steps = floor(Int,minimum(el_size)/3)               # Max steps for advection
-  tol = 1/(2order^2)*prod(inv,minimum(el_size))           # Advection tolerance
+  tol = 1/(2order^2)/minimum(el_size)           # Advection tolerance
   # Problem parameters
   κ = 1                                                   # Diffusivity
   g = 1                                                   # Heat flow in
@@ -859,7 +859,7 @@ function main(mesh_partition,distribute)
   γ = 0.1                                                 # HJ equation time step coefficient
   γ_reinit = 0.5                                          # Reinit. equation time step coefficient
   max_steps = floor(Int,minimum(el_size)/3)               # Max steps for advection
-  tol = 1/(2order^2)*prod(inv,minimum(el_size))           # Advection tolerance
+  tol = 1/(2order^2)/minimum(el_size)           # Advection tolerance
   # Problem parameters
   κ = 1                                                   # Diffusivity
   g = 1                                                   # Heat flow in
@@ -1026,7 +1026,7 @@ f_Γ_D(x) = (x[1] ≈ 0.0 &&                               # Γ_D indicator func
 γ = 0.1                                                 # HJ equation time step coefficient
 γ_reinit = 0.5                                          # Reinit. equation time step coefficient
 max_steps = floor(Int,minimum(el_size)/10)              # Max steps for advection
-tol = 1/(10order^2)*prod(inv,minimum(el_size))          # Advection tolerance
+tol = 1/(10order^2)/minimum(el_size)          # Advection tolerance
 # Problem parameters
 κ(u) = exp(-u)                                          # Diffusivity
 g = 1                                                   # Heat flow in

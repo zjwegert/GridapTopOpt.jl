@@ -19,7 +19,7 @@ function main(mesh_partition,distribute)
   γ = 0.1                                                 # HJ equation time step coefficient
   γ_reinit = 0.5                                          # Reinit. equation time step coefficient
   max_steps = floor(Int,minimum(el_size)/3)               # Max steps for advection
-  tol = 1/(2order^2)*prod(inv,minimum(el_size))           # Advection tolerance
+  tol = 1/(2order^2)/minimum(el_size)           # Advection tolerance
   # Problem parameters
   κ = 1                                                   # Diffusivity
   g = 1                                                   # Heat flow in

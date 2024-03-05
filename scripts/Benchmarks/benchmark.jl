@@ -25,7 +25,7 @@ function nl_elast(mesh_partition,ranks,el_size,order,verbose)
   γ = 0.05
   γ_reinit = 0.5
   max_steps = floor(Int,minimum(el_size)/3)
-  tol = 1/(2order^2)*prod(inv,minimum(el_size))
+  tol = 1/(2order^2)/minimum(el_size)
   vf = 0.5
   η_coeff = 2
   α_coeff = 4
@@ -134,7 +134,7 @@ function therm(mesh_partition,ranks,el_size,order,verbose)
   γ = 0.05
   γ_reinit = 0.5
   max_steps = floor(Int,minimum(el_size)/3)
-  tol = 1/(2order^2)*prod(inv,minimum(el_size))
+  tol = 1/(2order^2)/minimum(el_size)
   D = 1
   η_coeff = 2
   α_coeff = 4
@@ -216,7 +216,7 @@ function elast(mesh_partition,ranks,el_size,order,verbose)
   γ = 0.05
   γ_reinit = 0.5
   max_steps = floor(Int,minimum(el_size)/3)
-  tol = 1/(2order^2)*prod(inv,minimum(el_size))
+  tol = 1/(2order^2)/minimum(el_size)
   C = isotropic_elast_tensor(3,1.,0.3)
   g = VectorValue(0,0,-1)
   η_coeff = 2
@@ -300,7 +300,7 @@ function inverter_HPM(mesh_partition,ranks,el_size,order,verbose)
   γ = 0.05
   γ_reinit = 0.5
   max_steps = floor(Int,minimum(el_size)/3)
-  tol = 1/(2order^2)*prod(inv,minimum(el_size))
+  tol = 1/(2order^2)/minimum(el_size)
   C = isotropic_elast_tensor(3,1.0,0.3)
   η_coeff = 2
   α_coeff = 4

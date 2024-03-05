@@ -23,7 +23,7 @@ function main(mesh_partition,distribute,el_size)
   γ = 0.1
   γ_reinit = 0.5
   max_steps = floor(Int,minimum(el_size)/10)
-  tol = 1/(10order^2)*prod(inv,minimum(el_size))
+  tol = 1/(10order^2)/minimum(el_size)
   κ = 1
   η_coeff = 2
   α_coeff = 4

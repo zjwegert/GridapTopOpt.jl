@@ -22,7 +22,7 @@ function main(mesh_partition,distribute)
   γ = 0.1;
   γ_reinit = 0.5;
   max_steps = 1
-  tol = 1/(order^2*10)*prod(inv,minimum(el_size)) # <- change to 1/order^2*prod(...) ?
+  tol = 1/(order^2*10)/minimum(el_size) # <- change to 1/order^2*prod(...) ?
   D = 1;
   η_coeff = 2;
   α_coeff = 4;
