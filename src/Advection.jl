@@ -71,6 +71,11 @@ function reinit!(::FirstOrderStencil{2,T},φ_new,φ,vel,Δt,Δx,isperiodic,cache
   # Prepare shifted lsf
   circshift!(D⁺ʸ,φ,(0,-1)); circshift!(D⁻ʸ,φ,(0,1))
   circshift!(D⁺ˣ,φ,(-1,0)); circshift!(D⁻ˣ,φ,(1,0))
+  # Sign approximation
+  ∇⁺ .= @. (D⁺ʸ - D⁻ʸ)/(2Δy); ~yperiodic ? ∇⁺[:,end] .= zero(T) : 0;
+  ∇⁻ .= @. (D⁺ˣ - D⁻ˣ)/(2Δx); ~xperiodic ? ∇⁻[end,:] .= zero(T) : 0;
+  ϵₛ = maximum((Δx,Δy))
+  vel .= @. φ/sqrt(φ^2 + ϵₛ^2*(∇⁺^2+∇⁻^2))
   # Forward (+) & Backward (-)
   D⁺ʸ .= @. (D⁺ʸ - φ)/Δy; ~yperiodic ? D⁺ʸ[:,end] .= zero(T) : 0;
   D⁺ˣ .= @. (D⁺ˣ - φ)/Δx; ~xperiodic ? D⁺ˣ[end,:] .= zero(T) : 0;
@@ -431,7 +436,7 @@ function reinit!(s::AdvectionStencil{O},φ::PVector,γ) where O
   _φ = (O >= 2) ? permute!(perm_caches[1],φ,s.perm) : φ
 
   # Compute approx sign function S
-  vel_tmp = _φ ./ sqrt.(_φ .* _φ .+ minimum(Δ)^2)
+  vel_tmp = _φ ./ sqrt.(_φ .* _φ .+ (minimum(Δ)/20)^2)
 
   ## CFL Condition (requires γ≤0.5). Note inform(vel_tmp) = 1.0
   Δt = compute_Δt(s.stencil,Δ,γ,_φ,1.0)
@@ -468,7 +473,7 @@ function reinit!(s::AdvectionStencil{O},φ::Vector,γ) where O
   _φ = (O >= 2) ? permute!(perm_caches[1],φ,s.perm) : φ
 
   # Compute approx sign function S
-  vel_tmp .= _φ ./ sqrt.(_φ .* _φ .+ minimum(Δ)^2)
+  vel_tmp .= _φ ./ sqrt.(_φ .* _φ .+ (minimum(Δ)/20)^2)
 
   ## CFL Condition (requires γ≤0.5)
   Δt = compute_Δt(s.stencil,Δ,γ,_φ,1.0)
