@@ -16,7 +16,7 @@ function main()
   γ = 0.1                                         # HJ eqn time step coeff
   γ_reinit = 0.5                                  # Reinit. eqn time step coeff
   max_steps = floor(Int,minimum(el_size)/10)      # Max steps for advection
-  tol = 1/(10order^2)/minimum(el_size)  # Advection tolerance
+  tol = 1/(5order^2)/minimum(el_size)  # Advection tolerance
   # Problem parameters
   κ = 1                                           # Diffusivity
   g = 1                                           # Heat flow in

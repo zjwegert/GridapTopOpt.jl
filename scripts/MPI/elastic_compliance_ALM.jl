@@ -22,13 +22,13 @@ function main(mesh_partition,distribute,el_size)
   γ = 0.1
   γ_reinit = 0.5
   max_steps = floor(Int,minimum(el_size)/10)
-  tol = 1/(10order^2)/minimum(el_size)
+  tol = 1/(5order^2)/minimum(el_size)
   C = isotropic_elast_tensor(2,1.,0.3)
   g = VectorValue(0,-1)
   η_coeff = 2
   α_coeff = 4
   vf = 0.4
-  path = dirname(dirname(@__DIR__))*"/results/elastic_compliance_ALM"
+  path = dirname(dirname(@__DIR__))*"/results/elastic_compliance_ALM_MPI"
   i_am_main(ranks) && mkdir(path)
 
   ## FE Setup
@@ -109,7 +109,7 @@ end
 
 with_mpi() do distribute
   mesh_partition = (2,2)
-  el_size = (100,100)
+  el_size = (200,100)
   hilb_solver_options = "-pc_type gamg -ksp_type cg -ksp_error_if_not_converged true 
     -ksp_converged_reason -ksp_rtol 1.0e-12 -mat_block_size 3
     -mg_levels_ksp_type chebyshev -mg_levels_esteig_ksp_type cg -mg_coarse_sub_pc_type cholesky"

@@ -10,23 +10,23 @@ using Gridap, LevelSetTopOpt
           ⎡u∈V=H¹(Ω;u(Γ_D)=0),
           ⎣∫ κ*∇(u)⋅∇(v) dΩ = ∫ v dΓ_N, ∀v∈V.
 """ 
-function main(n,coef)
-  ## Parameters
+function main()
+  ## Parameters|
   order = 1
   xmax=ymax=1.0
   prop_Γ_N = 0.2
   prop_Γ_D = 0.2
   dom = (0,xmax,0,ymax)
-  el_size = (n,n)
+  el_size = (200,200)
   γ = 0.1
   γ_reinit = 0.5
   max_steps = floor(Int,minimum(el_size)/10)
-  tol = 1/(coef*order^2)/minimum(el_size)
+  tol = 1/(5*order^2)/minimum(el_size)
   κ = 1
   vf = 0.4
   η_coeff = 2
   α_coeff = 4
-  path = dirname(dirname(@__DIR__))*"/results/thermal_compliance_ALM_$(n)_$(coef)"
+  path = dirname(dirname(@__DIR__))*"/results/thermal_compliance_ALM"
   mkdir(path)
 
   ## FE Setup
@@ -72,7 +72,6 @@ function main(n,coef)
 
   ## Finite difference solver and level set function
   stencil = AdvectionStencil(FirstOrderStencil(2,Float64),model,V_φ,tol,max_steps)
-  # reinit!(stencil,φh,γ_reinit)
 
   ## Setup solver and FE operators
   state_map = AffineFEStateMap(a,l,U,V,V_φ,U_reg,φh,dΩ,dΓ_N)
@@ -94,4 +93,4 @@ function main(n,coef)
   write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi)|"=>(norm ∘ ∇(φh)),"uh"=>uh];iter_mod=1)
 end
 
-main(400,10)
+main()

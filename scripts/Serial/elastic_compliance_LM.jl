@@ -15,11 +15,11 @@ function main()
   xmax,ymax=(2.0,1.0)
   prop_Γ_N = 0.2
   dom = (0,xmax,0,ymax)
-  el_size = (200,200)
+  el_size = (200,100)
   γ = 0.1
   γ_reinit = 0.5
   max_steps = floor(Int,minimum(el_size)/10)
-  tol = 1/(10order^2)/minimum(el_size)
+  tol = 1/(5order^2)/minimum(el_size)
   C = isotropic_elast_tensor(2,1.,0.3)
   η_coeff = 2
   α_coeff = 4

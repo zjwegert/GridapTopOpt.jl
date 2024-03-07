@@ -84,14 +84,11 @@ function main(mesh_partition,distribute,el_size)
   l(v,φ,dΩ,dΓ_in,dΓ_out) = ∫(v⋅g)dΓ_in
 
   ## Optimisation functionals
-  β_vol = 1
-  β_UΓ_out = 1
-  
   e₁ = VectorValue(1,0,0)
   J(u,φ,dΩ,dΓ_in,dΓ_out) = ∫((u⋅e₁)/vol_Γ_in)dΓ_in
   Vol(u,φ,dΩ,dΓ_in,dΓ_out) = ∫(((ρ ∘ φ) - vf)/vol_D)dΩ;
-  dVol(q,u,φ,dΩ,dΓ_in,dΓ_out) = ∫(-β_vol/vol_D*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
-  UΓ_out(u,φ,dΩ,dΓ_in,dΓ_out) = ∫(β_UΓ_out*(u⋅-e₁-δₓ)/vol_Γ_out)dΓ_out
+  dVol(q,u,φ,dΩ,dΓ_in,dΓ_out) = ∫(-1/vol_D*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
+  UΓ_out(u,φ,dΩ,dΓ_in,dΓ_out) = ∫((u⋅-e₁-δₓ)/vol_Γ_out)dΓ_out
 
   ## Finite difference solver and level set function
   stencil = AdvectionStencil(FirstOrderStencil(3,Float64),model,V_φ,tol,max_steps)

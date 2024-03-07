@@ -87,7 +87,7 @@ function main_alt(mesh_partition,distribute,el_size,gz)
   prop_Γ_N = 0.8;
   γ_reinit = 0.5
   max_steps = floor(Int,minimum(el_size)/3)
-  tol = 1/(10order^2)/minimum(el_size)
+  tol = 1/(5order^2)/minimum(el_size)
   path = dirname(dirname(@__DIR__))*"/results/testing_hyper_elast"
   i_am_main(ranks) && ~isdir(path) && mkdir(path)
 

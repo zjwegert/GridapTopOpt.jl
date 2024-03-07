@@ -13,7 +13,7 @@ function main()
   γ = 0.05
   γ_reinit = 0.5
   max_steps = floor(Int,minimum(el_size)/10)
-  tol = 1/(10order^2)/minimum(el_size)
+  tol = 1/(5order^2)/minimum(el_size)
   η_coeff = 2
   α_coeff = 4
   vf = 0.6

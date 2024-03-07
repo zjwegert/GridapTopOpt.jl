@@ -23,12 +23,12 @@ function main(mesh_partition,distribute,el_size)
   γ = 0.1
   γ_reinit = 0.5
   max_steps = floor(Int,minimum(el_size)/10)
-  tol = 1/(10order^2)/minimum(el_size)
+  tol = 1/(5order^2)/minimum(el_size)
   κ = 1
   η_coeff = 2
   α_coeff = 4
   vf = 0.4
-  path = dirname(dirname(@__DIR__))*"/results/thermal_compliance_ALM_PETSc"
+  path = dirname(dirname(@__DIR__))*"/results/thermal_compliance_ALM_MPI+PETSc"
   i_am_main(ranks) && mkdir(path)
 
   ## FE Setup
@@ -108,7 +108,7 @@ function main(mesh_partition,distribute,el_size)
 end
 
 with_mpi() do distribute
-  mesh_partition = (2,3)
+  mesh_partition = (2,2)
   el_size = (400,400)
   solver_options = "-pc_type gamg -ksp_type cg -ksp_error_if_not_converged true 
     -ksp_converged_reason -ksp_rtol 1.0e-12"

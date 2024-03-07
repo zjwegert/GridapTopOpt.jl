@@ -13,7 +13,7 @@ function main()
   γ = 0.1
   γ_reinit = 0.5
   max_steps = floor(Int,minimum(el_size)/10)
-  tol = 1/(10order^2)/minimum(el_size)
+  tol = 1/(5order^2)/minimum(el_size)
   η_coeff = 2
   α_coeff = 4
   vf = 0.4
@@ -118,7 +118,7 @@ function main_LE_comparison()
   γ = 0.1
   γ_reinit = 0.5
   max_steps = floor(Int,minimum(el_size)/10)
-  tol = 1/(10order^2)/minimum(el_size)
+  tol = 1/(5order^2)/minimum(el_size)
   C = isotropic_elast_tensor(2,1000,0.3)
   η_coeff = 2
   α_coeff = 4

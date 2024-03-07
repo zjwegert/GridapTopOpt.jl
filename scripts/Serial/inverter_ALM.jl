@@ -22,7 +22,7 @@ function main()
   γ = 0.1
   γ_reinit = 0.5
   max_steps = floor(Int,minimum(el_size)/10)
-  tol = 1/(10order^2)/minimum(el_size)
+  tol = 1/(5order^2)/minimum(el_size)
   C = isotropic_elast_tensor(2,1.0,0.3)
   η_coeff = 2
   α_coeff = 4
@@ -30,7 +30,7 @@ function main()
   δₓ = 0.2
   ks = 0.1
   g = VectorValue(0.5,0)
-  path = dirname(dirname(@__DIR__))*"/results/inverter_ALM_alt"
+  path = dirname(dirname(@__DIR__))*"/results/inverter_ALM"
   mkdir(path)
   
   ## FE Setup
@@ -78,14 +78,11 @@ function main()
   l(v,φ,dΩ,dΓ_in,dΓ_out) = ∫(v⋅g)dΓ_in
 
   ## Optimisation functionals
-  β_vol = 0.1
-  β_UΓ_out = 10
-
   e₁ = VectorValue(1,0)
   J(u,φ,dΩ,dΓ_in,dΓ_out) = ∫((u⋅e₁)/vol_Γ_in)dΓ_in
   Vol(u,φ,dΩ,dΓ_in,dΓ_out) = ∫(((ρ ∘ φ) - vf)/vol_D)dΩ
-  dVol(q,u,φ,dΩ,dΓ_in,dΓ_out) = ∫(-β_vol/vol_D*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
-  UΓ_out(u,φ,dΩ,dΓ_in,dΓ_out) = ∫(β_UΓ_out*(u⋅-e₁-δₓ)/vol_Γ_out)dΓ_out
+  dVol(q,u,φ,dΩ,dΓ_in,dΓ_out) = ∫(-1/vol_D*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
+  UΓ_out(u,φ,dΩ,dΓ_in,dΓ_out) = ∫((u⋅-e₁-δₓ)/vol_Γ_out)dΓ_out
 
   ## Finite difference solver and level set function
   stencil = AdvectionStencil(FirstOrderStencil(2,Float64),model,V_φ,tol,max_steps)
