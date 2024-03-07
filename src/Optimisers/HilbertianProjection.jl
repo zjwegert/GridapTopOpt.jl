@@ -226,7 +226,7 @@ struct HilbertianProjection{T,N} <: Optimiser
     vel_ext :: VelocityExtension,
     φ0;
     orthog = HPModifiedGramSchmidt(),
-    λ=0.5, α_min=0.1, α_max=1.0, γ=0.1, γ_reinit=0.5,
+    λ=0.5, α_min=0.1, α_max=1.0, γ=0.1, γ_reinit=0.5, reinit_mod = 1,
     ls_enabled = true, ls_max_iters = 10, ls_δ_inc = 1.1, ls_δ_dec = 0.7,
     ls_ξ = 0.0025, ls_ξ_reduce_coef = 0.1, ls_ξ_reduce_abs_tol = 0.01,
     ls_γ_min = 0.001, ls_γ_max = 0.1,
@@ -242,7 +242,7 @@ struct HilbertianProjection{T,N} <: Optimiser
     history = OptimiserHistory(Float64,al_keys,al_bundles,maxiter,verbose)
 
     projector = HilbertianProjectionMap(N,orthog,vel_ext;λ,α_min,α_max,debug)
-    params = (;debug,γ,γ_reinit,ls_enabled,ls_max_iters,ls_δ_inc,ls_δ_dec,ls_ξ,
+    params = (;debug,γ,γ_reinit,reinit_mod,ls_enabled,ls_max_iters,ls_δ_inc,ls_δ_dec,ls_ξ,
                ls_ξ_reduce_coef,ls_ξ_reduce_abs_tol,ls_γ_min,ls_γ_max,os_γ_mult)
     T = typeof(orthog)
     new{T,N}(problem,stencil,vel_ext,projector,history,converged,
@@ -338,6 +338,7 @@ function Base.iterate(m::HilbertianProjection,state)
   interpolate!(FEFunction(U_reg,θ),vel,V_φ)
   
   ls_enabled = params.ls_enabled
+  reinit_mod = params.reinit_mod
   ls_max_iters,δ_inc,δ_dec = params.ls_max_iters,params.ls_δ_inc,params.ls_δ_dec
   ξ, ξ_reduce, ξ_reduce_tol = params.ls_ξ, params.ls_ξ_reduce_coef, params.ls_ξ_reduce_abs_tol
   γ_min, γ_max = params.ls_γ_min,params.ls_γ_max
@@ -347,7 +348,7 @@ function Base.iterate(m::HilbertianProjection,state)
   while !done && (ls_it <= ls_max_iters)
     # Advect  & Reinitialise
     advect!(m.stencil,φ,vel,γ)
-    reinit!(m.stencil,φ,params.γ_reinit)
+    iszero(it % reinit_mod) && reinit!(m.stencil,φ,params.γ_reinit)
 
     ~ls_enabled && break
 

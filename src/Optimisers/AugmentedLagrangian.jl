@@ -59,9 +59,10 @@ struct AugmentedLagrangian{N,O} <: Optimiser
 
   - `γ = 0.1`: Initial coeffient on the time step size for solving the Hamilton-Jacobi evolution equation.
   - `γ_reinit = 0.5`: Coeffient on the time step size for solving the reinitisation equation.
-  - `ζ = 1.1`: Increase multiplier on Λ every `update_mod` iterations
+  - `ζ = 1.1`: Increase multiplier on Λ every `update_mod` iterations.
   - `Λ_max = 5.0`: Maximum value on any entry in Λ.
-  - `update_mod = 5`: Number of iterations before increasing `Λ` 
+  - `update_mod = 5`: Number of iterations before increasing `Λ`.
+  - `reinit_mod = 1`: How often we solve reinitialisation equation.
   - `maxiter = 1000`: Maximum number of algorithm iterations.
   - `verbose=false`: Verbosity flag.
   - `constraint_names = map(i -> Symbol("C_\$i"),1:N)`: Constraint names for history output.
@@ -78,8 +79,8 @@ struct AugmentedLagrangian{N,O} <: Optimiser
     stencil :: AdvectionStencil{O},
     vel_ext :: VelocityExtension,
     φ0;
-    Λ_max = 5.0, ζ = 1.1, update_mod = 5, γ = 0.1, γ_reinit = 0.5, os_γ_mult = 0.75,
-    maxiter = 1000, verbose=false, constraint_names = map(i -> Symbol("C_$i"),1:N),
+    Λ_max = 5.0, ζ = 1.1, update_mod = 5, reinit_mod = 1, γ = 0.1, γ_reinit = 0.5, 
+    os_γ_mult = 0.75, maxiter = 1000, verbose=false, constraint_names = map(i -> Symbol("C_$i"),1:N),
     converged::Function = default_al_converged, debug = false,
     has_oscillations::Function = default_has_oscillations,
     initial_parameters::Function = default_al_init_params
@@ -92,7 +93,7 @@ struct AugmentedLagrangian{N,O} <: Optimiser
     al_bundles = Dict(:C => constraint_names, :λ => λ_names, :Λ => Λ_names)
     history = OptimiserHistory(Float64,al_keys,al_bundles,maxiter,verbose)
 
-    params = (;Λ_max,ζ,update_mod,γ,γ_reinit,os_γ_mult,debug,initial_parameters)
+    params = (;Λ_max,ζ,update_mod,reinit_mod,γ,γ_reinit,os_γ_mult,debug,initial_parameters)
     new{N,O}(problem,stencil,vel_ext,history,converged,has_oscillations,params,φ0)
   end
 end
@@ -174,8 +175,8 @@ end
 function Base.iterate(m::AugmentedLagrangian,state)
   it, L, J, C, dL, dJ, dC, uh, φh, vel, λ, Λ, γ, os_it = state
   params, history = m.params, m.history
-  update_mod, ζ, Λ_max, γ_reinit, os_γ_mult = params.update_mod, params.ζ, 
-    params.Λ_max, params.γ_reinit, params.os_γ_mult
+  update_mod, reinit_mod, ζ, Λ_max, γ_reinit, os_γ_mult = params.update_mod, 
+    params.reinit_mod, params.ζ, params.Λ_max, params.γ_reinit, params.os_γ_mult
 
   if finished(m)
     return nothing
@@ -192,7 +193,7 @@ function Base.iterate(m::AugmentedLagrangian,state)
   V_φ = get_aux_space(m.problem.state_map)
   interpolate!(FEFunction(U_reg,dL),vel,V_φ)
   advect!(m.stencil,φh,vel,γ)
-  reinit!(m.stencil,φh,γ_reinit)
+  iszero(it % reinit_mod) && reinit!(m.stencil,φh,γ_reinit)
 
   ## Calculate objective, constraints, and shape derivatives
   J, C, dJ, dC = evaluate!(m.problem,φh)
