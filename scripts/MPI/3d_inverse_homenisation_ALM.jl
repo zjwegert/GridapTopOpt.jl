@@ -18,10 +18,10 @@ function main(mesh_partition,distribute,el_size)
   order = 1
   xmax,ymax,zmax=(1.0,1.0,1.0)
   dom = (0,xmax,0,ymax,0,zmax)
-  γ = 0.05
+  γ = 0.1
   γ_reinit = 0.5
-  max_steps = floor(Int,minimum(el_size)/3)
-  tol = 1/(2order^2)/minimum(el_size)
+  max_steps = floor(Int,minimum(el_size)/10)
+  tol = 1/(5order^2)/minimum(el_size)
   C = isotropic_elast_tensor(3,1.,0.3)
   η_coeff = 2
   α_coeff = 4

@@ -75,7 +75,7 @@ function main(mesh_partition,distribute)
 
   ## Setup solver and FE operators
   state_map = AffineFEStateMap(a,l,U,V,V_φ,U_reg,φh,dΩ,dΓ_N)
-  pcfs = PDEConstrainedFunctionals(J,[Vol],state_map,analytic_dJ=dJ)
+  pcfs = PDEConstrainedFunctionals(J,[Vol],state_map,analytic_dJ=dJ,analytic_dC=[dVol])
 
   ## Hilbertian extension-regularisation problems
   α = α_coeff*maximum(el_Δ)
@@ -94,5 +94,5 @@ function main(mesh_partition,distribute)
 end
 
 with_mpi() do distribute
-  main((2,3),distribute)
+  main((2,2),distribute)
 end

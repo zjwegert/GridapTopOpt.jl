@@ -3,7 +3,7 @@
 #PBS -N 3d_inverse_homenisation_ALM
 
 #PBS -l select=125:ncpus=1:mpiprocs=1:ompthreads=1:mem=8GB:cputype=6140
-#PBS -l walltime=200:00:00
+#PBS -l walltime=50:00:00
 #PBS -j oe
 
 source $HOME/hpc-environments-main/lyra/load-ompi.sh

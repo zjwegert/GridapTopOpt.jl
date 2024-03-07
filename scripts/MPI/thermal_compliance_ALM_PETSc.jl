@@ -85,7 +85,7 @@ function main(mesh_partition,distribute,el_size)
     assem_deriv = SparseMatrixAssembler(Tm,Tv,U_reg,U_reg),
     ls = solver,adjoint_ls = solver
   )
-  pcfs = PDEConstrainedFunctionals(J,[Vol],state_map,analytic_dJ=dJ)
+  pcfs = PDEConstrainedFunctionals(J,[Vol],state_map,analytic_dJ=dJ,analytic_dC=[dVol])
 
   ## Hilbertian extension-regularisation problems
   α = α_coeff*maximum(el_Δ)
