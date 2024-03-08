@@ -1,5 +1,5 @@
 """
-    struct SmoothErsatzMaterialInterpolation{M<:AbstractFloat}
+    struct SmoothErsatzMaterialInterpolation{M<:Vector{<:Number},N<:Vector{<:Number}}
 
 A wrapper holding parameters and methods for interpolating an 
 integrand across a single boundary ``\\partial\\Omega``.
@@ -10,20 +10,29 @@ function ``\\varphi`` and ``I`` is an indicator function.
 # Properties
 
 - `η::M`: the interpolation or smoothing radius across ∂Ω
-- `ϵₘ::M`: the ersatz material density
+- `ϵ::M`: the ersatz material density
 - `H`: a smoothed Heaviside function
 - `DH`: the derivative of `H`
 - `I`: an indicator function
 - `ρ`: a function describing the volume density of ``\\Omega`` 
   (e.g., ``\\mathrm{Vol}(\\Omega) = \\int \\rho(\\varphi))~\\mathrm{d}D)``
+
+# Note
+- We store η and ϵ as length-one vectors so that updating these values propagates through H, DH, etc.
+- To update η and/or ϵ in an instance `m`, take `m.η .= <VALUE>`. 
+- A conviencence constructor is provided to create an instance given `η<:Number` and `ϵ<:Number`.
 """
-Base.@kwdef struct SmoothErsatzMaterialInterpolation{M<:AbstractFloat}
+Base.@kwdef struct SmoothErsatzMaterialInterpolation{M<:Vector{<:Number},N<:Vector{<:Number}}
   η::M
-  ϵₘ::M = 10^-3
-  H = x -> H_η(x,η)
-  DH = x -> DH_η(x,η)
-  I = φ -> (1 - H(φ)) + ϵₘ*H(φ)
+  ϵ::N
+  H = x -> H_η(x,first(η))
+  DH = x -> DH_η(x,first(η))
+  I = φ -> (1 - H(φ)) + first(ϵ)*H(φ)
   ρ = φ -> 1 - H(φ)
+end
+
+function SmoothErsatzMaterialInterpolation(;η::M,ϵ::N=10^-3) where {M<:Number,N<:Number}
+  return SmoothErsatzMaterialInterpolation{Vector{M},Vector{N}}(η=[η],ϵ=[ϵ])
 end
 
 function H_η(t,η)
