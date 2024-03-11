@@ -13,7 +13,7 @@ function main(mesh_partition,distribute)
   f_Γ_N(x) = (x[1] ≈ xmax &&                      # Γ_N indicator function
     ymax/2-ymax*prop_Γ_N/2 - eps() <= x[2] <= ymax/2+ymax*prop_Γ_N/2 + eps())
   f_Γ_D(x) = (x[1] ≈ 0.0 &&                       # Γ_D indicator function
-    (x[2] <= ymax*prop_Γ_D + eps() || x[2] >= ymax-ymax*prop_Γ_D - eps())) # @$\lvert\lvert$@
+    (x[2] <= ymax*prop_Γ_D + eps() || x[2] >= ymax-ymax*prop_Γ_D - eps()))
   # FD parameters
   γ = 0.1                                         # HJ eqn time step coeff
   γ_reinit = 0.5                                  # Reinit. eqn time step coeff
@@ -25,7 +25,7 @@ function main(mesh_partition,distribute)
   vf = 0.4                                        # Volume fraction constraint
   lsf_func = initial_lsf(4,0.2)                   # Initial level set function
   iter_mod = 10                                   # VTK Output modulo
-  path = "./results/tut1_MPI_PETSc_rtol12/"              # Output path
+  path = "./results/tut1_MPI_PETSc/"              # Output path
   i_am_main(ranks) && mkpath(path)                # Create path
   # Model
   model = CartesianDiscreteModel(ranks,mesh_partition,dom,el_size);
@@ -86,7 +86,7 @@ function main(mesh_partition,distribute)
   for (it,uh,φh) in optimiser
     data = ["φ"=>φh,"H(φ)"=>(H ∘ φh),"|∇(φ)|"=>(norm ∘ ∇(φh)),"uh"=>uh]
     iszero(it % iter_mod) && (writevtk(Ω,path*"out$it",cellfields=data);GC.gc())
-    write_history(path*"/history.txt",get_history(optimiser))
+    write_history(path*"/history.txt",get_history(optimiser);ranks)
   end
   # Final structure
   it = get_history(optimiser).niter; uh = get_state(pcfs)
