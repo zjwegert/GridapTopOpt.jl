@@ -7,7 +7,7 @@ function main(mesh_partition,distribute)
   order = 1                                       # Finite element order
   xmax = ymax = 1.0                               # Domain size
   dom = (0,xmax,0,ymax)                           # Bounding domain
-  el_size = (400,400)                             # Mesh partition size
+  el_size = (200,200)                             # Mesh partition size
   prop_Γ_N = 0.2                                  # Γ_N size parameter
   prop_Γ_D = 0.2                                  # Γ_D size parameter
   f_Γ_N(x) = (x[1] ≈ xmax &&                      # Γ_N indicator function
@@ -84,14 +84,14 @@ function main(mesh_partition,distribute)
     γ,γ_reinit,verbose=i_am_main(ranks),constraint_names=[:Vol])
   # Solve
   for (it,uh,φh) in optimiser
-    data = ["φ"=>φh,"H(φ)"=>(H ∘ φh),"|nabla(φ)|"=>(norm ∘ ∇(φh)),"uh"=>uh]
+    data = ["φ"=>φh,"H(φ)"=>(H ∘ φh),"|∇(φ)|"=>(norm ∘ ∇(φh)),"uh"=>uh]
     iszero(it % iter_mod) && (writevtk(Ω,path*"out$it",cellfields=data);GC.gc())
-    write_history(path*"/history.txt",get_history(optimiser);ranks)
+    write_history(path*"/history.txt",get_history(optimiser))
   end
   # Final structure
   it = get_history(optimiser).niter; uh = get_state(pcfs)
   writevtk(Ω,path*"out$it",cellfields=["φ"=>φh,
-    "H(φ)"=>(H ∘ φh),"|nabla(φ)|"=>(norm ∘ ∇(φh)),"uh"=>uh])
+    "H(φ)"=>(H ∘ φh),"|∇(φ)|"=>(norm ∘ ∇(φh)),"uh"=>uh])
 end
 
 with_mpi() do distribute
