@@ -49,7 +49,7 @@ function main(mesh_partition,distribute,el_size)
   U_reg = TrialFESpace(V_reg)
 
   ## Create FE functions
-  lsf_fn(x) cos(2π*x[1]) + cos(2π*x[2]) + cos(2π*x[3])
+  lsf_fn(x) = cos(2π*x[1]) + cos(2π*x[2]) + cos(2π*x[3])
   φh = interpolate(lsf_fn,V_φ)
 
   ## Interpolation and weak form
