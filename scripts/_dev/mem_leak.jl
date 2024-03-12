@@ -4,7 +4,7 @@ using Gridap, LevelSetTopOpt
 order = 1                                               # Finite element order
 xmax=ymax=zmax=1.0                                      # Domain size
 dom = (0,xmax,0,ymax,0,zmax)                            # Bounding domain
-el_size = (40,40,40)                                    # Mesh partition size
+el_size = (10,10,10)                                    # Mesh partition size
 prop_Γ_N = 0.4                                          # Γ_N size parameter
 prop_Γ_D = 0.2                                          # Γ_D size parameter
 f_Γ_N(x) = (x[1] ≈ xmax) &&                             # Γ_N indicator function
@@ -17,7 +17,7 @@ f_Γ_D(x) = (x[1] ≈ 0.0) &&                              # Γ_D indicator func
 γ = 0.1                                                 # HJ equation time step coefficient
 γ_reinit = 0.5                                          # Reinit. equation time step coefficient
 max_steps = floor(Int,minimum(el_size)/3)               # Max steps for advection
-tol = 1/(2order^2)*prod(inv,minimum(el_size))           # Advection tolerance
+tol = 1/(2*order^2)*prod(inv,minimum(el_size))           # Advection tolerance
 # Problem parameters
 κ = 1                                                   # Diffusivity
 g = 1                                                   # Heat flow in
