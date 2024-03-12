@@ -32,6 +32,8 @@ using GridapSolvers.SolverInterfaces: SolverVerboseLevel, SOLVER_VERBOSE_NONE, S
 
 using JLD2: save_object, load_object
 
+import Base: +
+
 include("GridapExtensions.jl")
 
 include("ChainRules.jl")
