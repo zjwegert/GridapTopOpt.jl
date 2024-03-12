@@ -68,13 +68,13 @@ as `name`.
 
 Note: `f_Γ` must recieve a Vector and return a Boolean depending on whether it indicates Γ
 """
-function update_labels!(e::Int,model::CartesianDiscreteModel,f_Γ::Function,name::String)
+function update_labels!(e::Integer,model::CartesianDiscreteModel,f_Γ::Function,name::String)
   mask = mark_nodes(f_Γ,model)
   _update_labels_locally!(e,model,mask,name)
   nothing
 end
 
-function update_labels!(e::Int,model::DistributedDiscreteModel,f_Γ::Function,name::String)
+function update_labels!(e::Integer,model::DistributedDiscreteModel,f_Γ::Function,name::String)
   mask = mark_nodes(f_Γ,model)
   cell_to_entity = map(local_views(model),local_views(mask)) do model,mask
     _update_labels_locally!(e,model,mask,name)

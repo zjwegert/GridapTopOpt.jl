@@ -24,6 +24,7 @@ PartitionedArrays = "5a9dfac6-5c52-46f7-8278-5e2210713be9"
 Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
 SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 SparseMatricesCSR = "a0a7dd2c-ebf4-11e9-1f05-cf50bc540ca1"
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [extras]
 MPIPreferences = "3da0fdf6-3ccc-4f1b-acd9-58baa6c99267"
