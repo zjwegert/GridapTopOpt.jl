@@ -12,11 +12,15 @@ PROJECT_DIR=$HOME/LevelSetTopOpt/
 
 julia --project=$PROJECT_DIR -e "using Pkg; Pkg.precompile()"
 
-mpirun --hostfile $PBS_NODEFILE julia --project=$PROJECT_DIR --check-bounds no -O3 --compiled-modules=no \
-    $PROJECT_DIR/scripts/MPI/3d_thermal_compliance_ALM.jl \
-    150 \
-    150 \
-    150 \
-    5 \
-    5 \
-    5
+mpirun --hostfile $PBS_NODEFILE \
+ julia --project=$PROJECT_DIR --check-bounds no -O3 --compiled-modules=no \
+  $PROJECT_DIR/scripts/MPI/3d_thermal_compliance_ALM.jl
+
+# mpirun --hostfile $PBS_NODEFILE julia --project=$PROJECT_DIR --check-bounds no -O3 --compiled-modules=no \
+#     $PROJECT_DIR/scripts/MPI/3d_thermal_compliance_ALM.jl \
+#     150 \
+#     150 \
+#     150 \
+#     5 \
+#     5 \
+#     5
