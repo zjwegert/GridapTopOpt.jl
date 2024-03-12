@@ -86,3 +86,10 @@ function Gridap.Algebra.solve!(x::T,nls::PETScNonlinearSolver,op::Gridap.Algebra
   copy!(x,cache.x_petsc)
   cache
 end
+
+# Stuff from ODE refactor 
+
+function (+)(a::Gridap.CellData.DomainContribution,b::GridapDistributed.DistributedDomainContribution)
+  @assert iszero(Gridap.CellData.num_domains(a))
+  return b
+end
