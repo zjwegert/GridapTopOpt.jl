@@ -1,4 +1,4 @@
-using Gridap, GridapDistributed, GridapPETSc, PartitionedArrays, LSTO_Distributed
+using Gridap, GridapDistributed, GridapPETSc, PartitionedArrays, LevelSetTopOpt
 
 """
   (Serial) Inverter mechanism with augmented Lagrangian method in 2D.
@@ -99,14 +99,14 @@ function main()
     print_history(it,["J"=>Ji,"C"=>Ci,"L"=>Li,"λ"=>λi,"Λ"=>Λi])
     write_history(history,path*"/history.csv")
     # uhi = get_state(pcfs)
-    # write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh)),"uh"=>uhi];iter_mod=1)
+    # write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi)|"=>(norm ∘ ∇(φh)),"uh"=>uhi];iter_mod=1)
   end
   it,Ji,Ci,Li = last(optimiser.history)
   λi = optimiser.λ; Λi = optimiser.Λ
   print_history(it,["J"=>Ji,"C"=>Ci,"L"=>Li,"λ"=>λi,"Λ"=>Λi])
   write_history(optimiser.history,path*"/history.csv")
   uhi = get_state(pcfs)
-  write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh)),"uh"=>uhi];iter_mod=1)
+  write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi)|"=>(norm ∘ ∇(φh)),"uh"=>uhi];iter_mod=1)
 end
 
 main();

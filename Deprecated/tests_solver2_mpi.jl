@@ -12,7 +12,7 @@ import GridapDistributed.DistributedDiscreteModel
 import GridapDistributed.DistributedMeasure
 import GridapDistributed.DistributedTriangulation
 
-using LSTO_Distributed
+using LevelSetTopOpt
 
 function isotropic_3d(E::M,nu::M) where M<:AbstractFloat
     λ = E*nu/((1+nu)*(1-2nu)); μ = E/(2*(1+nu))

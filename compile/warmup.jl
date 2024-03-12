@@ -1,4 +1,4 @@
-using Gridap, GridapDistributed, GridapPETSc, PartitionedArrays, LSTO_Distributed
+using Gridap, GridapDistributed, GridapPETSc, PartitionedArrays, LevelSetTopOpt
 
 """
   (MPI) Minimum thermal compliance with Lagrangian method in 2D.
@@ -15,14 +15,14 @@ function main(mesh_partition,distribute)
   ## Parameters
   order = 1;
   xmax=ymax=1.0
-  prop_Γ_N = 0.4;
+  prop_Γ_N = 0.2;
   prop_Γ_D = 0.2
   dom = (0,xmax,0,ymax);
   el_size = (30,30);
   γ = 0.1;
   γ_reinit = 0.5;
   max_steps = 1
-  tol = 1/(order^2*10)*prod(inv,minimum(el_size)) # <- change to 1/order^2*prod(...) ?
+  tol = 1/(order^2*10)/minimum(el_size) # <- change to 1/order^2*prod(...) ?
   D = 1;
   η_coeff = 2;
   α_coeff = 4;
@@ -30,11 +30,11 @@ function main(mesh_partition,distribute)
 
   ## FE Setup
   model = CartesianDiscreteModel(ranks,mesh_partition,dom,el_size);
-  Δ = get_Δ(model)
+  Δ = get_el_size(model)
   f_Γ_D(x) = (x[1] ≈ 0.0 && (x[2] <= ymax*prop_Γ_D + eps() ||
     x[2] >= ymax-ymax*prop_Γ_D - eps())) ? true : false;
-  f_Γ_N(x) = (x[1] ≈ xmax && ymax/2-ymax*prop_Γ_N/4 - eps() <= x[2] <=
-    ymax/2+ymax*prop_Γ_N/4 + eps()) ? true : false;
+  f_Γ_N(x) = (x[1] ≈ xmax && ymax/2-ymax*prop_Γ_N/2 - eps() <= x[2] <=
+    ymax/2+ymax*prop_Γ_N/2 + eps()) ? true : false;
   update_labels!(1,model,f_Γ_D,"Gamma_D")
   update_labels!(2,model,f_Γ_N,"Gamma_N")
 
@@ -53,7 +53,7 @@ function main(mesh_partition,distribute)
   U_reg = TrialFESpace(V_reg,0)
 
   ## Create FE functions
-  φh = interpolate(gen_lsf(4,0.2),V_φ);
+  φh = interpolate(initial_lsf(4,0.2),V_φ);
   φ = get_free_dof_values(φh)
 
   ## Interpolation and weak form
@@ -83,7 +83,7 @@ function main(mesh_partition,distribute)
   vel_ext = VelocityExtension(a_hilb,U_reg,V_reg)
 
   ## Optimiser
-  _conv_cond = t->LSTO_Distributed.conv_cond(t;coef=1/50);
+  _conv_cond = t->LevelSetTopOpt.conv_cond(t;coef=1/50);
   optimiser = AugmentedLagrangian(φ,pcfs,stencil,vel_ext,interp,el_size,γ,γ_reinit,conv_criterion=_conv_cond);
   for history in optimiser
     it,Ji,_,_ = last(history)

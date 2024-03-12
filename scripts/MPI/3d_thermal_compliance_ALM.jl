@@ -1,7 +1,14 @@
 using Gridap, Gridap.MultiField, GridapDistributed, GridapPETSc, GridapSolvers, 
-  PartitionedArrays, LSTO_Distributed, SparseMatricesCSR
+  PartitionedArrays, LevelSetTopOpt, SparseMatricesCSR
 
 using GridapSolvers: NewtonSolver
+
+global elx = parse(Int,ARGS[1])
+global ely = parse(Int,ARGS[2])
+global elz = parse(Int,ARGS[3])
+global Px = parse(Int,ARGS[4])
+global Py = parse(Int,ARGS[5])
+global Pz = parse(Int,ARGS[6])
 
 """
   (MPI) Minimum thermal compliance with augmented Lagrangian method in 3D.
@@ -13,32 +20,33 @@ using GridapSolvers: NewtonSolver
           ⎡u∈V=H¹(Ω;u(Γ_D)=0),
           ⎣∫ κ*∇(u)⋅∇(v) dΩ = ∫ v dΓ_N, ∀v∈V.
 """
-function main(mesh_partition,distribute,el_size)
+function main(mesh_partition,distribute,el_size,coef,step)
   ranks = distribute(LinearIndices((prod(mesh_partition),)))
 
   ## Parameters
   order = 1
   xmax=ymax=zmax=1.0
-  prop_Γ_N = 0.4
+  prop_Γ_N = 0.2
   prop_Γ_D = 0.2
   dom = (0,xmax,0,ymax,0,zmax)
   γ = 0.1
   γ_reinit = 0.5
-  max_steps = floor(Int,minimum(el_size)/3)
-  tol = 1/(2order^2)*prod(inv,minimum(el_size))
+  max_steps = floor(Int,minimum(el_size)/step)
+  tol = 1/(coef*order^2)/minimum(el_size)
   κ = 1
   η_coeff = 2
   α_coeff = 4
   vf = 0.4
-  path = dirname(dirname(@__DIR__))*"/results/3d_thermal_compliance_ALM"
+  path = dirname(dirname(@__DIR__))*"/results/3d_thermal_compliance_ALM_Nx$(el_size[1])_Coef$(coef)_Step$(step)"
+  i_am_main(ranks) && mkdir(path)
 
   ## FE Setup
   model = CartesianDiscreteModel(ranks,mesh_partition,dom,el_size);
-  Δ = get_Δ(model)
+  el_Δ = get_el_Δ(model)
   f_Γ_D(x) = (x[1] ≈ 0.0) && (x[2] <= ymax*prop_Γ_D + eps() || x[2] >= ymax-ymax*prop_Γ_D - eps()) &&
     (x[3] <= zmax*prop_Γ_D + eps() || x[3] >= zmax-zmax*prop_Γ_D - eps())
-  f_Γ_N(x) = (x[1] ≈ xmax) && (ymax/2-ymax*prop_Γ_N/4 - eps() <= x[2] <= ymax/2+ymax*prop_Γ_N/4 + eps()) &&
-    (zmax/2-zmax*prop_Γ_N/4 - eps() <= x[3] <= zmax/2+zmax*prop_Γ_N/4 + eps())
+  f_Γ_N(x) = (x[1] ≈ xmax) && (ymax/2-ymax*prop_Γ_N/2 - eps() <= x[2] <= ymax/2+ymax*prop_Γ_N/2 + eps()) &&
+    (zmax/2-zmax*prop_Γ_N/2 - eps() <= x[3] <= zmax/2+zmax*prop_Γ_N/2 + eps())
   update_labels!(1,model,f_Γ_D,"Gamma_D")
   update_labels!(2,model,f_Γ_N,"Gamma_N")
 
@@ -58,10 +66,10 @@ function main(mesh_partition,distribute,el_size)
   U_reg = TrialFESpace(V_reg,0)
 
   ## Create FE functions
-  φh = interpolate(gen_lsf(4,0.2),V_φ);
+  φh = interpolate(initial_lsf(4,0.2),V_φ);
 
   ## Interpolation and weak form
-  interp = SmoothErsatzMaterialInterpolation(η = η_coeff*maximum(Δ))
+  interp = SmoothErsatzMaterialInterpolation(η = η_coeff*maximum(el_Δ))
   I,H,DH,ρ = interp.I,interp.H,interp.DH,interp.ρ
 
   a(u,v,φ,dΩ,dΓ_N) = ∫((I ∘ φ)*κ*∇(u)⋅∇(v))dΩ
@@ -69,9 +77,9 @@ function main(mesh_partition,distribute,el_size)
 
   ## Optimisation functionals
   J(u,φ,dΩ,dΓ_N) = ∫((I ∘ φ)*κ*∇(u)⋅∇(u))dΩ
-  dJ(q,u,φ,dΩ,dΓ_N) = ∫((-κ*∇(u)⋅∇(u))*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
+  dJ(q,u,φ,dΩ,dΓ_N) = ∫((κ*∇(u)⋅∇(u))*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
   Vol(u,φ,dΩ,dΓ_N) = ∫(((ρ ∘ φ) - vf)/vol_D)dΩ
-  dVol(q,u,φ,dΩ,dΓ_N) = ∫(1/vol_D*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
+  dVol(q,u,φ,dΩ,dΓ_N) = ∫(-1/vol_D*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
 
   ## Finite difference solver and level set function
   stencil = AdvectionStencil(FirstOrderStencil(3,Float64),model,V_φ,tol,max_steps)
@@ -91,7 +99,7 @@ function main(mesh_partition,distribute,el_size)
   pcfs = PDEConstrainedFunctionals(J,[Vol],state_map,analytic_dJ=dJ,analytic_dC=[dVol])
 
   ## Hilbertian extension-regularisation problems
-  α = α_coeff*maximum(Δ)
+  α = α_coeff*maximum(el_Δ)
   a_hilb(p,q) = ∫(α^2*∇(p)⋅∇(q) + p*q)dΩ;
   vel_ext = VelocityExtension(
     a_hilb, U_reg, V_reg;
@@ -100,24 +108,30 @@ function main(mesh_partition,distribute,el_size)
   )
 
   ## Optimiser
-  make_dir(path;ranks=ranks)
   optimiser = AugmentedLagrangian(pcfs,stencil,vel_ext,φh;
     γ,γ_reinit,verbose=i_am_main(ranks),constraint_names=[:Vol])
   for (it, uh, φh) in optimiser
-    write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh)),"uh"=>uh])
+    write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi)|"=>(norm ∘ ∇(φh)),"uh"=>uh])
     write_history(path*"/history.txt",optimiser.history;ranks=ranks)
   end
-  it = optimiser.history.niter; uh = get_state(optimiser.problem)
-  write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh)),"uh"=>uh];iter_mod=1)
+  it = get_history(optimiser).niter; uh = get_state(pcfs)
+  write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi)|"=>(norm ∘ ∇(φh)),"uh"=>uh];iter_mod=1)
 end
 
 with_mpi() do distribute
-  mesh_partition = (5,5,5)
-  el_size = (150,150,150)
+  mesh_partition = (Px,Py,Pz)
+  el_size = (elx,ely,elz)
   all_solver_options = "-pc_type gamg -ksp_type cg -ksp_error_if_not_converged true 
     -ksp_converged_reason -ksp_rtol 1.0e-12"
   
   GridapPETSc.with(args=split(all_solver_options)) do
-    main(mesh_partition,distribute,el_size)
+    main(mesh_partition,distribute,el_size,5,10)
+    main(mesh_partition,distribute,el_size,2,10)
+
+    main(mesh_partition,distribute,el_size,5,5)
+    main(mesh_partition,distribute,el_size,2,5)
+
+    main(mesh_partition,distribute,el_size,5,3)
+    main(mesh_partition,distribute,el_size,2,3)
   end
 end;

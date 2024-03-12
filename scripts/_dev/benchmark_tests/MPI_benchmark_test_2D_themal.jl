@@ -1,4 +1,4 @@
-using Gridap, GridapDistributed, GridapPETSc, PartitionedArrays, LSTO_Distributed
+using Gridap, GridapDistributed, GridapPETSc, PartitionedArrays, LevelSetTopOpt
 
 """
 (MPI) Minimum thermal compliance with Lagrangian method in 2D.
@@ -13,22 +13,22 @@ function main(mesh_partition,el_size,ranks)
   ## Parameters
   order = 1
   xmax=ymax=1.0
-  prop_Γ_N = 0.4
+  prop_Γ_N = 0.2
   prop_Γ_D = 0.2
   dom = (0,xmax,0,ymax)
   γ = 0.1
   γ_reinit = 0.5
   max_steps = floor(Int,minimum(el_size)/10)
-  tol = 1/(order^2*10)*prod(inv,minimum(el_size))
+  tol = 1/(order^2*10)/minimum(el_size)
   D = 1
   η_coeff = 2
   α_coeff = 4
 
   ## FE Setup
   model = CartesianDiscreteModel(ranks,mesh_partition,dom,el_size);
-  Δ = get_Δ(model)
+  el_Δ = get_el_Δ(model)
   f_Γ_D(x) = (x[1] ≈ 0.0) && ((x[2] <= ymax*prop_Γ_D + eps()) || (x[2] >= ymax-ymax*prop_Γ_D - eps()))
-  f_Γ_N(x) = (x[1] ≈ xmax) && (ymax/2-ymax*prop_Γ_N/4 - eps() <= x[2] <= ymax/2+ymax*prop_Γ_N/4 + eps())
+  f_Γ_N(x) = (x[1] ≈ xmax) && (ymax/2-ymax*prop_Γ_N/2 - eps() <= x[2] <= ymax/2+ymax*prop_Γ_N/2 + eps())
   update_labels!(1,model,f_Γ_D,"Gamma_D")
   update_labels!(2,model,f_Γ_N,"Gamma_N")
 
@@ -47,10 +47,10 @@ function main(mesh_partition,el_size,ranks)
   U_reg = TrialFESpace(V_reg,0)
 
   ## Create FE functions
-  φh = interpolate(gen_lsf(4,0.2),V_φ)
+  φh = interpolate(initial_lsf(4,0.2),V_φ)
 
   ## Interpolation and weak form
-  interp = SmoothErsatzMaterialInterpolation(η = η_coeff*maximum(Δ))
+  interp = SmoothErsatzMaterialInterpolation(η = η_coeff*maximum(el_Δ))
   I,H,DH,ρ = interp.I,interp.H,interp.DH,interp.ρ
 
   a(u,v,φ,dΩ,dΓ_N) = ∫((I ∘ φ)*D*∇(u)⋅∇(v))dΩ
@@ -59,7 +59,7 @@ function main(mesh_partition,el_size,ranks)
   ## Optimisation functionals
   ξ = 0.3
   J(u,φ,dΩ,dΓ_N) = ∫((I ∘ φ)*D*∇(u)⋅∇(u) + ξ*(ρ ∘ φ))dΩ
-  dJ(q,u,φ,dΩ,dΓ_N) = ∫((ξ-D*∇(u)⋅∇(u))*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ;
+  dJ(q,u,φ,dΩ,dΓ_N) = ∫((-ξ+D*∇(u)⋅∇(u))*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ;
 
   ## Finite difference solver and level set function
   stencil = AdvectionStencil(FirstOrderStencil(2,Float64),model,V_φ,tol,max_steps)
@@ -70,7 +70,7 @@ function main(mesh_partition,el_size,ranks)
   pcfs = PDEConstrainedFunctionals(J,state_map,analytic_dJ=dJ)
 
   ## Hilbertian extension-regularisation problems
-  α = α_coeff*maximum(Δ)
+  α = α_coeff*maximum(el_Δ)
   a_hilb(p,q) =∫(α^2*∇(p)⋅∇(q) + p*q)dΩ;
   vel_ext = VelocityExtension(a_hilb,U_reg,V_reg)
 
@@ -88,8 +88,8 @@ with_debug() do distribute
   ## Benchmark forward problem
   bfwd = benchmark_forward_problem(opt.problem.state_map, opt.φ0, ranks)
   ## Benchmark advection
-  v = get_free_dof_values(interpolate(FEFunction(LSTO_Distributed.get_deriv_space(opt.problem.state_map),
-    opt.problem.dJ),LSTO_Distributed.get_aux_space(opt.problem.state_map)))
+  v = get_free_dof_values(interpolate(FEFunction(LevelSetTopOpt.get_deriv_space(opt.problem.state_map),
+    opt.problem.dJ),LevelSetTopOpt.get_aux_space(opt.problem.state_map)))
   badv = benchmark_advection(opt.stencil, get_free_dof_values(opt.φ0), v, 0.1, ranks)
   ## Benchmark reinitialisation
   brinit = benchmark_reinitialisation(opt.stencil, get_free_dof_values(opt.φ0), 0.1, ranks)

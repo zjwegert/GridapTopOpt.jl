@@ -1,0 +1,70 @@
+name: CI_MPI
+on: [push, pull_request]
+jobs:
+  test:
+    name: Julia ${{ matrix.version }} - ${{ matrix.os }} - ${{ matrix.arch }} - ${{ github.event_name }}
+    runs-on: ${{ matrix.os }}
+    env:
+      P4EST_ROOT_DIR: "/opt/p4est/2.2/"
+      JULIA_PETSC_LIBRARY: "/opt/petsc/3.18/lib/libpetsc"
+    strategy:
+      fail-fast: false
+      matrix:
+        version:
+          - '1.9'
+        os:
+          - ubuntu-latest
+        arch:
+          - x64
+    steps:
+      - uses: actions/checkout@v2
+      - name: Cache p4est
+        id: cache-p4est
+        uses: actions/cache@v2
+        with:
+         path: ${{env.P4EST_ROOT_DIR}}
+         key: ${{ runner.os }}-build-${{ env.P4EST_ROOT_DIR }}-
+         restore-keys: |
+           ${{ runner.os }}-build-${{ env.P4EST_ROOT_DIR }}-
+           ${{ runner.os }}-build-
+           ${{ runner.os }}-
+      - uses: julia-actions/setup-julia@v1
+        with:
+          version: ${{ matrix.version }}
+          arch: ${{ matrix.arch }}
+      - name: Install p4est/petsc dependencies
+        run: |
+          sudo apt-get update 
+          sudo apt-get install -y wget gfortran g++ openmpi-bin libopenmpi-dev 
+      - name: Install petsc
+        run: |
+          CURR_DIR=$(pwd)
+          PACKAGE=petsc
+          VERSION=3.18
+          INSTALL_ROOT=/opt
+          PETSC_INSTALL=$INSTALL_ROOT/$PACKAGE/$VERSION
+          TAR_FILE=$PACKAGE-$VERSION.tar.gz
+          URL="https://ftp.mcs.anl.gov/pub/petsc/release-snapshots/"
+          ROOT_DIR=/tmp
+          SOURCES_DIR=$ROOT_DIR/$PACKAGE-$VERSION
+          BUILD_DIR=$SOURCES_DIR/build
+          wget -q $URL/$TAR_FILE -O $ROOT_DIR/$TAR_FILE
+          mkdir -p $SOURCES_DIR
+          tar xzf $ROOT_DIR/$TAR_FILE -C $SOURCES_DIR --strip-components=1
+          cd $SOURCES_DIR
+          ./configure --prefix=$PETSC_INSTALL --with-cc=mpicc --with-cxx=mpicxx --with-fc=mpif90 \
+             --download-mumps --download-scalapack --download-parmetis --download-metis \
+             --download-ptscotch --with-debugging --with-x=0 --with-shared=1 \
+             --with-mpi=1 --with-64-bit-indices
+          make
+          make install
+      - uses: julia-actions/julia-buildpkg@latest
+      - run: echo $PWD
+      - run: julia --project=. -e 'using Pkg; Pkg.instantiate();'
+      - run: julia --project=. -e 'using Pkg; Pkg.add("MPIPreferences")'
+      - run: julia --project=. -e 'using MPIPreferences; MPIPreferences.use_system_binary()'
+      - run: julia --project=. -e 'using Pkg; Pkg.build(); Pkg.precompile()'
+      - run: julia --project=. --color=yes --check-bounds=yes test/mpi/runtests.jl
+      - uses: codecov/codecov-action@v1
+        with:
+          file: lcov.info

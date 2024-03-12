@@ -1,57 +1,55 @@
 """
-  abstract type Stencil end
+    abstract type Stencil
 
 Finite difference stencil for a single step of the Hamilton-Jacobi 
- evolution equation (Eqn. 1) and reinitialisation equation (Eqn. 2).
+evolution equation and reinitialisation equation.
 
-Equation 1:
- ∂ϕ/∂t + V|∇ϕ| = 0 for x∈D, t>0
-  with ϕ(0,x) = ϕ₀ for x∈D.
-Equation 2:
- ∂ϕ/∂t + Sign(ϕ₀)(|∇ϕ|-1) = 0 for x∈D, t>0
-  with ϕ(0,x) = ϕ₀ for x∈D.
+Your own stencil can be implemented by extending the methods below.
 """
 abstract type Stencil end
 
 """
+    allocate_caches(::Stencil,φ,vel)
 
+Allocate caches for a given `Stencil`.
 """
 function allocate_caches(::Stencil,φ,vel)
   nothing # By default, no caches are required.
 end
 
 """
-  reinit!(::Stencil,φ_new,φ,vel,Δt,Δx,isperiodic,caches) -> φ
+    reinit!(::Stencil,φ_new,φ,vel,Δt,Δx,isperiodic,caches) -> φ
 
-Single finite difference step of the reinitialisation equation:
- ∂ϕ/∂t + Sign(ϕ₀)(|∇ϕ|-1) = 0 for x∈D, t>0
-  with ϕ(0,x) = ϕ₀ for x∈D.
+Single finite difference step of the reinitialisation equation for a given `Stencil`.
 """
 function reinit!(::Stencil,φ_new,φ,vel,Δt,Δx,isperiodic,caches)
   @abstractmethod
 end
 
 """
-  advect!(::Stencil,φ_new,φ,vel,Δt,Δx,isperiodic,caches) -> φ
+    advect!(::Stencil,φ,vel,Δt,Δx,isperiodic,caches) -> φ
 
-Single finite difference step of the HJ evoluation equation:
- ∂ϕ/∂t + V|∇ϕ| = 0 for x∈D, t>0
-  with ϕ(0,x) = ϕ₀ for x∈D.
+Single finite difference step of the Hamilton-Jacobi evoluation equation for a given
+`Stencil`. 
 """
-function advect!(::Stencil,φ,vel,Δt,Δx,caches)
+function advect!(::Stencil,φ,vel,Δt,Δx,isperiodic,caches)
   @abstractmethod
 end
 
+"""
+    compute_Δt(::Stencil,φ,vel)
+
+Compute the time step for the `Stencil`.
+"""
 function compute_Δt(::Stencil,φ,vel)
   @abstractmethod
 end
 
-# First order stencil
 """
-  struct FirstOrderStencil{D,T} <: Stencil end
+    struct FirstOrderStencil{D,T} <: Stencil end
 
-Godunov upwind difference scheme per Osher and Fedkiw
- (10.1007/b98879)
+A first order Godunov upwind difference scheme based on Osher and Fedkiw 
+([link](https://doi.org/10.1007/b98879)).
 """
 struct FirstOrderStencil{D,T} <: Stencil
   function FirstOrderStencil(D::Integer,::Type{T}) where T<:Real
@@ -73,6 +71,11 @@ function reinit!(::FirstOrderStencil{2,T},φ_new,φ,vel,Δt,Δx,isperiodic,cache
   # Prepare shifted lsf
   circshift!(D⁺ʸ,φ,(0,-1)); circshift!(D⁻ʸ,φ,(0,1))
   circshift!(D⁺ˣ,φ,(-1,0)); circshift!(D⁻ˣ,φ,(1,0))
+  # Sign approximation
+  ∇⁺ .= @. (D⁺ʸ - D⁻ʸ)/(2Δy); ~yperiodic ? ∇⁺[:,[1,end]] .= zero(T) : 0;
+  ∇⁻ .= @. (D⁺ˣ - D⁻ˣ)/(2Δx); ~xperiodic ? ∇⁻[[1,end],:] .= zero(T) : 0;
+  ϵₛ = maximum((Δx,Δy))
+  vel .= @. φ/sqrt(φ^2 + ϵₛ^2*(∇⁺^2+∇⁻^2))
   # Forward (+) & Backward (-)
   D⁺ʸ .= @. (D⁺ʸ - φ)/Δy; ~yperiodic ? D⁺ʸ[:,end] .= zero(T) : 0;
   D⁺ˣ .= @. (D⁺ˣ - φ)/Δx; ~xperiodic ? D⁺ˣ[end,:] .= zero(T) : 0;
@@ -121,6 +124,13 @@ function reinit!(::FirstOrderStencil{3,T},φ_new,φ,vel,Δt,Δx,isperiodic,cache
   circshift!(D⁺ʸ,φ,(0,-1,0)); circshift!(D⁻ʸ,φ,(0,1,0))
   circshift!(D⁺ˣ,φ,(-1,0,0)); circshift!(D⁻ˣ,φ,(1,0,0))
   circshift!(D⁺ᶻ,φ,(0,0,-1)); circshift!(D⁻ᶻ,φ,(0,0,1))
+  # Sign approximation
+  ∇⁺ .= @. (D⁺ʸ - D⁻ʸ)/(2Δy); ~yperiodic ? ∇⁺[:,[1,end],:] .= zero(T) : 0;
+  ∇⁻ .= @. (D⁺ˣ - D⁻ˣ)/(2Δx); ~xperiodic ? ∇⁻[[1,end],:,:] .= zero(T) : 0;
+  ∇⁺ .= @. ∇⁺^2+∇⁻^2 # |∇φ|² (partially computed)
+  ∇⁻ .= @. (D⁺ᶻ - D⁻ᶻ)/(2Δz); ~xperiodic ? ∇⁻[:,:,[1,end]] .= zero(T) : 0;
+  ϵₛ = maximum((Δx,Δy))
+  vel .= @. φ/sqrt(φ^2 + ϵₛ^2*(∇⁺+∇⁻^2))
   # Forward (+) & Backward (-)
   D⁺ʸ .= (D⁺ʸ - φ)/Δy; ~yperiodic ? D⁺ʸ[:,end,:] .= zero(T) : 0;
   D⁺ˣ .= (D⁺ˣ - φ)/Δx; ~xperiodic ? D⁺ˣ[end,:,:] .= zero(T) : 0;
@@ -165,10 +175,21 @@ function compute_Δt(::FirstOrderStencil{D,T},Δ,γ,φ,vel) where {D,T}
 end
 
 """
-  struct AdvectionStencil{O} end
+    struct AdvectionStencil{O}
 
-Wrapper around Stencil and other structs to enable
- finite differences on arbitrary order finite elements. 
+Wrapper to enable finite differencing to solve the 
+Hamilton-Jacobi evolution equation and reinitialisation equation 
+on order `O` finite elements in serial or parallel.
+
+# Parameters
+
+- `stencil::Stencil`: Finite difference stencil for a single step HJ 
+  equation and reinitialisation equation.
+- `model`: A `CartesianDiscreteModel`.
+- `space`: FE space for level-set function
+- `perm`: A permutation vector
+- `params`: Tuple of additional params
+- `cache`: Stencil cache
 """
 struct AdvectionStencil{O}
   stencil :: Stencil
@@ -179,6 +200,13 @@ struct AdvectionStencil{O}
   cache
 end
 
+"""
+    AdvectionStencil(stencil::Stencil,model,space,tol,max_steps,max_steps_reinit)
+
+Create an instance of `AdvectionStencil` given a stencil, model, FE space, and 
+additional optional arguments. This automatically creates the DoF permutation
+to handle high-order finite elements. 
+"""
 function AdvectionStencil(
   stencil::Stencil,
   model,
@@ -223,15 +251,8 @@ end
 
 Gridap.ReferenceFEs.get_order(f::Gridap.Fields.LinearCombinationFieldVector) = get_order(f.fields)
 
-"""
-  create_dof_permutation(
-    model::CartesianDiscreteModel{Dc},
-    space::UnconstrainedFESpace,
-    order::Integer) where Dc -> n2o_dof_map
-
-Create dof permutation vector to enable finite differences on
- higher order Lagrangian finite elements on a Cartesian mesh.  
-"""
+# Create dof permutation vector to enable finite differences on 
+#  higher order Lagrangian finite elements on a Cartesian mesh.  
 function create_dof_permutation(model::CartesianDiscreteModel{Dc},
                                 space::UnconstrainedFESpace,
                                 order::Integer) where Dc
@@ -334,6 +355,23 @@ function advect!(s::AdvectionStencil,φh,args...)
   advect!(s,get_free_dof_values(φh),args...)
 end
 
+"""
+    advect!(s::AdvectionStencil{O},φ,vel,γ) where O
+
+Solve the Hamilton-Jacobi evolution equation using the `AdvectionStencil`.
+
+# Hamilton-Jacobi evolution equation
+``\\frac{\\partial\\phi}{\\partial t} + V(\\boldsymbol{x})\\lVert\\boldsymbol{\\nabla}\\phi\\rVert = 0,``
+
+with ``\\phi(0,\\boldsymbol{x})=\\phi_0(\\boldsymbol{x})`` and ``\\boldsymbol{x}\\in D,~t\\in(0,T)``.
+
+# Arguments
+
+- `s::AdvectionStencil{O}`: Stencil for computation
+- `φ`: level set function as a vector of degrees of freedom
+- `vel`: the normal velocity as a vector of degrees of freedom
+- `γ`: coeffient on the time step size.
+"""
 function advect!(s::AdvectionStencil{O},φ::PVector,vel::PVector,γ) where O
   _, _, perm_caches, stencil_cache = s.cache
   Δ, isperiodic,  = s.params.Δ, s.params.isperiodic
@@ -381,15 +419,28 @@ function reinit!(s::AdvectionStencil,φh,args...)
   reinit!(s,get_free_dof_values(φh),args...)
 end
 
+"""
+    reinit!(s::AdvectionStencil{O},φ,γ) where O
+
+Solve the reinitialisation equation using the `AdvectionStencil`.
+
+# Reinitialisation equation
+``\\frac{\\partial\\phi}{\\partial t} + \\mathrm{sign}(\\phi_0)(\\lVert\\boldsymbol{\\nabla}\\phi\\rVert-1) = 0,``
+
+with ``\\phi(0,\\boldsymbol{x})=\\phi_0(\\boldsymbol{x})`` and ``\\boldsymbol{x}\\in D,~t\\in(0,T)``.
+
+# Arguments
+
+- `s::AdvectionStencil{O}`: Stencil for computation
+- `φ`: level set function as a vector of degrees of freedom
+- `γ`: coeffient on the time step size.
+"""
 function reinit!(s::AdvectionStencil{O},φ::PVector,γ) where O
   φ_tmp, vel_tmp, perm_caches, stencil_cache = s.cache
   Δ, isperiodic, ndof  = s.params.Δ, s.params.isperiodic, s.params.ndof
   tol, max_steps = s.params.tol, s.params.max_steps_reinit
 
   _φ = (O >= 2) ? permute!(perm_caches[1],φ,s.perm) : φ
-
-  # Compute approx sign function S
-  vel_tmp = _φ ./ sqrt.(_φ .* _φ .+ prod(Δ))
 
   ## CFL Condition (requires γ≤0.5). Note inform(vel_tmp) = 1.0
   Δt = compute_Δt(s.stencil,Δ,γ,_φ,1.0)
@@ -425,9 +476,6 @@ function reinit!(s::AdvectionStencil{O},φ::Vector,γ) where O
 
   _φ = (O >= 2) ? permute!(perm_caches[1],φ,s.perm) : φ
 
-  # Compute approx sign function S
-  vel_tmp .= _φ ./ sqrt.(_φ .* _φ .+ prod(Δ))
-
   ## CFL Condition (requires γ≤0.5)
   Δt = compute_Δt(s.stencil,Δ,γ,_φ,1.0)
 
@@ -441,8 +489,8 @@ function reinit!(s::AdvectionStencil{O},φ::Vector,γ) where O
     reinit!(s.stencil,φ_tmp_mat,φ_mat,vel_tmp_mat,Δt,Δ,isperiodic,stencil_cache)
 
     # Compute error
-    _φ .-= φ_tmp # φ - φ_tmp
-    err = maximum(abs,_φ) # Ghosts not needed yet: partial maximums computed using owned values only. 
+    _φ .-= φ_tmp
+    err = maximum(abs,_φ)
     step += 1
 
     # Update φ

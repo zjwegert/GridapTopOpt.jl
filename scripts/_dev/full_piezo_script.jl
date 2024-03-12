@@ -5,7 +5,7 @@ using GridapPETSc: PetscScalar, PetscInt, PETSC,  @check_error_code
 using PartitionedArrays
 using SparseMatricesCSR
 using ChainRulesCore
-using LSTO_Distributed
+using LevelSetTopOpt
 
 using GridapSolvers
 using Gridap.MultiField
@@ -20,8 +20,8 @@ function main(mesh_partition,distribute,el_size)
   γ = 0.05
   γ_reinit = 0.5
   max_steps = floor(Int,minimum(el_size)/3)
-  tol = 1/(2order^2)*prod(inv,minimum(el_size))
-  C = isotropic_3d(1.,0.3)
+  tol = 1/(2order^2)/minimum(el_size)
+  C = isotropic_elast_tensor(3,1.,0.3)
   η_coeff = 2
   α_coeff = 4
   vf = 0.5
@@ -29,7 +29,7 @@ function main(mesh_partition,distribute,el_size)
 
   ## FE Setup
   model = CartesianDiscreteModel(ranks,mesh_partition,dom,el_size,isperiodic=(true,true,true))
-  Δ = get_Δ(model)
+  el_Δ = get_el_Δ(model)
   f_Γ_D(x) = iszero(x)
   update_labels!(1,model,f_Γ_D,"origin")
 
@@ -55,7 +55,7 @@ function main(mesh_partition,distribute,el_size)
   φh = interpolate(lsf_fn,V_φ)
 
   ## Interpolation and weak form
-  interp = SmoothErsatzMaterialInterpolation(η = η_coeff*maximum(Δ))
+  interp = SmoothErsatzMaterialInterpolation(η = η_coeff*maximum(el_Δ))
   I,H,DH,ρ = interp.I,interp.H,interp.DH,interp.ρ
 
   ## Material tensors
@@ -116,7 +116,7 @@ function main(mesh_partition,distribute,el_size)
   J, C, dJ, dC = Gridap.evaluate!(pcfs,φh)
 
   # ## Hilbertian extension-regularisation problems
-  # α = α_coeff*maximum(Δ)
+  # α = α_coeff*maximum(el_Δ)
   # a_hilb(p,q) = ∫(α^2*∇(p)⋅∇(q) + p*q)dΩ;
   # vel_ext = VelocityExtension(
   #   a_hilb,U_reg,V_reg,
@@ -128,11 +128,11 @@ function main(mesh_partition,distribute,el_size)
   # make_dir(path;ranks=ranks)
   # optimiser = AugmentedLagrangian(pcfs,stencil,vel_ext,φh;γ,γ_reinit,verbose=i_am_main(ranks))
   # for (it, uh, φh) in optimiser
-  #   write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh)),"uh"=>uh])
+  #   write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi)|"=>(norm ∘ ∇(φh)),"uh"=>uh])
   #   write_history(path*"/history.txt",optimiser.history;ranks=ranks)
   # end
   # it = optimiser.history.niter; uh = get_state(optimiser.problem)
-  # write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh)),"uh"=>uh];iter_mod=1)
+  # write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi)|"=>(norm ∘ ∇(φh)),"uh"=>uh];iter_mod=1)
 end;
 
 with_mpi() do distribute

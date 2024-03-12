@@ -1,5 +1,5 @@
 using Gridap, Gridap.MultiField, GridapDistributed, GridapPETSc, GridapSolvers, 
-  PartitionedArrays, LSTO_Distributed, SparseMatricesCSR
+  PartitionedArrays, LevelSetTopOpt, SparseMatricesCSR
 
 """
   (MPI) Maximum bulk modulus inverse homogenisation with augmented Lagrangian method in 3D.
@@ -18,19 +18,20 @@ function main(mesh_partition,distribute,el_size)
   order = 1
   xmax,ymax,zmax=(1.0,1.0,1.0)
   dom = (0,xmax,0,ymax,0,zmax)
-  γ = 0.05
+  γ = 0.1
   γ_reinit = 0.5
-  max_steps = floor(Int,minimum(el_size)/3)
-  tol = 1/(2order^2)*prod(inv,minimum(el_size))
-  C = isotropic_3d(1.,0.3)
+  max_steps = floor(Int,minimum(el_size)/10)
+  tol = 1/(5order^2)/minimum(el_size)
+  C = isotropic_elast_tensor(3,1.,0.3)
   η_coeff = 2
   α_coeff = 4
   vf = 0.5
   path = dirname(dirname(@__DIR__))*"/results/3d_inverse_homenisation_ALM"
+  i_am_main(ranks) && mkdir(path)
 
   ## FE Setup
   model = CartesianDiscreteModel(ranks,mesh_partition,dom,el_size,isperiodic=(true,true,true))
-  Δ = get_Δ(model)
+  el_Δ = get_el_Δ(model)
   f_Γ_D(x) = iszero(x)
   update_labels!(1,model,f_Γ_D,"origin")
 
@@ -48,11 +49,11 @@ function main(mesh_partition,distribute,el_size)
   U_reg = TrialFESpace(V_reg)
 
   ## Create FE functions
-  lsf_fn(x) cos(2π*x[1]) + cos(2π*x[2]) + cos(2π*x[3])
+  lsf_fn(x) = cos(2π*x[1]) + cos(2π*x[2]) + cos(2π*x[3])
   φh = interpolate(lsf_fn,V_φ)
 
   ## Interpolation and weak form
-  interp = SmoothErsatzMaterialInterpolation(η = η_coeff*maximum(Δ))
+  interp = SmoothErsatzMaterialInterpolation(η = η_coeff*maximum(el_Δ))
   I,H,DH,ρ = interp.I,interp.H,interp.DH,interp.ρ
 
   εᴹ = (TensorValue(1.,0.,0.,0.,0.,0.,0.,0.,0.),           # ϵᵢⱼ⁽¹¹⁾≡ϵᵢⱼ⁽¹⁾
@@ -75,9 +76,9 @@ function main(mesh_partition,distribute,el_size)
                 2(_C(C,ε(u[1])+εᴹ[1],ε(u[2])+εᴹ[2]) + _C(C,ε(u[1])+εᴹ[1],ε(u[3])+εᴹ[3]) + _C(C,ε(u[2])+εᴹ[2],ε(u[3])+εᴹ[3])))/9 
 
   J(u,φ,dΩ) = ∫(-(I ∘ φ)*_K(C,u,εᴹ))dΩ
-  dJ(q,u,φ,dΩ) = ∫(-_v_K(C,u,εᴹ)*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
+  dJ(q,u,φ,dΩ) = ∫(_v_K(C,u,εᴹ)*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
   Vol(u,φ,dΩ) = ∫(((ρ ∘ φ) - vf)/vol_D)dΩ;
-  dVol(q,u,φ,dΩ) = ∫(1/vol_D*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
+  dVol(q,u,φ,dΩ) = ∫(-1/vol_D*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
 
   ## Finite difference solver and level set function
   stencil = AdvectionStencil(FirstOrderStencil(3,Float64),model,V_φ,tol,max_steps)
@@ -97,7 +98,7 @@ function main(mesh_partition,distribute,el_size)
   pcfs = PDEConstrainedFunctionals(J,[Vol],state_map;analytic_dJ=dJ,analytic_dC=[dVol])
 
   ## Hilbertian extension-regularisation problems
-  α = α_coeff*maximum(Δ)
+  α = α_coeff*maximum(el_Δ)
   a_hilb(p,q) = ∫(α^2*∇(p)⋅∇(q) + p*q)dΩ;
   vel_ext = VelocityExtension(
     a_hilb,U_reg,V_reg,
@@ -106,15 +107,14 @@ function main(mesh_partition,distribute,el_size)
   )
   
   ## Optimiser
-  make_dir(path;ranks=ranks)
   optimiser = AugmentedLagrangian(pcfs,stencil,vel_ext,φh;
     γ,γ_reinit,verbose=i_am_main(ranks),constraint_names=[:Vol])
   for (it, uh, φh) in optimiser
-    write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh))])
+    write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi)|"=>(norm ∘ ∇(φh))])
     write_history(path*"/history.txt",optimiser.history;ranks=ranks)
   end
-  it = optimiser.history.niter; uh = get_state(optimiser.problem)
-  write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh))];iter_mod=1)
+  it = get_history(optimiser).niter; uh = get_state(pcfs)
+  write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi)|"=>(norm ∘ ∇(φh))];iter_mod=1)
 end
 
 with_mpi() do distribute

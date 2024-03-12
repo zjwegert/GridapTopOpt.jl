@@ -30,7 +30,7 @@ Base.@kwdef struct SmoothErsatzMaterialInterpolation{M<:AbstractFloat}
 end
 
 write_vtk(Ω,path,φh,uh,H) = writevtk(Ω,path,cellfields=["phi"=>φh,
-    "H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh)),"uh"=>uh])
+    "H(phi)"=>(H ∘ φh),"|nabla(phi)|"=>(norm ∘ ∇(φh)),"uh"=>uh])
 
 # Update layout of ghost nodes to match columns of stiffness matrix
 function correct_ghost_layout(xh::DistributedCellField,cols)

@@ -1,7 +1,6 @@
-# LSTO_Distributed.jl
+# LevelSetTopOpt.jl
+Welcome to the documentation for LevelSetTopOpt.jl!
 
-Documentation for LSTO_Distributed.jl
+# What
 
-```@autodocs
-Modules = [LSTO_Distributed,]
-```
+# Why

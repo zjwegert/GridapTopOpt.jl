@@ -123,31 +123,117 @@ function compute_α(C,dC_orthog,dC,normsq,K,P,λ,α_min,α_max)
   return α, ∑α², debug_flag
 end
 
-# Optimiser
 """
-  struct HilbertianProjection{T,N} <: Optimiser end
+    struct HilbertianProjection{T,N} <: Optimiser
+
+A Hilbertian projection method as described by Wegert et al., 2023 
+([link](https://doi.org/10.1007/s00158-023-03663-0)).
+
+# Parameters
+
+- `problem::PDEConstrainedFunctionals{N}`: The objective and constraint setup.
+- `stencil::AdvectionStencil{O}`: The finite difference stencil for 
+  solving the evolution and reinitisation equations.
+- `vel_ext::VelocityExtension`: The velocity-extension method for extending 
+  shape sensitivities onto the computational domain.
+- `projector::HilbertianProjectionMap`: Sensitivity information projector
+- `history::OptimiserHistory{Float64}`: Historical information for optimisation problem.
+- `converged::Function`: A function to check optimiser convergence. 
+- `has_oscillations::Function`: A function to check for oscillations.
+- `params::NamedTuple`: Optimisation parameters.
 """
 struct HilbertianProjection{T,N} <: Optimiser
-  problem   :: PDEConstrainedFunctionals{N}
-  stencil   :: AdvectionStencil
-  vel_ext   :: VelocityExtension
-  projector :: HilbertianProjectionMap
-  history   :: OptimiserHistory{Float64}
-  converged :: Function
-  params    :: NamedTuple
+  problem           :: PDEConstrainedFunctionals{N}
+  stencil           :: AdvectionStencil
+  vel_ext           :: VelocityExtension
+  projector         :: HilbertianProjectionMap
+  history           :: OptimiserHistory{Float64}
+  converged         :: Function
+  has_oscillations  :: Function
+  params            :: NamedTuple
   φ0 # TODO: Remove me please
-  function HilbertianProjection(
+
+  @doc """
+      HilbertianProjection(
+        problem :: PDEConstrainedFunctionals{N},
+        stencil :: AdvectionStencil,
+        vel_ext :: VelocityExtension,
+        φ0;
+        orthog = HPModifiedGramSchmidt(),
+        λ=0.5, α_min=0.1, α_max=1.0, γ=0.1, γ_reinit=0.5,
+        ls_max_iters = 10, ls_δ_inc = 1.1, ls_δ_dec = 0.7,
+        ls_ξ = 0.0025, ls_ξ_reduce_coef = 0.1, ls_ξ_reduce_abs_tol = 0.01,
+        ls_γ_min = 0.001, ls_γ_max = 0.1,
+        maxiter = 1000, verbose=false, constraint_names = map(i -> Symbol("C_\$i"),1:N),
+        converged::Function = default_hp_converged, debug = false
+      ) where {N}
+
+  Create an instance of `HilbertianProjection` with several adjustable defaults
+  including the orthogonalisation method. By default the later is [`HPModifiedGramSchmidt`](@ref).
+
+  # Required
+
+  - `problem::PDEConstrainedFunctionals{N}`: The objective and constraint setup.
+  - `stencil::AdvectionStencil{O}`: The finite difference stencil for 
+    solving the evolution and reinitisation equations.
+  - `vel_ext::VelocityExtension`: The velocity-extension method for extending 
+    shape sensitivities onto the computational domain.
+  - `φ0`: An initial level-set function defined as a FEFunction or GridapDistributed equivilent.
+
+  # Algorithm defaults
+
+  - `γ = 0.1`: Initial coeffient on the time step size for solving the Hamilton-Jacobi evolution equation.
+  - `γ_reinit = 0.5`: Coeffient on the time step size for solving the reinitisation equation.
+  - `maxiter = 1000`: Maximum number of algorithm iterations.
+  - `verbose=false`: Verbosity flag.
+  - `constraint_names = map(i -> Symbol("C_\$i"),1:N)`: Constraint names for history output.
+  - `converged::Function = default_hp_converged`: Convergence criteria.
+  - `has_oscillations::Function = (ls_enabled ? (args...)->false : default_has_oscillations`:
+    By default this is disabled when a line search in enabled.
+  - `os_γ_mult = 0.5`: Decrease multiplier for `γ` when `has_oscillations` returns true
+  - `debug = false`: Debug flag.
+  - `α_min ∈ [0,1] = 0.1`: Controls lower bound on on the projected objective descent coefficent.
+    `α_min = 1` ignores the objective function and instead solves a constraint satisfaction problem. 
+  - `α_max ∈ [0,1] = 1.0`: Controls the upper bound on the projected objective descent coeffient.
+    Typically this shouldn't change unless wanting to approach the optimum 'slower'.
+  - `λ = 0.5`: The rate of contraint decrease.
+
+  Note that in practice we usually only adjust `α_min` to control the balance between improving the 
+  objective or constraints. 
+
+  # Line search defaults
+
+  - `ls_enabled = true`: Set whether a line search is used.
+  - `ls_max_iters = 10`: Maximum number of line search iterations. 
+  - `ls_δ_inc = 1.1`: Increase multiplier for `γ` on acceptance.
+  - `ls_δ_dec = 0.7`: Decrease multiplier for `γ` on rejection.
+  - `ls_ξ = 0.0025`: Line search tolerance for objective reduction. 
+  - `ls_ξ_reduce_coef = 0.1`: Coeffient on `ls_ξ` if constraints within tolerance (see below).
+  - `ls_ξ_reduce_abs_tol = 0.01`: Tolerance on constraints to reduce `ls_ξ` via `ls_ξ_reduce_coef`.
+  - `ls_γ_min = 0.001`: Minimum coeffient on the time step size for solving the HJ evolution equation.
+  - `ls_γ_max = 0.1`: Maximum coeffient on the time step size for solving the HJ evolution equation.
+
+  A more concervative evolution of the boundary can be achieved by decreasing `ls_γ_max`.
+
+  !!! note
+      For some problems (e.g., inverter mechanism), we have observed that a simple oscillation
+      detection algorithm leads to better convergence compared to the line search. By default 
+      disabling the line search via `ls_enabled = false` will enable oscillation detection. 
+  """
+    function HilbertianProjection(
     problem :: PDEConstrainedFunctionals{N},
     stencil :: AdvectionStencil,
     vel_ext :: VelocityExtension,
     φ0;
     orthog = HPModifiedGramSchmidt(),
-    λ=0.5, α_min=0.1, α_max=1.0, γ=0.1, γ_reinit=0.5,
-    ls_max_iters = 10, ls_δ_inc = 1.1, ls_δ_dec = 0.7,
+    λ=0.5, α_min=0.1, α_max=1.0, γ=0.1, γ_reinit=0.5, reinit_mod = 1,
+    ls_enabled = true, ls_max_iters = 10, ls_δ_inc = 1.1, ls_δ_dec = 0.7,
     ls_ξ = 0.0025, ls_ξ_reduce_coef = 0.1, ls_ξ_reduce_abs_tol = 0.01,
     ls_γ_min = 0.001, ls_γ_max = 0.1,
     maxiter = 1000, verbose=false, constraint_names = map(i -> Symbol("C_$i"),1:N),
-    converged::Function = default_hp_converged, debug = false
+    converged::Function = default_hp_converged, debug = false,
+    has_oscillations::Function = (ls_enabled ? (args...)->false : default_has_oscillations),
+    os_γ_mult = 0.5
   ) where {N}
 
     constraint_names = map(Symbol,constraint_names)
@@ -156,10 +242,11 @@ struct HilbertianProjection{T,N} <: Optimiser
     history = OptimiserHistory(Float64,al_keys,al_bundles,maxiter,verbose)
 
     projector = HilbertianProjectionMap(N,orthog,vel_ext;λ,α_min,α_max,debug)
-    params = (;debug,γ,γ_reinit,ls_max_iters,ls_δ_inc,ls_δ_dec,ls_ξ,
-               ls_ξ_reduce_coef,ls_ξ_reduce_abs_tol,ls_γ_min,ls_γ_max)
+    params = (;debug,γ,γ_reinit,reinit_mod,ls_enabled,ls_max_iters,ls_δ_inc,ls_δ_dec,ls_ξ,
+               ls_ξ_reduce_coef,ls_ξ_reduce_abs_tol,ls_γ_min,ls_γ_max,os_γ_mult)
     T = typeof(orthog)
-    new{T,N}(problem,stencil,vel_ext,projector,history,converged,params,φ0)
+    new{T,N}(problem,stencil,vel_ext,projector,history,converged,
+      has_oscillations,params,φ0)
   end
 end
 
@@ -187,6 +274,22 @@ function default_hp_converged(
   return (it > 10) && A && B
 end
 
+function default_has_oscillations(m::HilbertianProjection,os_it;
+    itlength=50,itstart=2itlength,algo=:zerocrossing)
+  h  = m.history
+  it = get_last_iteration(h)
+  if it < itstart || it < os_it + itlength + 1
+    return false
+  end
+
+  J = h[:J]
+  J_osc = ~isnan(estimate_period(J[it-itlength+1:it+1],algo));
+  C = h[:C,it-itlength+1:it+1]
+  C_osc = all(x->~isnan(estimate_period(x,algo)),C);
+
+  return J_osc && C_osc
+end
+
 # 0th iteration
 function Base.iterate(m::HilbertianProjection)
   history, params = m.history, m.params
@@ -208,25 +311,34 @@ function Base.iterate(m::HilbertianProjection)
   
   # Update history and build state
   push!(history,(J,C...,params.γ))
-  state = (0,J,C,θ,dJ,dC,uh,φh,vel,φ_tmp,params.γ) # TODO: it changed to 0 here.
+  state = (;it=0,J,C,θ,dJ,dC,uh,φh,vel,φ_tmp,params.γ,os_it=-1)
   vars  = params.debug ? (0,uh,φh,state) : (0,uh,φh)
   return vars, state
 end
 
 # ith iteration
 function Base.iterate(m::HilbertianProjection,state)
-  it, J, C, θ, dJ, dC, uh, φh, vel, φ_tmp, γ = state
+  it, J, C, θ, dJ, dC, uh, φh, vel, φ_tmp, γ, os_it = state
   history, params = m.history, m.params
 
   if finished(m)
     return nothing
   end
   
+  ## Oscillation detection
+  if (γ > 0.001) && m.has_oscillations(m,os_it)
+    os_it = it + 1
+    γ    *= params.os_γ_mult
+    print_msg(m.history,"   Oscillations detected, reducing γ to $(γ)\n",color=:yellow)
+  end
+
   ## Line search
   U_reg = get_deriv_space(m.problem.state_map)
   V_φ   = get_aux_space(m.problem.state_map)
   interpolate!(FEFunction(U_reg,θ),vel,V_φ)
   
+  ls_enabled = params.ls_enabled
+  reinit_mod = params.reinit_mod
   ls_max_iters,δ_inc,δ_dec = params.ls_max_iters,params.ls_δ_inc,params.ls_δ_dec
   ξ, ξ_reduce, ξ_reduce_tol = params.ls_ξ, params.ls_ξ_reduce_coef, params.ls_ξ_reduce_abs_tol
   γ_min, γ_max = params.ls_γ_min,params.ls_γ_max
@@ -236,7 +348,9 @@ function Base.iterate(m::HilbertianProjection,state)
   while !done && (ls_it <= ls_max_iters)
     # Advect  & Reinitialise
     advect!(m.stencil,φ,vel,γ)
-    reinit!(m.stencil,φ,params.γ_reinit)
+    iszero(it % reinit_mod) && reinit!(m.stencil,φ,params.γ_reinit)
+
+    ~ls_enabled && break
 
     # Calcuate new objective and constraints
     J_interm, C_interm = evaluate_functionals!(m.problem,φh)
@@ -267,7 +381,7 @@ function Base.iterate(m::HilbertianProjection,state)
 
   ## Update history and build state
   push!(history,(J,C...,γ))
-  state = (it+1, J, C, θ, dJ, dC, uh, φh, vel, φ_tmp, γ)
+  state = (it+1, J, C, θ, dJ, dC, uh, φh, vel, φ_tmp, γ, os_it)
   vars  = params.debug ? (it,uh,φh,state) : (it,uh,φh)
   return vars, state
 end

@@ -117,7 +117,7 @@ function main(mesh_partition,distribute)
         solver = ElasticitySolver(solve_data.V)
         J,v_J,uh = elastic_compliance(φh,g,C,solve_data,interp,t,solver)
         display("Objective = $J")
-        writevtk(Ω,path,cellfields=["phi"=>φh,"H(phi)"=>(interp.H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh)),"uh"=>uh])
+        writevtk(Ω,path,cellfields=["phi"=>φh,"H(phi)"=>(interp.H ∘ φh),"|nabla(phi)|"=>(norm ∘ ∇(φh)),"uh"=>uh])
     end
     t
 end

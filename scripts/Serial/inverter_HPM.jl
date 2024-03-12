@@ -1,4 +1,4 @@
-using Gridap, LSTO_Distributed
+using Gridap, LevelSetTopOpt
 
 """
   (Serial) Inverter mechanism with Hilbertian projection method in 2D.
@@ -19,22 +19,23 @@ function main()
   order = 1
   dom = (0,1,0,0.5)
   el_size = (200,100)
-  γ = 0.05
+  γ = 0.1
   γ_reinit = 0.5
   max_steps = floor(Int,minimum(el_size)/10)
-  tol = 1/(10order^2)*prod(inv,minimum(el_size))
-  C = isotropic_2d(1.0,0.3)
+  tol = 1/(5order^2)/minimum(el_size)
+  C = isotropic_elast_tensor(2,1.0,0.3)
   η_coeff = 2
   α_coeff = 4
   vf = 0.4
-  δₓ = 0.75
-  ks = 0.01
-  g = VectorValue(1,0)
-  path = dirname(dirname(@__DIR__))*"/results/inverter_HPM"
+  δₓ = 0.2
+  ks = 0.1
+  g = VectorValue(0.5,0)
+  path = dirname(dirname(@__DIR__))*"/results/inverter_HPM_osc"
+  mkdir(path)
   
   ## FE Setup
   model = CartesianDiscreteModel(dom,el_size)
-  Δ = get_Δ(model)
+  el_Δ = get_el_Δ(model)
   f_Γ_in(x) = (x[1] ≈ 0.0) && (x[2] <= 0.03 + eps())
   f_Γ_out(x) = (x[1] ≈ 1.0) && (x[2] <= 0.07 + eps())
   f_Γ_D(x) = (x[1] ≈ 0.0) && (x[2] >= 0.4)
@@ -66,11 +67,12 @@ function main()
   U_reg = TrialFESpace(V_reg,[0,0])
 
   ## Create FE functions
-  lsf_fn(x) = max(gen_lsf(6,0.2)(x),-sqrt((x[1]-1)^2+(x[2]-0.5)^2)+0.2)
+  lsf_fn(x) = min(max(initial_lsf(6,0.2)(x),-sqrt((x[1]-1)^2+(x[2]-0.5)^2)+0.2),
+    sqrt((x[1])^2+(x[2]-0.5)^2)-0.1)
   φh = interpolate(lsf_fn,V_φ)
 
   ## Interpolation and weak form
-  interp = SmoothErsatzMaterialInterpolation(η = η_coeff*maximum(Δ))
+  interp = SmoothErsatzMaterialInterpolation(η = η_coeff*maximum(el_Δ))
   I,H,DH,ρ = interp.I,interp.H,interp.DH,interp.ρ
 
   a(u,v,φ,dΩ,dΓ_in,dΓ_out) = ∫((I ∘ φ)*(C ⊙ ε(u) ⊙ ε(v)))dΩ + ∫(ks*(u⋅v))dΓ_out
@@ -80,32 +82,31 @@ function main()
   e₁ = VectorValue(1,0)
   J(u,φ,dΩ,dΓ_in,dΓ_out) = ∫((u⋅e₁)/vol_Γ_in)dΓ_in
   Vol(u,φ,dΩ,dΓ_in,dΓ_out) = ∫(((ρ ∘ φ) - vf)/vol_D)dΩ
-  dVol(q,u,φ,dΩ,dΓ_in,dΓ_out) = ∫(1/vol_D*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
+  dVol(q,u,φ,dΩ,dΓ_in,dΓ_out) = ∫(-1/vol_D*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
   UΓ_out(u,φ,dΩ,dΓ_in,dΓ_out) = ∫((u⋅-e₁-δₓ)/vol_Γ_out)dΓ_out
 
   ## Finite difference solver and level set function
   stencil = AdvectionStencil(FirstOrderStencil(2,Float64),model,V_φ,tol,max_steps)
-  reinit!(stencil,φh,γ_reinit)
 
   ## Setup solver and FE operators
   state_map = AffineFEStateMap(a,l,U,V,V_φ,U_reg,φh,dΩ,dΓ_in,dΓ_out)
   pcfs = PDEConstrainedFunctionals(J,[Vol,UΓ_out],state_map,analytic_dC=[dVol,nothing])
 
   ## Hilbertian extension-regularisation problems
-  α = α_coeff*maximum(Δ)
+  α = α_coeff*maximum(el_Δ)
   a_hilb(p,q) = ∫(α^2*∇(p)⋅∇(q) + p*q)dΩ;
   vel_ext = VelocityExtension(a_hilb,U_reg,V_reg)
   
   ## Optimiser
-  make_dir(path)
+  ls_enabled=false # Setting to true will use a line search instead of oscillation detection
   optimiser = HilbertianProjection(pcfs,stencil,vel_ext,φh;
-    γ,γ_reinit,α_min=0.5,verbose=true,constraint_names=[:Vol,:UΓ_out])
+    γ,γ_reinit,α_min=0.4,ls_enabled,verbose=true,constraint_names=[:Vol,:UΓ_out])
   for (it,uh,φh) in optimiser
-    write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh)),"uh"=>uh])
+    write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi)|"=>(norm ∘ ∇(φh)),"uh"=>uh])
     write_history(path*"/history.txt",optimiser.history)
   end
-  it = optimiser.history.niter; uh = get_state(optimiser.problem)
-  write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh)),"uh"=>uh];iter_mod=1)
+  it = get_history(optimiser).niter; uh = get_state(pcfs)
+  write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi)|"=>(norm ∘ ∇(φh)),"uh"=>uh];iter_mod=1)
 end
 
 main()

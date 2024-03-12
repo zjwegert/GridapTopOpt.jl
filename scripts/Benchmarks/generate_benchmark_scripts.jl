@@ -59,7 +59,7 @@ nreps = 10; # Number of benchmark repetitions
 dofs_per_proc = 32000;
 fe_order= 1;
 verbose= 1;
-dir_name= "LSTO_Distributed";
+dir_name= "LevelSetTopOpt";
 write_dir = "\$HOME/$dir_name/results/benchmarks/"
 
 N = 1:10; # Number of partitions in x-axis

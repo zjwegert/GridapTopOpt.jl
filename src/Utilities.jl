@@ -1,25 +1,80 @@
-## Initial LSF
-gen_lsf(ξ,a;b=0) = x::VectorValue -> -1/4*prod(cos.(get_array(@.(ξ*pi*(x-b))))) - a/4
+"""
+    struct SmoothErsatzMaterialInterpolation{M<:Vector{<:Number},N<:Vector{<:Number}}
 
-## Get element size Δ
-function get_Δ(model::CartesianDiscreteModel)
-  desc = get_cartesian_descriptor(model)
-  return desc.sizes
+A wrapper holding parameters and methods for interpolating an 
+integrand across a single boundary ``\\partial\\Omega``.
+
+E.g., ``\\int f~\\mathrm{d}\\Omega = \\int I(\\varphi)f~\\mathrm{d}D`` where ``\\Omega\\subset D`` is described by a level-set
+function ``\\varphi`` and ``I`` is an indicator function.
+
+# Properties
+
+- `η::M`: the interpolation or smoothing radius across ∂Ω
+- `ϵ::M`: the ersatz material density
+- `H`: a smoothed Heaviside function
+- `DH`: the derivative of `H`
+- `I`: an indicator function
+- `ρ`: a function describing the volume density of ``\\Omega`` 
+  (e.g., ``\\mathrm{Vol}(\\Omega) = \\int \\rho(\\varphi))~\\mathrm{d}D)``
+
+# Note
+- We store η and ϵ as length-one vectors so that updating these values propagates through H, DH, etc.
+- To update η and/or ϵ in an instance `m`, take `m.η .= <VALUE>`. 
+- A conviencence constructor is provided to create an instance given `η<:Number` and `ϵ<:Number`.
+"""
+Base.@kwdef struct SmoothErsatzMaterialInterpolation{M<:Vector{<:Number},N<:Vector{<:Number}}
+  η::M
+  ϵ::N
+  H = x -> H_η(x,first(η))
+  DH = x -> DH_η(x,first(η))
+  I = φ -> (1 - H(φ)) + first(ϵ)*H(φ)
+  ρ = φ -> 1 - H(φ)
 end
 
-function get_Δ(model::DistributedDiscreteModel)
-  local_Δ = map(get_Δ,local_views(model))
-  return getany(local_Δ)
+function SmoothErsatzMaterialInterpolation(;η::M,ϵ::N=10^-3) where {M<:Number,N<:Number}
+  return SmoothErsatzMaterialInterpolation{Vector{M},Vector{N}}(η=[η],ϵ=[ϵ])
 end
 
-## Create label given function f_Γ. e is a count of added tags. TODO: Can this go in GridapExtensions.jl? @Jordi
-function update_labels!(e::Int,model::CartesianDiscreteModel,f_Γ::Function,name::String)
+function H_η(t,η)
+  M = typeof(η*t)
+  if t<-η
+    return zero(M)
+  elseif abs(t)<=η
+    return 1/2*(1+t/η+1/pi*sin(pi*t/η))
+  elseif t>η
+    return one(M)
+  end
+end
+
+function DH_η(t,η)
+  M = typeof(η*t)
+  if t<-η
+    return zero(M)
+  elseif abs(t)<=η
+    return 1/2/η*(1+cos(pi*t/η))
+  elseif t>η
+    return zero(M)
+  end
+end
+
+## Helpers
+
+"""
+    update_labels!(e::Int,model,f_Γ::Function,name::String)
+
+Given a tag number `e`, a `CartesianDiscreteModel` or `DistributedDiscreteModel` model,
+an indicator function `f_Γ`, and a string `name`, label the corresponding vertices, edges, and faces
+as `name`.
+
+Note: `f_Γ` must recieve a Vector and return a Boolean depending on whether it indicates Γ
+"""
+function update_labels!(e::Integer,model::CartesianDiscreteModel,f_Γ::Function,name::String)
   mask = mark_nodes(f_Γ,model)
   _update_labels_locally!(e,model,mask,name)
   nothing
 end
 
-function update_labels!(e::Int,model::DistributedDiscreteModel,f_Γ::Function,name::String)
+function update_labels!(e::Integer,model::DistributedDiscreteModel,f_Γ::Function,name::String)
   mask = mark_nodes(f_Γ,model)
   cell_to_entity = map(local_views(model),local_views(mask)) do model,mask
     _update_labels_locally!(e,model,mask,name)
@@ -90,62 +145,96 @@ function mark_nodes(f,model::DiscreteModel)
   return mask
 end
 
-# Isotropic elasticity tensors
-function isotropic_2d(E::M,ν::M) where M<:AbstractFloat
-  λ = E*ν/((1+ν)*(1-ν)); μ = E/(2*(1+ν))
-  C = [λ+2μ  λ     0
-        λ    λ+2μ   0
-        0     0     μ];
-  SymFourthOrderTensorValue(
-    C[1,1], C[3,1], C[2,1],
-    C[1,3], C[3,3], C[2,3],
-    C[1,2], C[3,2], C[2,2]
-  )
+"""
+    initial_lsf(ξ,a;b)
+
+Generate a function `f` according to
+f(x) = -1/4 ∏ᵢ(cos(ξ*π*(xᵢ-bᵢ))) - a/4
+where x is a vector with components xᵢ.
+"""
+initial_lsf(ξ,a;b=0) = x::VectorValue -> -1/4*prod(cos.(get_array(@.(ξ*pi*(x-b))))) - a/4
+
+"""
+    get_el_Δ(model)
+
+Given a CartesianDiscreteModel or DistributedDiscreteModel that is
+uniform, return the element size as a tuple. 
+"""
+function get_el_Δ(model::CartesianDiscreteModel)
+  desc = get_cartesian_descriptor(model)
+  return desc.sizes
 end
 
-function isotropic_3d(E::M,ν::M) where M<:AbstractFloat
-  λ = E*ν/((1+ν)*(1-2ν)); μ = E/(2*(1+ν))
-  C =[λ+2μ   λ      λ      0      0      0
+function get_el_Δ(model::DistributedDiscreteModel)
+  local_Δ = map(local_views(model)) do model
+    get_el_Δ(model)
+  end
+  return getany(local_Δ)
+end
+
+"""
+    isotropic_elast_tensor(D::Int,E::M,v::M)
+
+Generate an isotropic `SymFourthOrderTensorValue` given
+a dimension `D`, Young's modulus `E`, and Poisson's ratio `v`. 
+"""
+function isotropic_elast_tensor(D::Int,E::Number,v::Number)
+  if D == 2
+    λ = E*v/((1+v)*(1-v)); μ = E/(2*(1+v))
+    C = [
+      λ+2μ  λ     0
+      λ    λ+2μ   0
+      0     0     μ
+    ];
+    return SymFourthOrderTensorValue(
+      C[1,1], C[3,1], C[2,1],
+      C[1,3], C[3,3], C[2,3],
+      C[1,2], C[3,2], C[2,2]
+    )
+  elseif D == 3
+    λ = E*v/((1+v)*(1-2v)); μ = E/(2*(1+v))
+    C = [
+      λ+2μ   λ      λ      0      0      0
       λ     λ+2μ    λ      0      0      0
       λ      λ     λ+2μ    0      0      0
       0      0      0      μ      0      0
       0      0      0      0      μ      0
-      0      0      0      0      0      μ];
-  return SymFourthOrderTensorValue(
+      0      0      0      0      0      μ
+    ];
+    return SymFourthOrderTensorValue(
       C[1,1], C[6,1], C[5,1], C[2,1], C[4,1], C[3,1],
       C[1,6], C[6,6], C[5,6], C[2,6], C[4,6], C[3,6],
       C[1,5], C[6,5], C[5,5], C[2,5], C[4,5], C[3,5],
       C[1,2], C[6,2], C[5,2], C[2,2], C[4,2], C[3,2],
       C[1,4], C[6,4], C[5,4], C[2,4], C[4,4], C[3,4],
       C[1,3], C[6,3], C[5,3], C[2,3], C[4,3], C[3,3]
-  )
-end
-
-# Logging
-function make_dir(path;ranks=nothing) # TODO: Adjust to mkpath?
-  if i_am_main(ranks)
-    !isdir(path) ? mkdir(path) : rm(path,recursive=true);
-    !isdir(path) ? mkdir(path) : 0;
+    )
+  else
+    @notimplemented
   end
 end
 
-function print_history(it,entries::Vector{<:Pair};ranks=nothing) # TODO: Remove
-  if i_am_main(ranks)
-    str = "it: $it"
-    for pair in entries
-      val = round.(pair.second;digits=5)
-      str*=" | $(pair.first): $val"
-    end
-    println(str)
-  end
-end
+"""
+    write_vtk(Ω,path,it,entries::Vector{<:Pair};iter_mod=10)
 
-function write_vtk(Ω,path,it,entries::Vector{<:Pair};iter_mod=10) # TODO: Rename to writevtk
+Write a VTK file to `path`. This functions in a similar way to
+Gridap's `writevtk` function except we 
+
+!!! note
+    This may be removed in future and replaced by
+
+    ```(isone(it) || iszero(it % iter_mod)) && writevtk(Ω,path,cellfields=entries)```
+
+    or 
+    
+    ```iszero(it-1 % iter_mod) && writevtk(Ω,path,cellfields=entries)```
+"""
+function write_vtk(Ω,path,it,entries::Vector{<:Pair};iter_mod=10) # TODO: Rename to writevtk?
   if isone(it) || iszero(it % iter_mod) 
     writevtk(Ω,path,cellfields=entries)
   end
 
   if iszero(it % 10*iter_mod)
-    GC.gc() # Garbage collection, due to memory leak in writevtk - TODO
+    GC.gc() # TODO: Test in Julia 1.10.0 and check if fixed.
   end 
 end

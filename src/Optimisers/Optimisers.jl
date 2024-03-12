@@ -1,12 +1,12 @@
 """
-  abstract type Optimiser end
+    abstract type Optimiser
 
+Optimisers in LevelSetTopOpt.jl are implemented as iterators.
 Your own optimiser can be implemented by implementing 
- concrete functionality of the below.
+concrete functionality of the below.
 """
 abstract type Optimiser end
 
-# TODO: Add quality of life Base.show for each optimiser which displays extra info
 function Base.show(io::IO,object::Optimiser)
   print(io,typeof(object))
 end
@@ -14,19 +14,39 @@ end
 Base.IteratorEltype(::Type{<:Optimiser}) = Base.EltypeUnknown()
 Base.IteratorSize(::Type{<:Optimiser}) = Base.SizeUnknown()
 
-# Return tuple of first iteration state
+"""
+    Base.iterate(::Optimiser)
+
+Return tuple of first iteration state for `Optimiser`.
+"""
 function Base.iterate(::Optimiser)
   @abstractmethod
 end
 
-# Return tuple of next iteration state given current state
+"""
+    Base.iterate(::Optimiser,state)
+
+Return tuple of next iteration state given current state
+for `Optimiser`.
+"""
 function Base.iterate(::Optimiser,state)
   @abstractmethod
 end
 
+"""
+    get_history(::Optimiser) :: OptimiserHistory
+
+Get `OptimiserHistory` from `Optimiser`.
+"""
 get_history(::Optimiser) :: OptimiserHistory = @abstractmethod
 
-function converged(::Optimiser)
+"""
+    converged(::Optimiser)
+
+Return a `Bool` that is true if the `Optimiser` has 
+converged, otherwise false.
+"""
+function converged(::Optimiser) :: Bool
   @abstractmethod
 end
 
@@ -40,23 +60,30 @@ function finished(m::Optimiser) :: Bool
 end
 
 function print_msg(opt::Optimiser,msg::String;kwargs...) 
-  print_msg(get_optimiser_history(opt),msg;kwargs...)
+  print_msg(get_history(opt),msg;kwargs...)
 end
 
 """
-  mutable struct OptimiserHistory{T} end
+    mutable struct OptimiserHistory{T}
 
 Track historical information on optimisation problem
- iteration history with
-  - keys    -- Vector of symbols associated to values
-  - values  -- Dictionary of vectors associated to keys
-  - bundles -- Groups of symbols (e.g., a group of constraints)
+iteration history.
 
-Behaviour:
- - Indexing at a specific iteration returns an OptimiserHistorySlice.
- - Indexing with a key returns all values of that key
- - Indexing with a key and iteration returns value/s of
-    the key at the iteration.
+# Parameters
+
+- `niter::Int`: Current iteration number
+- `keys::Vector{Symbol}`: Vector of symbols associated to values
+- `values::Dict{Symbol,Vector{T}}`: Dictionary of vectors associated to keys
+- `bundles::Dict{Symbol,Vector{Symbol}}`: Groups of symbols (e.g., a group of constraints)
+- `verbose::SolverVerboseLevel`: Verbosity level
+- `maxiter::Int`: Maximum number of iterations.
+
+# Behaviour
+
+- Indexing at a specific iteration returns an OptimiserHistorySlice.
+- Indexing with a key returns all values of that key
+- Indexing with a key and iteration returns value/s of
+  the key at the iteration.
 """
 mutable struct OptimiserHistory{T}
   niter   :: Int
@@ -67,6 +94,18 @@ mutable struct OptimiserHistory{T}
   maxiter :: Int
 end
 
+"""
+    OptimiserHistory(
+      T::Type{<:Real},
+      keys::Vector{Symbol},
+      bundles::Dict{Symbol,Vector{Symbol}}=Dict{Symbol,Vector{Symbol}}(),
+      maxiter = 200,
+      verbose = SOLVER_VERBOSE_NONE
+    )
+
+Create an instance of Optimiser history with some defaults for
+`bundles`, `maxiter`, and `verbose`.
+"""
 function OptimiserHistory(
   T::Type{<:Real},
   keys::Vector{Symbol},
@@ -162,6 +201,12 @@ function Base.write(io::IO,h::OptimiserHistory)
   Base.write(io,content)
 end
 
+"""
+    write_history(path::String,h::OptimiserHistory;ranks=nothing)
+  
+Write the contents of an `OptimiserHistory` object to a `path`.
+Provide MPI `ranks` when running in parallel.
+"""
 function write_history(path::String,h::OptimiserHistory;ranks=nothing)
   if i_am_main(ranks)
     open(path,"w") do f
@@ -177,10 +222,10 @@ function print_msg(h::OptimiserHistory,msg::String;kwargs...)
 end
 
 """
-  struct OptimiserHistorySlice{T} end
+    struct OptimiserHistorySlice{T} end
 
 A read-only wrapper of OptimiserHistory for IO display 
- of iteration history at a specific iteration.
+of iteration history at a specific iteration.
 """
 struct OptimiserHistorySlice{T}
   it :: Int

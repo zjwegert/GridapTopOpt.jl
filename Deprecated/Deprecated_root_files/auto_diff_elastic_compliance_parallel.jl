@@ -99,7 +99,7 @@ function main(mesh_partition,distribute)
     # path = dirname(dirname(@__DIR__))*"/results/AutoDiffTesting_Parallel";
     # writevtk(Ω,path,cellfields=["phi"=>φh,
     #     "H(phi)"=>(interp.H ∘ φh),
-    #     "|nabla(phi))|"=>(norm ∘ ∇(φh)),
+    #     "|nabla(phi)|"=>(norm ∘ ∇(φh)),
     #     "uh"=>uh,
     #     "J′_analytic"=>FEFunction(U_reg,dF_analytic),
     #     "J′_autodiff"=>FEFunction(U_reg,dF),

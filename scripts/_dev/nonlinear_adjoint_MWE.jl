@@ -1,4 +1,4 @@
-using Gridap, GridapDistributed, GridapPETSc, PartitionedArrays, LSTO_Distributed
+using Gridap, GridapDistributed, GridapPETSc, PartitionedArrays, LevelSetTopOpt
 
 """
   (Serial) Minimum thermal compliance with Lagrangian method in 2D with nonlinear diffusivity.
@@ -15,25 +15,25 @@ function main()
   ## Parameters
   order = 1;
   xmax=ymax=1.0
-  prop_Γ_N = 0.4;
+  prop_Γ_N = 0.2;
   prop_Γ_D = 0.2
   dom = (0,xmax,0,ymax);
   el_size = (200,200);
   γ = 0.1;
   γ_reinit = 0.5;
   max_steps = floor(Int,minimum(el_size)/10)
-  tol = 1/(order^2*10)*prod(inv,minimum(el_size)) # <- We can do better than this I think
+  tol = 1/(order^2*10)/minimum(el_size) # <- We can do better than this I think
   η_coeff = 2;
   α_coeff = 4;
   path = dirname(dirname(@__DIR__))*"/results/main_nonlinear"
 
   ## FE Setup
   model = CartesianDiscreteModel(dom,el_size);
-  Δ = get_Δ(model)
+  el_Δ = get_el_Δ(model)
   f_Γ_D(x) = (x[1] ≈ 0.0 && (x[2] <= ymax*prop_Γ_D + eps() || 
     x[2] >= ymax-ymax*prop_Γ_D - eps())) ? true : false;
-  f_Γ_N(x) = (x[1] ≈ xmax && ymax/2-ymax*prop_Γ_N/4 - eps() <= x[2] <= 
-    ymax/2+ymax*prop_Γ_N/4 + eps()) ? true : false;
+  f_Γ_N(x) = (x[1] ≈ xmax && ymax/2-ymax*prop_Γ_N/2 - eps() <= x[2] <= 
+    ymax/2+ymax*prop_Γ_N/2 + eps()) ? true : false;
   update_labels!(1,model,f_Γ_D,"Gamma_D")
   update_labels!(2,model,f_Γ_N,"Gamma_N")
 
@@ -52,11 +52,11 @@ function main()
   U_reg = TrialFESpace(V_reg,0)
 
   ## Create FE functions
-  φh = interpolate(gen_lsf(4,0.2),V_φ);
+  φh = interpolate(initial_lsf(4,0.2),V_φ);
   φ = get_free_dof_values(φh)
 
   ## Interpolation and weak form
-  interp = SmoothErsatzMaterialInterpolation(η = η_coeff*maximum(Δ))
+  interp = SmoothErsatzMaterialInterpolation(η = η_coeff*maximum(el_Δ))
   I,H,DH,ρ = interp.I,interp.H,interp.DH,interp.ρ
 
   D0 = 1;
@@ -70,7 +70,7 @@ function main()
   J = (u,φ,dΩ,dΓ_N) -> ∫((I ∘ φ)*(D ∘ u)*∇(u)⋅∇(u) + ξ*(ρ ∘ φ))dΩ
 
   ## Finite difference solver and level set function
-  stencil = AdvectionStencil(FirstOrderStencil(2,Float64),model,V_φ,Δ./order,max_steps,tol)
+  stencil = AdvectionStencil(FirstOrderStencil(2,Float64),model,V_φ,el_size./order,max_steps,tol)
   reinit!(stencil,φ,γ_reinit)
 
   ## Setup solver and FE operators

@@ -1,3 +1,4 @@
+## TODO: @Jordi, are these going into GridapSolvers or should I write documentation?
 
 struct ElasticitySolver{A} <: LinearSolver
   space ::A

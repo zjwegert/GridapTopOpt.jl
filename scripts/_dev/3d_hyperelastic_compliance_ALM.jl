@@ -1,5 +1,5 @@
 using Gridap, Gridap.MultiField, GridapDistributed, GridapPETSc, GridapSolvers, 
-  PartitionedArrays, LSTO_Distributed, SparseMatricesCSR
+  PartitionedArrays, LevelSetTopOpt, SparseMatricesCSR
 using GridapSolvers: NewtonSolver
 
 function main(mesh_partition,distribute,el_size,δₓ)
@@ -10,16 +10,16 @@ function main(mesh_partition,distribute,el_size,δₓ)
   xmax,ymax,zmax=(1.0,1.0,1.0)
   dom = (0,xmax,0,ymax,0,zmax)
   η_coeff = 2
-  prop_Γ_N = 0.4;
+  prop_Γ_N = 0.2;
   path = dirname(dirname(@__DIR__))*"/results/testing_hyper_elast"
   i_am_main(ranks) && ~isdir(path) && mkdir(path)
 
   ## FE Setup
   model = CartesianDiscreteModel(ranks,mesh_partition,dom,el_size)
-  Δ = get_Δ(model)
+  el_Δ = get_el_Δ(model)
   f_Γ_D(x) = (x[1] ≈ 0.0)
-  f_Γ_N(x) = (x[1] ≈ xmax) && (ymax/2-ymax*prop_Γ_N/4 - eps() <= x[2] <= ymax/2+ymax*prop_Γ_N/4 + eps()) &&
-    (zmax/2-zmax*prop_Γ_N/4 - eps() <= x[3] <= zmax/2+zmax*prop_Γ_N/4 + eps())
+  f_Γ_N(x) = (x[1] ≈ xmax) && (ymax/2-ymax*prop_Γ_N/2 - eps() <= x[2] <= ymax/2+ymax*prop_Γ_N/2 + eps()) &&
+    (zmax/2-zmax*prop_Γ_N/2 - eps() <= x[3] <= zmax/2+zmax*prop_Γ_N/2 + eps())
   update_labels!(1,model,f_Γ_D,"Gamma_D")
   update_labels!(2,model,f_Γ_N,"Gamma_N")
 
@@ -37,11 +37,11 @@ function main(mesh_partition,distribute,el_size,δₓ)
   U_reg = TrialFESpace(V_reg,0)
 
   ## Create FE functions
-  # φh = interpolate(gen_lsf(4,0.2),V_φ)
+  # φh = interpolate(initial_lsf(4,0.2),V_φ)
   φh = interpolate(x->-1,V_φ)
 
   ## Interpolation and weak form
-  interp = SmoothErsatzMaterialInterpolation(η = η_coeff*maximum(Δ))
+  interp = SmoothErsatzMaterialInterpolation(η = η_coeff*maximum(el_Δ))
   I,H,DH,ρ = interp.I,interp.H,interp.DH,interp.ρ
 
   ## Material properties and loading
@@ -71,9 +71,9 @@ function main(mesh_partition,distribute,el_size,δₓ)
   )
 
   ## Optimiser
-  u = LSTO_Distributed.forward_solve(state_map,φh)
+  u = LevelSetTopOpt.forward_solve!(state_map,φh)
   uh = FEFunction(U,u)
-  write_vtk(Ω,path*"/struc_$δₓ",0,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh)),"uh"=>uh];iter_mod=1)
+  write_vtk(Ω,path*"/struc_$δₓ",0,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi)|"=>(norm ∘ ∇(φh)),"uh"=>uh];iter_mod=1)
 end
 
 function main_alt(mesh_partition,distribute,el_size,gz)
@@ -87,16 +87,16 @@ function main_alt(mesh_partition,distribute,el_size,gz)
   prop_Γ_N = 0.8;
   γ_reinit = 0.5
   max_steps = floor(Int,minimum(el_size)/3)
-  tol = 1/(10order^2)*prod(inv,minimum(el_size))
+  tol = 1/(5order^2)/minimum(el_size)
   path = dirname(dirname(@__DIR__))*"/results/testing_hyper_elast"
   i_am_main(ranks) && ~isdir(path) && mkdir(path)
 
   ## FE Setup
   model = CartesianDiscreteModel(ranks,mesh_partition,dom,el_size)
-  Δ = get_Δ(model)
+  el_Δ = get_el_Δ(model)
   f_Γ_D(x) = (x[1] ≈ 0.0)
-  f_Γ_N(x) = (x[1] ≈ xmax) && (ymax/2-ymax*prop_Γ_N/4 - eps() <= x[2] <= ymax/2+ymax*prop_Γ_N/4 + eps()) &&
-    (zmax/2-zmax*prop_Γ_N/4 - eps() <= x[3] <= zmax/2+zmax*prop_Γ_N/4 + eps())
+  f_Γ_N(x) = (x[1] ≈ xmax) && (ymax/2-ymax*prop_Γ_N/2 - eps() <= x[2] <= ymax/2+ymax*prop_Γ_N/2 + eps()) &&
+    (zmax/2-zmax*prop_Γ_N/2 - eps() <= x[3] <= zmax/2+zmax*prop_Γ_N/2 + eps())
   update_labels!(1,model,f_Γ_D,"Gamma_D")
   update_labels!(2,model,f_Γ_N,"Gamma_N")
 
@@ -116,11 +116,11 @@ function main_alt(mesh_partition,distribute,el_size,gz)
   U_reg = TrialFESpace(V_reg,0)
 
   ## Create FE functions
-  # φh = interpolate(gen_lsf(4,0.2),V_φ)
+  # φh = interpolate(initial_lsf(4,0.2),V_φ)
   φh = interpolate(x->-1,V_φ)
 
   ## Interpolation and weak form
-  interp = SmoothErsatzMaterialInterpolation(η = η_coeff*maximum(Δ))
+  interp = SmoothErsatzMaterialInterpolation(η = η_coeff*maximum(el_Δ))
   I,H,DH,ρ = interp.I,interp.H,interp.DH,interp.ρ
 
   ## Material properties and loading
@@ -171,9 +171,9 @@ function main_alt(mesh_partition,distribute,el_size,gz)
   )
 
   ## Optimiser
-  u = LSTO_Distributed.forward_solve(state_map,φh)
+  u = LevelSetTopOpt.forward_solve!(state_map,φh)
   uh = FEFunction(U,u)
-  write_vtk(Ω,path*"/struc_neohook_$gz",0,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh)),"uh"=>uh];iter_mod=1)
+  write_vtk(Ω,path*"/struc_neohook_$gz",0,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi)|"=>(norm ∘ ∇(φh)),"uh"=>uh];iter_mod=1)
 end
 
 with_mpi() do distribute

@@ -1,10 +1,40 @@
 using Documenter
-using LSTO_Distributed
+using LevelSetTopOpt
 
 makedocs(
-    sitename = "LSTO_Distributed",
-    format = Documenter.HTML(),
-    modules = [LSTO_Distributed]
+    sitename = "LevelSetTopOpt.jl",
+    format = Documenter.HTML(
+      prettyurls = false,
+      collapselevel = 1,
+    ),
+    modules = [LevelSetTopOpt],
+    pages = [
+      "Home" => "index.md",
+      "Usage" => [
+        "usage/getting-started.md",
+        "usage/ad.md",
+        "usage/petsc.md",
+        "usage/mpi-mode.md",
+      ],
+      "Tutorials" => [
+        "tutorials/minimum_thermal_compliance.md",
+        "tutorials/minimum_elastic_compliance.md",
+        "tutorials/inverter_mechanism.md",
+        "tutorials/inverse_homogenisation.md",
+      ],
+      "Reference" => [
+        "reference/optimisers.md",
+        "reference/chainrules.md",
+        "reference/advection.md",
+        "reference/velext.md",
+        "reference/io.md",
+        "reference/utilities.md",
+        "reference/benchmarking.md"
+      ],
+      "Developer Notes" => [
+        "dev/shape_der.md",
+      ]
+    ],
 )
 
 # Documenter can also automatically deploy documentation to gh-pages.

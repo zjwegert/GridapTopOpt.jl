@@ -1,20 +1,50 @@
 """
-  struct VelocityExtension{A,B} end
+    struct VelocityExtension{A,B}
 
-Wrapper to hold stiffness matrix and cache for
-  Hilbertian extension-regularisation procedure.
+Wrapper to hold a stiffness matrix and a cache for
+the Hilbertian extension-regularisation. See Allaire et al. 2022
+([link](https://doi.org/10.1016/bs.hna.2020.10.004)).
+
+The Hilbertian extension-regularisation method involves solving an 
+identification problem over a Hilbert space ``H`` on ``D`` with 
+inner product ``\\langle\\cdot,\\cdot\\rangle_H``: 
+*Find* ``g_\\Omega\\in H`` *such that* ``\\langle g_\\Omega,w\\rangle_H
+=-J^{\\prime}(\\Omega)(w\\boldsymbol{n})~
+\\forall w\\in H.``
+
+This provides two benefits: 
+ 1) It naturally extends the shape sensitivity from ``\\partial\\Omega`` 
+    onto the bounding domain ``D``; and
+ 2) ensures a descent direction for ``J(\\Omega)`` with additional regularity 
+    (i.e., ``H`` as opposed to ``L^2(\\partial\\Omega)``)
+
+# Properties
+
+- `K::A`: The discretised inner product over ``H``.
+- `cache::B`: Cached objects used for [`project!`](@ref)
 """
 struct VelocityExtension{A,B}
   K     :: A
   cache :: B
 end
 
+"""
+    VelocityExtension(biform,U_reg,V_reg;assem,ls)
+  
+Create an instance of `VelocityExtension` given a bilinear form `biform`,
+trial space `U_reg`, and test space `V_reg`.
+
+# Optional
+
+- `assem`: A matrix assembler
+- `ls::LinearSolver`: A linear solver
+"""
 function VelocityExtension(
-    biform,
-    U_reg,
-    V_reg;
+    biform::Function,
+    U_reg::FESpace,
+    V_reg::FESpace;
     assem = SparseMatrixAssembler(U_reg,V_reg),
-    ls = LUSolver())   
+    ls::LinearSolver = LUSolver())   
   ## Assembly
   K  = assemble_matrix(biform,assem,U_reg,V_reg)
   ns = numerical_setup(symbolic_setup(ls,K),K)
@@ -24,12 +54,10 @@ function VelocityExtension(
 end
 
 """
-  project!(vel_ext::VelocityExtension,dF::AbstractVector) -> dF
+    project!(vel_ext::VelocityExtension,dF::AbstractVector) -> dF
 
-Apply Hilbertian extension-regularisation to dF to project
- gradient into a space with additional regularity over the 
- bounding domain. See Allaire et al.
-  (10.1016/bs.hna.2020.10.004_978-0-444-64305-6_2021).
+Project shape derivative `dF` onto a function space described
+by the `vel_ext`.
 """
 function project!(vel_ext::VelocityExtension,dF::AbstractVector)
   ns, x = vel_ext.cache
@@ -39,4 +67,8 @@ function project!(vel_ext::VelocityExtension,dF::AbstractVector)
   return dF
 end
 
-project!(vel_ext::VelocityExtension,dF_vec::Vector{<:AbstractVector}) = map(dF -> project!(vel_ext,dF),dF_vec)
+project!(vel_ext::VelocityExtension,dF_vec::Vector{<:AbstractVector}) = broadcast(dF -> project!(vel_ext,dF),dF_vec)
+
+function Base.show(io::IO,object::VelocityExtension)
+  print(io,"$(nameof(typeof(object)))")
+end

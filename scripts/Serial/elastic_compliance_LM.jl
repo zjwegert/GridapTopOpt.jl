@@ -1,4 +1,4 @@
-using Gridap, LSTO_Distributed
+using Gridap, LevelSetTopOpt
 
 """
   (Serial) Minimum elastic compliance with Lagrangian method in 2D.
@@ -13,25 +13,26 @@ function main()
   ## Parameters
   order = 1
   xmax,ymax=(2.0,1.0)
-  prop_Γ_N = 0.4
+  prop_Γ_N = 0.2
   dom = (0,xmax,0,ymax)
-  el_size = (200,200)
+  el_size = (200,100)
   γ = 0.1
   γ_reinit = 0.5
   max_steps = floor(Int,minimum(el_size)/10)
-  tol = 1/(10order^2)*prod(inv,minimum(el_size))
-  C = isotropic_2d(1.,0.3)
+  tol = 1/(5order^2)/minimum(el_size)
+  C = isotropic_elast_tensor(2,1.,0.3)
   η_coeff = 2
   α_coeff = 4
   g = VectorValue(0,-1)
   path = dirname(dirname(@__DIR__))*"/results/elastic_compliance_LM"
+  mkdir(path)
 
   ## FE Setup
   model = CartesianDiscreteModel(dom,el_size)
-  Δ = get_Δ(model)
+  el_Δ = get_el_Δ(model)
   f_Γ_D(x) = iszero(x[1])
-  f_Γ_N(x) = (x[1] ≈ xmax && ymax/2-ymax*prop_Γ_N/4 - eps() <= x[2] <= 
-    ymax/2+ymax*prop_Γ_N/4 + eps())
+  f_Γ_N(x) = (x[1] ≈ xmax && ymax/2-ymax*prop_Γ_N/2 - eps() <= x[2] <= 
+    ymax/2+ymax*prop_Γ_N/2 + eps())
   update_labels!(1,model,f_Γ_D,"Gamma_D")
   update_labels!(2,model,f_Γ_N,"Gamma_N")
 
@@ -51,10 +52,10 @@ function main()
   U_reg = TrialFESpace(V_reg,0)
 
   ## Create FE functions
-  φh = interpolate(gen_lsf(4,0.2),V_φ)
+  φh = interpolate(initial_lsf(4,0.2),V_φ)
 
   ## Interpolation and weak form
-  interp = SmoothErsatzMaterialInterpolation(η = η_coeff*maximum(Δ))
+  interp = SmoothErsatzMaterialInterpolation(η = η_coeff*maximum(el_Δ))
   I,H,DH,ρ = interp.I,interp.H,interp.DH,interp.ρ
 
   a(u,v,φ,dΩ,dΓ_N) = ∫((I ∘ φ)*(C ⊙ ε(u) ⊙ ε(v)))dΩ
@@ -63,30 +64,28 @@ function main()
   ## Optimisation functionals
   ξ = 2
   J = (u,φ,dΩ,dΓ_N) -> ∫((I ∘ φ)*(C ⊙ ε(u) ⊙ ε(u)) + ξ*(ρ ∘ φ))dΩ
-  dJ = (q,u,φ,dΩ,dΓ_N) -> ∫((ξ - C ⊙ ε(u) ⊙ ε(u))*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ;
+  dJ = (q,u,φ,dΩ,dΓ_N) -> ∫((- ξ + C ⊙ ε(u) ⊙ ε(u))*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ;
 
   ## Finite difference solver and level set function
   stencil = AdvectionStencil(FirstOrderStencil(2,Float64),model,V_φ,tol,max_steps)
-  reinit!(stencil,φh,γ_reinit)
 
   ## Setup solver and FE operators
   state_map = AffineFEStateMap(a,l,U,V,V_φ,U_reg,φh,dΩ,dΓ_N)
   pcfs = PDEConstrainedFunctionals(J,state_map,analytic_dJ=dJ)
 
   ## Hilbertian extension-regularisation problems
-  α = α_coeff*maximum(Δ)
+  α = α_coeff*maximum(el_Δ)
   a_hilb(p,q) =∫(α^2*∇(p)⋅∇(q) + p*q)dΩ;
   vel_ext = VelocityExtension(a_hilb,U_reg,V_reg)
   
   ## Optimiser
-  make_dir(path)
   optimiser = AugmentedLagrangian(pcfs,stencil,vel_ext,φh;γ,γ_reinit,verbose=true)
   for (it, uh, φh) in optimiser
-    write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh)),"uh"=>uh])
+    write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi)|"=>(norm ∘ ∇(φh)),"uh"=>uh])
     write_history(path*"/history.txt",optimiser.history)
   end
-  it = optimiser.history.niter; uh = get_state(optimiser.problem)
-  write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh)),"uh"=>uh];iter_mod=1)
+  it = get_history(optimiser).niter; uh = get_state(pcfs)
+  write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi)|"=>(norm ∘ ∇(φh)),"uh"=>uh];iter_mod=1)
 end
 
 main();

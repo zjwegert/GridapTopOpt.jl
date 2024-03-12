@@ -1,5 +1,5 @@
 using Gridap, Gridap.MultiField, GridapDistributed, GridapPETSc, GridapSolvers, 
-  PartitionedArrays, LSTO_Distributed, SparseMatricesCSR
+  PartitionedArrays, LevelSetTopOpt, SparseMatricesCSR
 
 """
   (MPI) Inverter mechanism with Hilbertian projection method in 3D.
@@ -21,11 +21,11 @@ function main(mesh_partition,distribute,el_size)
   ## Parameters
   order = 1
   dom = (0,1,0,1,0,1)
-  γ = 0.05
+  γ = 0.1
   γ_reinit = 0.5
-  max_steps = floor(Int,minimum(el_size)/3)
-  tol = 1/(2order^2)*prod(inv,minimum(el_size))
-  C = isotropic_3d(1.0,0.3)
+  max_steps = floor(Int,minimum(el_size)/10)
+  tol = 1/(5order^2)/minimum(el_size)
+  C = isotropic_elast_tensor(3,1.0,0.3)
   η_coeff = 2
   α_coeff = 4
   vf=0.4
@@ -33,10 +33,11 @@ function main(mesh_partition,distribute,el_size)
   ks = 0.01
   g = VectorValue(1,0,0)
   path = dirname(dirname(@__DIR__))*"/results/3d_inverter_HPM"
+  i_am_main(ranks) && mkdir(path)
 
   ## FE Setup
   model = CartesianDiscreteModel(ranks,mesh_partition,dom,el_size);
-  Δ = get_Δ(model)
+  el_Δ = get_el_Δ(model)
   f_Γ_in(x) = (x[1] ≈ 0.0) && (0.4 - eps() <= x[2] <= 0.6 + eps()) && 
     (0.4 - eps() <= x[3] <= 0.6 + eps())
   f_Γ_out(x) = (x[1] ≈ 1.0) && (0.4 - eps() <= x[2] <= 0.6 + eps()) && 
@@ -71,12 +72,12 @@ function main(mesh_partition,distribute,el_size)
 
   ## Create FE functions
   sphere(x,(xc,yc,zc)) = -sqrt((x[1]-xc)^2+(x[2]-yc)^2+(x[3]-zc)^2) + 0.2
-  lsf_fn(x) = max(gen_lsf(4,0.2)(x),sphere(x,(1,0,0)),
+  lsf_fn(x) = max(initial_lsf(4,0.2)(x),sphere(x,(1,0,0)),
     sphere(x,(1,0,1)),sphere(x,(1,1,0)),sphere(x,(1,1,1)))
   φh = interpolate(lsf_fn,V_φ);
 
   ## Interpolation and weak form
-  interp = SmoothErsatzMaterialInterpolation(η = η_coeff*maximum(Δ))
+  interp = SmoothErsatzMaterialInterpolation(η = η_coeff*maximum(el_Δ))
   I,H,DH,ρ = interp.I,interp.H,interp.DH,interp.ρ
 
   a(u,v,φ,dΩ,dΓ_in,dΓ_out) = ∫((I ∘ φ)*(C ⊙ ε(u) ⊙ ε(v)))dΩ + ∫(ks*(u⋅v))dΓ_out
@@ -86,7 +87,7 @@ function main(mesh_partition,distribute,el_size)
   e₁ = VectorValue(1,0,0)
   J(u,φ,dΩ,dΓ_in,dΓ_out) = ∫((u⋅e₁)/vol_Γ_in)dΓ_in
   Vol(u,φ,dΩ,dΓ_in,dΓ_out) = ∫(((ρ ∘ φ) - vf)/vol_D)dΩ;
-  dVol(q,u,φ,dΩ,dΓ_in,dΓ_out) = ∫(1/vol_D*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
+  dVol(q,u,φ,dΩ,dΓ_in,dΓ_out) = ∫(-1/vol_D*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
   UΓ_out(u,φ,dΩ,dΓ_in,dΓ_out) = ∫((u⋅-e₁-δₓ)/vol_Γ_out)dΓ_out
 
   ## Finite difference solver and level set function
@@ -107,7 +108,7 @@ function main(mesh_partition,distribute,el_size)
   pcfs = PDEConstrainedFunctionals(J,[Vol,UΓ_out],state_map,analytic_dC=[dVol,nothing])
 
   ## Hilbertian extension-regularisation problems
-  α = α_coeff*maximum(Δ)
+  α = α_coeff*maximum(el_Δ)
   a_hilb(p,q) =∫(α^2*∇(p)⋅∇(q) + p*q)dΩ;
   vel_ext = VelocityExtension(
     a_hilb,U_reg,V_reg;
@@ -116,15 +117,15 @@ function main(mesh_partition,distribute,el_size)
   )
   
   ## Optimiser
-  make_dir(path;ranks=ranks)
-  optimiser = HilbertianProjection(pcfs,stencil,vel_ext,φh;γ,γ_reinit,α_min=0.7,ls_γ_max=0.05,
-    verbose=i_am_main(ranks),constraint_names=[:Vol,:UΓ_out])
+  ls_enabled=false # Setting to true will use a line search instead of oscillation detection
+  optimiser = HilbertianProjection(pcfs,stencil,vel_ext,φh;γ,γ_reinit,ls_enabled,α_min=0.7,
+    ls_γ_max=0.05,verbose=i_am_main(ranks),constraint_names=[:Vol,:UΓ_out])
   for (it, uh, φh) in optimiser
-    write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh)),"uh"=>uh])
+    write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi)|"=>(norm ∘ ∇(φh)),"uh"=>uh])
     write_history(path*"/history.txt",optimiser.history;ranks=ranks)
   end
-  it = optimiser.history.niter; uh = get_state(optimiser.problem)
-  write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi))|"=>(norm ∘ ∇(φh)),"uh"=>uh];iter_mod=1)
+  it = get_history(optimiser).niter; uh = get_state(pcfs)
+  write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi)|"=>(norm ∘ ∇(φh)),"uh"=>uh];iter_mod=1)
 end
 
 with_mpi() do distribute
