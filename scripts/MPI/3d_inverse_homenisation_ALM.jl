@@ -44,7 +44,7 @@ function main(mesh_partition,distribute,el_size)
   reffe = ReferenceFE(lagrangian,VectorValue{3,Float64},order)
   reffe_scalar = ReferenceFE(lagrangian,Float64,order)
   V = TestFESpace(model,reffe;dirichlet_tags=["origin"])
-  U = TrialFESpace(_V,VectorValue(0.0,0.0,0.0))
+  U = TrialFESpace(V,VectorValue(0.0,0.0,0.0))
   V_reg = V_φ = TestFESpace(model,reffe_scalar)
   U_reg = TrialFESpace(V_reg)
 
