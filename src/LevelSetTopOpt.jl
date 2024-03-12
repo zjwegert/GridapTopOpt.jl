@@ -8,7 +8,7 @@ using BlockArrays, SparseArrays, CircularArrays
 using LinearAlgebra, SparseMatricesCSR
 using ChainRulesCore
 using DelimitedFiles, Printf
-using ChaosTools
+using ChaosTools: estimate_period
 
 using Gridap
 using Gridap.Helpers, Gridap.Algebra, Gridap.TensorValues
