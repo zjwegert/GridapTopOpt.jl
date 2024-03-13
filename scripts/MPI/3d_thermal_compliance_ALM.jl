@@ -3,12 +3,12 @@ using Gridap, Gridap.MultiField, GridapDistributed, GridapPETSc, GridapSolvers,
 
 using GridapSolvers: NewtonSolver
 
-global elx = parse(Int,ARGS[1])
-global ely = parse(Int,ARGS[2])
-global elz = parse(Int,ARGS[3])
-global Px = parse(Int,ARGS[4])
-global Py = parse(Int,ARGS[5])
-global Pz = parse(Int,ARGS[6])
+# global elx = parse(Int,ARGS[1])
+# global ely = parse(Int,ARGS[2])
+# global elz = parse(Int,ARGS[3])
+# global Px = parse(Int,ARGS[4])
+# global Py = parse(Int,ARGS[5])
+# global Pz = parse(Int,ARGS[6])
 
 """
   (MPI) Minimum thermal compliance with augmented Lagrangian method in 3D.
@@ -119,8 +119,8 @@ function main(mesh_partition,distribute,el_size,coef,step)
 end
 
 with_mpi() do distribute
-  mesh_partition = (Px,Py,Pz)
-  el_size = (elx,ely,elz)
+  mesh_partition = (5,5,5)#(Px,Py,Pz)
+  el_size = (150,150,150)#(elx,ely,elz)
   all_solver_options = "-pc_type gamg -ksp_type cg -ksp_error_if_not_converged true 
     -ksp_converged_reason -ksp_rtol 1.0e-12"
   
