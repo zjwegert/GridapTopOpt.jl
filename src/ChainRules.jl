@@ -571,6 +571,7 @@ struct NonlinearFEStateMap{A,B,C,D,E,F} <: AbstractFEStateMap
   """
   function NonlinearFEStateMap(
     res::Function,U,V,V_φ,U_reg,φh,dΩ...;
+    jac = nothing,
     assem_U = SparseMatrixAssembler(U,V),
     assem_adjoint = SparseMatrixAssembler(V,U),
     assem_deriv = SparseMatrixAssembler(U_reg,U_reg),
@@ -578,7 +579,11 @@ struct NonlinearFEStateMap{A,B,C,D,E,F} <: AbstractFEStateMap
     adjoint_ls::LinearSolver = LUSolver()
   )
     res = IntegrandWithMeasure(res,dΩ)
-    jac = (u,du,dv,φh) -> jacobian(res,[u,dv,φh],1)
+    if isnothing(jac)
+      jacf = (u,du,v,φh) -> jacobian(res,[u,v,φh],1)
+    else 
+      jacf = (u,du,v,φh) -> jac(u,du,v,φh,dΩ...)
+    end
     spaces = (U,V,V_φ,U_reg)
 
     ## Pullback cache
@@ -590,21 +595,21 @@ struct NonlinearFEStateMap{A,B,C,D,E,F} <: AbstractFEStateMap
     ## Forward cache
     x = zero_free_values(U)
     _res(u,v) = res(u,v,φh)
-    _jac(u,du,dv) = jac(u,du,dv,φh)
+    _jac(u,du,v) = jacf(u,du,v,φh)
     op = get_algebraic_operator(FEOperator(_res,_jac,U,V,assem_U))
     nls_cache = instantiate_caches(x,nls,op)
     fwd_caches = (nls,nls_cache,x,assem_U)
 
     ## Adjoint cache
-    _jac_adj(du,dv) = jac(uhd,du,dv,φh)
+    _jac_adj(du,v) = jacf(uhd,du,v,φh)
     adjoint_K  = assemble_adjoint_matrix(_jac_adj,assem_adjoint,U,V)
     adjoint_x  = allocate_in_domain(adjoint_K); fill!(adjoint_x,zero(eltype(adjoint_x)))
     adjoint_ns = numerical_setup(symbolic_setup(adjoint_ls,adjoint_K),adjoint_K)
     adj_caches = (adjoint_ns,adjoint_K,adjoint_x,assem_adjoint)
     
-    A, B, C = typeof(res), typeof(jac), typeof(spaces)
+    A, B, C = typeof(res), typeof(jacf), typeof(spaces)
     D, E, F = typeof(plb_caches), typeof(fwd_caches), typeof(adj_caches)
-    return new{A,B,C,D,E,F}(res,jac,spaces,plb_caches,fwd_caches,adj_caches)
+    return new{A,B,C,D,E,F}(res,jacf,spaces,plb_caches,fwd_caches,adj_caches)
   end
 end
 
@@ -618,7 +623,7 @@ function forward_solve!(φ_to_u::NonlinearFEStateMap,φh)
   nls, nls_cache, x, assem_U = φ_to_u.fwd_caches
 
   res(u,v) = φ_to_u.res(u,v,φh)
-  jac(u,du,dv) = φ_to_u.jac(u,du,dv,φh)
+  jac(u,du,v) = φ_to_u.jac(u,du,v,φh)
   op = get_algebraic_operator(FEOperator(res,jac,U,V,assem_U))
   solve!(x,nls,op,nls_cache)
   return x
@@ -632,7 +637,7 @@ end
 function update_adjoint_caches!(φ_to_u::NonlinearFEStateMap,uh,φh)
   adjoint_ns, adjoint_K, _, assem_adjoint = φ_to_u.adj_caches
   U, V, _, _ = φ_to_u.spaces
-  jac(du,dv) =  φ_to_u.jac(uh,du,dv,φh)
+  jac(du,v) =  φ_to_u.jac(uh,du,v,φh)
   assemble_adjoint_matrix!(jac,adjoint_K,assem_adjoint,U,V)
   numerical_setup!(adjoint_ns,adjoint_K)
   return φ_to_u.adj_caches
