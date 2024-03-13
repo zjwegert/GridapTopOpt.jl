@@ -705,10 +705,15 @@ struct RepeatingAffineFEStateMap{A,B,C,D,E,F,G} <: AbstractFEStateMap
     @check nblocks == length(l)
 
     spaces_0 = (U0,V0)
+    assem_U0 = assem_U
+
     biform = IntegrandWithMeasure(a,dΩ)
     liforms = map(li -> IntegrandWithMeasure(li,dΩ),l)
     U, V = repeat_spaces(nblocks,U0,V0)
     spaces = (U,V,V_φ,U_reg)
+    assem_U = SparseMatrixAssembler(
+      get_matrix_type(assem_U0),get_vector_type(assem_V0),U,V,get_assembly_strategy(assem_U0)
+    )
 
     ## Pullback cache
     uhd = zero(U0)
@@ -802,9 +807,9 @@ function update_adjoint_caches!(φ_to_u::RepeatingAffineFEStateMap,uh,φh)
   return φ_to_u.adj_caches
 end
 
-function adjoint_solve!(φ_to_u::RepeatingAffineFEStateMap,du::AbstractVector)
+function adjoint_solve!(φ_to_u::RepeatingAffineFEStateMap,du::AbstractBlockVector)
   adjoint_ns, _, adjoint_x, _ = φ_to_u.adj_caches
-  map(blocks(adjoint_x),du) do xi, dui
+  map(blocks(adjoint_x),blocks(du)) do xi, dui
     solve!(xi,adjoint_ns,dui)
   end
   return adjoint_x
