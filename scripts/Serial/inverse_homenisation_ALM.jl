@@ -25,7 +25,7 @@ function main()
   α_coeff = 4
   vf = 0.5
   path = dirname(dirname(@__DIR__))*"/results/inverse_homenisation_ALM"
-  mkdir(path)
+  !isdir(path) && mkdir(path)
 
   ## FE Setup
   model = CartesianDiscreteModel(dom,el_size,isperiodic=(true,true))
