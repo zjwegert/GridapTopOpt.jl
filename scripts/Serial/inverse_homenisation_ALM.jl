@@ -24,8 +24,8 @@ function main()
   η_coeff = 2
   α_coeff = 4
   vf = 0.5
-  path = dirname(dirname(@__DIR__))*"/results/inverse_homenisation_ALM"
-  !isdir(path) && mkdir(path)
+  path = dirname(dirname(@__DIR__))*"/results/inverse_homenisation_ALM_new"
+  mkdir(path)
 
   ## FE Setup
   model = CartesianDiscreteModel(dom,el_size,isperiodic=(true,true))
@@ -62,12 +62,10 @@ function main()
   l = [(v,φ,dΩ) -> ∫(-(I ∘ φ)* C ⊙ εᴹ[i] ⊙ ε(v))dΩ for i in 1:3]
 
   ## Optimisation functionals
-  _C(C,ε_p,ε_q) = C ⊙ ε_p ⊙ ε_q
-  _K(C,(u1,u2,u3),εᴹ) = (_C(C,ε(u1)+εᴹ[1],εᴹ[1]) + _C(C,ε(u2)+εᴹ[2],εᴹ[2]) + 2*_C(C,ε(u1)+εᴹ[1],εᴹ[2]))/4
-  _v_K(C,(u1,u2,u3),εᴹ) = (_C(C,ε(u1)+εᴹ[1],ε(u1)+εᴹ[1]) + _C(C,ε(u2)+εᴹ[2],ε(u2)+εᴹ[2]) + 2*_C(C,ε(u1)+εᴹ[1],ε(u2)+εᴹ[2]))/4    
-
-  J(u,φ,dΩ) = ∫(-(I ∘ φ)*_K(C,u,εᴹ))dΩ
-  dJ(q,u,φ,dΩ) = ∫(_v_K(C,u,εᴹ)*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
+  Cᴴ(r,s,u,φ,dΩ) = ∫((I ∘ φ)*(C ⊙ (ε(u[r])+εᴹ[r]) ⊙ εᴹ[s]))dΩ
+  dCᴴ(r,s,q,u,φ,dΩ) = ∫(q*(C ⊙ (ε(u[r])+εᴹ[r]) ⊙ (ε(u[s])+εᴹ[s]))*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
+  κ(u,φ,dΩ) = -1/4*(Cᴴ(1,1,u,φ,dΩ)+Cᴴ(2,2,u,φ,dΩ)+2*Cᴴ(1,2,u,φ,dΩ))
+  dκ(q,u,φ,dΩ) = 1/4*(dCᴴ(1,1,q,u,φ,dΩ)+dCᴴ(2,2,q,u,φ,dΩ)+2*dCᴴ(1,2,q,u,φ,dΩ))
   Vol(u,φ,dΩ) = ∫(((ρ ∘ φ) - vf)/vol_D)dΩ
   dVol(q,u,φ,dΩ) = ∫(-1/vol_D*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
 
@@ -76,7 +74,7 @@ function main()
 
   ## Setup solver and FE operators
   state_map = RepeatingAffineFEStateMap(3,a,l,U,V,V_φ,U_reg,φh,dΩ)
-  pcfs = PDEConstrainedFunctionals(J,[Vol],state_map;analytic_dJ=dJ,analytic_dC=[dVol])
+  pcfs = PDEConstrainedFunctionals(κ,[Vol],state_map;analytic_dJ=dκ,analytic_dC=[dVol])
 
   ## Hilbertian extension-regularisation problems
   α = α_coeff*maximum(el_Δ)
