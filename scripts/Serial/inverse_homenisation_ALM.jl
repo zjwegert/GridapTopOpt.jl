@@ -63,9 +63,9 @@ function main()
 
   ## Optimisation functionals
   Cᴴ(r,s,u,φ,dΩ) = ∫((I ∘ φ)*(C ⊙ (ε(u[r])+εᴹ[r]) ⊙ εᴹ[s]))dΩ
-  dCᴴ(r,s,q,u,φ,dΩ) = ∫(q*(C ⊙ (ε(u[r])+εᴹ[r]) ⊙ (ε(u[s])+εᴹ[s]))*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
+  dCᴴ(r,s,q,u,φ,dΩ) = ∫(-q*(C ⊙ (ε(u[r])+εᴹ[r]) ⊙ (ε(u[s])+εᴹ[s]))*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
   κ(u,φ,dΩ) = -1/4*(Cᴴ(1,1,u,φ,dΩ)+Cᴴ(2,2,u,φ,dΩ)+2*Cᴴ(1,2,u,φ,dΩ))
-  dκ(q,u,φ,dΩ) = 1/4*(dCᴴ(1,1,q,u,φ,dΩ)+dCᴴ(2,2,q,u,φ,dΩ)+2*dCᴴ(1,2,q,u,φ,dΩ))
+  dκ(q,u,φ,dΩ) = -1/4*(dCᴴ(1,1,q,u,φ,dΩ)+dCᴴ(2,2,q,u,φ,dΩ)+2*dCᴴ(1,2,q,u,φ,dΩ))
   Vol(u,φ,dΩ) = ∫(((ρ ∘ φ) - vf)/vol_D)dΩ
   dVol(q,u,φ,dΩ) = ∫(-1/vol_D*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
 
