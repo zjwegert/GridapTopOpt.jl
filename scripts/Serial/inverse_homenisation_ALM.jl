@@ -24,7 +24,7 @@ function main()
   η_coeff = 2
   α_coeff = 4
   vf = 0.5
-  path = dirname(dirname(@__DIR__))*"/results/inverse_homenisation_ALM_new"
+  path = dirname(dirname(@__DIR__))*"/results/inverse_homenisation_ALM"
   mkdir(path)
 
   ## FE Setup
