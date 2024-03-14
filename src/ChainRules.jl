@@ -49,7 +49,9 @@ function Gridap.gradient(F::IntegrandWithMeasure,uh::Vector,K::Int)
   local_fields = map(local_views,uh) |> to_parray_of_arrays
   local_measures = map(local_views,F.dΩ) |> to_parray_of_arrays
   contribs = map(local_measures,local_fields) do dΩ,lf
-    _f = u -> F.F(lf[1:K-1]...,u,lf[K+1:end]...,dΩ...)
+    # TODO: Remove second term below, this is a fix for the problem discussed in 
+    #  https://github.com/zjwegert/LSTO_Distributed/issues/46
+    _f = u -> F.F(lf[1:K-1]...,u,lf[K+1:end]...,dΩ...) #+ ∑(∫(0)dΩ[i] for i = 1:length(dΩ))
     return Gridap.Fields.gradient(_f,lf[K])
   end
   return DistributedDomainContribution(contribs)

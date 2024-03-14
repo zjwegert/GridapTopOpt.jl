@@ -67,16 +67,12 @@ function main(mesh_partition,distribute,el_size)
   l = [(v,φ,dΩ) -> ∫(-(I ∘ φ) * C ⊙ εᴹ[i] ⊙ ε(v))dΩ for i in 1:6]
 
   ## Optimisation functionals
-  _C(C,ε_p,ε_q) = C ⊙ ε_p ⊙ ε_q;
-
-  _K(C,u,εᴹ) = (_C(C,ε(u[1])+εᴹ[1],εᴹ[1]) + _C(C,ε(u[2])+εᴹ[2],εᴹ[2]) + _C(C,ε(u[3])+εᴹ[3],εᴹ[3]) + 
-              2(_C(C,ε(u[1])+εᴹ[1],εᴹ[2]) + _C(C,ε(u[1])+εᴹ[1],εᴹ[3]) + _C(C,ε(u[2])+εᴹ[2],εᴹ[3])))/9 
-
-  _v_K(C,u,εᴹ) = (_C(C,ε(u[1])+εᴹ[1],ε(u[1])+εᴹ[1]) + _C(C,ε(u[2])+εᴹ[2],ε(u[2])+εᴹ[2]) + _C(C,ε(u[3])+εᴹ[3],ε(u[3])+εᴹ[3]) + 
-                2(_C(C,ε(u[1])+εᴹ[1],ε(u[2])+εᴹ[2]) + _C(C,ε(u[1])+εᴹ[1],ε(u[3])+εᴹ[3]) + _C(C,ε(u[2])+εᴹ[2],ε(u[3])+εᴹ[3])))/9 
-
-  J(u,φ,dΩ) = ∫(-(I ∘ φ)*_K(C,u,εᴹ))dΩ
-  dJ(q,u,φ,dΩ) = ∫(_v_K(C,u,εᴹ)*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
+  Cᴴ(r,s,u,φ,dΩ) = ∫((I ∘ φ)*(C ⊙ (ε(u[r])+εᴹ[r]) ⊙ εᴹ[s]))dΩ
+  dCᴴ(r,s,q,u,φ,dΩ) = ∫(q*(C ⊙ (ε(u[r])+εᴹ[r]) ⊙ (ε(u[s])+εᴹ[s]))*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
+  κ(u,φ,dΩ) = -1/9*(Cᴴ(1,1,u,φ,dΩ)+Cᴴ(2,2,u,φ,dΩ)+Cᴴ(3,3,u,φ,dΩ)+
+    2*(Cᴴ(1,2,u,φ,dΩ)+Cᴴ(1,3,u,φ,dΩ)+Cᴴ(2,3,u,φ,dΩ)))
+  dκ(q,u,φ,dΩ) = 1/9*(dCᴴ(1,1,q,u,φ,dΩ)+dCᴴ(2,2,q,u,φ,dΩ)+dCᴴ(3,3,q,u,φ,dΩ)+
+    2*(dCᴴ(1,2,q,u,φ,dΩ)+dCᴴ(1,3,q,u,φ,dΩ)+dCᴴ(2,3,q,u,φ,dΩ)))
   Vol(u,φ,dΩ) = ∫(((ρ ∘ φ) - vf)/vol_D)dΩ;
   dVol(q,u,φ,dΩ) = ∫(-1/vol_D*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
 
@@ -95,7 +91,7 @@ function main(mesh_partition,distribute,el_size)
     assem_deriv = SparseMatrixAssembler(Tm,Tv,U_reg,U_reg),
     ls = solver, adjoint_ls = solver
   )
-  pcfs = PDEConstrainedFunctionals(J,[Vol],state_map;analytic_dJ=dJ,analytic_dC=[dVol])
+  pcfs = PDEConstrainedFunctionals(κ,[Vol],state_map;analytic_dJ=dκ,analytic_dC=[dVol])
 
   ## Hilbertian extension-regularisation problems
   α = α_coeff*maximum(el_Δ)
