@@ -73,7 +73,7 @@ function main(mesh_partition,distribute,el_size,coef,step)
   I,H,DH,ρ = interp.I,interp.H,interp.DH,interp.ρ
 
   a(u,v,φ,dΩ,dΓ_N) = ∫((I ∘ φ)*κ*∇(u)⋅∇(v))dΩ
-  l(v,φ,dΩ,dΓ_N) = ∫(v)dΓ_N
+  l(v,φ,dΩ,dΓ_N) = ∫(10v)dΓ_N
 
   ## Optimisation functionals
   J(u,φ,dΩ,dΓ_N) = ∫((I ∘ φ)*κ*∇(u)⋅∇(u))dΩ
@@ -126,12 +126,12 @@ with_mpi() do distribute
   
   GridapPETSc.with(args=split(all_solver_options)) do
     main(mesh_partition,distribute,el_size,5,10)
-    main(mesh_partition,distribute,el_size,2,10)
+    # main(mesh_partition,distribute,el_size,2,10)
 
-    main(mesh_partition,distribute,el_size,5,5)
-    main(mesh_partition,distribute,el_size,2,5)
+    # main(mesh_partition,distribute,el_size,5,5)
+    # main(mesh_partition,distribute,el_size,2,5)
 
-    main(mesh_partition,distribute,el_size,5,3)
-    main(mesh_partition,distribute,el_size,2,3)
+    # main(mesh_partition,distribute,el_size,5,3)
+    # main(mesh_partition,distribute,el_size,2,3)
   end
 end;
