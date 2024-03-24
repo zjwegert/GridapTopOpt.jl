@@ -439,7 +439,7 @@ with_mpi() do distribute
       bopt0 = i_am_main(ranks) && zeros(NREPS)
     end
     if occursin("bopt1",BMARK_TYPE)
-      bopt1 = benchmark_optimizer(optim, 1, ranks; nreps=NREPS)
+      bopt1 = benchmark_single_iteration(optim, ranks; nreps = NREPS)
     else
       bopt1 = i_am_main(ranks) && zeros(NREPS)
     end

@@ -3,12 +3,12 @@ using Gridap, Gridap.MultiField, GridapDistributed, GridapPETSc, GridapSolvers,
 
 using GridapSolvers: NewtonSolver
 
-global elx = parse(Int,ARGS[1])
-global ely = parse(Int,ARGS[2])
-global elz = parse(Int,ARGS[3])
-global Px = parse(Int,ARGS[4])
-global Py = parse(Int,ARGS[5])
-global Pz = parse(Int,ARGS[6])
+# global elx = parse(Int,ARGS[1])
+# global ely = parse(Int,ARGS[2])
+# global elz = parse(Int,ARGS[3])
+# global Px = parse(Int,ARGS[4])
+# global Py = parse(Int,ARGS[5])
+# global Pz = parse(Int,ARGS[6])
 
 """
   (MPI) Minimum thermal compliance with augmented Lagrangian method in 3D.
@@ -73,7 +73,7 @@ function main(mesh_partition,distribute,el_size,coef,step)
   I,H,DH,ρ = interp.I,interp.H,interp.DH,interp.ρ
 
   a(u,v,φ,dΩ,dΓ_N) = ∫((I ∘ φ)*κ*∇(u)⋅∇(v))dΩ
-  l(v,φ,dΩ,dΓ_N) = ∫(v)dΓ_N
+  l(v,φ,dΩ,dΓ_N) = ∫(10v)dΓ_N
 
   ## Optimisation functionals
   J(u,φ,dΩ,dΓ_N) = ∫((I ∘ φ)*κ*∇(u)⋅∇(u))dΩ
@@ -119,19 +119,19 @@ function main(mesh_partition,distribute,el_size,coef,step)
 end
 
 with_mpi() do distribute
-  mesh_partition = (Px,Py,Pz)
-  el_size = (elx,ely,elz)
+  mesh_partition = (5,5,5)#(Px,Py,Pz)
+  el_size = (150,150,150)#(elx,ely,elz)
   all_solver_options = "-pc_type gamg -ksp_type cg -ksp_error_if_not_converged true 
     -ksp_converged_reason -ksp_rtol 1.0e-12"
   
   GridapPETSc.with(args=split(all_solver_options)) do
     main(mesh_partition,distribute,el_size,5,10)
-    main(mesh_partition,distribute,el_size,2,10)
+    # main(mesh_partition,distribute,el_size,2,10)
 
-    main(mesh_partition,distribute,el_size,5,5)
-    main(mesh_partition,distribute,el_size,2,5)
+    # main(mesh_partition,distribute,el_size,5,5)
+    # main(mesh_partition,distribute,el_size,2,5)
 
-    main(mesh_partition,distribute,el_size,5,3)
-    main(mesh_partition,distribute,el_size,2,3)
+    # main(mesh_partition,distribute,el_size,5,3)
+    # main(mesh_partition,distribute,el_size,2,3)
   end
 end;

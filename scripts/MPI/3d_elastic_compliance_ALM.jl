@@ -64,7 +64,6 @@ function main(mesh_partition,distribute,el_size)
 
   a(u,v,φ,dΩ,dΓ_N) = ∫((I ∘ φ)*(C ⊙ ε(u) ⊙ ε(v)))dΩ
   l(v,φ,dΩ,dΓ_N) = ∫(v⋅g)dΓ_N
-  res(u,v,φ,dΩ,dΓ_N) = a(u,v,φ,dΩ,dΓ_N) - l(v,φ,dΩ,dΓ_N)
 
   ## Optimisation functionals
   J(u,φ,dΩ,dΓ_N) = ∫((I ∘ φ)*(C ⊙ ε(u) ⊙ ε(u)))dΩ

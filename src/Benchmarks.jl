@@ -80,6 +80,25 @@ function benchmark_optimizer(m::Optimiser, niter, ranks; nreps = 10)
 end
 
 """
+    benchmark_single_iteration(m::Optimiser, ranks; nreps)
+
+Given an optimiser `m`, benchmark a single iteration after 0th iteration.
+"""
+function benchmark_single_iteration(m::Optimiser, ranks; nreps = 10)
+  _, state = iterate(m)
+  function f(m)
+    iterate(m, state)
+  end
+
+  φ0 = copy(get_free_dof_values(m.φ0))
+  function opt_reset!(m::Optimiser)
+    copy!(get_free_dof_values(m.φ0), φ0)
+    reset!(get_history(m))
+  end
+  return benchmark(f, (m,), ranks; nreps, reset! = opt_reset!)
+end
+
+"""
     benchmark_forward_problem(m::AbstractFEStateMap, φh, ranks; nreps)
 
 Benchmark the forward FE solve given `m::AbstractFEStateMap` and a level-set 

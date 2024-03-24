@@ -117,9 +117,8 @@ function main(mesh_partition,distribute,el_size)
   )
   
   ## Optimiser
-  ls_enabled=false # Setting to true will use a line search instead of oscillation detection
-  optimiser = HilbertianProjection(pcfs,stencil,vel_ext,φh;γ,γ_reinit,α_min=0.4,ls_enabled,
-    verbose=i_am_main(ranks),constraint_names=[:Vol,:UΓ_out])
+  optimiser = AugmentedLagrangian(pcfs,stencil,vel_ext,φh;
+    γ,γ_reinit,verbose=i_am_main(ranks),constraint_names=[:Vol,:UΓ_out])
   for (it, uh, φh) in optimiser
     write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi)|"=>(norm ∘ ∇(φh)),"uh"=>uh])
     write_history(path*"/history.txt",optimiser.history;ranks=ranks)
