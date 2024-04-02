@@ -10,6 +10,7 @@ get_state(::AbstractFEStateMap) = @abstractmethod
 get_measure(::AbstractFEStateMap) = @abstractmethod
 get_spaces(::AbstractFEStateMap) = @abstractmethod
 get_assemblers(::AbstractFEStateMap) = @abstractmethod
+
 get_trial_space(m::AbstractFEStateMap) = get_spaces(m)[1]
 get_test_space(m::AbstractFEStateMap) = get_spaces(m)[2]
 get_aux_space(m::AbstractFEStateMap) = get_spaces(m)[3]
@@ -174,7 +175,7 @@ struct AffineFEStateMap{A,B,C,D,E,F} <: AbstractFEStateMap
 
   Optional arguments enable specification of assemblers and linear solvers.
   """
-    function AffineFEStateMap(
+  function AffineFEStateMap(
     a::Function,l::Function,
     U,V,V_φ,φh,dΩ...;
     assem_U = SparseMatrixAssembler(U,V),
