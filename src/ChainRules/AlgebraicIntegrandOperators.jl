@@ -1,4 +1,3 @@
-
 """
     struct AlgebraicIntegrandOperator
 
@@ -9,7 +8,6 @@ struct AlgebraicIntegrandOperator{A,B,C,D}
   F      :: A
   spaces :: B
   assems :: C
-  caches :: D
   function AlgebraicIntegrandOperator(
     F::IntegrandOperator,
     spaces::Vector{<:FESpace};
@@ -36,16 +34,21 @@ function AlgebraicIntegrandOperator(
   return AlgebraicIntegrandOperator(op,spaces;assems=assems)
 end
 
-function Gridap.gradient(AF::AlgebraicIntegrandOperator,uh,K)
+function gradient_cache(AF::AlgebraicIntegrandOperator,uh,k)
   @check 0 < K <= length(AF.spaces)
-  Vk, ak, xk = AF.spaces[K], AF.assems[K], AF.caches[K]
-  assemble_vector!(xk,ak,collect_cell_vector(Vk,gradient(AF.F,uh,K)))
-  return xk
+  Vk, ak = AF.spaces[k], AF.assems[k]
+
+  dFduk_cache = gradient_cache(AF.F,uh,k)
+  dFduk = gradient!(dFduk_cache,AF.F,uh,k)
+  xk = allocate_vector(ak,collect_cell_vector(Vk,dFduk))
+  return xk, dFduk_cache
 end
 
-function Gridap.jacobian(AF::AlgebraicIntegrandOperator,uh,K)
+function gradient!(cache,AF::AlgebraicIntegrandOperator,uh,K)
   @check 0 < K <= length(AF.spaces)
-  Vk, ak, xk = AF.spaces[K], AF.assems[K], AF.caches[K]
-  assemble_vector!(xk,ak,collect_cell_vector(Vk,jacobian(AF.F,uh,K)))
+  xk, dFduk_cache = cache
+
+  dFduk = gradient!(dFduk_cache,AF.F,uh,K)
+  assemble_vector!(xk,ak,collect_cell_vector(Vk,dFduk))
   return xk
 end
