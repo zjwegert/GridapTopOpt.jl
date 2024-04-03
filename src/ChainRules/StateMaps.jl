@@ -6,7 +6,6 @@ the solution to an FE problem `u` that implicitly depends on an auxiliary parame
 """
 abstract type AbstractFEStateMap end
 
-get_state(::AbstractFEStateMap) = @abstractmethod
 get_measure(::AbstractFEStateMap) = @abstractmethod
 get_spaces(::AbstractFEStateMap) = @abstractmethod
 get_assemblers(::AbstractFEStateMap) = @abstractmethod
@@ -17,22 +16,34 @@ get_aux_space(m::AbstractFEStateMap) = get_spaces(m)[3]
 get_pde_assembler(m::AbstractFEStateMap) = get_assemblers(m)[1]
 get_aux_assembler(m::AbstractFEStateMap) = get_assemblers(m)[2]
 
-
-@inline (φ_to_u::AbstractFEStateMap)(φh) = forward_solve!(φ_to_u,φh)
+@inline (φ_to_u::AbstractFEStateMap)(φh) = forward_solve(φ_to_u,φh)
 
 """
-    forward_solve!(φ_to_u::AbstractFEStateMap,φh)
+    forward_solve!(φ_to_u::AbstractFEStateMap,uh,φh)
 
-Evaluate the forward problem `u` given `φ`. This should compute the
-FE problem.
+Evaluate the forward problem, i.e given the parameter `φh` compute the solution `uh`.
+Stores the solution in `uh`.
 """
-function forward_solve!(φ_to_u::AbstractFEStateMap,φh)
+function forward_solve!(φ_to_u::AbstractFEStateMap,xh,φh)
   @abstractmethod
 end
 
-function forward_solve!(φ_to_u::AbstractFEStateMap,φ::AbstractVector)
+"""
+    forward_solve(φ_to_u::AbstractFEStateMap,φh) -> FEFunction
+    forward_solve(φ_to_u::AbstractFEStateMap,φh) -> AbstractVector
+
+Evaluate the forward problem, i.e given the parameter `φh` compute the solution `uh`.
+Allocates the new solution.
+"""
+function forward_solve(φ_to_u::AbstractFEStateMap,φh)
+  xh = zero(get_trial_space(φ_to_u))
+  return forward_solve!(φ_to_u,xh,φh)
+end
+
+function forward_solve(φ_to_u::AbstractFEStateMap,φ)
   φh = FEFunction(get_aux_space(φ_to_u),φ)
-  return forward_solve!(φ_to_u,φh)
+  xh = forward_solve(φ_to_u,φh)
+  return get_free_dof_values(xh)
 end
 
 """
@@ -78,7 +89,7 @@ function dRdφ(φ_to_u::AbstractFEStateMap,u::AbstractVector,v::AbstractVector,�
 end
 
 """
-    pullback(φ_to_u::AbstractFEStateMap,uh,φh,du;updated)
+    pullback(φ_to_u::AbstractFEStateMap,uh,φh,du;updated) :: DomainContribution
 
 Compute `∂F∂u*dudφ` at `φh` and `uh` using the adjoint method. I.e., let 
 
@@ -104,18 +115,6 @@ function pullback(φ_to_u::AbstractFEStateMap,u::AbstractVector,φ::AbstractVect
   return pullback(φ_to_u,uh,φh,du;updated=updated)
 end
 
-function rrule_pullback(φ_to_u::AbstractFEStateMap,uh,φh,du;updated=false)
-  dudφ_vec, assem_φ = φ_to_u.plb_caches
-  V_φ = get_aux_space(φ_to_u)
-
-  ## Compute grad
-  dudφ = pullback(φ_to_u,uh,φh,du;updated=updated)
-  dudφ_vecdata = collect_cell_vector(V_φ,dudφ) 
-  assemble_vector!(dudφ_vec,assem_φ,dudφ_vecdata)
-  
-  return (NoTangent(),dudφ_vec)
-end
-
 """
     rrule(φ_to_u::AbstractFEStateMap,φh)
 
@@ -124,15 +123,25 @@ a function for evaluating the pullback of `φ_to_u`. This enables
 compatiblity with `ChainRules.jl`
 """
 function ChainRulesCore.rrule(φ_to_u::AbstractFEStateMap,φh)
-  u  = forward_solve!(φ_to_u,φh)
-  uh = FEFunction(get_trial_space(φ_to_u),u)
+  dudφ_vec, assem_φ = φ_to_u.plb_caches
+  V_φ = get_aux_space(φ_to_u)
+
+  uh  = forward_solve(φ_to_u,φh)
   update_adjoint_caches!(φ_to_u,uh,φh)
-  return u, du -> rrule_pullback(φ_to_u,uh,φh,du;updated=true)
+
+  function pb(du)
+    dudφ_contr = pullback(φ_to_u,uh,φh,du;updated=true)
+    assemble_vector!(dudφ_vec,assem_φ,collect_cell_vector(V_φ,dudφ_contr))
+    return (NoTangent(),dudφ_vec)
+  end
+
+  return uh, du -> pb(du)
 end
 
 function ChainRulesCore.rrule(φ_to_u::AbstractFEStateMap,φ::AbstractVector)
   φh = FEFunction(get_aux_space(φ_to_u),φ)
-  return ChainRulesCore.rrule(φ_to_u,φh)
+  uh, pb = ChainRulesCore.rrule(φ_to_u,φh)
+  return get_free_dof_values(uh), pb
 end
 
 """
@@ -161,12 +170,13 @@ struct AffineFEStateMap{A,B,C,D,E,F} <: AbstractFEStateMap
   @doc """
       AffineFEStateMap(
         a::Function,l::Function,
-        U,V,V_φ,φh,dΩ...;
+        U,V,V_φ,dΩ...;
         assem_U = SparseMatrixAssembler(U,V),
         assem_adjoint = SparseMatrixAssembler(V,U),
         assem_φ = SparseMatrixAssembler(V_φ,V_φ),
         ls::LinearSolver = LUSolver(),
-        adjoint_ls::LinearSolver = LUSolver()
+        adjoint_ls::LinearSolver = LUSolver(),
+        φh_init = V_φ -> zero(V_φ)
       )
 
   Create an instance of `AffineFEStateMap` given the bilinear form `a` and linear
@@ -177,20 +187,21 @@ struct AffineFEStateMap{A,B,C,D,E,F} <: AbstractFEStateMap
   """
   function AffineFEStateMap(
     a::Function,l::Function,
-    U,V,V_φ,φh,dΩ...;
+    U,V,V_φ,dΩ...;
     assem_U = SparseMatrixAssembler(U,V),
     assem_adjoint = SparseMatrixAssembler(V,U),
     assem_φ = SparseMatrixAssembler(V_φ,V_φ),
     ls::LinearSolver = LUSolver(),
-    adjoint_ls::LinearSolver = LUSolver()
+    adjoint_ls::LinearSolver = LUSolver(),
+    φh_init = V_φ -> zero(V_φ)
   )
-    # TODO: I really want to get rid of the φh argument...
 
     biform = IntegrandWithMeasure(a,dΩ)
     liform = IntegrandWithMeasure(l,dΩ)
     spaces = (U,V,V_φ)
 
     ## Pullback cache
+    φh = φh_init(V_φ)
     uhd = zero(U)
     vecdata = collect_cell_vector(V_φ,∇(biform,[uhd,uhd,φh],3) - ∇(liform,[uhd,φh],2))
     dudφ_vec = allocate_vector(assem_φ,vecdata)
@@ -216,12 +227,11 @@ struct AffineFEStateMap{A,B,C,D,E,F} <: AbstractFEStateMap
 end
 
 # Getters
-get_state(m::AffineFEStateMap) = FEFunction(get_trial_space(m),m.fwd_caches[4])
 get_measure(m::AffineFEStateMap) = m.biform.dΩ
 get_spaces(m::AffineFEStateMap) = m.spaces
 get_assemblers(m::AffineFEStateMap) = (m.fwd_caches[6],m.plb_caches[2],m.adj_caches[4])
 
-function forward_solve!(φ_to_u::AffineFEStateMap,φh)
+function forward_solve!(φ_to_u::AffineFEStateMap,uh,φh)
   biform, liform = φ_to_u.biform, φ_to_u.liform
   U, V, _ = φ_to_u.spaces
   ns, K, b, x, uhd, assem_U = φ_to_u.fwd_caches
@@ -231,7 +241,9 @@ function forward_solve!(φ_to_u::AffineFEStateMap,φh)
   assemble_matrix_and_vector!(a_fwd,l_fwd,K,b,assem_U,U,V,uhd)
   numerical_setup!(ns,K)
   solve!(x,ns,b)
-  return x
+  
+  copy!(get_free_dof_values(uh),x)
+  return uh
 end
 
 function dRdφ(φ_to_u::AffineFEStateMap,uh,vh,φh)
@@ -278,12 +290,13 @@ struct NonlinearFEStateMap{A,B,C,D,E,F} <: AbstractFEStateMap
 
   @doc """
       NonlinearFEStateMap(
-        res::Function,U,V,V_φ,φh,dΩ...;
+        res::Function,U,V,V_φ,dΩ...;
         assem_U = SparseMatrixAssembler(U,V),
         assem_adjoint = SparseMatrixAssembler(V,U),
         assem_φ = SparseMatrixAssembler(V_φ,V_φ),
         nls::NonlinearSolver = NewtonSolver(LUSolver();maxiter=50,rtol=1.e-8,verbose=true),
-        adjoint_ls::LinearSolver = LUSolver()
+        adjoint_ls::LinearSolver = LUSolver(),
+        φh_init = V_φ -> zero(V_φ)
       )
 
   Create an instance of `NonlinearFEStateMap` given the residual `res` as a `Function` type, 
@@ -292,18 +305,20 @@ struct NonlinearFEStateMap{A,B,C,D,E,F} <: AbstractFEStateMap
   Optional arguments enable specification of assemblers, nonlinear solver, and adjoint (linear) solver.
   """
   function NonlinearFEStateMap(
-    res::Function,U,V,V_φ,φh,dΩ...;
+    res::Function,U,V,V_φ,dΩ...;
     assem_U = SparseMatrixAssembler(U,V),
     assem_adjoint = SparseMatrixAssembler(V,U),
     assem_φ = SparseMatrixAssembler(V_φ,V_φ),
     nls::NonlinearSolver = NewtonSolver(LUSolver();maxiter=50,rtol=1.e-8,verbose=true),
-    adjoint_ls::LinearSolver = LUSolver()
+    adjoint_ls::LinearSolver = LUSolver(),
+    φh_init = V_φ -> zero(V_φ)
   )
     res = IntegrandWithMeasure(res,dΩ)
     jac = (u,du,dv,φh) -> jacobian(res,[u,dv,φh],1)
     spaces = (U,V,V_φ)
 
     ## Pullback cache
+    φh = φh_init(V_φ)
     uhd = zero(U)
     vecdata = collect_cell_vector(V_φ,∇(res,[uhd,uhd,φh],3))
     dudφ_vec = allocate_vector(assem_φ,vecdata)
@@ -330,12 +345,11 @@ struct NonlinearFEStateMap{A,B,C,D,E,F} <: AbstractFEStateMap
   end
 end
 
-get_state(m::NonlinearFEStateMap) = FEFunction(get_trial_space(m),m.fwd_caches[3])
 get_measure(m::NonlinearFEStateMap) = m.res.dΩ
 get_spaces(m::NonlinearFEStateMap) = m.spaces
 get_assemblers(m::NonlinearFEStateMap) = (m.fwd_caches[4],m.plb_caches[2],m.adj_caches[4])
 
-function forward_solve!(φ_to_u::NonlinearFEStateMap,φh)
+function forward_solve!(φ_to_u::NonlinearFEStateMap,uh,φh)
   U, V, _ = φ_to_u.spaces
   nls, nls_cache, x, assem_U = φ_to_u.fwd_caches
 
@@ -343,7 +357,9 @@ function forward_solve!(φ_to_u::NonlinearFEStateMap,φh)
   jac(u,du,dv) = φ_to_u.jac(u,du,dv,φh)
   op = get_algebraic_operator(FEOperator(res,jac,U,V,assem_U))
   solve!(x,nls,op,nls_cache)
-  return x
+  
+  copy!(get_free_dof_values(uh),x)
+  return uh
 end
 
 function dRdφ(φ_to_u::NonlinearFEStateMap,uh,vh,φh)
@@ -395,12 +411,13 @@ struct RepeatingAffineFEStateMap{A,B,C,D,E,F,G} <: AbstractFEStateMap
   @doc """
       RepeatingAffineFEStateMap(
         nblocks::Int,a::Function,l::Vector{<:Function},
-        U0,V0,V_φ,φh,dΩ...;
+        U0,V0,V_φ,dΩ...;
         assem_U = SparseMatrixAssembler(U0,V0),
         assem_adjoint = SparseMatrixAssembler(V0,U0),
         assem_φ = SparseMatrixAssembler(V_φ,V_φ),
         ls::LinearSolver = LUSolver(),
-        adjoint_ls::LinearSolver = LUSolver()
+        adjoint_ls::LinearSolver = LUSolver(),
+        φh_init = V_φ -> zero(V_φ)
       )
 
   Create an instance of `RepeatingAffineFEStateMap` given the number of blocks `nblocks`, 
@@ -417,12 +434,13 @@ struct RepeatingAffineFEStateMap{A,B,C,D,E,F,G} <: AbstractFEStateMap
   """
     function RepeatingAffineFEStateMap(
     nblocks::Int,a::Function,l::Vector{<:Function},
-    U0,V0,V_φ,φh,dΩ...;
+    U0,V0,V_φ,dΩ...;
     assem_U = SparseMatrixAssembler(U0,V0),
     assem_adjoint = SparseMatrixAssembler(V0,U0),
     assem_φ = SparseMatrixAssembler(V_φ,V_φ),
     ls::LinearSolver = LUSolver(),
-    adjoint_ls::LinearSolver = LUSolver()
+    adjoint_ls::LinearSolver = LUSolver(),
+    φh_init = V_φ -> zero(V_φ)
   )
     @check nblocks == length(l)
 
@@ -438,6 +456,7 @@ struct RepeatingAffineFEStateMap{A,B,C,D,E,F,G} <: AbstractFEStateMap
     )
 
     ## Pullback cache
+    φh = φh_init(V_φ)
     uhd = zero(U0)
     contr = nblocks * ∇(biform,[uhd,uhd,φh],3)
     for liform in liforms
@@ -483,12 +502,11 @@ function repeat_spaces(
   return U,V
 end
 
-get_state(m::RepeatingAffineFEStateMap) = FEFunction(get_trial_space(m),m.fwd_caches[4])
 get_measure(m::RepeatingAffineFEStateMap) = m.biform.dΩ
 get_spaces(m::RepeatingAffineFEStateMap) = m.spaces
 get_assemblers(m::RepeatingAffineFEStateMap) = (m.fwd_caches[8],m.plb_caches[2],m.adj_caches[4])
 
-function forward_solve!(φ_to_u::RepeatingAffineFEStateMap,φh)
+function forward_solve!(φ_to_u::RepeatingAffineFEStateMap,uh,φh)
   biform, liforms = φ_to_u.biform, φ_to_u.liform
   U0, V0 = φ_to_u.spaces_0
   ns, K, b, x, uhd, assem_U0, b0, _ = φ_to_u.fwd_caches
@@ -508,7 +526,9 @@ function forward_solve!(φ_to_u::RepeatingAffineFEStateMap,φh)
     assemble_vector_add!(b,assem_U0,vecdata)
     solve!(xi,ns,b)
   end
-  return x
+  
+  copy!(get_free_dof_values(uh),x)
+  return uh
 end
 
 function dRdφ(φ_to_u::RepeatingAffineFEStateMap,uh,vh,φh)

@@ -4,7 +4,7 @@
   Algebraic view of an `IntegrandOperator` that allows working with plain 
   arrays instead of `FEFunction`s and `DomainContribution`s.
 """
-struct AlgebraicIntegrandOperator{A,B,C,D}
+struct AlgebraicIntegrandOperator{A,B,C,D} <: IntegrandOperator
   F      :: A
   spaces :: B
   assems :: C
@@ -34,21 +34,29 @@ function AlgebraicIntegrandOperator(
   return AlgebraicIntegrandOperator(op,spaces;assems=assems)
 end
 
-function gradient_cache(AF::AlgebraicIntegrandOperator,uh,k)
-  @check 0 < K <= length(AF.spaces)
-  Vk, ak = AF.spaces[k], AF.assems[k]
+function evaluate_cache(AF::AlgebraicIntegrandOperator,uh)
+  return evaluate_cache(AF.F,uh)
+end
 
-  dFduk_cache = gradient_cache(AF.F,uh,k)
-  dFduk = gradient!(dFduk_cache,AF.F,uh,k)
+function Arrays.evaluate!(cache,AF::AlgebraicIntegrandOperator,uh;updated=false)
+  return evaluate!(cache,AF.F,uh;updated)
+end
+
+function gradient_cache(AF::AlgebraicIntegrandOperator,uh,K)
+  @check 0 < K <= length(AF.spaces)
+  Vk, ak = AF.spaces[K], AF.assems[K]
+
+  dFduk_cache = gradient_cache(AF.F,uh,K)
+  dFduk = gradient!(dFduk_cache,AF.F,uh,K)
   xk = allocate_vector(ak,collect_cell_vector(Vk,dFduk))
   return xk, dFduk_cache
 end
 
-function gradient!(cache,AF::AlgebraicIntegrandOperator,uh,K)
+function gradient!(cache,AF::AlgebraicIntegrandOperator,uh,K;updated=false)
   @check 0 < K <= length(AF.spaces)
   xk, dFduk_cache = cache
 
-  dFduk = gradient!(dFduk_cache,AF.F,uh,K)
+  dFduk = gradient!(dFduk_cache,AF.F,uh,K;updated)
   assemble_vector!(xk,ak,collect_cell_vector(Vk,dFduk))
   return xk
 end
