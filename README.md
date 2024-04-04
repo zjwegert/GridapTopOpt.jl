@@ -1,8 +1,10 @@
 # LevelSetTopOpt
 
-[comment]: badges
+| **badges** |
 
-LevelSetTopOpt is computational toolbox for level set-based topology optimisation implemented in Julia and the [Gridap](https://github.com/gridap/Gridap.jl) package ecosystem. See the documentation for further details.
+LevelSetTopOpt is computational toolbox for level set-based topology optimisation implemented in Julia and the [Gridap](https://github.com/gridap/Gridap.jl) package ecosystem. See the documentation and following publication for further details:
+
+> Zachary J. Wegert, Jordi M. Fuertes, Connor Mallon, Santiago Badia, and Vivien J. Challis (2024). "LevelSetTopOpt.jl: A scalable computational toolbox for level set-based topology optimisation". In preparation.
 
 ## Documentation
 
