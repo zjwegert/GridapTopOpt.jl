@@ -53,10 +53,10 @@ function main()
   J(u,φ,dΩ,dΓ_N) = ∫((I ∘ φ)*κ*∇(u)⋅∇(u))dΩ
   dJ(q,u,φ,dΩ,dΓ_N) = ∫(κ*∇(u)⋅∇(u)*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
   vol_D = sum(∫(1)dΩ)
-  C(u,φ,dΩ,dΓ_N) = ∫(((ρ ∘ φ) - vf)/vol_D)dΩ
-  dC(q,u,φ,dΩ,dΓ_N) = ∫(-1/vol_D*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
-  pcfs = PDEConstrainedFunctionals(J,[C],state_map,
-    analytic_dJ=dJ,analytic_dC=[dC])
+  C1(u,φ,dΩ,dΓ_N) = ∫(((ρ ∘ φ) - vf)/vol_D)dΩ
+  dC1(q,u,φ,dΩ,dΓ_N) = ∫(-1/vol_D*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
+  pcfs = PDEConstrainedFunctionals(J,[C1],state_map,
+    analytic_dJ=dJ,analytic_dC=[dC1])
   # Velocity extension
   α = 4*maximum(get_el_Δ(model))
   a_hilb(p,q) =∫(α^2*∇(p)⋅∇(q) + p*q)dΩ
