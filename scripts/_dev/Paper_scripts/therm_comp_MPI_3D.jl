@@ -5,8 +5,8 @@ function main(mesh_partition,distribute)
   ranks = distribute(LinearIndices((prod(mesh_partition),)))
   # FE parameters
   order = 1                                       # Finite element order
-  xmax = ymax = 1.0                               # Domain size
-  dom = (0,xmax,0,ymax)                           # Bounding domain
+  xmax,ymax,zmax = (1.0,1.0,1.0)                  # Domain size
+  dom = (0,xmax,0,ymax,0,zmax)                    # Bounding domain
   el_size = (150,150,150)                         # Mesh partition size
   prop_Γ_N = 0.2                                  # Γ_N size parameter
   prop_Γ_D = 0.2                                  # Γ_D size parameter
@@ -27,7 +27,7 @@ function main(mesh_partition,distribute)
   vf = 0.4                                        # Volume fraction constraint
   lsf_func = initial_lsf(4,0.2)                   # Initial level set function
   iter_mod = 10                                   # VTK Output modulo
-  path = "./results/tut1_MPI_PETSc_3D/"           # Output path
+  path = "./results/therm_comp_MPI_3D/"           # Output path
   i_am_main(ranks) && mkpath(path)                # Create path
   # Model
   model = CartesianDiscreteModel(ranks,mesh_partition,dom,el_size);
@@ -66,10 +66,10 @@ function main(mesh_partition,distribute)
   J(u,φ,dΩ,dΓ_N) = ∫((I ∘ φ)*κ*∇(u)⋅∇(u))dΩ
   dJ(q,u,φ,dΩ,dΓ_N) = ∫(κ*∇(u)⋅∇(u)*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
   vol_D = sum(∫(1)dΩ)
-  C(u,φ,dΩ,dΓ_N) = ∫(((ρ ∘ φ) - vf)/vol_D)dΩ
-  dC(q,u,φ,dΩ,dΓ_N) = ∫(-1/vol_D*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
-  pcfs = PDEConstrainedFunctionals(J,[C],state_map,
-    analytic_dJ=dJ,analytic_dC=[dC])
+  C1(u,φ,dΩ,dΓ_N) = ∫(((ρ ∘ φ) - vf)/vol_D)dΩ
+  dC1(q,u,φ,dΩ,dΓ_N) = ∫(-1/vol_D*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
+  pcfs = PDEConstrainedFunctionals(J,[C1],state_map,
+    analytic_dJ=dJ,analytic_dC=[dC1])
   # Velocity extension
   α = 4*maximum(get_el_Δ(model))
   a_hilb(p,q) =∫(α^2*∇(p)⋅∇(q) + p*q)dΩ
@@ -82,12 +82,12 @@ function main(mesh_partition,distribute)
   scheme = FirstOrderStencil(length(el_size),Float64)
   stencil = AdvectionStencil(scheme,model,V_φ,tol,max_steps)
   # Optimiser
-  optimiser = AugmentedLagrangian(pcfs,stencil,vel_ext,φh;
-    γ,γ_reinit,verbose=i_am_main(ranks),constraint_names=[:Vol])
+  optimiser = AugmentedLagrangian(pcfs,stencil,vel_ext,φh;γ,γ_reinit,
+    verbose=i_am_main(ranks))
   # Solve
   for (it,uh,φh) in optimiser
     data = ["φ"=>φh,"H(φ)"=>(H ∘ φh),"|∇(φ)|"=>(norm ∘ ∇(φh)),"uh"=>uh]
-    iszero(it % iter_mod) && (writevtk(Ω,path*"out$it",cellfields=data);GC.gc())
+    iszero(it % iter_mod) && writevtk(Ω,path*"out$it",cellfields=data)
     write_history(path*"/history.txt",get_history(optimiser);ranks)
   end
   # Final structure

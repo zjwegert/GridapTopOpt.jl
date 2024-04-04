@@ -23,7 +23,7 @@ function main()
   vf = 0.4                                        # Volume fraction constraint
   lsf_func = initial_lsf(4,0.2)                   # Initial level set function
   iter_mod = 10                                   # VTK Output modulo
-  path = "./results/tut1/"                        # Output path
+  path = "./results/therm_comp_serial/"           # Output path
   mkpath(path)                                    # Create path
   # Model
   model = CartesianDiscreteModel(dom,el_size);
@@ -65,8 +65,8 @@ function main()
   scheme = FirstOrderStencil(length(el_size),Float64)
   stencil = AdvectionStencil(scheme,model,V_φ,tol,max_steps)
   # Optimiser
-  optimiser = AugmentedLagrangian(pcfs,stencil,vel_ext,φh;
-    γ,γ_reinit,verbose=true,constraint_names=[:Vol])
+  optimiser = AugmentedLagrangian(pcfs,stencil,vel_ext,φh;γ,γ_reinit,
+    verbose=true)
   # Solve
   for (it,uh,φh) in optimiser
     data = ["φ"=>φh,"H(φ)"=>(H ∘ φh),"|∇(φ)|"=>(norm ∘ ∇(φh)),"uh"=>uh]

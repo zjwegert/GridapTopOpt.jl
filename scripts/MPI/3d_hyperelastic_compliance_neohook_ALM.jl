@@ -61,9 +61,9 @@ function main(mesh_partition,distribute,el_size)
   I,H,DH,ρ = interp.I,interp.H,interp.DH,interp.ρ
 
   ## Material properties
-  _E = 1000
+  E = 1000
   ν = 0.3
-  μ, λ = _E/(2*(1 + ν)), _E*ν/((1 + ν)*(1 - 2*ν))
+  μ, λ = E/(2*(1 + ν)), E*ν/((1 + ν)*(1 - 2*ν))
   g = VectorValue(0,0,-100)
 
   ## Neohookean hyperelastic material
