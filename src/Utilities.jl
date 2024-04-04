@@ -213,28 +213,3 @@ function isotropic_elast_tensor(D::Int,E::Number,v::Number)
     @notimplemented
   end
 end
-
-"""
-    write_vtk(Ω,path,it,entries::Vector{<:Pair};iter_mod=10)
-
-Write a VTK file to `path`. This functions in a similar way to
-Gridap's `writevtk` function except we 
-
-!!! note
-    This may be removed in future and replaced by
-
-    ```(isone(it) || iszero(it % iter_mod)) && writevtk(Ω,path,cellfields=entries)```
-
-    or 
-    
-    ```iszero(it-1 % iter_mod) && writevtk(Ω,path,cellfields=entries)```
-"""
-function write_vtk(Ω,path,it,entries::Vector{<:Pair};iter_mod=10) # TODO: Rename to writevtk?
-  if isone(it) || iszero(it % iter_mod) 
-    writevtk(Ω,path,cellfields=entries)
-  end
-
-  if iszero(it % 10*iter_mod)
-    GC.gc() # TODO: Test in Julia 1.10.0 and check if fixed.
-  end 
-end

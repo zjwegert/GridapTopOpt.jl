@@ -178,6 +178,10 @@ function Base.iterate(m::AugmentedLagrangian,state)
   update_mod, reinit_mod, ζ, Λ_max, γ_reinit, os_γ_mult = params.update_mod, 
     params.reinit_mod, params.ζ, params.Λ_max, params.γ_reinit, params.os_γ_mult
 
+  ## Periodicially call GC
+  iszero(it % 50) && GC.gc();
+
+  ## Check stopping criteria
   if finished(m)
     return nothing
   end

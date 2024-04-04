@@ -30,7 +30,8 @@ function main()
   δₓ = 0.2
   ks = 0.1
   g = VectorValue(0.5,0)
-  path = dirname(dirname(@__DIR__))*"/results/inverter_ALM"
+  path = dirname(dirname(@__DIR__))*"/results/inverter_ALM/"
+  iter_mod = 10
   mkdir(path)
   
   ## FE Setup
@@ -100,11 +101,12 @@ function main()
   optimiser = AugmentedLagrangian(pcfs,stencil,vel_ext,φh;
     γ,γ_reinit,verbose=true,constraint_names=[:Vol,:UΓ_out])
   for (it,uh,φh) in optimiser
-    write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi)|"=>(norm ∘ ∇(φh)),"uh"=>uh])
+    data = ["φ"=>φh,"H(φ)"=>(H ∘ φh),"|∇(φ)|"=>(norm ∘ ∇(φh)),"uh"=>uh]
+    iszero(it % iter_mod) && writevtk(Ω,path*"out$it",cellfields=data)
     write_history(path*"/history.txt",optimiser.history)
   end
   it = get_history(optimiser).niter; uh = get_state(pcfs)
-  write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi)|"=>(norm ∘ ∇(φh)),"uh"=>uh];iter_mod=1)
+  writevtk(Ω,path*"out$it",cellfields=["φ"=>φh,"H(φ)"=>(H ∘ φh),"|∇(φ)|"=>(norm ∘ ∇(φh)),"uh"=>uh])
 end
 
 main()

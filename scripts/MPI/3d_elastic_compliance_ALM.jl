@@ -28,7 +28,9 @@ function main(mesh_partition,distribute,el_size)
   η_coeff = 2
   α_coeff = 4
   vf = 0.4
-  path = dirname(dirname(@__DIR__))*"/results/3d_elastic_compliance_ALM"
+  path = dirname(dirname(@__DIR__))*"/results/3d_elastic_compliance_ALM/"
+  iter_mod = 10
+  i_am_main(ranks) && mkdir(path)
 
   ## FE Setup
   model = CartesianDiscreteModel(ranks,mesh_partition,dom,el_size);
@@ -98,15 +100,15 @@ function main(mesh_partition,distribute,el_size)
   )
 
   ## Optimiser
-  i_am_main(ranks) && mkdir(path)
   optimiser = AugmentedLagrangian(pcfs,stencil,vel_ext,φh;
     γ,γ_reinit,verbose=i_am_main(ranks),constraint_names=[:Vol])
   for (it, uh, φh) in optimiser
-    write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi)|"=>(norm ∘ ∇(φh)),"uh"=>uh])
+    data = ["φ"=>φh,"H(φ)"=>(H ∘ φh),"|∇(φ)|"=>(norm ∘ ∇(φh)),"uh"=>uh]
+    iszero(it % iter_mod) && writevtk(Ω,path*"out$it",cellfields=data)
     write_history(path*"/history.txt",optimiser.history;ranks=ranks)
   end
   it = get_history(optimiser).niter; uh = get_state(pcfs)
-  write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi)|"=>(norm ∘ ∇(φh)),"uh"=>uh];iter_mod=1)
+  writevtk(Ω,path*"out$it",cellfields=["φ"=>φh,"H(φ)"=>(H ∘ φh),"|∇(φ)|"=>(norm ∘ ∇(φh)),"uh"=>uh])
 end
 
 with_mpi() do distribute

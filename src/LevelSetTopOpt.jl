@@ -51,7 +51,6 @@ export update_labels!
 export initial_lsf
 export get_el_Δ
 export isotropic_elast_tensor
-export write_vtk
 
 include("Advection.jl")
 export AdvectionStencil

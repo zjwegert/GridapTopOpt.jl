@@ -38,6 +38,7 @@ function main(mesh_partition,distribute,el_size,coef,step)
   α_coeff = 4
   vf = 0.4
   path = dirname(dirname(@__DIR__))*"/results/3d_thermal_compliance_ALM_Nx$(el_size[1])_Coef$(coef)_Step$(step)"
+  iter_mod = 10
   i_am_main(ranks) && mkdir(path)
 
   ## FE Setup
@@ -111,11 +112,12 @@ function main(mesh_partition,distribute,el_size,coef,step)
   optimiser = AugmentedLagrangian(pcfs,stencil,vel_ext,φh;
     γ,γ_reinit,verbose=i_am_main(ranks),constraint_names=[:Vol])
   for (it, uh, φh) in optimiser
-    write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi)|"=>(norm ∘ ∇(φh)),"uh"=>uh])
+    data = ["φ"=>φh,"H(φ)"=>(H ∘ φh),"|∇(φ)|"=>(norm ∘ ∇(φh)),"uh"=>uh]
+    iszero(it % iter_mod) && writevtk(Ω,path*"out$it",cellfields=data)
     write_history(path*"/history.txt",optimiser.history;ranks=ranks)
   end
   it = get_history(optimiser).niter; uh = get_state(pcfs)
-  write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi)|"=>(norm ∘ ∇(φh)),"uh"=>uh];iter_mod=1)
+  writevtk(Ω,path*"out$it",cellfields=["φ"=>φh,"H(φ)"=>(H ∘ φh),"|∇(φ)|"=>(norm ∘ ∇(φh)),"uh"=>uh])
 end
 
 with_mpi() do distribute

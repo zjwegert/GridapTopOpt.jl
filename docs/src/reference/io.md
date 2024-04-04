@@ -1,12 +1,8 @@
 # IO
 
-## Optimiser history and visualisation
+## Optimiser history
 ```@docs
 LevelSetTopOpt.write_history
-```
-
-```@docs
-LevelSetTopOpt.write_vtk
 ```
 
 ## Object IO in serial

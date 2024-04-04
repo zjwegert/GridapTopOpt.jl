@@ -321,6 +321,10 @@ function Base.iterate(m::HilbertianProjection,state)
   it, J, C, θ, dJ, dC, uh, φh, vel, φ_tmp, γ, os_it = state
   history, params = m.history, m.params
 
+  ## Periodicially call GC
+  iszero(it % 50) && GC.gc();
+
+  ## Check stopping criteria
   if finished(m)
     return nothing
   end

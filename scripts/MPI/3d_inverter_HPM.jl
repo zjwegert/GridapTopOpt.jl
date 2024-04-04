@@ -32,7 +32,8 @@ function main(mesh_partition,distribute,el_size)
   δₓ=0.5
   ks = 0.01
   g = VectorValue(1,0,0)
-  path = dirname(dirname(@__DIR__))*"/results/3d_inverter_HPM"
+  path = dirname(dirname(@__DIR__))*"/results/3d_inverter_HPM/"
+  iter_mod = 10
   i_am_main(ranks) && mkdir(path)
 
   ## FE Setup
@@ -121,11 +122,12 @@ function main(mesh_partition,distribute,el_size)
   optimiser = HilbertianProjection(pcfs,stencil,vel_ext,φh;γ,γ_reinit,ls_enabled,α_min=0.7,
     ls_γ_max=0.05,verbose=i_am_main(ranks),constraint_names=[:Vol,:UΓ_out])
   for (it, uh, φh) in optimiser
-    write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi)|"=>(norm ∘ ∇(φh)),"uh"=>uh])
+    data = ["φ"=>φh,"H(φ)"=>(H ∘ φh),"|∇(φ)|"=>(norm ∘ ∇(φh)),"uh"=>uh]
+    iszero(it % iter_mod) && writevtk(Ω,path*"out$it",cellfields=data)
     write_history(path*"/history.txt",optimiser.history;ranks=ranks)
   end
   it = get_history(optimiser).niter; uh = get_state(pcfs)
-  write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi)|"=>(norm ∘ ∇(φh)),"uh"=>uh];iter_mod=1)
+  writevtk(Ω,path*"out$it",cellfields=["φ"=>φh,"H(φ)"=>(H ∘ φh),"|∇(φ)|"=>(norm ∘ ∇(φh)),"uh"=>uh])
 end
 
 with_mpi() do distribute
