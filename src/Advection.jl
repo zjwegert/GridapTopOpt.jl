@@ -74,7 +74,7 @@ function reinit!(::FirstOrderStencil{2,T},φ_new,φ,vel,Δt,Δx,isperiodic,cache
   # Sign approximation
   ∇⁺ .= @. (D⁺ʸ - D⁻ʸ)/(2Δy); ~yperiodic ? ∇⁺[:,[1,end]] .= zero(T) : 0;
   ∇⁻ .= @. (D⁺ˣ - D⁻ˣ)/(2Δx); ~xperiodic ? ∇⁻[[1,end],:] .= zero(T) : 0;
-  ϵₛ = maximum((Δx,Δy))
+  ϵₛ = minimum((Δx,Δy))
   vel .= @. φ/sqrt(φ^2 + ϵₛ^2*(∇⁺^2+∇⁻^2))
   # Forward (+) & Backward (-)
   D⁺ʸ .= @. (D⁺ʸ - φ)/Δy; ~yperiodic ? D⁺ʸ[:,end] .= zero(T) : 0;
@@ -129,7 +129,7 @@ function reinit!(::FirstOrderStencil{3,T},φ_new,φ,vel,Δt,Δx,isperiodic,cache
   ∇⁻ .= @. (D⁺ˣ - D⁻ˣ)/(2Δx); ~xperiodic ? ∇⁻[[1,end],:,:] .= zero(T) : 0;
   ∇⁺ .= @. ∇⁺^2+∇⁻^2 # |∇φ|² (partially computed)
   ∇⁻ .= @. (D⁺ᶻ - D⁻ᶻ)/(2Δz); ~xperiodic ? ∇⁻[:,:,[1,end]] .= zero(T) : 0;
-  ϵₛ = maximum((Δx,Δy))
+  ϵₛ = minimum((Δx,Δy,Δz))
   vel .= @. φ/sqrt(φ^2 + ϵₛ^2*(∇⁺+∇⁻^2))
   # Forward (+) & Backward (-)
   D⁺ʸ .= (D⁺ʸ - φ)/Δy; ~yperiodic ? D⁺ʸ[:,end,:] .= zero(T) : 0;
