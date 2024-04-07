@@ -1,6 +1,13 @@
 using Gridap, Gridap.MultiField, GridapDistributed, GridapPETSc, GridapSolvers, 
   PartitionedArrays, LevelSetTopOpt, SparseMatricesCSR
 
+global elx = parse(Int,ARGS[1])
+global ely = parse(Int,ARGS[2])
+global elz = parse(Int,ARGS[3])
+global Px = parse(Int,ARGS[4])
+global Py = parse(Int,ARGS[5])
+global Pz = parse(Int,ARGS[6])
+
 """
   (MPI) Inverter mechanism with Hilbertian projection method in 3D.
 
@@ -23,11 +30,11 @@ function main(mesh_partition,distribute,el_size)
   dom = (0,1,0,1,0,1)
   γ = 0.1
   γ_reinit = 0.5
-  max_steps = floor(Int,minimum(el_size)/10)
+  max_steps = floor(Int,order*minimum(el_size)/10)
   tol = 1/(5order^2)/minimum(el_size)
   C = isotropic_elast_tensor(3,1.0,0.3)
   η_coeff = 2
-  α_coeff = 4
+  α_coeff = 4max_steps*γ
   vf=0.4
   δₓ=0.5
   ks = 0.01
@@ -131,8 +138,8 @@ function main(mesh_partition,distribute,el_size)
 end
 
 with_mpi() do distribute
-  mesh_partition = (5,5,5)
-  el_size = (100,100,100)
+  mesh_partition = (Px,Py,Pz)
+  el_size = (elx,ely,elz)
   hilb_solver_options = "-pc_type gamg -ksp_type cg -ksp_error_if_not_converged true 
     -ksp_converged_reason -ksp_rtol 1.0e-12 -mat_block_size 3
     -mg_levels_ksp_type chebyshev -mg_levels_esteig_ksp_type cg -mg_coarse_sub_pc_type cholesky"
