@@ -79,7 +79,7 @@ struct AugmentedLagrangian{N,O} <: Optimiser
     stencil :: AdvectionStencil{O},
     vel_ext :: VelocityExtension,
     φ0;
-    Λ_max = 5.0, ζ = 1.1, update_mod = 5, reinit_mod = 1, γ = 0.1, γ_reinit = 0.5, 
+    Λ_max = 10^10, ζ = 1.1, update_mod = 5, reinit_mod = 1, γ = 0.1, γ_reinit = 0.5, 
     os_γ_mult = 0.75, maxiter = 1000, verbose=false, constraint_names = map(i -> Symbol("C_$i"),1:N),
     converged::Function = default_al_converged, debug = false,
     has_oscillations::Function = default_has_oscillations,
@@ -209,8 +209,12 @@ function Base.iterate(m::AugmentedLagrangian,state)
 
   ## Augmented Lagrangian method
   λ .= λ .- Λ .* C
-  if iszero(it % update_mod) 
-    Λ .= @.(min(Λ*ζ,Λ_max))
+  if iszero(it % update_mod)
+    for i = 1:length(C)
+      if abs(C[i])>0.01
+        Λ[i] = min(Λ[i]*ζ,Λ_max)
+      end
+    end
   end
 
   ## Compute dL and it's projection
