@@ -100,10 +100,11 @@ end
 
 get_history(m::AugmentedLagrangian) = m.history
 
-function default_has_oscillations(m::AugmentedLagrangian,os_it;itlength=25,algo=:zerocrossing)
+function default_has_oscillations(m::AugmentedLagrangian,os_it;itlength=25,
+    itstart=2itlength,algo=:zerocrossing)
   h  = m.history
   it = get_last_iteration(h)
-  if it < 2itlength || it < os_it + itlength + 1
+  if it < itstart || it < os_it + itlength + 1
     return false
   end
 
