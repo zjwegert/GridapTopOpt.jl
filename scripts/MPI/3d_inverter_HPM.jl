@@ -39,7 +39,7 @@ function main(mesh_partition,distribute,el_size)
   δₓ=0.5
   ks = 0.01
   g = VectorValue(1,0,0)
-  path = dirname(dirname(@__DIR__))*"/results/3d_inverter_HPM/"
+  path = dirname(dirname(@__DIR__))*"/results/3d_inverter_HPM_Nx$(el_size[1])/"
   iter_mod = 10
   i_am_main(ranks) && mkdir(path)
 
@@ -141,8 +141,7 @@ with_mpi() do distribute
   mesh_partition = (Px,Py,Pz)
   el_size = (elx,ely,elz)
   hilb_solver_options = "-pc_type gamg -ksp_type cg -ksp_error_if_not_converged true 
-    -ksp_converged_reason -ksp_rtol 1.0e-12 -mat_block_size 3
-    -mg_levels_ksp_type chebyshev -mg_levels_esteig_ksp_type cg -mg_coarse_sub_pc_type cholesky"
+    -ksp_converged_reason -ksp_rtol 1.0e-12"
   
   GridapPETSc.with(args=split(hilb_solver_options)) do
     main(mesh_partition,distribute,el_size)

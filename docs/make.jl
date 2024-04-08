@@ -1,5 +1,6 @@
-cd("./docs/")
-using Pkg; Pkg.activate(".")
+## Local generate
+# cd("./docs/")
+# using Pkg; Pkg.activate(".")
 
 using Documenter
 using LevelSetTopOpt

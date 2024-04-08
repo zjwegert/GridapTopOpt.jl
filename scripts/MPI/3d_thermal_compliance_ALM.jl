@@ -18,7 +18,7 @@ global Pz = parse(Int,ARGS[6])
           ⎡u∈V=H¹(Ω;u(Γ_D)=0),
           ⎣∫ κ*∇(u)⋅∇(v) dΩ = ∫ v dΓ_N, ∀v∈V.
 """
-function main(mesh_partition,distribute,el_size,coef,step)
+function main(mesh_partition,distribute,el_size)
   ranks = distribute(LinearIndices((prod(mesh_partition),)))
 
   ## Parameters
@@ -35,7 +35,7 @@ function main(mesh_partition,distribute,el_size,coef,step)
   η_coeff = 2
   α_coeff = 4max_steps*γ
   vf = 0.4
-  path = dirname(dirname(@__DIR__))*"/results/3d_thermal_compliance_ALM_Nx$(el_size[1])_Coef$(coef)_Step$(step)"
+  path = dirname(dirname(@__DIR__))*"/results/3d_thermal_compliance_ALM_Nx$(el_size[1])"
   iter_mod = 10
   i_am_main(ranks) && mkdir(path)
 
@@ -125,13 +125,6 @@ with_mpi() do distribute
     -ksp_converged_reason -ksp_rtol 1.0e-12"
   
   GridapPETSc.with(args=split(all_solver_options)) do
-    main(mesh_partition,distribute,el_size,5,10)
-    # main(mesh_partition,distribute,el_size,2,10)
-
-    # main(mesh_partition,distribute,el_size,5,5)
-    # main(mesh_partition,distribute,el_size,2,5)
-
-    # main(mesh_partition,distribute,el_size,5,3)
-    # main(mesh_partition,distribute,el_size,2,3)
+    main(mesh_partition,distribute,el_size)
   end
 end;
