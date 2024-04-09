@@ -28,7 +28,7 @@ function main(mesh_partition,distribute,el_size)
   η_coeff = 2
   α_coeff = 4max_steps*γ
   vf = 0.4
-  path = dirname(dirname(@__DIR__))*"/results/thermal_compliance_ALM_MPI+PETSc"
+  path = dirname(dirname(@__DIR__))*"/results/thermal_compliance_ALM_MPI+PETSc/"
   iter_mod = 10
   i_am_main(ranks) && mkdir(path)
 
