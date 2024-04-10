@@ -3,7 +3,7 @@ using LevelSetTopOpt, Gridap
 function main()
   # FE parameters
   order = 1                                       # Finite element order
-  xmax = ymax = 1.0                               # Domain size
+  xmax,ymax = (1.0,1.0)                           # Domain size
   dom = (0,xmax,0,ymax)                           # Bounding domain
   el_size = (200,200)                             # Mesh partition size
   prop_Γ_N = 0.2                                  # Γ_N size parameter
