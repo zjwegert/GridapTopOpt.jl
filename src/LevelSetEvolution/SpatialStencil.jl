@@ -1,10 +1,10 @@
 """
     abstract type SpatialStencil
 
-Finite difference stencil for a single step of the Hamilton-Jacobi 
+Spatial finite difference stencil for a single step of the Hamilton-Jacobi 
 evolution equation and reinitialisation equation.
 
-Your own stencil can be implemented by extending the methods below.
+Your own spatial stencil can be implemented by extending the methods below.
 """
 abstract type SpatialStencil end
 
@@ -49,7 +49,7 @@ end
 """
     struct FirstOrderStencil{D,T} <: SpatialStencil end
 
-A first order Godunov upwind difference scheme based on Osher and Fedkiw 
+A first order upwind difference scheme based on Osher and Fedkiw 
 ([link](https://doi.org/10.1007/b98879)).
 """
 struct FirstOrderStencil{D,T} <: SpatialStencil

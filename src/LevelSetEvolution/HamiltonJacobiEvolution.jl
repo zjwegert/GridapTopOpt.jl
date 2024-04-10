@@ -59,7 +59,7 @@ function HamiltonJacobiEvolution(
 end
 
 """
-    get_dof_Δ(::HamiltonJacobiEvolution)
+    get_dof_Δ(m::HamiltonJacobiEvolution)
 
 Return the distance betweem degree of freedom
 """
@@ -67,11 +67,7 @@ function get_dof_Δ(m::HamiltonJacobiEvolution)
   return m.params.Δ
 end
 
-"""
-    compute_Δt(::HamiltonJacobiEvolution,φ,vel)
-
-Compute the time step for the `HamiltonJacobiEvolution`.
-"""
+# Compute the time step for the `HamiltonJacobiEvolution`.
 function compute_Δt(::HamiltonJacobiEvolution,Δ,γ,φ,vel)
   T = eltype(γ)
   v_norm = maximum(abs,vel)

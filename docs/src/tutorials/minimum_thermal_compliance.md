@@ -349,7 +349,7 @@ scheme = FirstOrderStencil(length(el_size),Float64)
 stencil = HamiltonJacobiEvolution(scheme,model,V_φ,tol,max_steps)
 ```
 
-In the above we first build an object [`FirstOrderStencil`](@ref) that represents a finite difference stencil for a single step of the Hamilton-Jacobi evolution equation and reinitialisation equation. We use `length(el_size)` to indicate the dimension of the problem. We then create an [`HamiltonJacobiEvolution`](@ref) which enables finite differencing on order `O` finite elements in serial or parallel. The [`HamiltonJacobiEvolution`](@ref) object provides two important methods [`advect!`](@ref) and [`reinit!`](@ref) that correspond to solving the Hamilton-Jacobi evolution equation and reinitialisation equation, respectively.
+In the above we first build an object [`FirstOrderStencil`](@ref) that represents a finite difference stencil for a single step of the Hamilton-Jacobi evolution equation and reinitialisation equation. We use `length(el_size)` to indicate the dimension of the problem. We then create an [`HamiltonJacobiEvolution`](@ref) which enables finite differencing on order `O` finite elements in serial or parallel. The [`HamiltonJacobiEvolution`](@ref) object provides two important methods [`evolve!`](@ref) and [`reinit!`](@ref) that correspond to solving the Hamilton-Jacobi evolution equation and reinitialisation equation, respectively.
 
 ### Optimiser, visualisation and IO
 
