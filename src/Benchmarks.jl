@@ -120,11 +120,11 @@ end
 
 Benchmark solving the Hamilton-Jacobi evolution equation given a `stencil`,
 level-set function `φ0`, velocity function `v0`, and time step coefficient `γ`. 
-See [`advect!`](@ref) for input types.
+See [`evolve!`](@ref) for input types.
 """
 function benchmark_advection(stencil::LevelSetEvolution, φ0, v0, γ, ranks; nreps = 10)
   function f(stencil,φ,v,γ)
-    advect!(stencil,φ,v,γ)
+    evolve!(stencil,φ,v,γ)
   end
   function reset!(stencil,φ,v,γ)
     copy!(φ,φ0)

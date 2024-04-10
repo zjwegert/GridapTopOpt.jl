@@ -55,7 +55,7 @@ export isotropic_elast_tensor
 include("LevelSetEvolution/LevelSetEvolution.jl")
 export HamiltonJacobiEvolution
 export FirstOrderStencil
-export advect!
+export evolve!
 export reinit!
 
 include("Solvers.jl")
