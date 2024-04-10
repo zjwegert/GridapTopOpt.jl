@@ -32,8 +32,11 @@ In order to get familiar with the library we recommend following the numerical e
 
 > Zachary J. Wegert, Jordi M. Fuertes, Connor Mallon, Santiago Badia, and Vivien J. Challis (2024). "LevelSetTopOpt.jl: A scalable computational toolbox for level set-based topology optimisation". In preparation.
 
+In addition, there are several driver scripts available in `/scripts/..`
+
 More general tutorials for familiarising ones self with Gridap are available via the [Gridap Tutorials](https://gridap.github.io/Tutorials/dev/).
 
 ## Known issues
 - PETSc's GAMG preconditioner breaks for split Dirichlet DoFs (e.g., x constrained while y free for a single node). There is no simple fix for this. We recommend instead using MUMPS or another preconditioner for this case.
-- Currently, our implementation of automatic differentiation does not support multiplication and division of optimisation functionals. We plan to add this in a future release of `LevelSetTopOpt.jl`. 
+- Currently, our implementation of automatic differentiation does not support multiplication and division of optimisation functionals. We plan to add this in a future release of `LevelSetTopOpt.jl` -- Issue [#38](https://github.com/zjwegert/LSTO_Distributed/issues/38).
+- Analytic gradient breaks in parallel for integrals of certain measures -- Issue [#46](https://github.com/zjwegert/LSTO_Distributed/issues/46)

@@ -1,4 +1,5 @@
 # IO
+In LevelSetTopOpt, the usual IO from [Gridap](https://github.com/gridap/Gridap.jl/) is available. In addition, we also implement the below IO for convenience.
 
 ## Optimiser history
 ```@docs
