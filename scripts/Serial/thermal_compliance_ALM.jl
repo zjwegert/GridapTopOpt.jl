@@ -11,7 +11,7 @@ using Gridap, LevelSetTopOpt
           ⎣∫ κ*∇(u)⋅∇(v) dΩ = ∫ v dΓ_N, ∀v∈V.
 """ 
 function main()
-  ## Parameters|
+  ## Parameters
   order = 1
   xmax=ymax=1.0
   prop_Γ_N = 0.2
@@ -20,12 +20,12 @@ function main()
   el_size = (200,200)
   γ = 0.1
   γ_reinit = 0.5
-  max_steps = floor(Int,minimum(el_size)/10)
+  max_steps = floor(Int,order*minimum(el_size)/10)
   tol = 1/(5*order^2)/minimum(el_size)
   κ = 1
   vf = 0.4
   η_coeff = 2
-  α_coeff = 4
+  α_coeff = 4max_steps*γ
   path = dirname(dirname(@__DIR__))*"/results/thermal_compliance_ALM/"
   iter_mod = 10
   mkdir(path)

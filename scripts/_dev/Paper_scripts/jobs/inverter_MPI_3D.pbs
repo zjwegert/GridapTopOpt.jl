@@ -1,9 +1,10 @@
 #!/bin/bash -l
+
 #PBS -P LSTO
 #PBS -N inverter_MPI_3D
 
 #PBS -l select=125:ncpus=1:mpiprocs=1:ompthreads=1:mem=8GB:cputype=6140
-#PBS -l walltime=50:00:00
+#PBS -l walltime=23:00:00
 #PBS -j oe
 
 source $HOME/hpc-environments-main/lyra/load-ompi.sh

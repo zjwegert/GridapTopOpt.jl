@@ -38,7 +38,7 @@ struct AugmentedLagrangian{N,O} <: Optimiser
         stencil :: AdvectionStencil{O},
         vel_ext :: VelocityExtension,
         φ0;
-        Λ_max = 5.0, ζ = 1.1, update_mod = 5, γ = 0.1, γ_reinit = 0.5, os_γ_mult = 0.75,
+        Λ_max = 10^10, ζ = 1.1, update_mod = 5, γ = 0.1, γ_reinit = 0.5, os_γ_mult = 0.75,
         maxiter = 1000, verbose=false, constraint_names = map(i -> Symbol("C_\$i"),1:N),
         converged::Function = default_al_converged, debug = false,
         has_oscillations::Function = default_has_oscillations
@@ -100,10 +100,11 @@ end
 
 get_history(m::AugmentedLagrangian) = m.history
 
-function default_has_oscillations(m::AugmentedLagrangian,os_it;itlength=25,algo=:zerocrossing)
+function default_has_oscillations(m::AugmentedLagrangian,os_it;itlength=25,
+    itstart=2itlength,algo=:zerocrossing)
   h  = m.history
   it = get_last_iteration(h)
-  if it < 2itlength || it < os_it + itlength + 1
+  if it < itstart || it < os_it + itlength + 1
     return false
   end
 
@@ -124,8 +125,8 @@ end
 
 function default_al_converged(
   m::AugmentedLagrangian;
-  L_tol = 0.05*maximum(m.stencil.params.Δ),
-  C_tol = 0.001
+  L_tol = 0.01*maximum(m.stencil.params.Δ)/(length(m.stencil.params.Δ)-1),
+  C_tol = 0.01
 )
   h  = m.history
   it = get_last_iteration(h)
@@ -134,7 +135,7 @@ function default_al_converged(
   end
 
   Li, Ci = h[:L,it], h[:C,it]
-  L_prev = h[:L,it-10:it-1]
+  L_prev = h[:L,it-5:it-1]
   A = all(L -> abs(Li - L)/abs(Li) < L_tol, L_prev)
   B = all(C -> abs(C) < C_tol,Ci)
   return A && B

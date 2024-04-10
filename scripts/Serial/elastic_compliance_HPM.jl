@@ -19,11 +19,11 @@ function main()
   el_size = (200,100)
   γ = 0.1
   γ_reinit = 0.5
-  max_steps = floor(Int,minimum(el_size)/10)
+  max_steps = floor(Int,order*minimum(el_size)/10)
   tol = 1/(5order^2)/minimum(el_size)
   C = isotropic_elast_tensor(2,1.,0.3)
   η_coeff = 2
-  α_coeff = 4
+  α_coeff = 4max_steps*γ
   vf = 0.4
   g = VectorValue(0,-1)
   path = dirname(dirname(@__DIR__))*"/results/elastic_compliance_HPM/"

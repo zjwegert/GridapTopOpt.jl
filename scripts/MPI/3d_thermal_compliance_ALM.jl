@@ -1,14 +1,12 @@
 using Gridap, Gridap.MultiField, GridapDistributed, GridapPETSc, GridapSolvers, 
   PartitionedArrays, LevelSetTopOpt, SparseMatricesCSR
 
-using GridapSolvers: NewtonSolver
-
-# global elx = parse(Int,ARGS[1])
-# global ely = parse(Int,ARGS[2])
-# global elz = parse(Int,ARGS[3])
-# global Px = parse(Int,ARGS[4])
-# global Py = parse(Int,ARGS[5])
-# global Pz = parse(Int,ARGS[6])
+global elx = parse(Int,ARGS[1])
+global ely = parse(Int,ARGS[2])
+global elz = parse(Int,ARGS[3])
+global Px = parse(Int,ARGS[4])
+global Py = parse(Int,ARGS[5])
+global Pz = parse(Int,ARGS[6])
 
 """
   (MPI) Minimum thermal compliance with augmented Lagrangian method in 3D.
@@ -20,7 +18,7 @@ using GridapSolvers: NewtonSolver
           ⎡u∈V=H¹(Ω;u(Γ_D)=0),
           ⎣∫ κ*∇(u)⋅∇(v) dΩ = ∫ v dΓ_N, ∀v∈V.
 """
-function main(mesh_partition,distribute,el_size,coef,step)
+function main(mesh_partition,distribute,el_size)
   ranks = distribute(LinearIndices((prod(mesh_partition),)))
 
   ## Parameters
@@ -31,13 +29,13 @@ function main(mesh_partition,distribute,el_size,coef,step)
   dom = (0,xmax,0,ymax,0,zmax)
   γ = 0.1
   γ_reinit = 0.5
-  max_steps = floor(Int,minimum(el_size)/step)
+  max_steps = floor(Int,order*minimum(el_size)/step)
   tol = 1/(coef*order^2)/minimum(el_size)
   κ = 1
   η_coeff = 2
-  α_coeff = 4
+  α_coeff = 4max_steps*γ
   vf = 0.4
-  path = dirname(dirname(@__DIR__))*"/results/3d_thermal_compliance_ALM_Nx$(el_size[1])_Coef$(coef)_Step$(step)"
+  path = dirname(dirname(@__DIR__))*"/results/3d_thermal_compliance_ALM_Nx$(el_size[1])/"
   iter_mod = 10
   i_am_main(ranks) && mkdir(path)
 
@@ -121,19 +119,12 @@ function main(mesh_partition,distribute,el_size,coef,step)
 end
 
 with_mpi() do distribute
-  mesh_partition = (5,5,5)#(Px,Py,Pz)
-  el_size = (150,150,150)#(elx,ely,elz)
+  mesh_partition = (Px,Py,Pz)
+  el_size = (elx,ely,elz)
   all_solver_options = "-pc_type gamg -ksp_type cg -ksp_error_if_not_converged true 
     -ksp_converged_reason -ksp_rtol 1.0e-12"
   
   GridapPETSc.with(args=split(all_solver_options)) do
-    main(mesh_partition,distribute,el_size,5,10)
-    # main(mesh_partition,distribute,el_size,2,10)
-
-    # main(mesh_partition,distribute,el_size,5,5)
-    # main(mesh_partition,distribute,el_size,2,5)
-
-    # main(mesh_partition,distribute,el_size,5,3)
-    # main(mesh_partition,distribute,el_size,2,3)
+    main(mesh_partition,distribute,el_size)
   end
 end;

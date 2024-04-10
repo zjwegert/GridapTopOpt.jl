@@ -18,11 +18,11 @@ function main()
   el_size = (200,200)
   γ = 0.05
   γ_reinit = 0.5
-  max_steps = floor(Int,minimum(el_size)/10)
+  max_steps = floor(Int,order*minimum(el_size)/10)
   tol = 1/(5order^2)/minimum(el_size)
   C = isotropic_elast_tensor(2,1.,0.3)
   η_coeff = 2
-  α_coeff = 4
+  α_coeff = 4max_steps*γ
   vf = 0.5
   path = dirname(dirname(@__DIR__))*"/results/inverse_homenisation_ALM/"
   iter_mod = 10

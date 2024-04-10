@@ -19,7 +19,7 @@ function main(mesh_partition,distribute)
   # FD parameters
   γ = 0.1                                         # HJ eqn time step coeff
   γ_reinit = 0.5                                  # Reinit. eqn time step coeff
-  max_steps = floor(Int,minimum(el_size)/10)      # Max steps for advection
+  max_steps = floor(Int,order*minimum(el_size)/5) # Max steps for advection
   tol = 1/(5order^2)/minimum(el_size)             # Reinitialisation tolerance
   # Problem parameters
   κ = 1                                           # Diffusivity
@@ -71,7 +71,7 @@ function main(mesh_partition,distribute)
   pcfs = PDEConstrainedFunctionals(J,[C1],state_map,
     analytic_dJ=dJ,analytic_dC=[dC1])
   # Velocity extension
-  α = 4*maximum(get_el_Δ(model))
+  α = 4max_steps*γ*maximum(get_el_Δ(model))
   a_hilb(p,q) =∫(α^2*∇(p)⋅∇(q) + p*q)dΩ
   vel_ext = VelocityExtension(
     a_hilb, U_reg, V_reg;

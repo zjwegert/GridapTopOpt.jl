@@ -19,7 +19,7 @@ function generate(
   )
 
   ncpus = n_mesh_partition^3
-  wallhr = occursin("STRONG",name) && n_mesh_partition <= 3 ? 50 : wallhr
+  wallhr = occursin("STRONG",name) && n_mesh_partition <= 3 ? 100 : wallhr
   mem = occursin("STRONG",name) && n_mesh_partition == 1 ? 256 : 
         occursin("STRONG",name) && n_mesh_partition == 2 ? 32 : gb_per_cpu;
 
@@ -29,13 +29,15 @@ function generate(
 end
 
 function generate_jobs(template,phys_type,ndof_per_node,bmark_types)
-  strong = (N).^3;
-  weak_el_x = @. floor(Int,(dofs_per_proc*strong/ndof_per_node)^(1/3)-1);
-  dof_sanity_check = @.(floor(Int,ndof_per_node*(weak_el_x+1)^3/strong)),
-    maximum(abs,@. ndof_per_node*(weak_el_x+1)^3/strong/dofs_per_proc - 1)
+  npart = (N).^3;
+  weak_el_x = @. floor(Int,(dofs_per_proc*npart/ndof_per_node)^(1/3)-1);
+  dof_sanity_check = @.(floor(Int,ndof_per_node*(weak_el_x+1)^3/npart)),
+    maximum(abs,@. ndof_per_node*(weak_el_x+1)^3/npart/dofs_per_proc - 1)
 
   sname(phys_type,ndof_per_node,n,elx) = "STRONG_$(phys_type)_dof$(ndof_per_node)_N$(n)_elx$(elx)"
   wname(phys_type,ndof_per_node,n,elx) = "WEAK_$(phys_type)_dof$(ndof_per_node)_N$(n)_elx$(elx)"
+
+  strong_el_x = ceil(Int,(strong_dof/ndof_per_node)^(1/3));
 
   strong_jobs = map(n->(sname(phys_type,ndof_per_node,n,strong_el_x),
     generate(template,sname(phys_type,ndof_per_node,n,strong_el_x),phys_type,bmark_types,
@@ -63,14 +65,14 @@ dir_name= "LevelSetTopOpt";
 write_dir = "\$HOME/$dir_name/results/benchmarks/"
 
 N = 1:10; # Number of partitions in x-axis
-strong_el_x=100; # Number of elements in x-axis (strong scaling)
+strong_dof=(150+1)^3*3; # Number of dofs for strong scaling
 
 # Phys type and number of dofs per node, and what to benchmark
 phys_types = [
   ("THERM",1,"bopt0,bopt1,bfwd,badv,breinit,bvelext"),
-  ("ELAST",3,"bopt0,bopt1,bfwd"),
+  ("ELAST",3,"bopt0,bopt1,bfwd,badv,breinit,bvelext"),
   ("NLELAST",3,"bopt0,bopt1,bfwd"),
-  ("INVERTER_HPM",3,"bhpm"),
+  # ("INVERTER_HPM",3,"bhpm"),
 ];
 
 # Template
