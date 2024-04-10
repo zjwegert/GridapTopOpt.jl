@@ -86,7 +86,7 @@ function main(mesh_partition,distribute,el_size,diag_assem::Bool)
   dVol = (q,u,φ,dΩ) -> ∫(1/vol_D*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
 
   ## Finite difference solver and level set function
-  stencil = HamiltonJacobiEvolution(FirstOrderStencil(3,Float64),model,V_φ,el_size./order,max_steps,tol)
+  ls_evo = HamiltonJacobiEvolution(FirstOrderStencil(3,Float64),model,V_φ,el_size./order,max_steps,tol)
   reinit!(stencil,φ,γ_reinit)
 
   ## Setup solver and FE operators
@@ -130,7 +130,7 @@ function main(mesh_partition,distribute,el_size,diag_assem::Bool)
   
   ## Optimiser
   make_dir(path;ranks=ranks)
-  optimiser = AugmentedLagrangian(φ,pcfs,stencil,vel_ext,interp,el_size,γ,γ_reinit);
+  optimiser = AugmentedLagrangian(φ,pcfs,ls_evo,vel_ext,interp,el_size,γ,γ_reinit);
   for history in optimiser
     it,Ji,Ci,Li = last(history)
     λi = optimiser.λ; Λi = optimiser.Λ
