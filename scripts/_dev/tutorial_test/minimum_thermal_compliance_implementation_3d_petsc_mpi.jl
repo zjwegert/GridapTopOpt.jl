@@ -78,9 +78,9 @@ function main(mesh_partition,distribute)
   )
   # Finite difference scheme
   scheme = FirstOrderStencil(length(el_size),Float64)
-  stencil = HamiltonJacobiEvolution(scheme,model,V_φ,tol,max_steps)
+  ls_evo = HamiltonJacobiEvolution(scheme,model,V_φ,tol,max_steps)
   # Optimiser
-  optimiser = AugmentedLagrangian(pcfs,stencil,vel_ext,φh;
+  optimiser = AugmentedLagrangian(pcfs,ls_evo,vel_ext,φh;
     γ,γ_reinit,verbose=i_am_main(ranks),constraint_names=[:Vol])
   # Solve
   for (it,uh,φh) in optimiser

@@ -92,7 +92,7 @@ function main(mesh_partition,distribute,el_size)
   dVol(q,u,φ,dΩ) = ∫(1/vol_D*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
 
   ## Finite difference solver and level set function
-  stencil = HamiltonJacobiEvolution(FirstOrderStencil(3,Float64),model,V_φ,tol,max_steps)
+  ls_evo = HamiltonJacobiEvolution(FirstOrderStencil(3,Float64),model,V_φ,tol,max_steps)
   reinit!(stencil,φh,γ_reinit)
 
   ## Setup solver and FE operators
@@ -126,7 +126,7 @@ function main(mesh_partition,distribute,el_size)
 
   # ## Optimiser
   # make_dir(path;ranks=ranks)
-  # optimiser = AugmentedLagrangian(pcfs,stencil,vel_ext,φh;γ,γ_reinit,verbose=i_am_main(ranks))
+  # optimiser = AugmentedLagrangian(pcfs,ls_evo,vel_ext,φh;γ,γ_reinit,verbose=i_am_main(ranks))
   # for (it, uh, φh) in optimiser
   #   write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi)|"=>(norm ∘ ∇(φh)),"uh"=>uh])
   #   write_history(path*"/history.txt",optimiser.history;ranks=ranks)

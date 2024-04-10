@@ -63,9 +63,9 @@ a_hilb(p,q) =∫(α^2*∇(p)⋅∇(q) + p*q)dΩ
 vel_ext = VelocityExtension(a_hilb,U_reg,V_reg)
 # Finite difference scheme
 scheme = FirstOrderStencil(length(el_size),Float64)
-stencil = HamiltonJacobiEvolution(scheme,model,V_φ,tol,max_steps)
+ls_evo = HamiltonJacobiEvolution(scheme,model,V_φ,tol,max_steps)
 # Optimiser
-optimiser = AugmentedLagrangian(pcfs,stencil,vel_ext,φh;γ,γ_reinit,verbose=true,constraint_names=[:Vol])
+optimiser = AugmentedLagrangian(pcfs,ls_evo,vel_ext,φh;γ,γ_reinit,verbose=true,constraint_names=[:Vol])
 # Solve
 for (it,uh,φh) in optimiser
   data = ["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi)|"=>(norm ∘ ∇(φh)),"uh"=>uh]
