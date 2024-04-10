@@ -1,58 +1,58 @@
 """
-    abstract type SpatialStencil
+    abstract type Stencil
 
-Spatial finite difference stencil for a single step of the Hamilton-Jacobi 
+Finite difference stencil for a single step of the Hamilton-Jacobi 
 evolution equation and reinitialisation equation.
 
 Your own spatial stencil can be implemented by extending the methods below.
 """
-abstract type SpatialStencil end
+abstract type Stencil end
 
 """
-    allocate_caches(::SpatialStencil,φ,vel)
+    allocate_caches(::Stencil,φ,vel)
 
-Allocate caches for a given `SpatialStencil`.
+Allocate caches for a given `Stencil`.
 """
-function allocate_caches(::SpatialStencil,φ,vel)
+function allocate_caches(::Stencil,φ,vel)
   nothing # By default, no caches are required.
 end
 
 """
-    check_order(::SpatialStencil,order)
+    check_order(::Stencil,order)
 
 Throw error if insufficient reference element order
 to implement stencil in parallel.
 """
-function check_order(::SpatialStencil,order)
+function check_order(::Stencil,order)
   @abstractmethod
 end
 
 """
-    reinit!(::SpatialStencil,φ_new,φ,vel,Δt,Δx,isperiodic,caches) -> φ
+    reinit!(::Stencil,φ_new,φ,vel,Δt,Δx,isperiodic,caches) -> φ
 
-Single finite difference step of the reinitialisation equation for a given `SpatialStencil`.
+Single finite difference step of the reinitialisation equation for a given `Stencil`.
 """
-function reinit!(::SpatialStencil,φ_new,φ,vel,Δt,Δx,isperiodic,caches)
+function reinit!(::Stencil,φ_new,φ,vel,Δt,Δx,isperiodic,caches)
   @abstractmethod
 end
 
 """
-    evolve!(::SpatialStencil,φ,vel,Δt,Δx,isperiodic,caches) -> φ
+    evolve!(::Stencil,φ,vel,Δt,Δx,isperiodic,caches) -> φ
 
 Single finite difference step of the Hamilton-Jacobi evoluation equation for a given
-`SpatialStencil`. 
+`Stencil`. 
 """
-function evolve!(::SpatialStencil,φ,vel,Δt,Δx,isperiodic,caches)
+function evolve!(::Stencil,φ,vel,Δt,Δx,isperiodic,caches)
   @abstractmethod
 end
 
 """
-    struct FirstOrderStencil{D,T} <: SpatialStencil end
+    struct FirstOrderStencil{D,T} <: Stencil end
 
 A first order upwind difference scheme based on Osher and Fedkiw 
 ([link](https://doi.org/10.1007/b98879)).
 """
-struct FirstOrderStencil{D,T} <: SpatialStencil
+struct FirstOrderStencil{D,T} <: Stencil
   function FirstOrderStencil(D::Integer,::Type{T}) where T<:Real
     new{D,T}()
   end

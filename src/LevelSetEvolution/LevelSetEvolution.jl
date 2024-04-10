@@ -35,5 +35,5 @@ function get_dof_Δ(::LevelSetEvolution)
   @abstractmethod
 end
 
-include("SpatialStencil.jl")
+include("Stencil.jl")
 include("HamiltonJacobiEvolution.jl")

@@ -9,16 +9,16 @@ Based on the scheme by Osher and Fedkiw ([link](https://doi.org/10.1007/b98879))
 
 # Parameters
 
-- `stencil::SpatialStencil`: Spatial finite difference stencil for a single step HJ 
+- `stencil::Stencil`: Spatial finite difference stencil for a single step HJ 
   equation and reinitialisation equation.
 - `model`: A `CartesianDiscreteModel`.
 - `space`: FE space for level-set function
 - `perm`: A permutation vector
 - `params`: Tuple of additional params
-- `cache`: SpatialStencil cache
+- `cache`: Stencil cache
 """
 struct HamiltonJacobiEvolution{O} <: LevelSetEvolution
-  stencil :: SpatialStencil
+  stencil :: Stencil
   model
   space
   perm
@@ -27,14 +27,14 @@ struct HamiltonJacobiEvolution{O} <: LevelSetEvolution
 end
 
 """
-    HamiltonJacobiEvolution(stencil::SpatialStencil,model,space,tol,max_steps,max_steps_reinit)
+    HamiltonJacobiEvolution(stencil::Stencil,model,space,tol,max_steps,max_steps_reinit)
 
 Create an instance of `HamiltonJacobiEvolution` given a stencil, model, FE space, and 
 additional optional arguments. This automatically creates the DoF permutation
 to handle high-order finite elements. 
 """
 function HamiltonJacobiEvolution(
-  stencil::SpatialStencil,
+  stencil::Stencil,
   model,
   space,
   tol=1.e-3,
@@ -302,7 +302,7 @@ function PartitionedArrays.permute_indices(indices::LocalIndices,perm)
   return LocalIndices(n_glob,id,l2g,l2o)
 end
 
-function allocate_caches(s::SpatialStencil,φ::Vector,vel::Vector,perm,order,ndofs)
+function allocate_caches(s::Stencil,φ::Vector,vel::Vector,perm,order,ndofs)
   stencil_caches = allocate_caches(s,reshape(φ,ndofs),reshape(vel,ndofs))
   φ_tmp   = similar(φ)
   vel_tmp = similar(vel)
@@ -310,7 +310,7 @@ function allocate_caches(s::SpatialStencil,φ::Vector,vel::Vector,perm,order,ndo
   return φ_tmp, vel_tmp, perm_caches, stencil_caches
 end
 
-function allocate_caches(s::SpatialStencil,φ::PVector,vel::PVector,perm,order,local_ndofs)
+function allocate_caches(s::Stencil,φ::PVector,vel::PVector,perm,order,local_ndofs)
   local_stencil_caches = map(local_views(φ),local_views(vel),local_views(local_ndofs)) do φ,vel,ndofs
     allocate_caches(s,reshape(φ,ndofs),reshape(vel,ndofs))
   end
