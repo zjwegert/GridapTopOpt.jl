@@ -16,6 +16,7 @@ LevelSetTopOpt.get_dof_Δ(m::HamiltonJacobiEvolution)
 
 ```@docs
 LevelSetTopOpt.FirstOrderStencil
+LevelSetTopOpt.SecondOrderStencil
 ```
 
 ## Custom `SpatialStencil`
