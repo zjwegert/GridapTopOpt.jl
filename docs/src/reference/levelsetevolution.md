@@ -1,9 +1,9 @@
-# Advection
+# LevelSetEvolution (NEED TO UPDATE THIS)
 
-## `AdvectionStencil`
+## `HamiltonJacobiEvolution`
 ```@docs
-LevelSetTopOpt.AdvectionStencil
-LevelSetTopOpt.AdvectionStencil(stencil::LevelSetTopOpt.Stencil,model,space,tol=1.e-3,max_steps=100,max_steps_reinit=2000)
+LevelSetTopOpt.HamiltonJacobiEvolution
+LevelSetTopOpt.HamiltonJacobiEvolution(stencil::LevelSetTopOpt.Stencil,model,space,tol=1.e-3,max_steps=100,max_steps_reinit=2000)
 LevelSetTopOpt.advect!
 LevelSetTopOpt.reinit!
 ```
