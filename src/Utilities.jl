@@ -22,17 +22,24 @@ function ``\\varphi`` and ``I`` is an indicator function.
 - To update η and/or ϵ in an instance `m`, take `m.η .= <VALUE>`. 
 - A conviencence constructor is provided to create an instance given `η<:Number` and `ϵ<:Number`.
 """
-Base.@kwdef struct SmoothErsatzMaterialInterpolation{M<:Vector{<:Number},N<:Vector{<:Number}}
+struct SmoothErsatzMaterialInterpolation{M<:Vector{<:Number},N<:Vector{<:Number}}
   η::M
   ϵ::N
-  H = x -> H_η(x,first(η))
-  DH = x -> DH_η(x,first(η))
-  I = φ -> (1 - H(φ)) + first(ϵ)*H(φ)
-  ρ = φ -> 1 - H(φ)
-end
+  H
+  DH
+  I
+  ρ
+  function SmoothErsatzMaterialInterpolation(;
+      η::M,
+      ϵ::N = 10^-3,
+      H = x -> H_η(x,first(η)),
+      DH = x -> DH_η(x,first(η)),
+      I = φ -> (1 - H(φ)) + first(ϵ)*H(φ),
+      ρ = φ -> 1 - H(φ)
+    ) where {M<:Number,N<:Number}
 
-function SmoothErsatzMaterialInterpolation(;η::M,ϵ::N=10^-3) where {M<:Number,N<:Number}
-  return SmoothErsatzMaterialInterpolation{Vector{M},Vector{N}}(η=[η],ϵ=[ϵ])
+    new{Vector{M},Vector{N}}([η],[ϵ],H,DH,I,ρ)
+  end
 end
 
 function H_η(t,η)
