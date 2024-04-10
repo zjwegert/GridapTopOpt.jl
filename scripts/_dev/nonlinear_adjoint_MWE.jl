@@ -70,7 +70,7 @@ function main()
   J = (u,φ,dΩ,dΓ_N) -> ∫((I ∘ φ)*(D ∘ u)*∇(u)⋅∇(u) + ξ*(ρ ∘ φ))dΩ
 
   ## Finite difference solver and level set function
-  stencil = AdvectionStencil(FirstOrderStencil(2,Float64),model,V_φ,el_size./order,max_steps,tol)
+  stencil = HamiltonJacobiEvolution(FirstOrderStencil(2,Float64),model,V_φ,el_size./order,max_steps,tol)
   reinit!(stencil,φ,γ_reinit)
 
   ## Setup solver and FE operators

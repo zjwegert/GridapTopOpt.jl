@@ -102,7 +102,7 @@ function nl_elast(mesh_partition,ranks,el_size,order,verbose)
   )
   # Finite difference scheme
   scheme = FirstOrderStencil(length(el_size),Float64)
-  stencil = AdvectionStencil(scheme,model,V_φ,tol,max_steps)
+  stencil = HamiltonJacobiEvolution(scheme,model,V_φ,tol,max_steps)
   # Optimiser
   return AugmentedLagrangian(pcfs,stencil,vel_ext,φh;γ,γ_reinit,verbose)
 end
@@ -180,7 +180,7 @@ function therm(mesh_partition,ranks,el_size,order,verbose)
   )
   # Finite difference scheme
   scheme = FirstOrderStencil(length(el_size),Float64)
-  stencil = AdvectionStencil(scheme,model,V_φ,tol,max_steps)
+  stencil = HamiltonJacobiEvolution(scheme,model,V_φ,tol,max_steps)
   # Optimiser
   return AugmentedLagrangian(pcfs,stencil,vel_ext,φh;γ,γ_reinit,verbose)
 end
@@ -256,7 +256,7 @@ function elast(mesh_partition,ranks,el_size,order,verbose)
   )
   # Finite difference scheme
   scheme = FirstOrderStencil(length(el_size),Float64)
-  stencil = AdvectionStencil(scheme,model,V_φ,tol,max_steps)
+  stencil = HamiltonJacobiEvolution(scheme,model,V_φ,tol,max_steps)
   # Optimiser
   return AugmentedLagrangian(pcfs,stencil,vel_ext,φh;γ,γ_reinit,verbose)
 end
@@ -329,7 +329,7 @@ function inverter_HPM(mesh_partition,ranks,el_size,order,verbose)
   UΓ_out(u,φ,dΩ,dΓ_in,dΓ_out) = ∫((u⋅-e₁-δₓ)/vol_Γ_out)dΓ_out
 
   ## Finite difference solver
-  stencil = AdvectionStencil(FirstOrderStencil(3,Float64),model,V_φ,tol,max_steps)
+  stencil = HamiltonJacobiEvolution(FirstOrderStencil(3,Float64),model,V_φ,tol,max_steps)
 
   ## Setup solver and FE operators
   Tm = SparseMatrixCSR{0,PetscScalar,PetscInt}
