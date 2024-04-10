@@ -175,14 +175,14 @@ function evolve!(::FirstOrderStencil{3,T},φ,vel,Δt,Δx,isperiodic,caches) wher
 end
 
 """
-    struct SecondOrderStencil{D,T} <: SpatialStencil end
+    struct SecondOrderStencil{D,T} <: Stencil end
 
 A second order upwind difference scheme based on Sethian's
 Level Set Methods and Fast Marching Methods (2nd edition).
 
 Experimental feature: `SecondOrderStencil` is not working as expected for periodic problems.
 """
-struct SecondOrderStencil{D,T} <: SpatialStencil
+struct SecondOrderStencil{D,T} <: Stencil
   function SecondOrderStencil(D::Integer,::Type{T}) where T<:Real
     @warn "Experimental feature: SecondOrderStencil is not working as expected for periodic problems."
     new{D,T}()
