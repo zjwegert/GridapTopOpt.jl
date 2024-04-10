@@ -52,10 +52,10 @@ export initial_lsf
 export get_el_Δ
 export isotropic_elast_tensor
 
-include("Advection.jl")
-export AdvectionStencil
+include("LevelSetEvolution/LevelSetEvolution.jl")
+export HamiltonJacobiEvolution
 export FirstOrderStencil
-export advect!
+export evolve!
 export reinit!
 
 include("Solvers.jl")

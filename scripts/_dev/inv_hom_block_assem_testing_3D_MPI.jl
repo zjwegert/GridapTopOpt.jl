@@ -86,7 +86,7 @@ function main(mesh_partition,distribute,el_size,diag_assem::Bool)
   dVol = (q,u,φ,dΩ) -> ∫(1/vol_D*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
 
   ## Finite difference solver and level set function
-  stencil = AdvectionStencil(FirstOrderStencil(3,Float64),model,V_φ,el_size./order,max_steps,tol)
+  stencil = HamiltonJacobiEvolution(FirstOrderStencil(3,Float64),model,V_φ,el_size./order,max_steps,tol)
   reinit!(stencil,φ,γ_reinit)
 
   ## Setup solver and FE operators

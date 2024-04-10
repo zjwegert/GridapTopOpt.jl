@@ -346,10 +346,10 @@ Both of these equations can be solved numerically on a Cartesian mesh using a fi
 ```julia
 # Finite difference scheme
 scheme = FirstOrderStencil(length(el_size),Float64)
-stencil = AdvectionStencil(scheme,model,V_φ,tol,max_steps)
+stencil = HamiltonJacobiEvolution(scheme,model,V_φ,tol,max_steps)
 ```
 
-In the above we first build an object [`FirstOrderStencil`](@ref) that represents a finite difference stencil for a single step of the Hamilton-Jacobi evolution equation and reinitialisation equation. We use `length(el_size)` to indicate the dimension of the problem. We then create an [`AdvectionStencil`](@ref) which enables finite differencing on order `O` finite elements in serial or parallel. The [`AdvectionStencil`](@ref) object provides two important methods [`advect!`](@ref) and [`reinit!`](@ref) that correspond to solving the Hamilton-Jacobi evolution equation and reinitialisation equation, respectively.
+In the above we first build an object [`FirstOrderStencil`](@ref) that represents a finite difference stencil for a single step of the Hamilton-Jacobi evolution equation and reinitialisation equation. We use `length(el_size)` to indicate the dimension of the problem. We then create an [`HamiltonJacobiEvolution`](@ref) which enables finite differencing on order `O` finite elements in serial or parallel. The [`HamiltonJacobiEvolution`](@ref) object provides two important methods [`evolve!`](@ref) and [`reinit!`](@ref) that correspond to solving the Hamilton-Jacobi evolution equation and reinitialisation equation, respectively.
 
 ### Optimiser, visualisation and IO
 
@@ -461,7 +461,7 @@ a_hilb(p,q) =∫(α^2*∇(p)⋅∇(q) + p*q)dΩ
 vel_ext = VelocityExtension(a_hilb,U_reg,V_reg)
 # Finite difference scheme
 scheme = FirstOrderStencil(length(el_size),Float64)
-stencil = AdvectionStencil(scheme,model,V_φ,tol,max_steps)
+stencil = HamiltonJacobiEvolution(scheme,model,V_φ,tol,max_steps)
 # Optimiser
 optimiser = AugmentedLagrangian(pcfs,stencil,vel_ext,φh;γ,γ_reinit,verbose=true,constraint_names=[:Vol])
 # Solve
@@ -604,7 +604,7 @@ a_hilb(p,q) =∫(α^2*∇(p)⋅∇(q) + p*q)dΩ
 vel_ext = VelocityExtension(a_hilb,U_reg,V_reg)
 # Finite difference scheme
 scheme = FirstOrderStencil(length(el_size),Float64)
-stencil = AdvectionStencil(scheme,model,V_φ,tol,max_steps)
+stencil = HamiltonJacobiEvolution(scheme,model,V_φ,tol,max_steps)
 # Optimiser
 optimiser = AugmentedLagrangian(pcfs,stencil,vel_ext,φh;γ,γ_reinit,verbose=true,constraint_names=[:Vol])
 # Solve
@@ -754,7 +754,7 @@ function main()
   )
   # Finite difference scheme
   scheme = FirstOrderStencil(length(el_size),Float64)
-  stencil = AdvectionStencil(scheme,model,V_φ,tol,max_steps)
+  stencil = HamiltonJacobiEvolution(scheme,model,V_φ,tol,max_steps)
   # Optimiser
   optimiser = AugmentedLagrangian(pcfs,stencil,vel_ext,φh;γ,γ_reinit,verbose=true,constraint_names=[:Vol])
   # Solve
@@ -918,7 +918,7 @@ function main(mesh_partition,distribute)
   )
   # Finite difference scheme
   scheme = FirstOrderStencil(length(el_size),Float64)
-  stencil = AdvectionStencil(scheme,model,V_φ,tol,max_steps)
+  stencil = HamiltonJacobiEvolution(scheme,model,V_φ,tol,max_steps)
   # Optimiser
   optimiser = AugmentedLagrangian(pcfs,stencil,vel_ext,φh;
     γ,γ_reinit,verbose=i_am_main(ranks),constraint_names=[:Vol])
@@ -1070,7 +1070,7 @@ a_hilb(p,q) =∫(α^2*∇(p)⋅∇(q) + p*q)dΩ
 vel_ext = VelocityExtension(a_hilb,U_reg,V_reg)
 # Finite difference scheme
 scheme = FirstOrderStencil(length(el_size),Float64)
-stencil = AdvectionStencil(scheme,model,V_φ,tol,max_steps)
+stencil = HamiltonJacobiEvolution(scheme,model,V_φ,tol,max_steps)
 # Optimiser
 optimiser = AugmentedLagrangian(pcfs,stencil,vel_ext,φh;γ,γ_reinit,verbose=true,constraint_names=[:Vol])
 # Solve

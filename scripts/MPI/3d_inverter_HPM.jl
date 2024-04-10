@@ -99,7 +99,7 @@ function main(mesh_partition,distribute,el_size)
   UΓ_out(u,φ,dΩ,dΓ_in,dΓ_out) = ∫((u⋅-e₁-δₓ)/vol_Γ_out)dΓ_out
 
   ## Finite difference solver and level set function
-  stencil = AdvectionStencil(FirstOrderStencil(3,Float64),model,V_φ,tol,max_steps)
+  stencil = HamiltonJacobiEvolution(FirstOrderStencil(3,Float64),model,V_φ,tol,max_steps)
 
   ## Setup solver and FE operators
   Tm = SparseMatrixCSR{0,PetscScalar,PetscInt}

@@ -62,7 +62,7 @@ function main(mesh_partition,el_size,ranks)
   dJ(q,u,φ,dΩ,dΓ_N) = ∫((-ξ+D*∇(u)⋅∇(u))*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ;
 
   ## Finite difference solver and level set function
-  stencil = AdvectionStencil(FirstOrderStencil(2,Float64),model,V_φ,tol,max_steps)
+  stencil = HamiltonJacobiEvolution(FirstOrderStencil(2,Float64),model,V_φ,tol,max_steps)
   reinit!(stencil,φh,γ_reinit)
 
   ## Setup solver and FE operators

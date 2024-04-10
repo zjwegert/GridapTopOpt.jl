@@ -116,15 +116,15 @@ function benchmark_forward_problem(m::AbstractFEStateMap, φh, ranks; nreps = 10
 end
 
 """
-    benchmark_advection(stencil::AdvectionStencil, φ0, v0, γ, ranks; nreps)
+    benchmark_advection(stencil::LevelSetEvolution, φ0, v0, γ, ranks; nreps)
 
 Benchmark solving the Hamilton-Jacobi evolution equation given a `stencil`,
 level-set function `φ0`, velocity function `v0`, and time step coefficient `γ`. 
-See [`advect!`](@ref) for input types.
+See [`evolve!`](@ref) for input types.
 """
-function benchmark_advection(stencil::AdvectionStencil, φ0, v0, γ, ranks; nreps = 10)
+function benchmark_advection(stencil::LevelSetEvolution, φ0, v0, γ, ranks; nreps = 10)
   function f(stencil,φ,v,γ)
-    advect!(stencil,φ,v,γ)
+    evolve!(stencil,φ,v,γ)
   end
   function reset!(stencil,φ,v,γ)
     copy!(φ,φ0)
@@ -136,12 +136,12 @@ function benchmark_advection(stencil::AdvectionStencil, φ0, v0, γ, ranks; nrep
 end
 
 """
-    benchmark_reinitialisation(stencil::AdvectionStencil, φ0, γ_reinit, ranks; nreps)
+    benchmark_reinitialisation(stencil::LevelSetEvolution, φ0, γ_reinit, ranks; nreps)
 
 Benchmark solving the reinitialisation equation given a `stencil`, level-set function
 `φ0`, and time step coefficient `γ`. See [`reinit!`](@ref) for input types.
 """
-function benchmark_reinitialisation(stencil::AdvectionStencil, φ0, γ_reinit, ranks; nreps = 10)
+function benchmark_reinitialisation(stencil::LevelSetEvolution, φ0, γ_reinit, ranks; nreps = 10)
   function f(stencil,φ,γ_reinit)
     reinit!(stencil,φ,γ_reinit)
   end

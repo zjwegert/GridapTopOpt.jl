@@ -77,7 +77,7 @@ function main()
   )
   # Finite difference scheme
   scheme = FirstOrderStencil(length(el_size),Float64)
-  stencil = AdvectionStencil(scheme,model,V_φ,tol,max_steps)
+  stencil = HamiltonJacobiEvolution(scheme,model,V_φ,tol,max_steps)
   # Optimiser
   optimiser = AugmentedLagrangian(pcfs,stencil,vel_ext,φh;γ,γ_reinit,verbose=true,constraint_names=[:Vol])
   # Solve
