@@ -15,6 +15,7 @@ using Gridap.Helpers, Gridap.Algebra, Gridap.TensorValues
 using Gridap.Geometry, Gridap.CellData, Gridap.Fields
 using Gridap.ReferenceFEs, Gridap.FESpaces,  Gridap.MultiField
 using Gridap.Geometry: get_faces
+using Gridap.FESpaces: get_assembly_strategy
 using Gridap: writevtk
 
 using GridapDistributed
