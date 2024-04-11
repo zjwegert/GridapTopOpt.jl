@@ -93,3 +93,23 @@ function (+)(a::Gridap.CellData.DomainContribution,b::GridapDistributed.Distribu
   @assert iszero(Gridap.CellData.num_domains(a))
   return b
 end
+
+# GridapDistributed
+
+function GridapDistributed.to_parray_of_arrays(a::NTuple{N,T}) where {N,T<:DebugArray}
+  indices = linear_indices(first(a))
+  map(indices) do i
+    map(a) do aj
+      aj.items[i]
+    end
+  end
+end  
+
+function GridapDistributed.to_parray_of_arrays(a::NTuple{N,T}) where {N,T<:MPIArray}
+  indices = linear_indices(first(a))
+  map(indices) do i
+    map(a) do aj
+      PartitionedArrays.getany(aj)
+    end
+  end
+end
