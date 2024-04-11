@@ -10,14 +10,29 @@ struct IntegralQuantity <: IntegrandOperator
   F :: IntegrandOperator
 end
 
-(F::IntegralQuantity)(args...) = sum(F.F(args...))
-
-function gradient_cache(F::IntegralQuantity,uh,K)
-  return gradient_cache(F.F,uh,K)
+function evaluate_cache(J::IntegralQuantity,uh)
+  return evaluate_cache(J.F,uh)
 end
 
-function gradient!(cache,F::IntegralQuantity,uh,K)
-  return gradient!(cache,F.F,uh,K)
+function evaluate!(cache,J::IntegralQuantity,uh)
+  return sum(evaluate!(cache,J.F,uh))
+end
+
+function gradient_cache(J::IntegralQuantity,uh,K)
+  return gradient_cache(J.F,uh,K)
+end
+
+function gradient!(cache,J::IntegralQuantity,uh,K;updated=false)
+  return gradient!(cache,J.F,uh,K;updated)
+end
+
+function gradient_and_evaluate_cache(J::IntegralQuantity,uh,k)
+  return gradient_and_evaluate_cache(J.F,uh,k)
+end
+
+function gradient_and_evaluate!(cache,J::IntegralQuantity,uh,k;updated=false)
+  j, dj = gradient_and_evaluate!(cache,J.F,uh,k;updated)
+  return sum(j), dj
 end
 
 struct OperationIntegralQuantity{T} <: IntegrandOperator
@@ -25,8 +40,24 @@ struct OperationIntegralQuantity{T} <: IntegrandOperator
   quants :: Tuple
 end
 
-(op::Operation)(quants...::IntegralQuantity...) = OperationIntegralQuantity(op,quants)
+Arrays.evaluate!(op::Operation,quants...::IntegralQuantity...) = OperationIntegralQuantity(op,quants)
 
-(J::OperationIntegralQuantity)(args...) = J.op(map(Jk -> Jk(args...),J.quants)...)
+function Arrays.evaluate!(cache,J::OperationIntegralQuantity,uh)
+  return J.op.op(map(Jk -> evaluate!(cache,Jk,uh),J.quants)...)
+end
 
-# We can now define the rrules depending on the operation type...
+function gradient_cache(J::OperationIntegralQuantity,uh,K)
+  return gradient_cache(J.op,uh,K)
+end
+
+function gradient!(cache,J::OperationIntegralQuantity,uh,K;updated=false)
+  return gradient!(cache,J.op,uh,K;updated)
+end
+
+function gradient_and_evaluate_cache(J::OperationIntegralQuantity,uh,k)
+  return gradient_and_evaluate_cache(J.op,uh,k)
+end
+
+function gradient_and_evaluate!(cache,J::OperationIntegralQuantity,uh,k;updated=false)
+  return gradient_and_evaluate!(cache,J.op,uh,k;updated)
+end
