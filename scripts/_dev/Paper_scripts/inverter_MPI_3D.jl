@@ -22,6 +22,7 @@ function main(mesh_partition,distribute)
   # Problem parameters
   C = isotropic_elast_tensor(3,1.,0.3)            # Stiffness tensor
   g = VectorValue(0,0,-1)                         # Applied load on Γ_N
+  ks = 0.01                                       # Artificial spring stiffness
   vf = 0.4                                        # Volume fraction constraint
   sphere(x,(xc,yc,zc)) = -sqrt((x[1]-xc)^2+(x[2]-yc)^2+(x[3]-zc)^2) + 0.2
   lsf_func(x) = max(initial_lsf(4,0.2)(x),        # Initial level set function
