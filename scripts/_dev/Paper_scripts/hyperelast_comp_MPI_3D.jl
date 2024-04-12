@@ -1,6 +1,8 @@
 using LevelSetTopOpt, Gridap, GridapDistributed, GridapPETSc, PartitionedArrays, 
   SparseMatricesCSR
 
+using GridapSolvers: NewtonSolver
+
 function main(mesh_partition,distribute)
   ranks = distribute(LinearIndices((prod(mesh_partition),)))
   # FE parameters
