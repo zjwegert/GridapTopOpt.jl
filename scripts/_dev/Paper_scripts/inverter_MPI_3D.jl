@@ -61,7 +61,7 @@ function main(mesh_partition,distribute)
   Tv = Vector{PetscScalar}
   solver = ElasticitySolver(V)
   state_map = AffineFEStateMap(
-    a,l,U,V,V_φ,U_reg,φh,dΩ,dΓ_N;
+    a,l,U,V,V_φ,U_reg,φh,dΩ,dΓ_in,dΓ_out;
     assem_U = SparseMatrixAssembler(Tm,Tv,U,V),
     assem_adjoint = SparseMatrixAssembler(Tm,Tv,V,U),
     assem_deriv = SparseMatrixAssembler(Tm,Tv,U_reg,U_reg),
@@ -73,8 +73,8 @@ function main(mesh_partition,distribute)
   vol_Γ_out = sum(∫(1)dΓ_out)
   vol_D = sum(∫(1)dΩ)
   J(u,φ,dΩ,dΓ_in,dΓ_out) = ∫((u⋅e₁)/vol_Γ_in)dΓ_in
-  C1(u,φ,dΩ,dΓ_N) = ∫(((ρ ∘ φ) - vf)/vol_D)dΩ
-  dC1(q,u,φ,dΩ,dΓ_N) = ∫(-1/vol_D*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
+  C1(u,φ,dΩ,dΓ_in,dΓ_out) = ∫(((ρ ∘ φ) - vf)/vol_D)dΩ
+  dC1(q,u,φ,dΩ,dΓ_in,dΓ_out) = ∫(-1/vol_D*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
   C2(u,φ,dΩ,dΓ_in,dΓ_out) = ∫((u⋅-e₁-δₓ)/vol_Γ_out)dΓ_out
   pcfs = PDEConstrainedFunctionals(J,[C1,C2],state_map,
     analytic_dJ=dJ,analytic_dC=[dC1,nothing])
