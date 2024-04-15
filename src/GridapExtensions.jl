@@ -59,7 +59,7 @@ function assemble_adjoint_matrix!(f::Function,A::AbstractMatrix,a::Assembler,U::
 end
 
 # Assembly addons
-
+"""
 function Gridap.FESpaces.allocate_matrix(a::Function,assem::Assembler,U::FESpace,V::FESpace)
   v = get_fe_basis(V)
   u = get_trial_fe_basis(U)
@@ -77,6 +77,18 @@ function Gridap.FESpaces.assemble_matrix_and_vector!(
   u = get_trial_fe_basis(U)
   assemble_matrix_and_vector!(A,b,assem,collect_cell_matrix_and_vector(U,V,a(u,v),l(v),uhd))
 end
+"""
+
+get_local_matrix_type(a::Assembler) = get_matrix_type(a)
+get_local_vector_type(a::Assembler) = get_vector_type(a)
+
+function get_local_matrix_type(a::GridapDistributed.DistributedSparseMatrixAssembler)
+  return getany(map(get_matrix_type,a.assems))
+end
+
+function get_local_vector_type(a::GridapDistributed.DistributedSparseMatrixAssembler)
+  return getany(map(get_vector_type,a.assems))
+end
 
 # PETScNonlinearSolver override
 
@@ -88,8 +100,9 @@ function Gridap.Algebra.solve!(x::T,nls::PETScNonlinearSolver,op::Gridap.Algebra
 end
 
 # Stuff from ODE refactor 
-
+"""
 function (+)(a::Gridap.CellData.DomainContribution,b::GridapDistributed.DistributedDomainContribution)
   @assert iszero(Gridap.CellData.num_domains(a))
   return b
 end
+"""

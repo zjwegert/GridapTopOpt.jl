@@ -21,14 +21,14 @@ function main(mesh_partition,distribute,el_size)
   γ = 0.05
   γ_reinit = 0.5
   max_steps = floor(Int,order*minimum(el_size)/10)
-  tol = 1/(5order^2)/minimum(el_size)
+  tol = 1/(5*order^2)/minimum(el_size)
   C = isotropic_elast_tensor(2,1.,0.3)
   η_coeff = 2
-  α_coeff = 4max_steps*γ
+  α_coeff = 4*max_steps*γ
   vf = 0.5
   path = dirname(dirname(@__DIR__))*"/results/inverse_homenisation_ALM_MPI/"
   iter_mod = 10
-  i_am_main(ranks) && mkdir(path)
+  #i_am_main(ranks) && mkdir(path)
 
   ## FE Setup
   model = CartesianDiscreteModel(ranks,mesh_partition,dom,el_size,isperiodic=(true,true));

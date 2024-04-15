@@ -714,7 +714,8 @@ struct RepeatingAffineFEStateMap{A,B,C,D,E,F,G} <: AbstractFEStateMap
     U, V = repeat_spaces(nblocks,U0,V0)
     spaces = (U,V,V_φ,U_reg)
     assem_U = SparseMatrixAssembler(
-      get_matrix_type(assem_U0),get_vector_type(assem_U0),U,V,FESpaces.get_assembly_strategy(assem_U0)
+      get_local_matrix_type(assem_U0), get_local_vector_type(assem_U0),
+      U, V, get_assembly_strategy(assem_U0)
     )
 
     ## Pullback cache
