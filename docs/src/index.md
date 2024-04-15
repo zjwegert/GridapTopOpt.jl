@@ -4,7 +4,7 @@ Welcome to the documentation for `LevelSetTopOpt.jl`!
 ## Introduction
 `LevelSetTopOpt.jl` is computational toolbox for level set-based topology optimisation implemented in Julia and the Gridap package ecosystem. The core design principle of `LevelSetTopOpt.jl` is to provide an extendable framework for solving optimisation problems in serial or parallel with a high-level programming interface and automatic differentiation. See the following publication for further details:
 
-> Zachary J. Wegert, Jordi M. Fuertes, Connor Mallon, Santiago Badia, and Vivien J. Challis (2024). "LevelSetTopOpt.jl: A scalable computational toolbox for level set-based topology optimisation". In preparation.
+> Zachary J. Wegert, Jordi Manyer, Connor Mallon, Santiago Badia, and Vivien J. Challis (2024). "LevelSetTopOpt.jl: A scalable computational toolbox for level set-based topology optimisation". In preparation.
 
 ## How to use this documentation
 

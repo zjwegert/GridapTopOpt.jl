@@ -1,6 +1,6 @@
 MIT License
 
-Copyright (c) 2024 [Zachary Wegert](mailto:zach.wegert@hdr.qut.edu.au), [Jordi Fuertes](mailto:jordi.manyer@monash.edu), [Connor Mallon](mailto:connor.mallon@monash.edu), [Santiago Badia](mailto:santiago.badia@monash.edu) and [Vivien Challis](mailto:vivien.challis@qut.edu.au)
+Copyright (c) 2024 [Zachary Wegert](mailto:zach.wegert@hdr.qut.edu.au), [Jordi Manyer](mailto:jordi.manyer@monash.edu), [Connor Mallon](mailto:connor.mallon@monash.edu), [Santiago Badia](mailto:santiago.badia@monash.edu) and [Vivien Challis](mailto:vivien.challis@qut.edu.au)
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal

@@ -521,7 +521,7 @@ end
 function update_adjoint_caches!(φ_to_u::AffineFEStateMap,uh,φh)
   adjoint_ns, adjoint_K, _, assem_adjoint = φ_to_u.adj_caches
   U, V, _, _ = φ_to_u.spaces
-  assemble_matrix!((u,v) -> φ_to_u.biform(v,u,φh),adjoint_K,assem_adjoint,V,U) # TODO: @Jordi, should this be `assemble_adjoint_matrix!`?
+  assemble_matrix!((u,v) -> φ_to_u.biform(v,u,φh),adjoint_K,assem_adjoint,V,U)
   numerical_setup!(adjoint_ns,adjoint_K)
   return φ_to_u.adj_caches
 end
