@@ -124,7 +124,7 @@ function compute_α(C,dC_orthog,dC,normsq,K,P,λ,α_min,α_max)
 end
 
 """
-    struct HilbertianProjection{T,N} <: Optimiser
+    struct HilbertianProjection <: Optimiser
 
 A Hilbertian projection method as described by Wegert et al., 2023 
 ([link](https://doi.org/10.1007/s00158-023-03663-0)).
@@ -132,8 +132,7 @@ A Hilbertian projection method as described by Wegert et al., 2023
 # Parameters
 
 - `problem::PDEConstrainedFunctionals{N}`: The objective and constraint setup.
-- `stencil::AdvectionStencil{O}`: The finite difference stencil for 
-  solving the evolution and reinitisation equations.
+- `ls_evolver::LevelSetEvolution`: Solver for the evolution and reinitisation equations.
 - `vel_ext::VelocityExtension`: The velocity-extension method for extending 
   shape sensitivities onto the computational domain.
 - `projector::HilbertianProjectionMap`: Sensitivity information projector
@@ -142,9 +141,9 @@ A Hilbertian projection method as described by Wegert et al., 2023
 - `has_oscillations::Function`: A function to check for oscillations.
 - `params::NamedTuple`: Optimisation parameters.
 """
-struct HilbertianProjection{T,N} <: Optimiser
-  problem           :: PDEConstrainedFunctionals{N}
-  stencil           :: AdvectionStencil
+struct HilbertianProjection <: Optimiser
+  problem           :: PDEConstrainedFunctionals
+  ls_evolver        :: LevelSetEvolution
   vel_ext           :: VelocityExtension
   projector         :: HilbertianProjectionMap
   history           :: OptimiserHistory{Float64}
@@ -156,7 +155,7 @@ struct HilbertianProjection{T,N} <: Optimiser
   @doc """
       HilbertianProjection(
         problem :: PDEConstrainedFunctionals{N},
-        stencil :: AdvectionStencil,
+        ls_evolver :: LevelSetEvolution,
         vel_ext :: VelocityExtension,
         φ0;
         orthog = HPModifiedGramSchmidt(),
@@ -174,8 +173,7 @@ struct HilbertianProjection{T,N} <: Optimiser
   # Required
 
   - `problem::PDEConstrainedFunctionals{N}`: The objective and constraint setup.
-  - `stencil::AdvectionStencil{O}`: The finite difference stencil for 
-    solving the evolution and reinitisation equations.
+  - `ls_evolver::LevelSetEvolution`: Solver for the evolution and reinitisation equations.
   - `vel_ext::VelocityExtension`: The velocity-extension method for extending 
     shape sensitivities onto the computational domain.
   - `φ0`: An initial level-set function defined as a FEFunction or GridapDistributed equivilent.
@@ -221,9 +219,9 @@ struct HilbertianProjection{T,N} <: Optimiser
       disabling the line search via `ls_enabled = false` will enable oscillation detection. 
   """
     function HilbertianProjection(
-    problem :: PDEConstrainedFunctionals{N},
-    stencil :: AdvectionStencil,
-    vel_ext :: VelocityExtension,
+    problem    :: PDEConstrainedFunctionals{N},
+    ls_evolver :: LevelSetEvolution,
+    vel_ext    :: VelocityExtension,
     φ0;
     orthog = HPModifiedGramSchmidt(),
     λ=0.5, α_min=0.1, α_max=1.0, γ=0.1, γ_reinit=0.5, reinit_mod = 1,
@@ -234,7 +232,9 @@ struct HilbertianProjection{T,N} <: Optimiser
     converged::Function = default_hp_converged, debug = false,
     has_oscillations::Function = (ls_enabled ? (args...)->false : default_has_oscillations),
     os_γ_mult = 0.5
-  ) where {N}
+  ) where N
+
+    @assert α_min <= α_max "We require α_min <= α_max"
 
     constraint_names = map(Symbol,constraint_names)
     al_keys = [:J,constraint_names...,:γ]
@@ -244,8 +244,7 @@ struct HilbertianProjection{T,N} <: Optimiser
     projector = HilbertianProjectionMap(N,orthog,vel_ext;λ,α_min,α_max,debug)
     params = (;debug,γ,γ_reinit,reinit_mod,ls_enabled,ls_max_iters,ls_δ_inc,ls_δ_dec,ls_ξ,
                ls_ξ_reduce_coef,ls_ξ_reduce_abs_tol,ls_γ_min,ls_γ_max,os_γ_mult)
-    T = typeof(orthog)
-    new{T,N}(problem,stencil,vel_ext,projector,history,converged,
+    new(problem,ls_evolver,vel_ext,projector,history,converged,
       has_oscillations,params,φ0)
   end
 end
@@ -258,7 +257,7 @@ end
 
 function default_hp_converged(
   m::HilbertianProjection;
-  J_tol = 0.2*maximum(m.stencil.params.Δ),
+  J_tol = 0.2*maximum(get_dof_Δ(m.ls_evolver)),
   C_tol = 0.001
 )
   h  = m.history
@@ -296,7 +295,7 @@ function Base.iterate(m::HilbertianProjection)
   φh = m.φ0
 
   ## Reinitialise as SDF
-  reinit!(m.stencil,φh,params.γ_reinit)
+  reinit!(m.ls_evolver,φh,params.γ_reinit)
 
   ## Compute FE problem and shape derivatives
   J, C, dJ, dC = Gridap.evaluate!(m.problem,φh)
@@ -351,8 +350,8 @@ function Base.iterate(m::HilbertianProjection,state)
   φ = get_free_dof_values(φh); copy!(φ_tmp,φ)
   while !done && (ls_it <= ls_max_iters)
     # Advect  & Reinitialise
-    advect!(m.stencil,φ,vel,γ)
-    iszero(it % reinit_mod) && reinit!(m.stencil,φ,params.γ_reinit)
+    evolve!(m.ls_evolver,φ,vel,γ)
+    iszero(it % reinit_mod) && reinit!(m.ls_evolver,φ,params.γ_reinit)
 
     ~ls_enabled && break
 

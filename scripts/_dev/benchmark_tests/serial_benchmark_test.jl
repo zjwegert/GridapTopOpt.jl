@@ -56,7 +56,7 @@ function main()
   dJ(q,u,φ,dΩ,dΓ_N) = ∫((ξ-D*∇(u)⋅∇(u))*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
 
   ## Finite difference solver and level set function
-  stencil = AdvectionStencil(FirstOrderStencil(2,Float64),model,V_φ,tol,max_steps)
+  ls_evo = HamiltonJacobiEvolution(FirstOrderStencil(2,Float64),model,V_φ,tol,max_steps)
   reinit!(stencil,φh,γ_reinit)
 
   ## Setup solver and FE operators
@@ -69,7 +69,7 @@ function main()
   vel_ext = VelocityExtension(a_hilb,U_reg,V_reg)
   
   ## Optimiser
-  return AugmentedLagrangian(pcfs,stencil,vel_ext,φh;γ,γ_reinit)
+  return AugmentedLagrangian(pcfs,ls_evo,vel_ext,φh;γ,γ_reinit)
 end
 
 function main_benchmark()

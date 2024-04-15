@@ -30,7 +30,7 @@ makedocs(
       "Reference" => [
         "reference/optimisers.md",
         "reference/chainrules.md",
-        "reference/advection.md",
+        "reference/levelsetevolution.md",
         "reference/velext.md",
         "reference/io.md",
         "reference/utilities.md",

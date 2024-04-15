@@ -27,7 +27,7 @@ LevelSetTopOpt.OptimiserHistory
 LevelSetTopOpt.OptimiserHistorySlice
 ```
 
-## Custom optimiser
+## Custom `Optimiser`
 ```@docs
 LevelSetTopOpt.Optimiser
 LevelSetTopOpt.iterate(::LevelSetTopOpt.Optimiser)

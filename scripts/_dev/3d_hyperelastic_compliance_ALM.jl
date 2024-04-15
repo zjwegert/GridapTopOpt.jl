@@ -153,7 +153,7 @@ function main_alt(mesh_partition,distribute,el_size,gz)
   res(u,v,φ,dΩ,dΓ_N) = ∫((I ∘ φ)*((T ∘ ∇(u)) ⊙ ∇(v)))dΩ - ∫(g⋅v)dΓ_N
 
   ## Finite difference solver and level set function
-  # stencil = AdvectionStencil(FirstOrderStencil(3,Float64),model,V_φ,tol,max_steps)
+  # ls_evo = HamiltonJacobiEvolution(FirstOrderStencil(3,Float64),model,V_φ,tol,max_steps)
   # reinit!(stencil,φh,γ_reinit)
 
   ## Setup solver and FE operators

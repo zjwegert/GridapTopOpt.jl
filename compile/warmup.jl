@@ -70,7 +70,7 @@ function main(mesh_partition,distribute)
   dJ = (q,u,φ,dΩ,dΓ_N) -> ∫((ξ-D*∇(u)⋅∇(u))*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ;
 
   ## Finite difference solver and level set function
-  stencil = AdvectionStencil(FirstOrderStencil(2,Float64),model,V_φ,Δ./order,max_steps,tol)
+  ls_evo = HamiltonJacobiEvolution(FirstOrderStencil(2,Float64),model,V_φ,Δ./order,max_steps,tol)
   reinit!(stencil,φ,γ_reinit)
 
   ## Setup solver and FE operators
@@ -84,7 +84,7 @@ function main(mesh_partition,distribute)
 
   ## Optimiser
   _conv_cond = t->LevelSetTopOpt.conv_cond(t;coef=1/50);
-  optimiser = AugmentedLagrangian(φ,pcfs,stencil,vel_ext,interp,el_size,γ,γ_reinit,conv_criterion=_conv_cond);
+  optimiser = AugmentedLagrangian(φ,pcfs,ls_evo,vel_ext,interp,el_size,γ,γ_reinit,conv_criterion=_conv_cond);
   for history in optimiser
     it,Ji,_,_ = last(history)
     print_history(it,["J"=>Ji];ranks=ranks)

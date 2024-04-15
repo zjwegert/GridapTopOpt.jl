@@ -74,7 +74,7 @@ Vol = (u,φ,dΩ) -> ∫(((ρ ∘ φ) - 0.5)/vol_D)dΩ;
 dVol = (q,u,φ,dΩ) -> ∫(1/vol_D*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
 
 ## Finite difference solver and level set function
-stencil = AdvectionStencil(FirstOrderStencil(2,Float64),model,V_φ,el_size./order,max_steps,tol);
+ls_evo = HamiltonJacobiEvolution(FirstOrderStencil(2,Float64),model,V_φ,el_size./order,max_steps,tol);
 reinit!(stencil,φ,γ_reinit)
 
 ## Initialise op

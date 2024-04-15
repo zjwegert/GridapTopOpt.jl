@@ -87,7 +87,7 @@ function main()
   UΓ_out(u,φ,dΩ,dΓ_in,dΓ_out) = ∫((u⋅-e₁-δₓ)/vol_Γ_out)dΓ_out
 
   ## Finite difference solver and level set function
-  stencil = AdvectionStencil(FirstOrderStencil(2,Float64),model,V_φ,tol,max_steps)
+  ls_evo = HamiltonJacobiEvolution(FirstOrderStencil(2,Float64),model,V_φ,tol,max_steps)
 
   ## Setup solver and FE operators
   state_map = AffineFEStateMap(a,l,U,V,V_φ,U_reg,φh,dΩ,dΓ_in,dΓ_out)
@@ -100,7 +100,7 @@ function main()
   
   ## Optimiser
   ls_enabled=false # Setting to true will use a line search instead of oscillation detection
-  optimiser = HilbertianProjection(pcfs,stencil,vel_ext,φh;
+  optimiser = HilbertianProjection(pcfs,ls_evo,vel_ext,φh;
     γ,γ_reinit,α_min=0.4,ls_enabled,verbose=true,constraint_names=[:Vol,:UΓ_out])
   for (it,uh,φh) in optimiser
     data = ["φ"=>φh,"H(φ)"=>(H ∘ φh),"|∇(φ)|"=>(norm ∘ ∇(φh)),"uh"=>uh]
