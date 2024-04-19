@@ -409,12 +409,12 @@ with_mpi() do distribute
     end
     ## Benchmark reinitialisation
     if occursin("breinit",BMARK_TYPE)
-      breinit = benchmark_reinitialisation(optim.stencil, get_free_dof_values(optim.φ0), 0.1, ranks; nreps=NREPS)
+      breinit = benchmark_reinitialisation(optim.ls_evolver, get_free_dof_values(optim.φ0), 0.1, ranks; nreps=NREPS)
     else
       breinit = i_am_main(ranks) && zeros(NREPS)
     end
     ## Benchmark forward problem
-    reinit!(optim.stencil,optim.φ0,optim.params.γ_reinit)
+    reinit!(optim.ls_evolver,optim.φ0,optim.params.γ_reinit)
     if occursin("bfwd",BMARK_TYPE)
       bfwd = benchmark_forward_problem(optim.problem.state_map, optim.φ0, ranks; nreps=NREPS)
     else
@@ -425,7 +425,7 @@ with_mpi() do distribute
       vh = interpolate(FEFunction(get_deriv_space(optim.problem.state_map),optim.problem.dJ),
         get_aux_space(optim.problem.state_map))
       v = get_free_dof_values(vh)
-      badv = benchmark_advection(optim.stencil, get_free_dof_values(optim.φ0), v, 0.1, ranks; nreps=NREPS)
+      badv = benchmark_advection(optim.ls_evolver, get_free_dof_values(optim.φ0), v, 0.1, ranks; nreps=NREPS)
     else
       badv = i_am_main(ranks) && zeros(NREPS)
     end
