@@ -3,7 +3,7 @@ using Gridap, Gridap.MultiField, GridapDistributed, GridapPETSc, GridapSolvers,
 
 using LevelSetTopOpt: get_deriv_space, get_aux_space,benchmark_optimizer,
   benchmark_forward_problem,benchmark_advection,benchmark_reinitialisation,
-  benchmark_velocity_extension,benchmark_hilbertian_projection_map
+  benchmark_velocity_extension,benchmark_hilbertian_projection_map,benchmark_single_iteration
 
 using GridapSolvers: NewtonSolver
 
