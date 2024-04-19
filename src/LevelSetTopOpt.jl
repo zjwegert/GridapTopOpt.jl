@@ -4,11 +4,11 @@ using GridapPETSc, GridapPETSc.PETSC
 using GridapPETSc: PetscScalar, PetscInt, PETSC,  @check_error_code
 
 using MPI
-using BlockArrays, SparseArrays, CircularArrays
-using LinearAlgebra, SparseMatricesCSR
+using BlockArrays
+using CircularArrays
+using LinearAlgebra
 using ChainRulesCore
 using DelimitedFiles, Printf
-using ChaosTools: estimate_period
 
 using Gridap
 using Gridap.Helpers, Gridap.Algebra, Gridap.TensorValues

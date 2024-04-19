@@ -274,7 +274,7 @@ function default_hp_converged(
 end
 
 function default_has_oscillations(m::HilbertianProjection,os_it;
-    itlength=50,itstart=2itlength,algo=:zerocrossing)
+    itlength=50,itstart=2itlength)
   h  = m.history
   it = get_last_iteration(h)
   if it < itstart || it < os_it + itlength + 1
@@ -282,9 +282,9 @@ function default_has_oscillations(m::HilbertianProjection,os_it;
   end
 
   J = h[:J]
-  J_osc = ~isnan(estimate_period(J[it-itlength+1:it+1],algo));
+  J_osc = ~isnan(_zerocrossing_period(J[it-itlength+1:it+1]));
   C = h[:C,it-itlength+1:it+1]
-  C_osc = all(x->~isnan(estimate_period(x,algo)),C);
+  C_osc = all(x->~isnan(_zerocrossing_period(x)),C);
 
   return J_osc && C_osc
 end

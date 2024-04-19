@@ -99,7 +99,7 @@ end
 get_history(m::AugmentedLagrangian) = m.history
 
 function default_has_oscillations(m::AugmentedLagrangian,os_it;itlength=25,
-    itstart=2itlength,algo=:zerocrossing)
+    itstart=2itlength)
   h  = m.history
   it = get_last_iteration(h)
   if it < itstart || it < os_it + itlength + 1
@@ -107,7 +107,7 @@ function default_has_oscillations(m::AugmentedLagrangian,os_it;itlength=25,
   end
 
   L = h[:L]
-  return ~isnan(estimate_period(L[it-itlength+1:it+1],algo))
+  return ~isnan(_zerocrossing_period(L[it-itlength+1:it+1]))
 end
 
 function default_al_init_params(J,C)

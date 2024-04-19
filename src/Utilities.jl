@@ -220,3 +220,15 @@ function isotropic_elast_tensor(D::Int,E::Number,v::Number)
     @notimplemented
   end
 end
+
+#   function zerocrossing_period
+#
+# Find the period of oscillations based on a zero crossing algorithm.
+#
+# This is based on the zero crossing method from ChaosTools.jl 
+# See (https://github.com/JuliaDynamics/ChaosTools.jl)  
+function _zerocrossing_period(v;t=0:length(v)-1,line=sum(v)/length(v))
+  inds = findall(@. ≥(line, $@view(v[2:end])) & <(line, $@view(v[1:end-1])))
+  difft = diff(t[inds])
+  sum(difft)/length(difft)
+end
