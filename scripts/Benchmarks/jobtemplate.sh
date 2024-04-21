@@ -11,7 +11,7 @@ PROJECT_DIR=$HOME/{{:dir_name}}/
 
 julia --project=$PROJECT_DIR -e "using Pkg; Pkg.precompile()"
 
-mpirun --hostfile $PBS_NODEFILE julia --project=$PROJECT_DIR --check-bounds no -O3 --compiled-modules=no \
+mpirun -n {{:ncpus}} julia --project=$PROJECT_DIR --check-bounds no -O3 --compiled-modules=no \
     $PROJECT_DIR/scripts/Benchmarks/benchmark.jl \
     {{:name}} \
     {{{:write_dir}}} \

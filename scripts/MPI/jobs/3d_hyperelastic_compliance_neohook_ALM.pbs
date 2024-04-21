@@ -11,7 +11,7 @@ PROJECT_DIR=$HOME/LevelSetTopOpt/
 
 julia --project=$PROJECT_DIR -e "using Pkg; Pkg.precompile()"
 
-mpirun --hostfile $PBS_NODEFILE julia --project=$PROJECT_DIR --check-bounds no -O3 --compiled-modules=no \
+mpirun -n 125 julia --project=$PROJECT_DIR --check-bounds no -O3 --compiled-modules=no \
     $PROJECT_DIR/scripts/MPI/3d_hyperelastic_compliance_neohook_ALM.jl \
     160 \
     80 \

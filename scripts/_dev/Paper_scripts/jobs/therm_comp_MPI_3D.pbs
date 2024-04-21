@@ -12,6 +12,5 @@ PROJECT_DIR=$HOME/LevelSetTopOpt/
 
 julia --project=$PROJECT_DIR -e "using Pkg; Pkg.precompile()"
 
-mpirun --hostfile $PBS_NODEFILE \
- julia --project=$PROJECT_DIR --check-bounds no -O3 --compiled-modules=no \
+mpirun -n 125 julia --project=$PROJECT_DIR --check-bounds no -O3 --compiled-modules=no \
   $PROJECT_DIR/scripts/_dev/Paper_scripts/therm_comp_MPI_3D.jl
