@@ -65,7 +65,7 @@ Gridap.gradient(F::IntegrandWithMeasure,uh) = Gridap.gradient(F,[uh],1)
 Given an an `IntegrandWithMeasure` `F` and a vector of `FEFunctions` or `CellField` `uh` 
 (excluding measures) evaluate the Jacobian `F.F` with respect to `uh[K]`.
 """
-function Gridap.jacobian(F::IntegrandWithMeasure,uh::Vector{<:Union{FEFunction,CellField}},K::Int)
+function Gridap.jacobian(F::IntegrandWithMeasure,uh::Vector{<:FEFunction},K::Int)
   @check 0 < K <= length(uh)
   _f(uk) = F.F(uh[1:K-1]...,uk,uh[K+1:end]...,F.dΩ...)
   return Gridap.jacobian(_f,uh[K])
