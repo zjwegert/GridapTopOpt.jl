@@ -73,6 +73,8 @@ function benchmark_optimizer(m::Optimiser, niter, ranks; nreps = 10)
 
   φ0 = copy(get_free_dof_values(m.φ0))
   function opt_reset!(m::Optimiser)
+    u = get_free_dof_values(get_state(m.problem));
+    fill!(u,zero(eltype(u)))
     copy!(get_free_dof_values(m.φ0), φ0)
     reset!(get_history(m))
   end
@@ -86,16 +88,17 @@ Given an optimiser `m`, benchmark a single iteration after 0th iteration.
 """
 function benchmark_single_iteration(m::Optimiser, ranks; nreps = 10)
   _, state = iterate(m)
-  _, L, J, C, dL, dJ, dC, uh, φh, vel, λ, Λ, γ, os_it = state;
   function f(m)
-    _state = (;it=1,L,J,C,dL,dJ,dC,uh,φh,vel,λ,Λ,γ,os_it)
-    iterate(m, _state)
+    iterate(m, state)
   end
 
   φ0 = copy(get_free_dof_values(m.φ0))
   function opt_reset!(m::Optimiser)
+    u = get_free_dof_values(get_state(m.problem));
+    fill!(u,zero(eltype(u)))
     copy!(get_free_dof_values(m.φ0), φ0)
     reset!(get_history(m))
+    iterate(m)
   end
   return benchmark(f, (m,), ranks; nreps, reset! = opt_reset!)
 end

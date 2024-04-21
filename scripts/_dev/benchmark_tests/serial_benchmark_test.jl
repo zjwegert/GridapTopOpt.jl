@@ -57,7 +57,6 @@ function main()
 
   ## Finite difference solver and level set function
   ls_evo = HamiltonJacobiEvolution(FirstOrderStencil(2,Float64),model,V_φ,tol,max_steps)
-  reinit!(stencil,φh,γ_reinit)
 
   ## Setup solver and FE operators
   state_map = AffineFEStateMap(a,l,U,V,V_φ,U_reg,φh,dΩ,dΓ_N)
@@ -69,7 +68,7 @@ function main()
   vel_ext = VelocityExtension(a_hilb,U_reg,V_reg)
   
   ## Optimiser
-  return AugmentedLagrangian(pcfs,ls_evo,vel_ext,φh;γ,γ_reinit)
+  return AugmentedLagrangian(pcfs,ls_evo,vel_ext,φh;γ,γ_reinit,verbose=true)
 end
 
 function main_benchmark()
@@ -95,3 +94,8 @@ bfwd
 badv
 brinit
 bvelext
+
+opt = main()
+  ## Benchmark optimiser
+bopt0 = LevelSetTopOpt.benchmark_optimizer(opt,0, nothing; nreps = 10)
+bopt = LevelSetTopOpt.benchmark_single_iteration(opt, nothing; nreps = 10)
