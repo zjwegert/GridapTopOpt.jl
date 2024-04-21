@@ -414,13 +414,13 @@ with_mpi() do distribute
       breinit = i_am_main(ranks) && zeros(NREPS)
     end
     ## Benchmark forward problem
-    reinit!(optim.ls_evolver,optim.φ0,optim.params.γ_reinit)
     if occursin("bfwd",BMARK_TYPE)
       bfwd = benchmark_forward_problem(optim.problem.state_map, optim.φ0, ranks; nreps=NREPS)
     else
       bfwd = i_am_main(ranks) && zeros(NREPS)
     end
     ## Benchmark advection
+    reinit!(optim.ls_evolver,optim.φ0,optim.params.γ_reinit)
     if occursin("badv",BMARK_TYPE)
       vh = interpolate(FEFunction(get_deriv_space(optim.problem.state_map),optim.problem.dJ),
         get_aux_space(optim.problem.state_map))
