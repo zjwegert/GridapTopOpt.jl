@@ -86,8 +86,10 @@ Given an optimiser `m`, benchmark a single iteration after 0th iteration.
 """
 function benchmark_single_iteration(m::Optimiser, ranks; nreps = 10)
   _, state = iterate(m)
+  _, L, J, C, dL, dJ, dC, uh, φh, vel, λ, Λ, γ, os_it = state;
   function f(m)
-    iterate(m, state)
+    _state = (;it=1,L,J,C,dL,dJ,dC,uh,φh,vel,λ,Λ,γ,os_it)
+    iterate(m, _state)
   end
 
   φ0 = copy(get_free_dof_values(m.φ0))
