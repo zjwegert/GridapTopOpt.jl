@@ -6,7 +6,7 @@
 #PBS -l walltime={{:wallhr}}:00:00
 #PBS -j oe
 
-source $HOME/hpc-environments-main/lyra/load-ompi.sh
+source $HOME/hpc-environments-main/lyra/load-intel.sh
 PROJECT_DIR=$HOME/{{:dir_name}}/
 
 julia --project=$PROJECT_DIR -e "using Pkg; Pkg.precompile()"
