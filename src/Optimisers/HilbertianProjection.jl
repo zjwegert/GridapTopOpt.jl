@@ -384,7 +384,7 @@ function Base.iterate(m::HilbertianProjection,state)
 
   ## Update history and build state
   push!(history,(J,C...,γ))
-  state = (it+1, J, C, θ, dJ, dC, uh, φh, vel, φ_tmp, γ, os_it)
+  state = (;it=it+1, J, C, θ, dJ, dC, uh, φh, vel, φ_tmp, γ, os_it)
   vars  = params.debug ? (it,uh,φh,state) : (it,uh,φh)
   return vars, state
 end

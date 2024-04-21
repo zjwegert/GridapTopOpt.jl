@@ -224,7 +224,7 @@ function Base.iterate(m::AugmentedLagrangian,state)
 
   ## Update history and build state
   push!(history,(L,J,C...,γ,λ...,Λ...))
-  state = (it+1,L,J,C,dL,dJ,dC,uh,φh,vel,λ,Λ,γ,os_it)
+  state = (;it=it+1,L,J,C,dL,dJ,dC,uh,φh,vel,λ,Λ,γ,os_it)
   vars  = params.debug ? (it,uh,φh,state) : (it,uh,φh)
   return vars, state
 end
