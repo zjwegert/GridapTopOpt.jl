@@ -62,11 +62,24 @@ end
 
 get_local_matrix_type(a::Assembler) = get_matrix_type(a)
 get_local_vector_type(a::Assembler) = get_vector_type(a)
+get_local_assembly_strategy(a::Assembler) = get_assembly_strategy(a)
 
 function get_local_matrix_type(a::GridapDistributed.DistributedSparseMatrixAssembler)
   return getany(map(get_matrix_type,a.assems))
 end
-
 function get_local_vector_type(a::GridapDistributed.DistributedSparseMatrixAssembler)
   return getany(map(get_vector_type,a.assems))
+end
+function get_local_assembly_strategy(a::GridapDistributed.DistributedSparseMatrixAssembler)
+  return get_assembly_strategy(a)
+end
+
+function get_local_matrix_type(a::MultiField.BlockSparseMatrixAssembler)
+  return get_local_matrix_type(first(a.block_assemblers))
+end
+function get_local_vector_type(a::MultiField.BlockSparseMatrixAssembler)
+  return get_local_vector_type(first(a.block_assemblers))
+end
+function get_local_assembly_strategy(a::MultiField.BlockSparseMatrixAssembler)
+  return get_local_assembly_strategy(first(a.block_assemblers))
 end

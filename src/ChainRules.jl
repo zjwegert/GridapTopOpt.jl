@@ -695,7 +695,7 @@ struct RepeatingAffineFEStateMap{A,B,C,D,E,F,G} <: AbstractFEStateMap
   - The resulting `FEFunction` will be a `MultiFieldFEFunction` (or GridapDistributed equivalent) 
     where each field corresponds to an entry in the vector of linear forms
   """
-    function RepeatingAffineFEStateMap(
+  function RepeatingAffineFEStateMap(
     nblocks::Int,a::Function,l::Vector{<:Function},
     U0,V0,V_φ,U_reg,φh,dΩ...;
     assem_U = SparseMatrixAssembler(U0,V0),
@@ -715,7 +715,7 @@ struct RepeatingAffineFEStateMap{A,B,C,D,E,F,G} <: AbstractFEStateMap
     spaces = (U,V,V_φ,U_reg)
     assem_U = SparseMatrixAssembler(
       get_local_matrix_type(assem_U0), get_local_vector_type(assem_U0),
-      U, V, get_assembly_strategy(assem_U0)
+      U, V, get_local_assembly_strategy(assem_U0)
     )
 
     ## Pullback cache
@@ -731,13 +731,13 @@ struct RepeatingAffineFEStateMap{A,B,C,D,E,F,G} <: AbstractFEStateMap
     K  = assemble_matrix((u,v) -> biform(u,v,φh),assem_U0,U0,V0)
     b  = allocate_in_range(K); fill!(b,zero(eltype(b)))
     b0 = allocate_in_range(K); fill!(b0,zero(eltype(b0)))
-    x  = mortar(map(i -> allocate_in_domain(K), 1:nblocks)); fill!(x,zero(eltype(x)))
+    x  = repeated_allocate_in_domain(nblocks,K); fill!(x,zero(eltype(x)))
     ns = numerical_setup(symbolic_setup(ls,K),K)
     fwd_caches = (ns,K,b,x,uhd,assem_U0,b0,assem_U)
 
     ## Adjoint cache
     adjoint_K  = assemble_matrix((u,v)->biform(v,u,φh),assem_adjoint,V0,U0)
-    adjoint_x  = mortar(map(i -> allocate_in_domain(adjoint_K), 1:nblocks)); fill!(adjoint_x,zero(eltype(adjoint_x)))
+    adjoint_x  = repeated_allocate_in_domain(nblocks,adjoint_K); fill!(adjoint_x,zero(eltype(adjoint_x)))
     adjoint_ns = numerical_setup(symbolic_setup(adjoint_ls,adjoint_K),adjoint_K)
     adj_caches = (adjoint_ns,adjoint_K,adjoint_x,assem_adjoint)
 
@@ -782,6 +782,7 @@ end
 repeated_blocks(V0::FESpace,x::AbstractBlockVector) = blocks(x)
 repeated_blocks(V0::FESpace,xh) = xh
 
+repeated_blocks(V0::MultiFieldSpaceTypes,x::AbstractBlockVector) = repeated_blocks(MultiFieldStyle(V0),V0,x)
 repeated_blocks(V0::MultiFieldSpaceTypes,x) = repeated_blocks(MultiFieldStyle(V0),V0,x)
 repeated_blocks(::ConsecutiveMultiFieldStyle,V0,x::AbstractBlockVector) = blocks(x)
 repeated_blocks(::ConsecutiveMultiFieldStyle,V0,xh) = xh
@@ -798,11 +799,19 @@ function repeated_blocks(::BlockMultiFieldStyle{NB},V0::MultiFieldSpaceTypes,x::
 end
 
 function repeated_blocks(::BlockMultiFieldStyle,V0::MultiFieldSpaceTypes,xh)
-  x_blocks = repeated_blocks(MultiFieldStyle(V0),V0,get_free_values(xh))
+  x_blocks = repeated_blocks(MultiFieldStyle(V0),V0,get_free_dof_values(xh))
   rep_blocks = map(x_blocks) do xb
     FEFunction(V0,xb)
   end
   return rep_blocks
+end
+
+function repeated_allocate_in_domain(nblocks::Integer,M::AbstractMatrix)
+  mortar(map(i -> allocate_in_domain(M), 1:nblocks))
+end
+
+function repeated_allocate_in_domain(nblocks::Integer,M::AbstractBlockMatrix)
+  mortar(vcat(map(i -> blocks(allocate_in_domain(M)), 1:nblocks)...))
 end
 
 get_state(m::RepeatingAffineFEStateMap) = FEFunction(get_trial_space(m),m.fwd_caches[4])
