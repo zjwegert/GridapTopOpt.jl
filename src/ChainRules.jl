@@ -798,13 +798,9 @@ function repeated_blocks(::BlockMultiFieldStyle{NB},V0::MultiFieldSpaceTypes,x::
 end
 
 function repeated_blocks(::BlockMultiFieldStyle,V0::MultiFieldSpaceTypes,xh)
-  xb = blocks(x)
-  nfields = num_fields(V0)
-  @assert length(xb) % nfields == 0
-  
-  nblocks = length(xb) ÷ nfields
-  rep_blocks = map(1:nblocks) do iB
-    FEFunction(V0,xh[(iB-1)*nfields+1:iB*nfields])
+  x_blocks = repeated_blocks(MultiFieldStyle(V0),V0,get_free_values(xh))
+  rep_blocks = map(x_blocks) do xb
+    FEFunction(V0,xb)
   end
   return rep_blocks
 end
