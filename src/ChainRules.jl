@@ -747,21 +747,66 @@ struct RepeatingAffineFEStateMap{A,B,C,D,E,F,G} <: AbstractFEStateMap
   end
 end
 
+const MultiFieldSpaceTypes = Union{<:MultiField.MultiFieldFESpace,<:GridapDistributed.DistributedMultiFieldFESpace}
+
 function repeat_spaces(nblocks::Integer,U0::FESpace,V0::FESpace)
   U = MultiFieldFESpace([U0 for i in 1:nblocks];style=BlockMultiFieldStyle())
   V = MultiFieldFESpace([V0 for i in 1:nblocks];style=BlockMultiFieldStyle())
   return U,V
 end
 
-function repeat_spaces(
-  nblocks::Integer,U0::T,V0::T
-) where T <: Union{MultiField.MultiFieldFESpace,GridapDistributed.DistributedMultiFieldFESpace}
+function repeat_spaces(nblocks::Integer,U0::MultiFieldSpaceTypes,V0::MultiFieldSpaceTypes)
   nfields = num_fields(U0)
   @assert nfields == num_fields(V0)
-  mfs = BlockMultiFieldStyle(nblocks,Tuple(fill(nfields,nblocks)))
+  @assert MultiFieldStyle(U0) === MultiFieldStyle(V0)
+
+  mfs = repeat_mfs(nblocks,nfields,MultiFieldStyle(U0))
   U = MultiFieldFESpace(repeat([U0...],nblocks);style=mfs)
   V = MultiFieldFESpace(repeat([V0...],nblocks);style=mfs)
   return U,V
+end
+
+function repeat_mfs(nblocks::Integer,nfields::Integer,::ConsecutiveMultiFieldStyle)
+  return BlockMultiFieldStyle(nblocks,Tuple(fill(nfields,nblocks)))
+end
+
+function repeat_mfs(nblocks::Integer,nfields::Integer,::BlockMultiFieldStyle{NB,SB,P}) where {NB,SB,P}
+  @assert length(P) == nfields
+  P_new = [P...]
+  for iB in 2:nblocks
+    P_new = vcat(P_new,(P .+ (iB-1)*nfields)...)
+  end
+  return BlockMultiFieldStyle(NB*nblocks, Tuple(repeat([SB...],nblocks)), Tuple(P_new))
+end
+
+repeated_blocks(V0::FESpace,x::AbstractBlockVector) = blocks(x)
+repeated_blocks(V0::FESpace,xh) = xh
+
+repeated_blocks(V0::MultiFieldSpaceTypes,x) = repeated_blocks(MultiFieldStyle(V0),V0,x)
+repeated_blocks(::ConsecutiveMultiFieldStyle,V0,x::AbstractBlockVector) = blocks(x)
+repeated_blocks(::ConsecutiveMultiFieldStyle,V0,xh) = xh
+
+function repeated_blocks(::BlockMultiFieldStyle{NB},V0::MultiFieldSpaceTypes,x::AbstractBlockVector) where NB
+  xb = blocks(x)
+  @assert length(xb) % NB == 0
+  
+  nblocks = length(xb) ÷ NB
+  rep_blocks = map(1:nblocks) do iB
+    mortar(xb[(iB-1)*NB+1:iB*NB])
+  end
+  return rep_blocks
+end
+
+function repeated_blocks(::BlockMultiFieldStyle,V0::MultiFieldSpaceTypes,xh)
+  xb = blocks(x)
+  nfields = num_fields(V0)
+  @assert length(xb) % nfields == 0
+  
+  nblocks = length(xb) ÷ nfields
+  rep_blocks = map(1:nblocks) do iB
+    FEFunction(V0,xh[(iB-1)*nfields+1:iB*nfields])
+  end
+  return rep_blocks
 end
 
 get_state(m::RepeatingAffineFEStateMap) = FEFunction(get_trial_space(m),m.fwd_caches[4])
@@ -783,7 +828,7 @@ function forward_solve!(φ_to_u::RepeatingAffineFEStateMap,φh)
   rmul!(b0,-1)
 
   v = get_fe_basis(V0)
-  map(blocks(x),liforms) do xi, li
+  map(repeated_blocks(U0,x),liforms) do xi, li
     copy!(b,b0)
     vecdata = collect_cell_vector(V0,li(v,φh))
     assemble_vector_add!(b,assem_U0,vecdata)
@@ -794,9 +839,12 @@ end
 
 function dRdφ(φ_to_u::RepeatingAffineFEStateMap,uh,vh,φh)
   biform, liforms = φ_to_u.biform, φ_to_u.liform
+  U0, V0 = φ_to_u.spaces_0
 
+  uh_blocks = repeated_blocks(U0,uh)
+  vh_blocks = repeated_blocks(V0,vh)
   res = DomainContribution()
-  for (liform,uhi,vhi) in zip(liforms,uh,vh)
+  for (liform,uhi,vhi) in zip(liforms,uh_blocks,vh_blocks)
     res = res + ∇(biform,[uhi,vhi,φh],3) - ∇(liform,[vhi,φh],2)
   end
   return res
@@ -812,7 +860,8 @@ end
 
 function adjoint_solve!(φ_to_u::RepeatingAffineFEStateMap,du::AbstractBlockVector)
   adjoint_ns, _, adjoint_x, _ = φ_to_u.adj_caches
-  map(blocks(adjoint_x),blocks(du)) do xi, dui
+  U0, V0 = φ_to_u.spaces_0
+  map(repeated_blocks(U0,adjoint_x),repeated_blocks(U0,du)) do xi, dui
     solve!(xi,adjoint_ns,dui)
   end
   return adjoint_x
