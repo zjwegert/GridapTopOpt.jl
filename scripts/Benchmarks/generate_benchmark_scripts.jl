@@ -65,7 +65,7 @@ dir_name= "LevelSetTopOpt";
 write_dir = "\$HOME/$dir_name/results/benchmarks/"
 
 N = 1:10; # Number of partitions in x-axis
-strong_dof=(150+1)^3*3; # Number of dofs for strong scaling
+strong_dof=(100+1)^3*3; # Number of dofs for strong scaling
 
 # Phys type and number of dofs per node, and what to benchmark
 phys_types = [
