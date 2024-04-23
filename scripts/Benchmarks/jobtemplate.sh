@@ -5,6 +5,10 @@
 #PBS -l select={{:ncpus}}:ncpus=1:mpiprocs=1:ompthreads=1:mem={{:mem}}GB:cputype={{:cputype}}
 #PBS -l walltime={{:wallhr}}:00:00
 #PBS -j oe
+#PBS -v I_MPI_HYDRA_BOOTSTRAP=rsh
+#PBS -v I_MPI_HYDRA_BOOTSTRAP_EXEC=pbs_tmrsh
+#PBS -v I_MPI_HYDRA_IFACE=ib0
+#PBS -v OMP_NUM_THREADS=1
 
 source $HOME/hpc-environments-main/lyra/load-intel.sh
 PROJECT_DIR=$HOME/{{:dir_name}}/
