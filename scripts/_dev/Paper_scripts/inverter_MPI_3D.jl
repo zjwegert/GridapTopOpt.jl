@@ -77,8 +77,7 @@ function main(mesh_partition,distribute)
   C1(u,φ,dΩ,dΓ_in,dΓ_out) = ∫(((ρ ∘ φ) - vf)/vol_D)dΩ
   dC1(q,u,φ,dΩ,dΓ_in,dΓ_out) = ∫(-1/vol_D*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
   C2(u,φ,dΩ,dΓ_in,dΓ_out) = ∫((u⋅-e₁-δₓ)/vol_Γ_out)dΓ_out
-  pcfs = PDEConstrainedFunctionals(J,[C1,C2],state_map,
-    analytic_dJ=dJ,analytic_dC=[dC1,nothing])
+  pcfs = PDEConstrainedFunctionals(J,[C1,C2],state_map,analytic_dC=[dC1,nothing])
   # Velocity extension
   α = 4max_steps*γ*maximum(get_el_Δ(model))
   a_hilb(p,q) =∫(α^2*∇(p)⋅∇(q) + p*q)dΩ
