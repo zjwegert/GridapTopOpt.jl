@@ -50,7 +50,7 @@ function generate_jobs(template,phys_type,ndof_per_node,bmark_types)
 end
 
 dir_name= "LevelSetTopOpt";
-job_output_path = "./$dir_name/scripts/Benchmarks/jobs-gadi/";
+job_output_path = "$(ENV["SCRATCH"])/$dir_name/scripts/Benchmarks/jobs-gadi/";
 mkpath(job_output_path);
 
 # SETUP PARAMETERS
@@ -76,7 +76,7 @@ phys_types = [
 ];
 
 # Template
-template = read("./$dir_name/scripts/Benchmarks/jobtemplate_gadi.sh",String)
+template = read("$(ENV["SCRATCH"])/$dir_name/scripts/Benchmarks/jobtemplate_gadi.sh",String)
 
 ## Generate Jobs
 jobs_by_phys = map(x->(x[1],generate_jobs(template,x[1],x[2],x[3])),phys_types);
