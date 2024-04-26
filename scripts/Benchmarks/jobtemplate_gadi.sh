@@ -12,7 +12,7 @@ source $HOME/hpc-environments/gadi/load-intel.sh
 PROJECT_DIR=$SCRATCH/{{:dir_name}}/
 
 mpirun -n {{:ncpus}} julia --project=$PROJECT_DIR --check-bounds no -O3 \
-    $PROJECT_DIR/scripts/Benchmarks/benchmark.jl \
+    $PROJECT_DIR/scripts/Benchmarks/benchmark_gadi.jl \
     {{:name}} \
     {{{:write_dir}}} \
     {{:type}} \
