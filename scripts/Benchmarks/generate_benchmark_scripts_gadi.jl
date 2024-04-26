@@ -81,7 +81,10 @@ fe_order= 1;
 verbose= 1;
 write_dir = "\$SCRATCH/$dir_name/results/benchmarks/"
 
-parts = [(1,1,1);(2,2,2);(3,3,3);mesh_partitions[1:3:22]] # Mesh partitions
+# parts = [(1,1,1);(2,2,2);(3,3,3);mesh_partitions[1:3:22]] # Mesh partitions
+# parts = [(1,1,1);mesh_partitions[1:2:20]]
+# parts = [(1,1,1);mesh_partitions[[1,2,3,4,5]];mesh_partitions[8:4:20]]
+parts = [(1,1,1);mesh_partitions[[1,2,3,5]];mesh_partitions[8:5:23]]
 strong_dof=(100+1)^3*3; # Number of dofs for strong scaling
 
 # Phys type and number of dofs per node, and what to benchmark
