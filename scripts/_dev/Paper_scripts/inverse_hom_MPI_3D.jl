@@ -68,8 +68,8 @@ function main(mesh_partition,distribute,write_dir)
   dκ(q,u,φ,dΩ) = -1/9*(dCᴴ(1,1,q,u,φ,dΩ)+dCᴴ(2,2,q,u,φ,dΩ)+dCᴴ(3,3,q,u,φ,dΩ)+
     2*(dCᴴ(1,2,q,u,φ,dΩ)+dCᴴ(1,3,q,u,φ,dΩ)+dCᴴ(2,3,q,u,φ,dΩ)))
   vol_D = sum(∫(1)dΩ)
-  C1(u,φ,dΩ,dΓ_N) = ∫(((ρ ∘ φ) - vf)/vol_D)dΩ
-  dC1(q,u,φ,dΩ,dΓ_N) = ∫(-1/vol_D*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
+  C1(u,φ,dΩ) = ∫(((ρ ∘ φ) - vf)/vol_D)dΩ
+  dC1(q,u,φ,dΩ) = ∫(-1/vol_D*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
   pcfs = PDEConstrainedFunctionals(κ,[C1],state_map,
     analytic_dJ=dκ,analytic_dC=[dC1])
   # Velocity extension
