@@ -1,7 +1,7 @@
 using LevelSetTopOpt, Gridap, GridapDistributed, GridapPETSc, PartitionedArrays, 
   SparseMatricesCSR
 
-function main(mesh_partition,distribute)
+function main(mesh_partition,distribute,write_dir)
   ranks = distribute(LinearIndices((prod(mesh_partition),)))
   # FE parameters
   order = 1                                       # Finite element order
@@ -29,7 +29,7 @@ function main(mesh_partition,distribute)
     sphere(x,(1,0,0)),sphere(x,(1,0,1)),sphere(x,(1,1,0)),sphere(x,(1,1,1)))
   lsf_func = initial_lsf(4,0.2)                   # Initial level set function
   iter_mod = 10                                   # VTK Output modulo
-  path = "./results/inverter_MPI_3D/"             # Output path
+  path = "$write_dir/inverter_MPI_3D/"            # Output path
   i_am_main(ranks) && mkpath(path)                # Create path
   # Model
   model = CartesianDiscreteModel(ranks,mesh_partition,dom,el_size);
@@ -106,9 +106,10 @@ end
 
 with_mpi() do distribute
   mesh_partition = (4,6,6)
+  write_dir = ARGS[1]
   solver_options = "-pc_type gamg -ksp_type cg -ksp_error_if_not_converged true 
     -ksp_converged_reason -ksp_rtol 1.0e-12"
   GridapPETSc.with(args=split(solver_options)) do
-    main(mesh_partition,distribute)
+    main(mesh_partition,distribute,write_dir)
   end
 end
