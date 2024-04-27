@@ -21,7 +21,7 @@ function main(mesh_partition,distribute,write_dir)
   tol = 1/(5order^2)/minimum(el_size)             # Reinitialisation tolerance
   # Problem parameters
   C = isotropic_elast_tensor(3,1.,0.3)            # Stiffness tensor
-  g = VectorValue(0,0,-1)                         # Applied load on Γ_N
+  g = VectorValue(1,0,0)                         # Applied load on Γ_N
   ks = 0.01                                       # Artificial spring stiffness
   δₓ = 0.5                                        # Required displacement
   vf = 0.4                                        # Volume fraction constraint
