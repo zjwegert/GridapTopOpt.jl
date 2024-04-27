@@ -111,7 +111,7 @@ function main(mesh_partition,distribute)
 end
 
 with_mpi() do distribute
-  mesh_partition = (5,5,5)
+  mesh_partition = (4,6,6)
   solver_options = "-pc_type gamg -ksp_type cg -ksp_error_if_not_converged true 
     -ksp_converged_reason -ksp_rtol 1.0e-12"
   GridapPETSc.with(args=split(solver_options)) do

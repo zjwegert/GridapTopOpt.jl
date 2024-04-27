@@ -1,0 +1,14 @@
+#!/bin/bash -l
+#PBS -P np01
+#PBS -q normal
+#PBS -N hyperelast_comp_MPI_3D
+#PBS -l ncpus=144
+#PBS -l mem=576GB
+#PBS -l walltime=10:00:00
+#PBS -j oe
+
+source $HOME/hpc-environments-main/lyra/load-intel.sh
+PROJECT_DIR=$HOME/LevelSetTopOpt/
+
+mpirun -n 144 julia --project=$PROJECT_DIR --check-bounds no -O3 \
+  $PROJECT_DIR/scripts/_dev/Paper_scripts/hyperelast_comp_MPI_3D.jl

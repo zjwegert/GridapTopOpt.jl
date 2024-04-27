@@ -35,8 +35,11 @@ function generate(
 
   ncpus = prod(mesh_partition)
   wallhr = occursin("STRONG",name) && ncpus == 1 ? 100 : 
-           occursin("STRONG",name) && ncpus == 8 ? 24 : wallhr
-  mem = occursin("STRONG",name) && ncpus == 1 ? 100 : Int(gb_per_node*ncpus/cps_per_node);
+           occursin("STRONG",name) && ncpus == 8 ? 24 :          
+           occursin("STRONG",name) && ncpus == 27 ? 10 : wallhr
+  mem = occursin("STRONG",name) && ncpus == 1 ? 100 : 
+        occursin("STRONG",name) && ncpus == 8 ? 128 : 
+        occursin("STRONG",name) && ncpus == 27 ? 192 : Int(gb_per_node*ncpus/cps_per_node);
   Nx_partition, Ny_partition, Nz_partition = mesh_partition
 
   settings = (;name,type,bmark_type,cputype,wallhr,ncpus,mem,
