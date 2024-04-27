@@ -12,6 +12,9 @@ function main(mesh_partition,distribute,write_dir)
     (0.4 - eps() <= x[2] <= 0.6 + eps()) && (0.4 - eps() <= x[3] <= 0.6 + eps())
   f_Γ_out(x) = (x[1] ≈ 1.0) &&                    # Γ_out indicator function
     (0.4 - eps() <= x[2] <= 0.6 + eps()) && (0.4 - eps() <= x[3] <= 0.6 + eps())
+  f_Γ_out_ext(x) = ~f_Γ_out(x) &&                 # Γ_out_ext indicator function
+    (0.95 <= x[1] <= 1.0) && (0.35 - eps() <= x[2] <= 0.65 + eps()) && 
+    (0.35 - eps() <= x[3] <= 0.65 + eps())
   f_Γ_D(x) = (x[1] ≈ 0.0)  &&                     # Γ_D indicator function
     (x[2] <= 0.1 || x[2] >= 0.9) && (x[3] <= 0.1 || x[3] >= 0.9)
   # FD parameters
@@ -21,9 +24,9 @@ function main(mesh_partition,distribute,write_dir)
   tol = 1/(5order^2)/minimum(el_size)             # Reinitialisation tolerance
   # Problem parameters
   C = isotropic_elast_tensor(3,1.,0.3)            # Stiffness tensor
-  g = VectorValue(1,0,0)                         # Applied load on Γ_N
+  g = VectorValue(1,0,0)                          # Applied load on Γ_N
   ks = 0.01                                       # Artificial spring stiffness
-  δₓ = 0.5                                        # Required displacement
+  δₓ = 0.25                                       # Required displacement
   vf = 0.4                                        # Volume fraction constraint
   sphere(x,(xc,yc,zc)) = -sqrt((x[1]-xc)^2+(x[2]-yc)^2+(x[3]-zc)^2) + 0.2
   lsf_func(x) = max(initial_lsf(4,0.2)(x),        # Initial level set function
@@ -36,6 +39,7 @@ function main(mesh_partition,distribute,write_dir)
   model = CartesianDiscreteModel(ranks,mesh_partition,dom,el_size);
   update_labels!(1,model,f_Γ_in,"Gamma_in")
   update_labels!(2,model,f_Γ_out,"Gamma_out")
+  update_labels!(3,model,f_Γ_out_ext,"Gamma_out_ext")
   update_labels!(4,model,f_Γ_D,"Gamma_D")
   # Triangulation and measures
   Ω = Triangulation(model)
@@ -50,7 +54,8 @@ function main(mesh_partition,distribute,write_dir)
   V = TestFESpace(model,reffe;dirichlet_tags=["Gamma_D"])
   U = TrialFESpace(V,VectorValue(0.0,0.0,0.0))
   V_φ = TestFESpace(model,reffe_scalar)
-  V_reg = TestFESpace(model,reffe_scalar;dirichlet_tags=["Gamma_in","Gamma_out"])
+  V_reg = TestFESpace(model,reffe_scalar;dirichlet_tags=[
+    "Gamma_in","Gamma_out","Gamma_out_ext"])
   U_reg = TrialFESpace(V_reg,0)
   # Level set and interpolator
   φh = interpolate(lsf_func,V_φ);
