@@ -21,8 +21,8 @@ using Gridap: writevtk
 using GridapDistributed
 using GridapDistributed: DistributedDiscreteModel, DistributedTriangulation, 
   DistributedFESpace, DistributedDomainContribution, to_parray_of_arrays,
-  allocate_in_domain, DistributedCellField, DistributedMultiFieldFEBasis,
-  BlockPMatrix, BlockPVector, change_ghost
+  allocate_in_domain, DistributedCellField, DistributedMultiFieldCellField,
+  DistributedMultiFieldFEBasis, BlockPMatrix, BlockPVector, change_ghost
 
 using PartitionedArrays
 using PartitionedArrays: getany, tuple_of_arrays, matching_ghost_indices
