@@ -6,5 +6,6 @@ using Test
 @time @testset "Nonlinear Thermal Compliance - ALM" begin include("NonLinearThermalComplianceALMTests.jl") end
 @time @testset "Inverse Homogenisation - ALM" begin include("InverseHomogenisationALMTests.jl") end
 @time @testset "Inverter - HPM" begin include("InverterHPMTests.jl") end
+@time @testset "PZMultiFieldRepeatingState - ALM" begin include("PZMultiFieldRepeatingStateTests.jl") end
 
 end # module
