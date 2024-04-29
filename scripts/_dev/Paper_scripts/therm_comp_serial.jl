@@ -1,6 +1,6 @@
 using LevelSetTopOpt, Gridap
 
-function main()
+function main(write_dir)
   # FE parameters
   order = 1                                       # Finite element order
   xmax,ymax = (1.0,1.0)                           # Domain size
@@ -23,7 +23,7 @@ function main()
   vf = 0.4                                        # Volume fraction constraint
   lsf_func = initial_lsf(4,0.2)                   # Initial level set function
   iter_mod = 10                                   # VTK Output modulo
-  path = "./results/therm_comp_serial/"           # Output path
+  path = "$write_dir/therm_comp_serial/"          # Output path
   mkpath(path)                                    # Create path
   # Model
   model = CartesianDiscreteModel(dom,el_size);
@@ -79,4 +79,4 @@ function main()
     "H(φ)"=>(H ∘ φh),"|∇(φ)|"=>(norm ∘ ∇(φh)),"uh"=>uh])
 end
 
-main()
+main("results/")
