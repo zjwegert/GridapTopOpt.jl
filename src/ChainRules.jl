@@ -785,9 +785,7 @@ repeated_blocks(V0::FESpace,x::AbstractBlockVector) = blocks(x)
 repeated_blocks(V0::FESpace,xh) = xh
 
 repeated_blocks(V0::MultiFieldSpaceTypes,x::AbstractBlockVector) = repeated_blocks(MultiFieldStyle(V0),V0,x)
-repeated_blocks(V0::MultiFieldSpaceTypes,x) = repeated_blocks(MultiFieldStyle(V0),V0,x)
 repeated_blocks(::ConsecutiveMultiFieldStyle,V0,x::AbstractBlockVector) = blocks(x)
-repeated_blocks(::ConsecutiveMultiFieldStyle,V0,xh) = xh
 
 function repeated_blocks(::BlockMultiFieldStyle{NB},V0::MultiFieldSpaceTypes,x::AbstractBlockVector) where NB
   xb = blocks(x)
@@ -800,7 +798,7 @@ function repeated_blocks(::BlockMultiFieldStyle{NB},V0::MultiFieldSpaceTypes,x::
   return rep_blocks
 end
 
-function repeated_blocks(::BlockMultiFieldStyle,V0::MultiFieldSpaceTypes,xh)
+function repeated_blocks(V0::MultiFieldSpaceTypes,xh)
   x_blocks = repeated_blocks(MultiFieldStyle(V0),V0,get_free_dof_values(xh))
   rep_blocks = map(x_blocks) do xb
     FEFunction(V0,xb)
