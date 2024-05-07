@@ -1,4 +1,4 @@
-using Gridap, GridapDistributed, GridapPETSc, PartitionedArrays, LevelSetTopOpt
+using Gridap, GridapDistributed, GridapPETSc, PartitionedArrays, GridapTopOpt
 
 global write_dir = ARGS[1]
 

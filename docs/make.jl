@@ -3,15 +3,15 @@
 # using Pkg; Pkg.activate(".")
 
 using Documenter
-using LevelSetTopOpt
+using GridapTopOpt
 
 makedocs(
-    sitename = "LevelSetTopOpt.jl",
+    sitename = "GridapTopOpt.jl",
     format = Documenter.HTML(
       prettyurls = false,
       # collapselevel = 1,
     ),
-    modules = [LevelSetTopOpt],
+    modules = [GridapTopOpt],
     pages = [
       "Home" => "index.md",
       "Getting Started" => "getting-started.md",

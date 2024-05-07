@@ -26,4 +26,4 @@ docs/site/
 # environment.
 Manifest.toml
 LocalPreferences.toml
-LevelSetTopOpt.so
+GridapTopOpt.so

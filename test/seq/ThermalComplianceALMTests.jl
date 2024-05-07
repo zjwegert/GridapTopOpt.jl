@@ -1,7 +1,7 @@
 module ThermalComplianceALMTests
 using Test
 
-using Gridap, LevelSetTopOpt
+using Gridap, GridapTopOpt
 
 """
   (Serial) Minimum thermal compliance with augmented Lagrangian method in 2D.
@@ -12,7 +12,7 @@ using Gridap, LevelSetTopOpt
     s.t., Vol(Ω) = vf,
           ⎡u∈V=H¹(Ω;u(Γ_D)=0),
           ⎣∫ κ*∇(u)⋅∇(v) dΩ = ∫ v dΓ_N, ∀v∈V.
-""" 
+"""
 function main(;order,AD)
   ## Parameters
   xmax = ymax = 1.0
@@ -32,9 +32,9 @@ function main(;order,AD)
   ## FE Setup
   model = CartesianDiscreteModel(dom,el_size);
   el_Δ = get_el_Δ(model)
-  f_Γ_D(x) = (x[1] ≈ 0.0 && (x[2] <= ymax*prop_Γ_D + eps() || 
+  f_Γ_D(x) = (x[1] ≈ 0.0 && (x[2] <= ymax*prop_Γ_D + eps() ||
       x[2] >= ymax-ymax*prop_Γ_D - eps()))
-  f_Γ_N(x) = (x[1] ≈ xmax && ymax/2-ymax*prop_Γ_N/2 - eps() <= x[2] <= 
+  f_Γ_N(x) = (x[1] ≈ xmax && ymax/2-ymax*prop_Γ_N/2 - eps() <= x[2] <=
       ymax/2+ymax*prop_Γ_N/2 + eps())
   update_labels!(1,model,f_Γ_D,"Gamma_D")
   update_labels!(2,model,f_Γ_N,"Gamma_N")
@@ -85,7 +85,7 @@ function main(;order,AD)
   α = α_coeff*maximum(el_Δ)
   a_hilb(p,q) =∫(α^2*∇(p)⋅∇(q) + p*q)dΩ;
   vel_ext = VelocityExtension(a_hilb,U_reg,V_reg)
-  
+
   ## Optimiser
   optimiser = AugmentedLagrangian(pcfs,ls_evo,vel_ext,φh;
     γ,γ_reinit,verbose=true,constraint_names=[:Vol])
@@ -105,7 +105,7 @@ end
     s.t., Vol(Ω) = vf,
           ⎡u∈V=H¹(Ω;u(Γ_D)=0),
           ⎣∫ κ*∇(u)⋅∇(v) dΩ = ∫ v dΓ_N, ∀v∈V.
-""" 
+"""
 function main_3d(;order)
   ## Parameters
   xmax = ymax = zmax = 1.0
@@ -174,7 +174,7 @@ function main_3d(;order)
   α = α_coeff*maximum(el_Δ)
   a_hilb(p,q) =∫(α^2*∇(p)⋅∇(q) + p*q)dΩ;
   vel_ext = VelocityExtension(a_hilb,U_reg,V_reg)
-  
+
   ## Optimiser
   optimiser = AugmentedLagrangian(pcfs,ls_evo,vel_ext,φh;
     γ,γ_reinit,verbose=true,constraint_names=[:Vol])

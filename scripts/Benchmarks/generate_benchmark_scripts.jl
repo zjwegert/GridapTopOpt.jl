@@ -34,11 +34,11 @@ function generate(
   )
 
   ncpus = prod(mesh_partition)
-  wallhr = occursin("STRONG",name) && ncpus == 1 ? 100 : 
-           occursin("STRONG",name) && ncpus == 8 ? 24 :          
+  wallhr = occursin("STRONG",name) && ncpus == 1 ? 100 :
+           occursin("STRONG",name) && ncpus == 8 ? 24 :
            occursin("STRONG",name) && ncpus == 27 ? 10 : wallhr
-  mem = occursin("STRONG",name) && ncpus == 1 ? 100 : 
-        occursin("STRONG",name) && ncpus == 8 ? 128 : 
+  mem = occursin("STRONG",name) && ncpus == 1 ? 100 :
+        occursin("STRONG",name) && ncpus == 8 ? 128 :
         occursin("STRONG",name) && ncpus == 27 ? 192 : Int(gb_per_node*ncpus/cps_per_node);
   Nx_partition, Ny_partition, Nz_partition = mesh_partition
 
@@ -68,7 +68,7 @@ function generate_jobs(template,phys_type,ndof_per_node,bmark_types)
   strong_jobs,weak_jobs,dof_sanity_check
 end
 
-dir_name= "LevelSetTopOpt";
+dir_name= "GridapTopOpt";
 job_output_path = "$(ENV["SCRATCH"])/$dir_name/scripts/Benchmarks/jobs-gadi/";
 mkpath(job_output_path);
 
@@ -103,7 +103,7 @@ jobs_by_phys = map(x->(x[1],generate_jobs(template,x[1],x[2],x[3])),phys_types);
 
 for jobs in jobs_by_phys
   strong_jobs,weak_jobs,dof_sanity_check = jobs[2]
-  
+
   println("$(jobs[1]): Weak dofs = $(dof_sanity_check[1])\n     Error = $(dof_sanity_check[2])\n")
   for job in vcat(strong_jobs,weak_jobs)
     name = job[1]

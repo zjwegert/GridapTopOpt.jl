@@ -1,8 +1,8 @@
 module PZMultiFieldRepeatingStateTests
 using Test
 
-using Gridap, GridapDistributed, GridapPETSc, GridapSolvers, 
-  PartitionedArrays, LevelSetTopOpt, SparseMatricesCSR
+using Gridap, GridapDistributed, GridapPETSc, GridapSolvers,
+  PartitionedArrays, GridapTopOpt, SparseMatricesCSR
 
 using Gridap.TensorValues, Gridap.Helpers
 
@@ -54,8 +54,8 @@ function main(;AD)
 
   ## Material tensors
   C, e, κ = PZT5A_2D();
-  k0 = norm(C.data,Inf); 
-  α0 = norm(e.data,Inf); 
+  k0 = norm(C.data,Inf);
+  α0 = norm(e.data,Inf);
   β0 = norm(κ.data,Inf);
   γ0 = β0*k0/α0^2;
 
@@ -66,9 +66,9 @@ function main(;AD)
   Eⁱ = (VectorValue(1.0,0.0,),
         VectorValue(0.0,1.0))
 
-  a((u,ϕ),(v,q),φ,dΩ) = ∫((I ∘ φ) * (1/k0*((C ⊙ ε(u)) ⊙ ε(v)) - 
+  a((u,ϕ),(v,q),φ,dΩ) = ∫((I ∘ φ) * (1/k0*((C ⊙ ε(u)) ⊙ ε(v)) -
                                     1/α0*((-∇(ϕ) ⋅ e) ⊙ ε(v)) +
-                                    -1/α0*((e ⋅² ε(u)) ⋅ -∇(q)) + 
+                                    -1/α0*((e ⋅² ε(u)) ⋅ -∇(q)) +
                                     -γ0/β0*((κ ⋅ -∇(ϕ)) ⋅ -∇(q))) )dΩ;
 
   l_ε = [((v,q),φ,dΩ) -> ∫(((I ∘ φ) * (-C ⊙ εᴹ[i] ⊙ ε(v) + k0/α0*(e ⋅² εᴹ[i]) ⋅ -∇(q))))dΩ for i = 1:3];
@@ -84,9 +84,9 @@ function main(;AD)
     u_r = uϕ[2r-1]; ϕ_r = uϕ[2r]
     u_s = uϕ[2s-1]; ϕ_s = uϕ[2s]
     ∫(- 1/k0 * q * (
-      (C ⊙ (1/k0*ε(u_s) + εᴹ[s])) ⊙ (1/k0*ε(u_r) + εᴹ[r]) - 
+      (C ⊙ (1/k0*ε(u_s) + εᴹ[s])) ⊙ (1/k0*ε(u_r) + εᴹ[r]) -
       (-1/α0*∇(ϕ_s) ⋅ e) ⊙ (1/k0*ε(u_r) + εᴹ[r]) -
-      (e ⋅² (1/k0*ε(u_s) + εᴹ[s])) ⋅ (-1/α0*∇(ϕ_r)) - 
+      (e ⋅² (1/k0*ε(u_s) + εᴹ[s])) ⋅ (-1/α0*∇(ϕ_r)) -
       (κ ⋅ (-1/α0*∇(ϕ_s))) ⋅ (-1/α0*∇(ϕ_r))
       ) * (DH ∘ φ) * (norm ∘ ∇(φ))
     )dΩ;

@@ -1,7 +1,7 @@
 module InverseHomogenisationALMTests
 using Test
 
-using Gridap, LevelSetTopOpt
+using Gridap, GridapTopOpt
 
 """
   (Serial) Maximum bulk modulus inverse homogenisation with augmented Lagrangian method in 2D.
@@ -10,9 +10,9 @@ using Gridap, LevelSetTopOpt
       Min J(Ω) = -κ(Ω)
         Ω
     s.t., Vol(Ω) = vf,
-          ⎡For unique εᴹᵢ, find uᵢ∈V=H¹ₚₑᵣ(Ω)ᵈ, 
+          ⎡For unique εᴹᵢ, find uᵢ∈V=H¹ₚₑᵣ(Ω)ᵈ,
           ⎣∫ ∑ᵢ C ⊙ ε(uᵢ) ⊙ ε(vᵢ) dΩ = ∫ -∑ᵢ C ⊙ ε⁰ᵢ ⊙ ε(vᵢ) dΩ, ∀v∈V.
-""" 
+"""
 function main(;AD)
   ## Parameters
   order = 1
@@ -85,7 +85,7 @@ function main(;AD)
   α = α_coeff*maximum(el_Δ)
   a_hilb(p,q) =∫(α^2*∇(p)⋅∇(q) + p*q)dΩ
   vel_ext = VelocityExtension(a_hilb,U_reg,V_reg)
-  
+
   ## Optimiser
   optimiser = AugmentedLagrangian(pcfs,ls_evo,vel_ext,φh;
     γ,γ_reinit,verbose=true,constraint_names=[:Vol])

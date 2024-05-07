@@ -1,5 +1,5 @@
 using Gridap, Gridap.MultiField, GridapDistributed, GridapPETSc, GridapSolvers,
-  PartitionedArrays, LevelSetTopOpt, SparseMatricesCSR
+  PartitionedArrays, GridapTopOpt, SparseMatricesCSR
 
 global elx       = parse(Int,ARGS[1])
 global ely       = parse(Int,ARGS[2])

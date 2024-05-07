@@ -32,7 +32,7 @@ The final result of course does not yet match ``(\star)``. Over a fixed computat
 J_1^\prime(\Omega)(-v\boldsymbol{n})=-\int_{D}vf(\boldsymbol{x})H'(\varphi)\lvert\nabla\varphi\rvert~\mathrm{d}s.
 ```
 
-As ``\varphi`` is a signed distance function we have ``\lvert\nabla\varphi\rvert=1`` for ``D\setminus\Sigma`` where ``\Sigma`` is the skeleton of ``\Omega`` and ``\Omega^\complement``. Furthermore, ``H'(\varphi)`` provides support only within a band of ``\partial\Omega``. 
+As ``\varphi`` is a signed distance function we have ``\lvert\nabla\varphi\rvert=1`` for ``D\setminus\Sigma`` where ``\Sigma`` is the skeleton of ``\Omega`` and ``\Omega^\complement``. Furthermore, ``H'(\varphi)`` provides support only within a band of ``\partial\Omega``.
 
 !!! tip "Result I"
     Therefore, we have that almost everywhere
@@ -71,9 +71,9 @@ Consider ``\Omega\subset D`` with ``J(\Omega)=\int_\Omega j(\boldsymbol{u})~\mat
 In the above ``\boldsymbol{\varepsilon}`` is the strain tensor, ``\boldsymbol{C}`` is the stiffness tensor, ``\Gamma_0 = \partial\Omega\setminus(\Gamma_D\cup\Gamma_N\cup\Gamma_R)``, and ``\Gamma_D``, ``\Gamma_N``, ``\Gamma_R`` are required to be fixed.
 
 ### Shape derivative
-Let us first consider the shape derivative of ``J``. Disregarding embedding inside the computational domain ``D``, the above strong form can be written in weak form as: 
+Let us first consider the shape derivative of ``J``. Disregarding embedding inside the computational domain ``D``, the above strong form can be written in weak form as:
 
-``\quad`` *Find* ``\boldsymbol{u}\in H^1_{\Gamma_D}(\Omega)^d`` *such that* 
+``\quad`` *Find* ``\boldsymbol{u}\in H^1_{\Gamma_D}(\Omega)^d`` *such that*
 
 ```math
 \int_{\Omega} \boldsymbol{C\varepsilon}(\boldsymbol{u})\boldsymbol{\varepsilon}(\boldsymbol{v})~\mathrm{d}\boldsymbol{x}+\int_{\Gamma_R}\boldsymbol{w}(\boldsymbol{u})\cdot\boldsymbol{v}~\mathrm{d}s=\int_\Omega \boldsymbol{f}\cdot\boldsymbol{v}~\mathrm{d}\boldsymbol{x}+\int_{\Gamma_N}\boldsymbol{g}\cdot\boldsymbol{v}~\mathrm{d}s,~\forall \boldsymbol{v}\in H^1_{\Gamma_D}(\Omega)^d.
@@ -137,7 +137,7 @@ As required. Note that in the above, we have used that ``\boldsymbol{\theta}\cdo
 
 
 ### Gâteaux derivative in ``\varphi``
-Let us now return to derivatives of ``J`` with respect to ``\varphi`` over the whole computational domain. As previously, suppose that we rewrite ``J`` as 
+Let us now return to derivatives of ``J`` with respect to ``\varphi`` over the whole computational domain. As previously, suppose that we rewrite ``J`` as
 
 ```math
 \hat{\mathcal{J}}(\varphi)=\int_D (1-H(\varphi))j(\boldsymbol{u})~\mathrm{d}\boldsymbol{x}+\int_{\Gamma_N} l_1(\boldsymbol{u})~\mathrm{d}s+\int_{\Gamma_R} l_2(\boldsymbol{u})~\mathrm{d}s
@@ -212,7 +212,7 @@ This exactly as previously up to relaxation over ``D``. Finally, The derivative 
 \end{aligned}
 ```
 
-where we have used that ``v=0`` on ``\Gamma_D`` as previously. As previously taking ``\boldsymbol{\theta}=v\boldsymbol{n}`` and relaxing the shape derivative of ``J`` over ``D`` with a signed distance function ``\varphi`` yields: 
+where we have used that ``v=0`` on ``\Gamma_D`` as previously. As previously taking ``\boldsymbol{\theta}=v\boldsymbol{n}`` and relaxing the shape derivative of ``J`` over ``D`` with a signed distance function ``\varphi`` yields:
 
 !!! tip "Result II"
     ```math
@@ -227,7 +227,7 @@ Owing to a fixed computational regime we do not capture a variation of the domai
 In addition, functionals of the signed distance function posed over the whole bounding domain ``D`` admit a special structure under shape differentiation ([Paper](https://doi.org/10.1051/m2an/2019056)). Such cases are not captured by a Gâteaux derivative at ``\varphi`` under relaxation.
 
 !!! note
-    In future, we plan to implement CellFEM via GridapEmbedded in LevelSetTopOpt. This will enable Gâteaux derivative of the mapping
+    In future, we plan to implement CellFEM via GridapEmbedded in GridapTopOpt. This will enable Gâteaux derivative of the mapping
 
     ```math
     \varphi \mapsto \int_{\Omega(\varphi)}f(\varphi)~\mathrm{d}\boldsymbol{x} + \int_{\Omega(\varphi)^\complement}f(\varphi)~\mathrm{d}\boldsymbol{x}.

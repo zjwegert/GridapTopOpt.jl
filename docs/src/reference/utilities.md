@@ -2,18 +2,18 @@
 
 ## Ersatz material interpolation
 ```@docs
-LevelSetTopOpt.SmoothErsatzMaterialInterpolation
+GridapTopOpt.SmoothErsatzMaterialInterpolation
 ```
 
 ## Mesh labelling
 ```@docs
-LevelSetTopOpt.update_labels!
+GridapTopOpt.update_labels!
 ```
 
 ## Helpers
 
 ```@docs
-LevelSetTopOpt.initial_lsf
-LevelSetTopOpt.isotropic_elast_tensor
-LevelSetTopOpt.get_el_Δ
+GridapTopOpt.initial_lsf
+GridapTopOpt.isotropic_elast_tensor
+GridapTopOpt.get_el_Δ
 ```

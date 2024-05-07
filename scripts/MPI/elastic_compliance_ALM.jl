@@ -1,5 +1,5 @@
 using Gridap, Gridap.MultiField, GridapDistributed, GridapPETSc, GridapSolvers,
-  PartitionedArrays, LevelSetTopOpt, SparseMatricesCSR
+  PartitionedArrays, GridapTopOpt, SparseMatricesCSR
 
 global write_dir = ARGS[1]
 

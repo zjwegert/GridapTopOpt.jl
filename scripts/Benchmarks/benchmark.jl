@@ -1,7 +1,7 @@
-using Gridap, Gridap.MultiField, GridapDistributed, GridapPETSc, GridapSolvers, 
-  PartitionedArrays, LevelSetTopOpt, SparseMatricesCSR
+using Gridap, Gridap.MultiField, GridapDistributed, GridapPETSc, GridapSolvers,
+  PartitionedArrays, GridapTopOpt, SparseMatricesCSR
 
-using LevelSetTopOpt: get_deriv_space, get_aux_space,benchmark_optimizer,
+using GridapTopOpt: get_deriv_space, get_aux_space,benchmark_optimizer,
   benchmark_forward_problem,benchmark_advection,benchmark_reinitialisation,
   benchmark_velocity_extension,benchmark_hilbertian_projection_map,benchmark_single_iteration
 
@@ -75,7 +75,7 @@ function nl_elast(mesh_partition,ranks,el_size,order,verbose)
   F(∇u) = one(∇u) + ∇u'
   ## Volume change
   J(F) = sqrt(det(C(F)))
-  ## Residual  
+  ## Residual
   res(u,v,φ,dΩ,dΓ_N) = ∫( (I ∘ φ)*((dE ∘ (∇(v),∇(u))) ⊙ (S ∘ ∇(u))) )*dΩ - ∫(g⋅v)dΓ_N
   Tm = SparseMatrixCSR{0,PetscScalar,PetscInt}
   Tv = Vector{PetscScalar}
@@ -281,11 +281,11 @@ function inverter_HPM(mesh_partition,ranks,el_size,order,verbose)
   ## FE Setup
   model = CartesianDiscreteModel(ranks,mesh_partition,dom,el_size);
   el_Δ = get_el_Δ(model)
-  f_Γ_in(x) = (x[1] ≈ 0.0) && (0.4 - eps() <= x[2] <= 0.6 + eps()) && 
+  f_Γ_in(x) = (x[1] ≈ 0.0) && (0.4 - eps() <= x[2] <= 0.6 + eps()) &&
     (0.4 - eps() <= x[3] <= 0.6 + eps())
-  f_Γ_out(x) = (x[1] ≈ 1.0) && (0.4 - eps() <= x[2] <= 0.6 + eps()) && 
+  f_Γ_out(x) = (x[1] ≈ 1.0) && (0.4 - eps() <= x[2] <= 0.6 + eps()) &&
     (0.4 - eps() <= x[3] <= 0.6 + eps())
-  f_Γ_out_ext(x) = ~f_Γ_out(x) && (0.9 <= x[1] <= 1.0) && (0.3 - eps() <= x[2] <= 0.7 + eps()) && 
+  f_Γ_out_ext(x) = ~f_Γ_out(x) && (0.9 <= x[1] <= 1.0) && (0.3 - eps() <= x[2] <= 0.7 + eps()) &&
     (0.3 - eps() <= x[3] <= 0.7 + eps())
   f_Γ_D(x) = (x[1] ≈ 0.0)  && (x[2] <= 0.1 || x[2] >= 0.9) && (x[3] <= 0.1 || x[3] >= 0.9)
   update_labels!(1,model,f_Γ_in,"Gamma_in")
@@ -337,7 +337,7 @@ function inverter_HPM(mesh_partition,ranks,el_size,order,verbose)
   Tm = SparseMatrixCSR{0,PetscScalar,PetscInt}
   Tv = Vector{PetscScalar}
   solver = ElasticitySolver(V)
-  
+
   state_map = AffineFEStateMap(
     a,l,U,V,V_φ,U_reg,φh,dΩ,dΓ_in,dΓ_out;
     assem_U = SparseMatrixAssembler(Tm,Tv,U,V),
@@ -355,7 +355,7 @@ function inverter_HPM(mesh_partition,ranks,el_size,order,verbose)
     assem = SparseMatrixAssembler(Tm,Tv,U_reg,V_reg),
     ls = PETScLinearSolver()
   )
-  
+
   ## Optimiser
   return HilbertianProjection(pcfs,ls_evo,vel_ext,φh;γ,γ_reinit,verbose=verbose)
 end
@@ -365,21 +365,21 @@ with_mpi() do distribute
   mesh_partition = (Nx,Ny,Nz)
   ranks = distribute(LinearIndices((prod(mesh_partition),)))
   el_size = (N_EL,N_EL,N_EL)
-  verbose = Bool(VERBOSE) ? i_am_main(ranks) : false; 
+  verbose = Bool(VERBOSE) ? i_am_main(ranks) : false;
   if PROB_TYPE == "NLELAST"
-    options = "-pc_type gamg -ksp_type cg -ksp_error_if_not_converged true 
+    options = "-pc_type gamg -ksp_type cg -ksp_error_if_not_converged true
       -ksp_converged_reason -ksp_rtol 1.0e-12"
     opt = nl_elast
-  elseif PROB_TYPE == "THERM" 
-    options = "-pc_type gamg -ksp_type cg -ksp_error_if_not_converged true 
+  elseif PROB_TYPE == "THERM"
+    options = "-pc_type gamg -ksp_type cg -ksp_error_if_not_converged true
       -ksp_converged_reason -ksp_rtol 1.0e-12"
     opt = therm
   elseif PROB_TYPE == "ELAST"
-    options = "-pc_type gamg -ksp_type cg -ksp_error_if_not_converged true 
+    options = "-pc_type gamg -ksp_type cg -ksp_error_if_not_converged true
       -ksp_converged_reason -ksp_rtol 1.0e-12"
     opt = elast
   elseif PROB_TYPE == "INVERTER_HPM"
-    options = "-pc_type gamg -ksp_type cg -ksp_error_if_not_converged true 
+    options = "-pc_type gamg -ksp_type cg -ksp_error_if_not_converged true
       -ksp_converged_reason -ksp_rtol 1.0e-12"
     opt = inverter_HPM
   else
@@ -439,7 +439,7 @@ with_mpi() do distribute
     end
     ## HPM
     if occursin("bhpm",BMARK_TYPE)
-      @assert typeof(optim) <: HilbertianProjection 
+      @assert typeof(optim) <: HilbertianProjection
       J, C, dJ, dC = Gridap.evaluate!(optim.problem,optim.φ0)
       optim.projector,dJ,C,dC,optim.vel_ext.K
       bhpm = benchmark_hilbertian_projection_map(optim.projector,dJ,C,dC,optim.vel_ext.K,ranks)

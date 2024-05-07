@@ -1,4 +1,4 @@
-using Gridap, LevelSetTopOpt
+using Gridap, GridapTopOpt
 
 """
   (Serial) Inverter mechanism with Hilbertian projection method in 2D.

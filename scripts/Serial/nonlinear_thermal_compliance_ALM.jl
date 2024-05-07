@@ -1,4 +1,4 @@
-using Gridap, LevelSetTopOpt
+using Gridap, GridapTopOpt
 
 """
   (Serial) Minimum thermal compliance with augmented Lagrangian method in 2D with nonlinear diffusivity.

@@ -1,4 +1,4 @@
-using Gridap, GridapDistributed, GridapPETSc, PartitionedArrays, LevelSetTopOpt
+using Gridap, GridapDistributed, GridapPETSc, PartitionedArrays, GridapTopOpt
 
 """
   (MPI) Minimum thermal compliance with Lagrangian method in 2D.
@@ -83,7 +83,7 @@ function main(mesh_partition,distribute)
   vel_ext = VelocityExtension(a_hilb,U_reg,V_reg)
 
   ## Optimiser
-  _conv_cond = t->LevelSetTopOpt.conv_cond(t;coef=1/50);
+  _conv_cond = t->GridapTopOpt.conv_cond(t;coef=1/50);
   optimiser = AugmentedLagrangian(φ,pcfs,ls_evo,vel_ext,interp,el_size,γ,γ_reinit,conv_criterion=_conv_cond);
   for history in optimiser
     it,Ji,_,_ = last(history)
