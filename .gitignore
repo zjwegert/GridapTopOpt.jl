@@ -27,3 +27,6 @@ docs/site/
 Manifest.toml
 LocalPreferences.toml
 GridapTopOpt.so
+
+# Ensure never to write results to git
+results/*
