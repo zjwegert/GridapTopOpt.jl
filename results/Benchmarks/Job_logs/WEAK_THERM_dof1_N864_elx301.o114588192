@@ -1,0 +1,176 @@
+<------------- Compilation  ------------->
+Linear solve converged due to CONVERGED_RTOL iterations 19
+Linear solve converged due to CONVERGED_RTOL iterations 15
+Iteration:   0 | L=6.5732e-03, J=6.3802e-03, C_1=3.6629e-01, γ=1.0000e-01, λ1=0.0000e+00, Λ1=2.8780e-03
+<------------- Benchmarking ------------->
+      Benchmark - Iteration 1 of 10
+Linear solve converged due to CONVERGED_RTOL iterations 19
+Linear solve converged due to CONVERGED_RTOL iterations 15
+Iteration:   0 | L=6.5732e-03, J=6.3802e-03, C_1=3.6629e-01, γ=1.0000e-01, λ1=0.0000e+00, Λ1=2.8780e-03
+      Benchmark - Iteration 2 of 10
+Linear solve converged due to CONVERGED_RTOL iterations 19
+Linear solve converged due to CONVERGED_RTOL iterations 15
+Iteration:   0 | L=6.5732e-03, J=6.3802e-03, C_1=3.6629e-01, γ=1.0000e-01, λ1=0.0000e+00, Λ1=2.8780e-03
+      Benchmark - Iteration 3 of 10
+Linear solve converged due to CONVERGED_RTOL iterations 19
+Linear solve converged due to CONVERGED_RTOL iterations 15
+Iteration:   0 | L=6.5732e-03, J=6.3802e-03, C_1=3.6629e-01, γ=1.0000e-01, λ1=0.0000e+00, Λ1=2.8780e-03
+      Benchmark - Iteration 4 of 10
+Linear solve converged due to CONVERGED_RTOL iterations 19
+Linear solve converged due to CONVERGED_RTOL iterations 15
+Iteration:   0 | L=6.5732e-03, J=6.3802e-03, C_1=3.6629e-01, γ=1.0000e-01, λ1=0.0000e+00, Λ1=2.8780e-03
+      Benchmark - Iteration 5 of 10
+Linear solve converged due to CONVERGED_RTOL iterations 19
+Linear solve converged due to CONVERGED_RTOL iterations 15
+Iteration:   0 | L=6.5732e-03, J=6.3802e-03, C_1=3.6629e-01, γ=1.0000e-01, λ1=0.0000e+00, Λ1=2.8780e-03
+      Benchmark - Iteration 6 of 10
+Linear solve converged due to CONVERGED_RTOL iterations 19
+Linear solve converged due to CONVERGED_RTOL iterations 15
+Iteration:   0 | L=6.5732e-03, J=6.3802e-03, C_1=3.6629e-01, γ=1.0000e-01, λ1=0.0000e+00, Λ1=2.8780e-03
+      Benchmark - Iteration 7 of 10
+Linear solve converged due to CONVERGED_RTOL iterations 19
+Linear solve converged due to CONVERGED_RTOL iterations 15
+Iteration:   0 | L=6.5732e-03, J=6.3802e-03, C_1=3.6629e-01, γ=1.0000e-01, λ1=0.0000e+00, Λ1=2.8780e-03
+      Benchmark - Iteration 8 of 10
+Linear solve converged due to CONVERGED_RTOL iterations 19
+Linear solve converged due to CONVERGED_RTOL iterations 15
+Iteration:   0 | L=6.5732e-03, J=6.3802e-03, C_1=3.6629e-01, γ=1.0000e-01, λ1=0.0000e+00, Λ1=2.8780e-03
+      Benchmark - Iteration 9 of 10
+Linear solve converged due to CONVERGED_RTOL iterations 19
+Linear solve converged due to CONVERGED_RTOL iterations 15
+Iteration:   0 | L=6.5732e-03, J=6.3802e-03, C_1=3.6629e-01, γ=1.0000e-01, λ1=0.0000e+00, Λ1=2.8780e-03
+      Benchmark - Iteration 10 of 10
+Linear solve converged due to CONVERGED_RTOL iterations 19
+Linear solve converged due to CONVERGED_RTOL iterations 15
+Iteration:   0 | L=6.5732e-03, J=6.3802e-03, C_1=3.6629e-01, γ=1.0000e-01, λ1=0.0000e+00, Λ1=2.8780e-03
+Linear solve converged due to CONVERGED_RTOL iterations 19
+Linear solve converged due to CONVERGED_RTOL iterations 15
+Iteration:   1 | L=6.5731e-03, J=6.3800e-03, C_1=3.6630e-01, γ=1.0000e-01, λ1=0.0000e+00, Λ1=2.8778e-03
+<------------- Compilation  ------------->
+Linear solve converged due to CONVERGED_RTOL iterations 19
+Linear solve converged due to CONVERGED_RTOL iterations 15
+Iteration:   2 | L=6.3034e-03, J=6.1026e-03, C_1=3.7359e-01, γ=1.0000e-01, λ1=-1.0751e-03, Λ1=2.8778e-03
+<------------- Benchmarking ------------->
+      Benchmark - Iteration 1 of 10
+Linear solve converged due to CONVERGED_RTOL iterations 19
+Linear solve converged due to CONVERGED_RTOL iterations 15
+Iteration:   1 | L=6.3034e-03, J=6.1026e-03, C_1=3.7359e-01, γ=1.0000e-01, λ1=-1.0751e-03, Λ1=2.8778e-03
+      Benchmark - Iteration 2 of 10
+Linear solve converged due to CONVERGED_RTOL iterations 19
+Linear solve converged due to CONVERGED_RTOL iterations 15
+Iteration:   1 | L=6.3034e-03, J=6.1026e-03, C_1=3.7359e-01, γ=1.0000e-01, λ1=-1.0751e-03, Λ1=2.8778e-03
+      Benchmark - Iteration 3 of 10
+Linear solve converged due to CONVERGED_RTOL iterations 19
+Linear solve converged due to CONVERGED_RTOL iterations 15
+Iteration:   1 | L=6.3034e-03, J=6.1026e-03, C_1=3.7359e-01, γ=1.0000e-01, λ1=-1.0751e-03, Λ1=2.8778e-03
+      Benchmark - Iteration 4 of 10
+Linear solve converged due to CONVERGED_RTOL iterations 19
+Linear solve converged due to CONVERGED_RTOL iterations 15
+Iteration:   1 | L=6.3034e-03, J=6.1026e-03, C_1=3.7359e-01, γ=1.0000e-01, λ1=-1.0751e-03, Λ1=2.8778e-03
+      Benchmark - Iteration 5 of 10
+Linear solve converged due to CONVERGED_RTOL iterations 19
+Linear solve converged due to CONVERGED_RTOL iterations 15
+Iteration:   1 | L=6.3034e-03, J=6.1026e-03, C_1=3.7359e-01, γ=1.0000e-01, λ1=-1.0751e-03, Λ1=2.8778e-03
+      Benchmark - Iteration 6 of 10
+Linear solve converged due to CONVERGED_RTOL iterations 19
+Linear solve converged due to CONVERGED_RTOL iterations 15
+Iteration:   1 | L=6.3034e-03, J=6.1026e-03, C_1=3.7359e-01, γ=1.0000e-01, λ1=-1.0751e-03, Λ1=2.8778e-03
+      Benchmark - Iteration 7 of 10
+Linear solve converged due to CONVERGED_RTOL iterations 19
+Linear solve converged due to CONVERGED_RTOL iterations 15
+Iteration:   1 | L=6.3034e-03, J=6.1026e-03, C_1=3.7359e-01, γ=1.0000e-01, λ1=-1.0751e-03, Λ1=2.8778e-03
+      Benchmark - Iteration 8 of 10
+Linear solve converged due to CONVERGED_RTOL iterations 19
+Linear solve converged due to CONVERGED_RTOL iterations 15
+Iteration:   1 | L=6.3034e-03, J=6.1026e-03, C_1=3.7359e-01, γ=1.0000e-01, λ1=-1.0751e-03, Λ1=2.8778e-03
+      Benchmark - Iteration 9 of 10
+Linear solve converged due to CONVERGED_RTOL iterations 19
+Linear solve converged due to CONVERGED_RTOL iterations 15
+Iteration:   1 | L=6.3034e-03, J=6.1026e-03, C_1=3.7359e-01, γ=1.0000e-01, λ1=-1.0751e-03, Λ1=2.8778e-03
+      Benchmark - Iteration 10 of 10
+Linear solve converged due to CONVERGED_RTOL iterations 19
+Linear solve converged due to CONVERGED_RTOL iterations 15
+Iteration:   1 | L=6.3034e-03, J=6.1026e-03, C_1=3.7359e-01, γ=1.0000e-01, λ1=-1.0751e-03, Λ1=2.8778e-03
+<------------- Compilation  ------------->
+<------------- Benchmarking ------------->
+      Benchmark - Iteration 1 of 10
+      Benchmark - Iteration 2 of 10
+      Benchmark - Iteration 3 of 10
+      Benchmark - Iteration 4 of 10
+      Benchmark - Iteration 5 of 10
+      Benchmark - Iteration 6 of 10
+      Benchmark - Iteration 7 of 10
+      Benchmark - Iteration 8 of 10
+      Benchmark - Iteration 9 of 10
+      Benchmark - Iteration 10 of 10
+<------------- Compilation  ------------->
+Linear solve converged due to CONVERGED_RTOL iterations 19
+<------------- Benchmarking ------------->
+      Benchmark - Iteration 1 of 10
+Linear solve converged due to CONVERGED_RTOL iterations 19
+      Benchmark - Iteration 2 of 10
+Linear solve converged due to CONVERGED_RTOL iterations 19
+      Benchmark - Iteration 3 of 10
+Linear solve converged due to CONVERGED_RTOL iterations 19
+      Benchmark - Iteration 4 of 10
+Linear solve converged due to CONVERGED_RTOL iterations 19
+      Benchmark - Iteration 5 of 10
+Linear solve converged due to CONVERGED_RTOL iterations 19
+      Benchmark - Iteration 6 of 10
+Linear solve converged due to CONVERGED_RTOL iterations 19
+      Benchmark - Iteration 7 of 10
+Linear solve converged due to CONVERGED_RTOL iterations 19
+      Benchmark - Iteration 8 of 10
+Linear solve converged due to CONVERGED_RTOL iterations 19
+      Benchmark - Iteration 9 of 10
+Linear solve converged due to CONVERGED_RTOL iterations 19
+      Benchmark - Iteration 10 of 10
+Linear solve converged due to CONVERGED_RTOL iterations 19
+<------------- Compilation  ------------->
+<------------- Benchmarking ------------->
+      Benchmark - Iteration 1 of 10
+      Benchmark - Iteration 2 of 10
+      Benchmark - Iteration 3 of 10
+      Benchmark - Iteration 4 of 10
+      Benchmark - Iteration 5 of 10
+      Benchmark - Iteration 6 of 10
+      Benchmark - Iteration 7 of 10
+      Benchmark - Iteration 8 of 10
+      Benchmark - Iteration 9 of 10
+      Benchmark - Iteration 10 of 10
+<------------- Compilation  ------------->
+Linear solve converged due to CONVERGED_RTOL iterations 15
+<------------- Benchmarking ------------->
+      Benchmark - Iteration 1 of 10
+Linear solve converged due to CONVERGED_RTOL iterations 15
+      Benchmark - Iteration 2 of 10
+Linear solve converged due to CONVERGED_RTOL iterations 15
+      Benchmark - Iteration 3 of 10
+Linear solve converged due to CONVERGED_RTOL iterations 15
+      Benchmark - Iteration 4 of 10
+Linear solve converged due to CONVERGED_RTOL iterations 15
+      Benchmark - Iteration 5 of 10
+Linear solve converged due to CONVERGED_RTOL iterations 15
+      Benchmark - Iteration 6 of 10
+Linear solve converged due to CONVERGED_RTOL iterations 15
+      Benchmark - Iteration 7 of 10
+Linear solve converged due to CONVERGED_RTOL iterations 15
+      Benchmark - Iteration 8 of 10
+Linear solve converged due to CONVERGED_RTOL iterations 15
+      Benchmark - Iteration 9 of 10
+Linear solve converged due to CONVERGED_RTOL iterations 15
+      Benchmark - Iteration 10 of 10
+Linear solve converged due to CONVERGED_RTOL iterations 15
+
+======================================================================================
+                  Resource Usage on 2024-04-26 23:27:58:
+   Job Id:             114588192.gadi-pbs
+   Project:            np01
+   Exit Status:        0
+   Service Units:      205.92
+   NCPUs Requested:    864                    NCPUs Used: 864             
+                                           CPU Time Used: 84:00:45        
+   Memory Requested:   3.38TB                Memory Used: 1.15TB          
+   Walltime requested: 03:00:00            Walltime Used: 00:07:09        
+   JobFS requested:    1.76GB                 JobFS used: 0B              
+======================================================================================

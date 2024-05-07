@@ -1,0 +1,436 @@
+KSP Object: 8 MPI processes
+  type: cg
+  maximum iterations=200, initial guess is zero
+  tolerances:  relative=1e-12, absolute=1e-50, divergence=10000.
+  left preconditioning
+  using DEFAULT norm type for convergence test
+PC Object: 8 MPI processes
+  type: gamg
+  PC has not been set up so information may be incomplete
+    type is MULTIPLICATIVE, levels=0 cycles=unknown
+      Cycles per PCApply=0
+      Using externally compute Galerkin coarse grid matrices
+      GAMG specific options
+        Threshold for dropping small values in graph on each level =  
+        Threshold scaling factor for each level not specified = 1.
+        AGG specific options
+          Number of levels to square graph 1
+          Number smoothing steps 1
+        Complexity:    grid = 0.    operator = 0.
+  linear system matrix = precond matrix:
+  Mat Object: 8 MPI processes
+    type: mpiaij
+    rows=249744, cols=249744
+    total: nonzeros=19316700, allocated nonzeros=19316700
+    total number of mallocs used during MatSetValues calls=0
+      has attached near null space
+      using I-node (on process 0) routines: found 8820 nodes, limit used is 5
+KSP Object: 8 MPI processes
+  type: cg
+  maximum iterations=200, initial guess is zero
+  tolerances:  relative=1e-12, absolute=1e-50, divergence=10000.
+  left preconditioning
+  using DEFAULT norm type for convergence test
+PC Object: 8 MPI processes
+  type: gamg
+  PC has not been set up so information may be incomplete
+    type is MULTIPLICATIVE, levels=0 cycles=unknown
+      Cycles per PCApply=0
+      Using externally compute Galerkin coarse grid matrices
+      GAMG specific options
+        Threshold for dropping small values in graph on each level =  
+        Threshold scaling factor for each level not specified = 1.
+        AGG specific options
+          Number of levels to square graph 1
+          Number smoothing steps 1
+        Complexity:    grid = 0.    operator = 0.
+  linear system matrix = precond matrix:
+  Mat Object: 8 MPI processes
+    type: mpiaij
+    rows=249744, cols=249744
+    total: nonzeros=19316700, allocated nonzeros=19316700
+    total number of mallocs used during MatSetValues calls=0
+      has attached near null space
+      using I-node (on process 0) routines: found 8820 nodes, limit used is 5
+<------------- Compilation  ------------->
+--------------- Starting Newton-Raphson solver --------
+  > Iteration   0 - Residuals: 3.52e-03,   1.00e+00 
+Linear solve converged due to CONVERGED_RTOL iterations 27
+  > Iteration   1 - Residuals: 6.30e-06,   1.79e-03 
+Linear solve converged due to CONVERGED_RTOL iterations 28
+  > Iteration   2 - Residuals: 3.42e-12,   9.74e-10 
+Solver Newton-Raphson finished with reason SOLVER_CONVERGED_RTOL
+Iterations:   2 - Residuals: 3.42e-12,   9.74e-10 
+--------------- Exiting Newton-Raphson solver ---------
+Linear solve converged due to CONVERGED_RTOL iterations 27
+Linear solve converged due to CONVERGED_RTOL iterations 12
+Iteration:   0 | L=1.1627e-05, J=1.1281e-05, C_1=3.7674e-01, γ=1.0000e-01, λ1=0.0000e+00, Λ1=4.8783e-06
+<------------- Benchmarking ------------->
+      Benchmark - Iteration 1 of 10
+--------------- Starting Newton-Raphson solver --------
+  > Iteration   0 - Residuals: 3.52e-03,   1.00e+00 
+Linear solve converged due to CONVERGED_RTOL iterations 27
+  > Iteration   1 - Residuals: 6.30e-06,   1.79e-03 
+Linear solve converged due to CONVERGED_RTOL iterations 28
+  > Iteration   2 - Residuals: 3.42e-12,   9.74e-10 
+Solver Newton-Raphson finished with reason SOLVER_CONVERGED_RTOL
+Iterations:   2 - Residuals: 3.42e-12,   9.74e-10 
+--------------- Exiting Newton-Raphson solver ---------
+Linear solve converged due to CONVERGED_RTOL iterations 27
+Linear solve converged due to CONVERGED_RTOL iterations 12
+Iteration:   0 | L=1.1627e-05, J=1.1281e-05, C_1=3.7674e-01, γ=1.0000e-01, λ1=0.0000e+00, Λ1=4.8783e-06
+      Benchmark - Iteration 2 of 10
+--------------- Starting Newton-Raphson solver --------
+  > Iteration   0 - Residuals: 3.52e-03,   1.00e+00 
+Linear solve converged due to CONVERGED_RTOL iterations 27
+  > Iteration   1 - Residuals: 6.30e-06,   1.79e-03 
+Linear solve converged due to CONVERGED_RTOL iterations 28
+  > Iteration   2 - Residuals: 3.42e-12,   9.74e-10 
+Solver Newton-Raphson finished with reason SOLVER_CONVERGED_RTOL
+Iterations:   2 - Residuals: 3.42e-12,   9.74e-10 
+--------------- Exiting Newton-Raphson solver ---------
+Linear solve converged due to CONVERGED_RTOL iterations 27
+Linear solve converged due to CONVERGED_RTOL iterations 12
+Iteration:   0 | L=1.1627e-05, J=1.1281e-05, C_1=3.7674e-01, γ=1.0000e-01, λ1=0.0000e+00, Λ1=4.8783e-06
+      Benchmark - Iteration 3 of 10
+--------------- Starting Newton-Raphson solver --------
+  > Iteration   0 - Residuals: 3.52e-03,   1.00e+00 
+Linear solve converged due to CONVERGED_RTOL iterations 27
+  > Iteration   1 - Residuals: 6.30e-06,   1.79e-03 
+Linear solve converged due to CONVERGED_RTOL iterations 28
+  > Iteration   2 - Residuals: 3.42e-12,   9.74e-10 
+Solver Newton-Raphson finished with reason SOLVER_CONVERGED_RTOL
+Iterations:   2 - Residuals: 3.42e-12,   9.74e-10 
+--------------- Exiting Newton-Raphson solver ---------
+Linear solve converged due to CONVERGED_RTOL iterations 27
+Linear solve converged due to CONVERGED_RTOL iterations 12
+Iteration:   0 | L=1.1627e-05, J=1.1281e-05, C_1=3.7674e-01, γ=1.0000e-01, λ1=0.0000e+00, Λ1=4.8783e-06
+      Benchmark - Iteration 4 of 10
+--------------- Starting Newton-Raphson solver --------
+  > Iteration   0 - Residuals: 3.52e-03,   1.00e+00 
+Linear solve converged due to CONVERGED_RTOL iterations 27
+  > Iteration   1 - Residuals: 6.30e-06,   1.79e-03 
+Linear solve converged due to CONVERGED_RTOL iterations 28
+  > Iteration   2 - Residuals: 3.42e-12,   9.74e-10 
+Solver Newton-Raphson finished with reason SOLVER_CONVERGED_RTOL
+Iterations:   2 - Residuals: 3.42e-12,   9.74e-10 
+--------------- Exiting Newton-Raphson solver ---------
+Linear solve converged due to CONVERGED_RTOL iterations 27
+Linear solve converged due to CONVERGED_RTOL iterations 12
+Iteration:   0 | L=1.1627e-05, J=1.1281e-05, C_1=3.7674e-01, γ=1.0000e-01, λ1=0.0000e+00, Λ1=4.8783e-06
+      Benchmark - Iteration 5 of 10
+--------------- Starting Newton-Raphson solver --------
+  > Iteration   0 - Residuals: 3.52e-03,   1.00e+00 
+Linear solve converged due to CONVERGED_RTOL iterations 27
+  > Iteration   1 - Residuals: 6.30e-06,   1.79e-03 
+Linear solve converged due to CONVERGED_RTOL iterations 28
+  > Iteration   2 - Residuals: 3.42e-12,   9.74e-10 
+Solver Newton-Raphson finished with reason SOLVER_CONVERGED_RTOL
+Iterations:   2 - Residuals: 3.42e-12,   9.74e-10 
+--------------- Exiting Newton-Raphson solver ---------
+Linear solve converged due to CONVERGED_RTOL iterations 27
+Linear solve converged due to CONVERGED_RTOL iterations 12
+Iteration:   0 | L=1.1627e-05, J=1.1281e-05, C_1=3.7674e-01, γ=1.0000e-01, λ1=0.0000e+00, Λ1=4.8783e-06
+      Benchmark - Iteration 6 of 10
+--------------- Starting Newton-Raphson solver --------
+  > Iteration   0 - Residuals: 3.52e-03,   1.00e+00 
+Linear solve converged due to CONVERGED_RTOL iterations 27
+  > Iteration   1 - Residuals: 6.30e-06,   1.79e-03 
+Linear solve converged due to CONVERGED_RTOL iterations 28
+  > Iteration   2 - Residuals: 3.42e-12,   9.74e-10 
+Solver Newton-Raphson finished with reason SOLVER_CONVERGED_RTOL
+Iterations:   2 - Residuals: 3.42e-12,   9.74e-10 
+--------------- Exiting Newton-Raphson solver ---------
+Linear solve converged due to CONVERGED_RTOL iterations 27
+Linear solve converged due to CONVERGED_RTOL iterations 12
+Iteration:   0 | L=1.1627e-05, J=1.1281e-05, C_1=3.7674e-01, γ=1.0000e-01, λ1=0.0000e+00, Λ1=4.8783e-06
+      Benchmark - Iteration 7 of 10
+--------------- Starting Newton-Raphson solver --------
+  > Iteration   0 - Residuals: 3.52e-03,   1.00e+00 
+Linear solve converged due to CONVERGED_RTOL iterations 27
+  > Iteration   1 - Residuals: 6.30e-06,   1.79e-03 
+Linear solve converged due to CONVERGED_RTOL iterations 28
+  > Iteration   2 - Residuals: 3.42e-12,   9.74e-10 
+Solver Newton-Raphson finished with reason SOLVER_CONVERGED_RTOL
+Iterations:   2 - Residuals: 3.42e-12,   9.74e-10 
+--------------- Exiting Newton-Raphson solver ---------
+Linear solve converged due to CONVERGED_RTOL iterations 27
+Linear solve converged due to CONVERGED_RTOL iterations 12
+Iteration:   0 | L=1.1627e-05, J=1.1281e-05, C_1=3.7674e-01, γ=1.0000e-01, λ1=0.0000e+00, Λ1=4.8783e-06
+      Benchmark - Iteration 8 of 10
+--------------- Starting Newton-Raphson solver --------
+  > Iteration   0 - Residuals: 3.52e-03,   1.00e+00 
+Linear solve converged due to CONVERGED_RTOL iterations 27
+  > Iteration   1 - Residuals: 6.30e-06,   1.79e-03 
+Linear solve converged due to CONVERGED_RTOL iterations 28
+  > Iteration   2 - Residuals: 3.42e-12,   9.74e-10 
+Solver Newton-Raphson finished with reason SOLVER_CONVERGED_RTOL
+Iterations:   2 - Residuals: 3.42e-12,   9.74e-10 
+--------------- Exiting Newton-Raphson solver ---------
+Linear solve converged due to CONVERGED_RTOL iterations 27
+Linear solve converged due to CONVERGED_RTOL iterations 12
+Iteration:   0 | L=1.1627e-05, J=1.1281e-05, C_1=3.7674e-01, γ=1.0000e-01, λ1=0.0000e+00, Λ1=4.8783e-06
+      Benchmark - Iteration 9 of 10
+--------------- Starting Newton-Raphson solver --------
+  > Iteration   0 - Residuals: 3.52e-03,   1.00e+00 
+Linear solve converged due to CONVERGED_RTOL iterations 27
+  > Iteration   1 - Residuals: 6.30e-06,   1.79e-03 
+Linear solve converged due to CONVERGED_RTOL iterations 28
+  > Iteration   2 - Residuals: 3.42e-12,   9.74e-10 
+Solver Newton-Raphson finished with reason SOLVER_CONVERGED_RTOL
+Iterations:   2 - Residuals: 3.42e-12,   9.74e-10 
+--------------- Exiting Newton-Raphson solver ---------
+Linear solve converged due to CONVERGED_RTOL iterations 27
+Linear solve converged due to CONVERGED_RTOL iterations 12
+Iteration:   0 | L=1.1627e-05, J=1.1281e-05, C_1=3.7674e-01, γ=1.0000e-01, λ1=0.0000e+00, Λ1=4.8783e-06
+      Benchmark - Iteration 10 of 10
+--------------- Starting Newton-Raphson solver --------
+  > Iteration   0 - Residuals: 3.52e-03,   1.00e+00 
+Linear solve converged due to CONVERGED_RTOL iterations 27
+  > Iteration   1 - Residuals: 6.30e-06,   1.79e-03 
+Linear solve converged due to CONVERGED_RTOL iterations 28
+  > Iteration   2 - Residuals: 3.42e-12,   9.74e-10 
+Solver Newton-Raphson finished with reason SOLVER_CONVERGED_RTOL
+Iterations:   2 - Residuals: 3.42e-12,   9.74e-10 
+--------------- Exiting Newton-Raphson solver ---------
+Linear solve converged due to CONVERGED_RTOL iterations 27
+Linear solve converged due to CONVERGED_RTOL iterations 12
+Iteration:   0 | L=1.1627e-05, J=1.1281e-05, C_1=3.7674e-01, γ=1.0000e-01, λ1=0.0000e+00, Λ1=4.8783e-06
+--------------- Starting Newton-Raphson solver --------
+  > Iteration   0 - Residuals: 1.51e-05,   1.00e+00 
+Linear solve converged due to CONVERGED_RTOL iterations 27
+  > Iteration   1 - Residuals: 3.61e-11,   2.39e-06 
+Linear solve converged due to CONVERGED_RTOL iterations 28
+  > Iteration   2 - Residuals: 1.35e-14,   8.95e-10 
+Solver Newton-Raphson finished with reason SOLVER_CONVERGED_RTOL
+Iterations:   2 - Residuals: 1.35e-14,   8.95e-10 
+--------------- Exiting Newton-Raphson solver ---------
+Linear solve converged due to CONVERGED_RTOL iterations 27
+Linear solve converged due to CONVERGED_RTOL iterations 12
+Iteration:   1 | L=1.1610e-05, J=1.1264e-05, C_1=3.7758e-01, γ=1.0000e-01, λ1=0.0000e+00, Λ1=4.8547e-06
+<------------- Compilation  ------------->
+--------------- Starting Newton-Raphson solver --------
+  > Iteration   0 - Residuals: 6.64e-04,   1.00e+00 
+Linear solve converged due to CONVERGED_RTOL iterations 27
+  > Iteration   1 - Residuals: 2.15e-07,   3.24e-04 
+Linear solve converged due to CONVERGED_RTOL iterations 28
+  > Iteration   2 - Residuals: 1.96e-14,   2.94e-11 
+Solver Newton-Raphson finished with reason SOLVER_CONVERGED_RTOL
+Iterations:   2 - Residuals: 1.96e-14,   2.94e-11 
+--------------- Exiting Newton-Raphson solver ---------
+Linear solve converged due to CONVERGED_RTOL iterations 26
+Linear solve converged due to CONVERGED_RTOL iterations 12
+Iteration:   2 | L=1.1153e-05, J=1.0788e-05, C_1=3.8796e-01, γ=1.0000e-01, λ1=-1.8834e-06, Λ1=4.8547e-06
+<------------- Benchmarking ------------->
+      Benchmark - Iteration 1 of 10
+--------------- Starting Newton-Raphson solver --------
+  > Iteration   0 - Residuals: 3.52e-03,   1.00e+00 
+Linear solve converged due to CONVERGED_RTOL iterations 26
+  > Iteration   1 - Residuals: 5.74e-06,   1.63e-03 
+Linear solve converged due to CONVERGED_RTOL iterations 28
+  > Iteration   2 - Residuals: 2.64e-12,   7.52e-10 
+Solver Newton-Raphson finished with reason SOLVER_CONVERGED_RTOL
+Iterations:   2 - Residuals: 2.64e-12,   7.52e-10 
+--------------- Exiting Newton-Raphson solver ---------
+Linear solve converged due to CONVERGED_RTOL iterations 26
+Linear solve converged due to CONVERGED_RTOL iterations 12
+Iteration:   1 | L=1.1153e-05, J=1.0788e-05, C_1=3.8796e-01, γ=1.0000e-01, λ1=-1.8834e-06, Λ1=4.8547e-06
+      Benchmark - Iteration 2 of 10
+--------------- Starting Newton-Raphson solver --------
+  > Iteration   0 - Residuals: 3.52e-03,   1.00e+00 
+Linear solve converged due to CONVERGED_RTOL iterations 26
+  > Iteration   1 - Residuals: 5.74e-06,   1.63e-03 
+Linear solve converged due to CONVERGED_RTOL iterations 28
+  > Iteration   2 - Residuals: 2.64e-12,   7.52e-10 
+Solver Newton-Raphson finished with reason SOLVER_CONVERGED_RTOL
+Iterations:   2 - Residuals: 2.64e-12,   7.52e-10 
+--------------- Exiting Newton-Raphson solver ---------
+Linear solve converged due to CONVERGED_RTOL iterations 26
+Linear solve converged due to CONVERGED_RTOL iterations 12
+Iteration:   1 | L=1.1153e-05, J=1.0788e-05, C_1=3.8796e-01, γ=1.0000e-01, λ1=-1.8834e-06, Λ1=4.8547e-06
+      Benchmark - Iteration 3 of 10
+--------------- Starting Newton-Raphson solver --------
+  > Iteration   0 - Residuals: 3.52e-03,   1.00e+00 
+Linear solve converged due to CONVERGED_RTOL iterations 26
+  > Iteration   1 - Residuals: 5.74e-06,   1.63e-03 
+Linear solve converged due to CONVERGED_RTOL iterations 28
+  > Iteration   2 - Residuals: 2.64e-12,   7.52e-10 
+Solver Newton-Raphson finished with reason SOLVER_CONVERGED_RTOL
+Iterations:   2 - Residuals: 2.64e-12,   7.52e-10 
+--------------- Exiting Newton-Raphson solver ---------
+Linear solve converged due to CONVERGED_RTOL iterations 26
+Linear solve converged due to CONVERGED_RTOL iterations 12
+Iteration:   1 | L=1.1153e-05, J=1.0788e-05, C_1=3.8796e-01, γ=1.0000e-01, λ1=-1.8834e-06, Λ1=4.8547e-06
+      Benchmark - Iteration 4 of 10
+--------------- Starting Newton-Raphson solver --------
+  > Iteration   0 - Residuals: 3.52e-03,   1.00e+00 
+Linear solve converged due to CONVERGED_RTOL iterations 26
+  > Iteration   1 - Residuals: 5.74e-06,   1.63e-03 
+Linear solve converged due to CONVERGED_RTOL iterations 28
+  > Iteration   2 - Residuals: 2.64e-12,   7.52e-10 
+Solver Newton-Raphson finished with reason SOLVER_CONVERGED_RTOL
+Iterations:   2 - Residuals: 2.64e-12,   7.52e-10 
+--------------- Exiting Newton-Raphson solver ---------
+Linear solve converged due to CONVERGED_RTOL iterations 26
+Linear solve converged due to CONVERGED_RTOL iterations 12
+Iteration:   1 | L=1.1153e-05, J=1.0788e-05, C_1=3.8796e-01, γ=1.0000e-01, λ1=-1.8834e-06, Λ1=4.8547e-06
+      Benchmark - Iteration 5 of 10
+--------------- Starting Newton-Raphson solver --------
+  > Iteration   0 - Residuals: 3.52e-03,   1.00e+00 
+Linear solve converged due to CONVERGED_RTOL iterations 26
+  > Iteration   1 - Residuals: 5.74e-06,   1.63e-03 
+Linear solve converged due to CONVERGED_RTOL iterations 28
+  > Iteration   2 - Residuals: 2.64e-12,   7.52e-10 
+Solver Newton-Raphson finished with reason SOLVER_CONVERGED_RTOL
+Iterations:   2 - Residuals: 2.64e-12,   7.52e-10 
+--------------- Exiting Newton-Raphson solver ---------
+Linear solve converged due to CONVERGED_RTOL iterations 26
+Linear solve converged due to CONVERGED_RTOL iterations 12
+Iteration:   1 | L=1.1153e-05, J=1.0788e-05, C_1=3.8796e-01, γ=1.0000e-01, λ1=-1.8834e-06, Λ1=4.8547e-06
+      Benchmark - Iteration 6 of 10
+--------------- Starting Newton-Raphson solver --------
+  > Iteration   0 - Residuals: 3.52e-03,   1.00e+00 
+Linear solve converged due to CONVERGED_RTOL iterations 26
+  > Iteration   1 - Residuals: 5.74e-06,   1.63e-03 
+Linear solve converged due to CONVERGED_RTOL iterations 28
+  > Iteration   2 - Residuals: 2.64e-12,   7.52e-10 
+Solver Newton-Raphson finished with reason SOLVER_CONVERGED_RTOL
+Iterations:   2 - Residuals: 2.64e-12,   7.52e-10 
+--------------- Exiting Newton-Raphson solver ---------
+Linear solve converged due to CONVERGED_RTOL iterations 26
+Linear solve converged due to CONVERGED_RTOL iterations 12
+Iteration:   1 | L=1.1153e-05, J=1.0788e-05, C_1=3.8796e-01, γ=1.0000e-01, λ1=-1.8834e-06, Λ1=4.8547e-06
+      Benchmark - Iteration 7 of 10
+--------------- Starting Newton-Raphson solver --------
+  > Iteration   0 - Residuals: 3.52e-03,   1.00e+00 
+Linear solve converged due to CONVERGED_RTOL iterations 26
+  > Iteration   1 - Residuals: 5.74e-06,   1.63e-03 
+Linear solve converged due to CONVERGED_RTOL iterations 28
+  > Iteration   2 - Residuals: 2.64e-12,   7.52e-10 
+Solver Newton-Raphson finished with reason SOLVER_CONVERGED_RTOL
+Iterations:   2 - Residuals: 2.64e-12,   7.52e-10 
+--------------- Exiting Newton-Raphson solver ---------
+Linear solve converged due to CONVERGED_RTOL iterations 26
+Linear solve converged due to CONVERGED_RTOL iterations 12
+Iteration:   1 | L=1.1153e-05, J=1.0788e-05, C_1=3.8796e-01, γ=1.0000e-01, λ1=-1.8834e-06, Λ1=4.8547e-06
+      Benchmark - Iteration 8 of 10
+--------------- Starting Newton-Raphson solver --------
+  > Iteration   0 - Residuals: 3.52e-03,   1.00e+00 
+Linear solve converged due to CONVERGED_RTOL iterations 26
+  > Iteration   1 - Residuals: 5.74e-06,   1.63e-03 
+Linear solve converged due to CONVERGED_RTOL iterations 28
+  > Iteration   2 - Residuals: 2.64e-12,   7.52e-10 
+Solver Newton-Raphson finished with reason SOLVER_CONVERGED_RTOL
+Iterations:   2 - Residuals: 2.64e-12,   7.52e-10 
+--------------- Exiting Newton-Raphson solver ---------
+Linear solve converged due to CONVERGED_RTOL iterations 26
+Linear solve converged due to CONVERGED_RTOL iterations 12
+Iteration:   1 | L=1.1153e-05, J=1.0788e-05, C_1=3.8796e-01, γ=1.0000e-01, λ1=-1.8834e-06, Λ1=4.8547e-06
+      Benchmark - Iteration 9 of 10
+--------------- Starting Newton-Raphson solver --------
+  > Iteration   0 - Residuals: 3.52e-03,   1.00e+00 
+Linear solve converged due to CONVERGED_RTOL iterations 26
+  > Iteration   1 - Residuals: 5.74e-06,   1.63e-03 
+Linear solve converged due to CONVERGED_RTOL iterations 28
+  > Iteration   2 - Residuals: 2.64e-12,   7.52e-10 
+Solver Newton-Raphson finished with reason SOLVER_CONVERGED_RTOL
+Iterations:   2 - Residuals: 2.64e-12,   7.52e-10 
+--------------- Exiting Newton-Raphson solver ---------
+Linear solve converged due to CONVERGED_RTOL iterations 26
+Linear solve converged due to CONVERGED_RTOL iterations 12
+Iteration:   1 | L=1.1153e-05, J=1.0788e-05, C_1=3.8796e-01, γ=1.0000e-01, λ1=-1.8834e-06, Λ1=4.8547e-06
+      Benchmark - Iteration 10 of 10
+--------------- Starting Newton-Raphson solver --------
+  > Iteration   0 - Residuals: 3.52e-03,   1.00e+00 
+Linear solve converged due to CONVERGED_RTOL iterations 26
+  > Iteration   1 - Residuals: 5.74e-06,   1.63e-03 
+Linear solve converged due to CONVERGED_RTOL iterations 28
+  > Iteration   2 - Residuals: 2.64e-12,   7.52e-10 
+Solver Newton-Raphson finished with reason SOLVER_CONVERGED_RTOL
+Iterations:   2 - Residuals: 2.64e-12,   7.52e-10 
+--------------- Exiting Newton-Raphson solver ---------
+Linear solve converged due to CONVERGED_RTOL iterations 26
+Linear solve converged due to CONVERGED_RTOL iterations 12
+Iteration:   1 | L=1.1153e-05, J=1.0788e-05, C_1=3.8796e-01, γ=1.0000e-01, λ1=-1.8834e-06, Λ1=4.8547e-06
+<------------- Compilation  ------------->
+--------------- Starting Newton-Raphson solver --------
+  > Iteration   0 - Residuals: 2.64e-12,   1.00e+00 
+Linear solve converged due to CONVERGED_RTOL iterations 28
+  > Iteration   1 - Residuals: 1.20e-14,   4.53e-03 
+Solver Newton-Raphson finished with reason SOLVER_CONVERGED_ATOL
+Iterations:   1 - Residuals: 1.20e-14,   4.53e-03 
+--------------- Exiting Newton-Raphson solver ---------
+<------------- Benchmarking ------------->
+      Benchmark - Iteration 1 of 10
+--------------- Starting Newton-Raphson solver --------
+  > Iteration   0 - Residuals: 1.20e-14,   1.00e+00 
+Solver Newton-Raphson finished with reason SOLVER_CONVERGED_ATOL
+Iterations:   0 - Residuals: 1.20e-14,   1.00e+00 
+--------------- Exiting Newton-Raphson solver ---------
+      Benchmark - Iteration 2 of 10
+--------------- Starting Newton-Raphson solver --------
+  > Iteration   0 - Residuals: 1.20e-14,   1.00e+00 
+Solver Newton-Raphson finished with reason SOLVER_CONVERGED_ATOL
+Iterations:   0 - Residuals: 1.20e-14,   1.00e+00 
+--------------- Exiting Newton-Raphson solver ---------
+      Benchmark - Iteration 3 of 10
+--------------- Starting Newton-Raphson solver --------
+  > Iteration   0 - Residuals: 1.20e-14,   1.00e+00 
+Solver Newton-Raphson finished with reason SOLVER_CONVERGED_ATOL
+Iterations:   0 - Residuals: 1.20e-14,   1.00e+00 
+--------------- Exiting Newton-Raphson solver ---------
+      Benchmark - Iteration 4 of 10
+--------------- Starting Newton-Raphson solver --------
+  > Iteration   0 - Residuals: 1.20e-14,   1.00e+00 
+Solver Newton-Raphson finished with reason SOLVER_CONVERGED_ATOL
+Iterations:   0 - Residuals: 1.20e-14,   1.00e+00 
+--------------- Exiting Newton-Raphson solver ---------
+      Benchmark - Iteration 5 of 10
+--------------- Starting Newton-Raphson solver --------
+  > Iteration   0 - Residuals: 1.20e-14,   1.00e+00 
+Solver Newton-Raphson finished with reason SOLVER_CONVERGED_ATOL
+Iterations:   0 - Residuals: 1.20e-14,   1.00e+00 
+--------------- Exiting Newton-Raphson solver ---------
+      Benchmark - Iteration 6 of 10
+--------------- Starting Newton-Raphson solver --------
+  > Iteration   0 - Residuals: 1.20e-14,   1.00e+00 
+Solver Newton-Raphson finished with reason SOLVER_CONVERGED_ATOL
+Iterations:   0 - Residuals: 1.20e-14,   1.00e+00 
+--------------- Exiting Newton-Raphson solver ---------
+      Benchmark - Iteration 7 of 10
+--------------- Starting Newton-Raphson solver --------
+  > Iteration   0 - Residuals: 1.20e-14,   1.00e+00 
+Solver Newton-Raphson finished with reason SOLVER_CONVERGED_ATOL
+Iterations:   0 - Residuals: 1.20e-14,   1.00e+00 
+--------------- Exiting Newton-Raphson solver ---------
+      Benchmark - Iteration 8 of 10
+--------------- Starting Newton-Raphson solver --------
+  > Iteration   0 - Residuals: 1.20e-14,   1.00e+00 
+Solver Newton-Raphson finished with reason SOLVER_CONVERGED_ATOL
+Iterations:   0 - Residuals: 1.20e-14,   1.00e+00 
+--------------- Exiting Newton-Raphson solver ---------
+      Benchmark - Iteration 9 of 10
+--------------- Starting Newton-Raphson solver --------
+  > Iteration   0 - Residuals: 1.20e-14,   1.00e+00 
+Solver Newton-Raphson finished with reason SOLVER_CONVERGED_ATOL
+Iterations:   0 - Residuals: 1.20e-14,   1.00e+00 
+--------------- Exiting Newton-Raphson solver ---------
+      Benchmark - Iteration 10 of 10
+--------------- Starting Newton-Raphson solver --------
+  > Iteration   0 - Residuals: 1.20e-14,   1.00e+00 
+Solver Newton-Raphson finished with reason SOLVER_CONVERGED_ATOL
+Iterations:   0 - Residuals: 1.20e-14,   1.00e+00 
+--------------- Exiting Newton-Raphson solver ---------
+
+======================================================================================
+                  Resource Usage on 2024-04-27 09:36:36:
+   Job Id:             114615877.gadi-pbs
+   Project:            np01
+   Exit Status:        0
+   Service Units:      16.00
+   NCPUs Requested:    8                      NCPUs Used: 8               
+                                           CPU Time Used: 07:59:09        
+   Memory Requested:   32.0GB                Memory Used: 18.57GB         
+   Walltime requested: 03:00:00            Walltime Used: 01:00:00        
+   JobFS requested:    100.0MB                JobFS used: 0B              
+======================================================================================
