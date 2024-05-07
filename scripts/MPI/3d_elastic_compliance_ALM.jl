@@ -1,12 +1,13 @@
-using Gridap, Gridap.MultiField, GridapDistributed, GridapPETSc, GridapSolvers, 
-  PartitionedArrays, LevelSetTopOpt, SparseMatricesCSR
+using Gridap, Gridap.MultiField, GridapDistributed, GridapPETSc, GridapSolvers,
+  PartitionedArrays, GridapTopOpt, SparseMatricesCSR
 
-global elx = parse(Int,ARGS[1])
-global ely = parse(Int,ARGS[2])
-global elz = parse(Int,ARGS[3])
-global Px = parse(Int,ARGS[4])
-global Py = parse(Int,ARGS[5])
-global Pz = parse(Int,ARGS[6])
+global elx       = parse(Int,ARGS[1])
+global ely       = parse(Int,ARGS[2])
+global elz       = parse(Int,ARGS[3])
+global Px        = parse(Int,ARGS[4])
+global Py        = parse(Int,ARGS[5])
+global Pz        = parse(Int,ARGS[6])
+global write_dir = ARGS[7]
 
 """
   (MPI) Minimum elastic compliance with augmented Lagrangian method in 3D.
@@ -15,10 +16,10 @@ global Pz = parse(Int,ARGS[6])
       Min J(Ω) = ∫ C ⊙ ε(u) ⊙ ε(v) dΩ
         Ω
     s.t., Vol(Ω) = vf,
-          ⎡u∈V=H¹(Ω;u(Γ_D)=0)³, 
+          ⎡u∈V=H¹(Ω;u(Γ_D)=0)³,
           ⎣∫ C ⊙ ε(u) ⊙ ε(v) dΩ = ∫ v⋅g dΓ_N, ∀v∈V.
 """
-function main(mesh_partition,distribute,el_size)
+function main(mesh_partition,distribute,el_size,path)
   ranks = distribute(LinearIndices((prod(mesh_partition),)))
 
   ## Parameters
@@ -35,9 +36,8 @@ function main(mesh_partition,distribute,el_size)
   η_coeff = 2
   α_coeff = 4max_steps*γ
   vf = 0.4
-  path = dirname(dirname(@__DIR__))*"/results/3d_elastic_compliance_ALM_Nx$(el_size[1])/"
   iter_mod = 10
-  i_am_main(ranks) && mkdir(path)
+  i_am_main(ranks) && mkpath(path)
 
   ## FE Setup
   model = CartesianDiscreteModel(ranks,mesh_partition,dom,el_size);
@@ -87,7 +87,7 @@ function main(mesh_partition,distribute,el_size)
   Tm = SparseMatrixCSR{0,PetscScalar,PetscInt}
   Tv = Vector{PetscScalar}
   solver = ElasticitySolver(V)
-  
+
   state_map = AffineFEStateMap(
     a,l,U,V,V_φ,U_reg,φh,dΩ,dΓ_N;
     assem_U = SparseMatrixAssembler(Tm,Tv,U,V),
@@ -121,10 +121,10 @@ end
 with_mpi() do distribute
   mesh_partition = (Px,Py,Pz)
   el_size = (elx,ely,elz)
-  hilb_solver_options = "-pc_type gamg -ksp_type cg -ksp_error_if_not_converged true 
+  hilb_solver_options = "-pc_type gamg -ksp_type cg -ksp_error_if_not_converged true
     -ksp_converged_reason -ksp_rtol 1.0e-12"
-  
+
   GridapPETSc.with(args=split(hilb_solver_options)) do
-    main(mesh_partition,distribute,el_size)
+    main(mesh_partition,distribute,el_size,write_dir)
   end
 end;

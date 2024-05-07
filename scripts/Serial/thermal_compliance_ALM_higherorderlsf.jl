@@ -1,10 +1,10 @@
-using Gridap, LevelSetTopOpt
+using Gridap, GridapTopOpt
 
 """
   (Serial) Minimum thermal compliance with augmented Lagrangian method in 2D.
 
-  This problem uses a higher order level set function than the FE solution for 
-  the state equation. In future, second order upwind schemes will require a 
+  This problem uses a higher order level set function than the FE solution for
+  the state equation. In future, second order upwind schemes will require a
   higher order FE function.
 
   Optimisation problem:
@@ -13,8 +13,8 @@ using Gridap, LevelSetTopOpt
     s.t., Vol(Ω) = vf,
           ⎡u∈V=H¹(Ω;u(Γ_D)=0),
           ⎣∫ κ*∇(u)⋅∇(v) dΩ = ∫ v dΓ_N, ∀v∈V.
-""" 
-function main()
+"""
+function main(path="./results/thermal_compliance_ALM_higherorderlsf/")
   ## Parameters
   fe_order = 1
   order = 2
@@ -31,16 +31,15 @@ function main()
   vf = 0.4
   η_coeff = 2
   α_coeff = 4max_steps*γ
-  path = dirname(dirname(@__DIR__))*"/results/thermal_compliance_ALM_higherorderlsf/"
   iter_mod = 10
-  mkdir(path)
+  mkpath(path)
 
   ## FE Setup
   model = CartesianDiscreteModel(dom,el_size);
   el_Δ = get_el_Δ(model)
-  f_Γ_D(x) = (x[1] ≈ 0.0 && (x[2] <= ymax*prop_Γ_D + eps() || 
+  f_Γ_D(x) = (x[1] ≈ 0.0 && (x[2] <= ymax*prop_Γ_D + eps() ||
       x[2] >= ymax-ymax*prop_Γ_D - eps()))
-  f_Γ_N(x) = (x[1] ≈ xmax && ymax/2-ymax*prop_Γ_N/2 - eps() <= x[2] <= 
+  f_Γ_N(x) = (x[1] ≈ xmax && ymax/2-ymax*prop_Γ_N/2 - eps() <= x[2] <=
       ymax/2+ymax*prop_Γ_N/2 + eps())
   update_labels!(1,model,f_Γ_D,"Gamma_D")
   update_labels!(2,model,f_Γ_N,"Gamma_N")
@@ -88,7 +87,7 @@ function main()
   α = α_coeff*maximum(el_Δ)
   a_hilb(p,q) =∫(α^2*∇(p)⋅∇(q) + p*q)dΩ;
   vel_ext = VelocityExtension(a_hilb,U_reg,V_reg)
-  
+
   ## Optimiser
   optimiser = AugmentedLagrangian(pcfs,ls_evo,vel_ext,φh;
     γ,γ_reinit,verbose=true,constraint_names=[:Vol])

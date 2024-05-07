@@ -1,4 +1,4 @@
-name = "LevelSetTopOpt"
+name = "GridapTopOpt"
 uuid = "27dd0110-1916-4fd6-8b4b-1bc109db1170"
 authors = ["Zach Wegert <zach.wegert@hdr.qut.edu.au>", "JordiManyer <jordi.manyer@monash.edu>"]
 version = "0.1.0"

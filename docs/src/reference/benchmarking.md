@@ -1,16 +1,16 @@
 # Benchmarking
 
 ```@docs
-LevelSetTopOpt.benchmark
+GridapTopOpt.benchmark
 ```
 
 ## Existing benchmark methods
 ```@docs
-LevelSetTopOpt.benchmark_optimizer
-LevelSetTopOpt.benchmark_single_iteration
-LevelSetTopOpt.benchmark_forward_problem
-LevelSetTopOpt.benchmark_advection
-LevelSetTopOpt.benchmark_reinitialisation
-LevelSetTopOpt.benchmark_velocity_extension
-LevelSetTopOpt.benchmark_hilbertian_projection_map
+GridapTopOpt.benchmark_optimizer
+GridapTopOpt.benchmark_single_iteration
+GridapTopOpt.benchmark_forward_problem
+GridapTopOpt.benchmark_advection
+GridapTopOpt.benchmark_reinitialisation
+GridapTopOpt.benchmark_velocity_extension
+GridapTopOpt.benchmark_hilbertian_projection_map
 ```

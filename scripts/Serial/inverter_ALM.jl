@@ -1,4 +1,4 @@
-using Gridap, LevelSetTopOpt
+using Gridap, GridapTopOpt
 
 """
   (Serial) Inverter mechanism with Hilbertian projection method in 2D.
@@ -7,14 +7,14 @@ using Gridap, LevelSetTopOpt
       Min J(Ω) = ηᵢₙ*∫ u⋅e₁ dΓᵢₙ/Vol(Γᵢₙ)
         Ω
     s.t., Vol(Ω) = vf,
-            C(Ω) = 0, 
-          ⎡u∈V=H¹(Ω;u(Γ_D)=0)ᵈ, 
+            C(Ω) = 0,
+          ⎡u∈V=H¹(Ω;u(Γ_D)=0)ᵈ,
           ⎣∫ C ⊙ ε(u) ⊙ ε(v) dΩ + ∫ kₛv⋅u dΓₒᵤₜ = ∫ v⋅g dΓᵢₙ , ∀v∈V.
-        
+
     where C(Ω) = ∫ -u⋅e₁-δₓ dΓₒᵤₜ/Vol(Γₒᵤₜ). We assume symmetry in the problem to aid
      convergence.
-""" 
-function main()
+"""
+function main(path="./results/inverter_ALM/")
   ## Parameters
   order = 1
   dom = (0,1,0,0.5)
@@ -30,10 +30,9 @@ function main()
   δₓ = 0.2
   ks = 0.1
   g = VectorValue(0.5,0)
-  path = dirname(dirname(@__DIR__))*"/results/inverter_ALM/"
   iter_mod = 10
-  mkdir(path)
-  
+  mkpath(path)
+
   ## FE Setup
   model = CartesianDiscreteModel(dom,el_size)
   el_Δ = get_el_Δ(model)
@@ -96,7 +95,7 @@ function main()
   α = α_coeff*maximum(el_Δ)
   a_hilb(p,q) = ∫(α^2*∇(p)⋅∇(q) + p*q)dΩ;
   vel_ext = VelocityExtension(a_hilb,U_reg,V_reg)
-  
+
   ## Optimiser
   optimiser = AugmentedLagrangian(pcfs,ls_evo,vel_ext,φh;
     γ,γ_reinit,verbose=true,constraint_names=[:Vol,:UΓ_out])

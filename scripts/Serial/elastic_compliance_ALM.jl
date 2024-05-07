@@ -1,4 +1,4 @@
-using Gridap, LevelSetTopOpt
+using Gridap, GridapTopOpt
 
 """
   (Serial) Minimum elastic compliance with augmented Lagrangian method in 2D.
@@ -7,10 +7,10 @@ using Gridap, LevelSetTopOpt
       Min J(Ω) = ∫ C ⊙ ε(u) ⊙ ε(v) dΩ
         Ω
     s.t., Vol(Ω) = vf,
-          ⎡u∈V=H¹(Ω;u(Γ_D)=0)ᵈ, 
+          ⎡u∈V=H¹(Ω;u(Γ_D)=0)ᵈ,
           ⎣∫ C ⊙ ε(u) ⊙ ε(v) dΩ = ∫ v⋅g dΓ_N, ∀v∈V.
-""" 
-function main()
+"""
+function main(path="./results/elastic_compliance_ALM/")
   ## Parameters
   order = 1
   xmax,ymax=(2.0,1.0)
@@ -26,9 +26,8 @@ function main()
   α_coeff = 4max_steps*γ
   vf = 0.4
   g = VectorValue(0,-1)
-  path = dirname(dirname(@__DIR__))*"/results/elastic_compliance_ALM/"
   iter_mod = 10
-  mkdir(path)
+  mkpath(path)
 
   ## FE Setup
   model = CartesianDiscreteModel(dom,el_size)
@@ -81,7 +80,7 @@ function main()
   α = α_coeff*maximum(el_Δ)
   a_hilb(p,q) =∫(α^2*∇(p)⋅∇(q) + p*q)dΩ;
   vel_ext = VelocityExtension(a_hilb,U_reg,V_reg)
-  
+
   ## Optimiser
   optimiser = AugmentedLagrangian(pcfs,ls_evo,vel_ext,φh;
     γ,γ_reinit,verbose=true,constraint_names=[:Vol])

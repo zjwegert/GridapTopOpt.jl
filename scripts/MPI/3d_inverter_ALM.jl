@@ -1,12 +1,13 @@
-using Gridap, Gridap.MultiField, GridapDistributed, GridapPETSc, GridapSolvers, 
-  PartitionedArrays, LevelSetTopOpt, SparseMatricesCSR
+using Gridap, Gridap.MultiField, GridapDistributed, GridapPETSc, GridapSolvers,
+  PartitionedArrays, GridapTopOpt, SparseMatricesCSR
 
-global elx = parse(Int,ARGS[1])
-global ely = parse(Int,ARGS[2])
-global elz = parse(Int,ARGS[3])
-global Px = parse(Int,ARGS[4])
-global Py = parse(Int,ARGS[5])
-global Pz = parse(Int,ARGS[6])
+global elx       = parse(Int,ARGS[1])
+global ely       = parse(Int,ARGS[2])
+global elz       = parse(Int,ARGS[3])
+global Px        = parse(Int,ARGS[4])
+global Py        = parse(Int,ARGS[5])
+global Pz        = parse(Int,ARGS[6])
+global write_dir = ARGS[7]
 
 """
   (MPI) Inverter mechanism with Hilbertian projection method in 3D.
@@ -15,14 +16,14 @@ global Pz = parse(Int,ARGS[6])
       Min J(Ω) = ηᵢₙ*∫ u⋅e₁ dΓᵢₙ
         Ω
     s.t., Vol(Ω) = vf,
-            C(Ω) = 0, 
-          ⎡u∈V=H¹(Ω;u(Γ_D)=0)ᵈ, 
+            C(Ω) = 0,
+          ⎡u∈V=H¹(Ω;u(Γ_D)=0)ᵈ,
           ⎣∫ C ⊙ ε(u) ⊙ ε(v) dΩ + ∫ kₛv⋅u dΓₒᵤₜ = ∫ v⋅g dΓᵢₙ , ∀v∈V.
-        
+
     where C(Ω) = ∫ -u⋅e₁-δₓ dΓₒᵤₜ. We assume symmetry in the problem to aid
      convergence.
-""" 
-function main(mesh_partition,distribute,el_size)
+"""
+function main(mesh_partition,distribute,el_size,path)
   ranks = distribute(LinearIndices((prod(mesh_partition),)))
 
   ## Parameters
@@ -39,18 +40,17 @@ function main(mesh_partition,distribute,el_size)
   δₓ=0.5
   ks = 0.01
   g = VectorValue(1,0,0)
-  path = dirname(dirname(@__DIR__))*"/results/3d_inverter_ALM_Nx$(el_size[1])/"
   iter_mod = 10
-  i_am_main(ranks) && mkdir(path)
+  i_am_main(ranks) && mkpath(path)
 
   ## FE Setup
   model = CartesianDiscreteModel(ranks,mesh_partition,dom,el_size);
   el_Δ = get_el_Δ(model)
-  f_Γ_in(x) = (x[1] ≈ 0.0) && (0.4 - eps() <= x[2] <= 0.6 + eps()) && 
+  f_Γ_in(x) = (x[1] ≈ 0.0) && (0.4 - eps() <= x[2] <= 0.6 + eps()) &&
     (0.4 - eps() <= x[3] <= 0.6 + eps())
-  f_Γ_out(x) = (x[1] ≈ 1.0) && (0.4 - eps() <= x[2] <= 0.6 + eps()) && 
+  f_Γ_out(x) = (x[1] ≈ 1.0) && (0.4 - eps() <= x[2] <= 0.6 + eps()) &&
     (0.4 - eps() <= x[3] <= 0.6 + eps())
-  f_Γ_out_ext(x) = ~f_Γ_out(x) && (0.9 <= x[1] <= 1.0) && (0.3 - eps() <= x[2] <= 0.7 + eps()) && 
+  f_Γ_out_ext(x) = ~f_Γ_out(x) && (0.9 <= x[1] <= 1.0) && (0.3 - eps() <= x[2] <= 0.7 + eps()) &&
     (0.3 - eps() <= x[3] <= 0.7 + eps())
   f_Γ_D(x) = (x[1] ≈ 0.0)  && (x[2] <= 0.1 || x[2] >= 0.9) && (x[3] <= 0.1 || x[3] >= 0.9)
   update_labels!(1,model,f_Γ_in,"Gamma_in")
@@ -105,7 +105,7 @@ function main(mesh_partition,distribute,el_size)
   Tm = SparseMatrixCSR{0,PetscScalar,PetscInt}
   Tv = Vector{PetscScalar}
   solver = ElasticitySolver(V)
-  
+
   state_map = AffineFEStateMap(
     a,l,U,V,V_φ,U_reg,φh,dΩ,dΓ_in,dΓ_out;
     assem_U = SparseMatrixAssembler(Tm,Tv,U,V),
@@ -123,7 +123,7 @@ function main(mesh_partition,distribute,el_size)
     assem = SparseMatrixAssembler(Tm,Tv,U_reg,V_reg),
     ls = PETScLinearSolver()
   )
-  
+
   ## Optimiser
   optimiser = AugmentedLagrangian(pcfs,ls_evo,vel_ext,φh;
     γ,γ_reinit,verbose=i_am_main(ranks),constraint_names=[:Vol,:UΓ_out])
@@ -139,10 +139,10 @@ end
 with_mpi() do distribute
   mesh_partition = (Px,Py,Pz)
   el_size = (elx,ely,elz)
-  hilb_solver_options = "-pc_type gamg -ksp_type cg -ksp_error_if_not_converged true 
+  hilb_solver_options = "-pc_type gamg -ksp_type cg -ksp_error_if_not_converged true
     -ksp_converged_reason -ksp_rtol 1.0e-12"
-  
+
   GridapPETSc.with(args=split(hilb_solver_options)) do
-    main(mesh_partition,distribute,el_size)
+    main(mesh_partition,distribute,el_size,write_dir)
   end
 end

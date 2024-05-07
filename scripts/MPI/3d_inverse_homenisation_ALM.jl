@@ -1,13 +1,14 @@
-using Gridap, Gridap.MultiField, GridapDistributed, GridapPETSc, GridapSolvers, 
-  PartitionedArrays, LevelSetTopOpt, SparseMatricesCSR
+using Gridap, Gridap.MultiField, GridapDistributed, GridapPETSc, GridapSolvers,
+  PartitionedArrays, GridapTopOpt, SparseMatricesCSR
 
-global elx = parse(Int,ARGS[1])
-global ely = parse(Int,ARGS[2])
-global elz = parse(Int,ARGS[3])
-global Px = parse(Int,ARGS[4])
-global Py = parse(Int,ARGS[5])
-global Pz = parse(Int,ARGS[6])
-  
+global elx       = parse(Int,ARGS[1])
+global ely       = parse(Int,ARGS[2])
+global elz       = parse(Int,ARGS[3])
+global Px        = parse(Int,ARGS[4])
+global Py        = parse(Int,ARGS[5])
+global Pz        = parse(Int,ARGS[6])
+global write_dir = ARGS[7]
+
 """
   (MPI) Maximum bulk modulus inverse homogenisation with augmented Lagrangian method in 3D.
 
@@ -15,10 +16,10 @@ global Pz = parse(Int,ARGS[6])
       Min J(Ω) = -κ(Ω)
         Ω
     s.t., Vol(Ω) = vf,
-          ⎡For unique εᴹᵢ, find uᵢ∈V=H¹ₚₑᵣ(Ω)ᵈ, 
+          ⎡For unique εᴹᵢ, find uᵢ∈V=H¹ₚₑᵣ(Ω)ᵈ,
           ⎣∫ ∑ᵢ C ⊙ ε(uᵢ) ⊙ ε(vᵢ) dΩ = ∫ -∑ᵢ C ⊙ ε⁰ᵢ ⊙ ε(vᵢ) dΩ, ∀v∈V.
-""" 
-function main(mesh_partition,distribute,el_size)
+"""
+function main(mesh_partition,distribute,el_size,path)
   ranks = distribute(LinearIndices((prod(mesh_partition),)))
 
   ## Parameters
@@ -33,9 +34,8 @@ function main(mesh_partition,distribute,el_size)
   η_coeff = 2
   α_coeff = 4max_steps*γ
   vf = 0.5
-  path = dirname(dirname(@__DIR__))*"/results/3d_inverse_homenisation_ALM_Nx$(el_size[1])/"
   iter_mod = 10
-  i_am_main(ranks) && mkdir(path)  
+  i_am_main(ranks) && mkpath(path)
 
   ## FE Setup
   model = CartesianDiscreteModel(ranks,mesh_partition,dom,el_size,isperiodic=(true,true,true))
@@ -109,7 +109,7 @@ function main(mesh_partition,distribute,el_size)
     assem = SparseMatrixAssembler(Tm,Tv,U_reg,V_reg),
     ls = PETScLinearSolver()
   )
-  
+
   ## Optimiser
   optimiser = AugmentedLagrangian(pcfs,ls_evo,vel_ext,φh;
     γ,γ_reinit,verbose=i_am_main(ranks),constraint_names=[:Vol])
@@ -125,10 +125,10 @@ end
 with_mpi() do distribute
   mesh_partition = (Px,Py,Pz)
   el_size = (elx,ely,elz)
-  hilb_solver_options = "-pc_type gamg -ksp_type cg -ksp_error_if_not_converged true 
+  hilb_solver_options = "-pc_type gamg -ksp_type cg -ksp_error_if_not_converged true
     -ksp_converged_reason -ksp_rtol 1.0e-12"
-  
+
   GridapPETSc.with(args=split(hilb_solver_options)) do
-    main(mesh_partition,distribute,el_size)
+    main(mesh_partition,distribute,el_size,write_dir)
   end
 end

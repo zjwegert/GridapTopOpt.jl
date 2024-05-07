@@ -1,4 +1,4 @@
-module LevelSetTopOpt
+module GridapTopOpt
 
 using GridapPETSc, GridapPETSc.PETSC
 using GridapPETSc: PetscScalar, PetscInt, PETSC,  @check_error_code
@@ -19,7 +19,7 @@ using Gridap.FESpaces: get_assembly_strategy
 using Gridap: writevtk
 
 using GridapDistributed
-using GridapDistributed: DistributedDiscreteModel, DistributedTriangulation, 
+using GridapDistributed: DistributedDiscreteModel, DistributedTriangulation,
   DistributedFESpace, DistributedDomainContribution, to_parray_of_arrays,
   allocate_in_domain, DistributedCellField, DistributedMultiFieldCellField,
   DistributedMultiFieldFEBasis, BlockPMatrix, BlockPVector, change_ghost

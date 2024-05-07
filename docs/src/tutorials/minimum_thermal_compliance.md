@@ -3,7 +3,7 @@
 The goal of this tutorial is to learn
 - How to formulate a topology optimisation problem
 - How to describe the problem over a fixed computational domain ``D`` via the level-set method.
-- How to setup and solve the problem in LevelSetTopOpt
+- How to setup and solve the problem in GridapTopOpt
 
 We consider the following extensions at the end of the tutorial:
 - How to extend problems to 3D and utilise PETSc solvers
@@ -63,7 +63,7 @@ For this tutorial, we consider minimising the thermal compliance (or dissipated 
 \right.
 \end{aligned}
 ```
-where ``\operatorname{Vol}(\Omega)=\int_\Omega1~\mathrm{d}\boldsymbol{x}``. This objective is equivalent to equivalent to maximising the heat transfer efficiency through ``\Omega``. 
+where ``\operatorname{Vol}(\Omega)=\int_\Omega1~\mathrm{d}\boldsymbol{x}``. This objective is equivalent to equivalent to maximising the heat transfer efficiency through ``\Omega``.
 
 ## Shape differentiation
 
@@ -74,7 +74,7 @@ Suppose that we consider smooth variations of the domain ``\Omega`` of the form 
 !!! note "Definition [3]"
     The shape derivative of ``J(\Omega)`` at ``\Omega`` is defined as the Fréchet derivative in ``W^{1, \infty}(\mathbb{R}^d, \mathbb{R}^d)`` at ``\boldsymbol{\theta}`` of the application ``\boldsymbol{\theta} \rightarrow J(\Omega_{\boldsymbol{\theta}})``, i.e.,
     ```math
-    J(\Omega_{\boldsymbol{\theta}})(\Omega)=J(\Omega)+J^{\prime}(\Omega)(\boldsymbol{\theta})+\mathrm{o}(\boldsymbol{\theta})  
+    J(\Omega_{\boldsymbol{\theta}})(\Omega)=J(\Omega)+J^{\prime}(\Omega)(\boldsymbol{\theta})+\mathrm{o}(\boldsymbol{\theta})
     ```
     with ``\lim _{\boldsymbol{\theta} \rightarrow 0} \frac{\lvert\mathrm{o}(\boldsymbol{\theta})\rvert}{\|\boldsymbol{\theta}\|}=0,`` where the shape derivative ``J^{\prime}(\Omega)`` is a continuous linear form on ``W^{1, \infty}(\mathbb{R}^d, \mathbb{R}^d)``
 
@@ -97,7 +97,7 @@ and
 \operatorname{Vol}'(\Omega)(-q\boldsymbol{n}) = -\int_{\Gamma}q~\mathrm{d}s.
 ```
 
-## Discretisation via a level set 
+## Discretisation via a level set
 
 Suppose that we attribute a level set function ``\varphi:D\rightarrow\mathbb{R}`` to our domain ``\Omega\subset D`` with ``\bar{\Omega}=\lbrace \boldsymbol{x}:\varphi(\boldsymbol{x})\leq0\rbrace`` and ``\Omega^\complement=\lbrace \boldsymbol{x}:\varphi(\boldsymbol{x})>0\rbrace``. We can then define a smooth characteristic function ``I:\mathbb{R}\rightarrow[\epsilon,1]`` as ``I(\varphi)=(1-H(\varphi))+\epsilon H(\varphi)`` where ``H`` is a smoothed Heaviside function with smoothing radius ``\eta``, and ``\epsilon\ll1`` allows for an ersatz material approximation. Of course, ``\epsilon`` can be taken as zero depending on the computational regime. Over the fixed computational domain we may relax integrals to be over all of ``D`` via ``\mathrm{d}\boldsymbol{x}= H(\varphi)~\mathrm{d}\boldsymbol{x}`` and ``\mathrm{d}s = H'(\varphi)\lvert\nabla\varphi\rvert~\mathrm{d}\boldsymbol{x}``. The above optimisation problem then rewrites in terms of ``\varphi`` as
 
@@ -122,14 +122,14 @@ C(\varphi)&=\int_D (\rho(\varphi) - V_f)/\operatorname{Vol}(D)~\mathrm{d}\boldsy
 &=\int_D \rho(\varphi)~\mathrm{d}\boldsymbol{x}/\operatorname{Vol}(D) - V_f\\
 &=\int_\Omega~\mathrm{d}\boldsymbol{x}/\operatorname{Vol}(D)-V_f = \operatorname{Vol}(\Omega)/\operatorname{Vol}(D)-V_f
 \end{aligned}
-``` 
+```
 
 where ``\rho(\varphi)=1-H(\varphi)`` is the smoothed volume density function.
 
 !!! note
-    In LevelSetTopOpt we assume constraints are of the integral form above.
+    In GridapTopOpt we assume constraints are of the integral form above.
 
-The shape derivatives from the previous section can be relaxed over the computational domain as 
+The shape derivatives from the previous section can be relaxed over the computational domain as
 
 ```math
 J'(\varphi)(-q\boldsymbol{n}) = \int_{D}q\kappa\boldsymbol{\nabla}(u)\cdot\boldsymbol{\nabla}(u)H'(\varphi)\lvert\nabla\varphi\rvert~\mathrm{d}\boldsymbol{x}
@@ -141,16 +141,16 @@ C'(\varphi)(-q\boldsymbol{n}) = -\int_{D}qH'(\varphi)\lvert\nabla\varphi\rvert~\
 
 ## Computational method
 
-In the following, we discuss the implementation of the above optimisation problem in LevelSetTopOpt. For the purpose of this tutorial we break the computational formulation into chunks.
+In the following, we discuss the implementation of the above optimisation problem in GridapTopOpt. For the purpose of this tutorial we break the computational formulation into chunks.
 
 The first step in creating our script is to load any packages required:
 ```julia
-using LevelSetTopOpt, Gridap
+using GridapTopOpt, Gridap
 ```
 
 ### Parameters
-The following are user defined parameters for the problem. 
-These parameters will be discussed over the course of this tutorial. 
+The following are user defined parameters for the problem.
+These parameters will be discussed over the course of this tutorial.
 
 ```julia
 # FE parameters
@@ -199,7 +199,7 @@ dΓ_N = Measure(Γ_N,2*order)
 ```
 where `2*order` indicates the quadrature degree for numerical integration.
 
-The final stage of the finite element setup is the approximation of the finite element spaces. This is given as follows: 
+The final stage of the finite element setup is the approximation of the finite element spaces. This is given as follows:
 ```julia
 # Spaces
 reffe = ReferenceFE(lagrangian,Float64,order)
@@ -223,7 +223,7 @@ For this problem we set `lsf_func` using the function [`initial_lsf`](@ref) in t
 ```math
 \varphi_{\xi,a}(\boldsymbol{x})=-\frac{1}{4} \prod_i^D(\cos(\xi\pi x_i)) - a/4
 ```
-with ``\xi,a=(4,0.2)`` and ``D=2`` in two dimensions. 
+with ``\xi,a=(4,0.2)`` and ``D=2`` in two dimensions.
 
 We also generate a smooth characteristic function of radius ``\eta`` using:
 
@@ -238,7 +238,7 @@ This the [`SmoothErsatzMaterialInterpolation`](@ref) structure defines the chara
 |:--:|
 |Figure 2: A visualisation of the initial level set function and the interpolated density function ``\rho`` for ``\Omega``.|
 
-Optional: we can generate a VTK file for visualisation in Paraview via 
+Optional: we can generate a VTK file for visualisation in Paraview via
 ```julia
 writevtk(Ω,"initial_lsf",cellfields=["phi"=>φh,
   "ρ(phi)"=>(ρ ∘ φh),"|nabla(phi)|"=>(norm ∘ ∇(φh))])
@@ -292,17 +292,17 @@ In this case, the analytic shape derivatives are passed as optional arguments. W
 
 ### Velocity extension-regularisation method
 
-The Hilbertian extension-regularisation [4] method involves solving an 
-identification problem over a Hilbert space ``H`` on ``D`` with 
-inner product ``\langle\cdot,\cdot\rangle_H``: 
+The Hilbertian extension-regularisation [4] method involves solving an
+identification problem over a Hilbert space ``H`` on ``D`` with
+inner product ``\langle\cdot,\cdot\rangle_H``:
 *Find* ``g_\Omega\in H`` *such that* ``\langle g_\Omega,q\rangle_H
 =-J^{\prime}(\Omega)(q\boldsymbol{n})~
 \forall q\in H.``
 
-This provides two benefits: 
- 1) It naturally extends the shape sensitivity from ``\partial\Omega`` 
+This provides two benefits:
+ 1) It naturally extends the shape sensitivity from ``\partial\Omega``
     onto the bounding domain ``D``; and
- 2) ensures a descent direction for ``J(\Omega)`` with additional regularity 
+ 2) ensures a descent direction for ``J(\Omega)`` with additional regularity
     (i.e., ``H`` as opposed to ``L^2(\partial\Omega)``).
 
 For our problem above we take the inner product
@@ -317,7 +317,7 @@ where ``\alpha`` is the smoothing length scale. Equivalently in our script we ha
 a_hilb(p,q) =∫(α^2*∇(p)⋅∇(q) + p*q)dΩ
 ```
 
-We then build an object [`VelocityExtension`](@ref). This object provides a method [`project!`](@ref) that applies the Hilbertian velocity-extension method to a given shape derivative. 
+We then build an object [`VelocityExtension`](@ref). This object provides a method [`project!`](@ref) that applies the Hilbertian velocity-extension method to a given shape derivative.
 
 ```julia
 vel_ext = VelocityExtension(a_hilb,U_reg,V_reg)
@@ -360,7 +360,7 @@ We may now create the optimiser object. This structure holds all information reg
 optimiser = AugmentedLagrangian(pcfs,ls_evo,vel_ext,φh;γ,γ_reinit,verbose=true,constraint_names=[:Vol])
 ```
 
-As optimisers inheriting from [`LevelSetTopOpt.Optimiser`](@ref) implement Julia's iterator functionality, we can solve the optimisation problem to convergence by iterating over the optimiser:
+As optimisers inheriting from [`GridapTopOpt.Optimiser`](@ref) implement Julia's iterator functionality, we can solve the optimisation problem to convergence by iterating over the optimiser:
 
 ```julia
 # Solve
@@ -379,7 +379,7 @@ end
 ```
 
 !!! warning
-    Due to a possible memory leak in Julia 1.9.* IO, we include a call to the garbage collector using `GC.gc()`. 
+    Due to a possible memory leak in Julia 1.9.* IO, we include a call to the garbage collector using `GC.gc()`.
 
 Depending on whether we use `iszero(it % iter_mod)`, the VTK file for the final structure
 may need to be saved using
@@ -398,7 +398,7 @@ writevtk(Ω,path*"_$it",cellfields=["phi"=>φh,
 ```
 
 ```julia
-using Gridap, LevelSetTopOpt
+using Gridap, GridapTopOpt
 
 # FE parameters
 order = 1                                               # Finite element order
@@ -504,7 +504,7 @@ The first and most straightforward in terms of programmatic changes is extending
 |:--:|
 |Figure 4: The setup for the three-dimensional minimum thermal compliance problem.|
 
-We use a unit cube for the bounding domain ``D`` with ``50^3`` elements. This corresponds to changing lines 5-7 in the above script to  
+We use a unit cube for the bounding domain ``D`` with ``50^3`` elements. This corresponds to changing lines 5-7 in the above script to
 
 ```julia
 xmax=ymax=zmax=1.0                                      # Domain size
@@ -539,7 +539,7 @@ tol = 1/(2order^2)/minimum(el_size)           # Advection tolerance
 ```
 
 ```julia
-using Gridap, LevelSetTopOpt
+using Gridap, GridapTopOpt
 
 # FE parameters
 order = 1                                               # Finite element order
@@ -623,10 +623,10 @@ writevtk(Ω,path*"struc_$it",cellfields=["phi"=>φh,
 </details>
 ```
 
-At this stage the problem will not be possible to run as we're using a standard LU solver. For this reason we now consider adjusting Script 2 to use an iterative solver provided by PETSc. We rely on the GridapPETSc satellite package to utilise PETSc. This provides the necessary structures to efficiently interface with the linear and nonlinear solvers provided by the PETSc library. To call GridapPETSc we change line 1 of Script 2 to 
+At this stage the problem will not be possible to run as we're using a standard LU solver. For this reason we now consider adjusting Script 2 to use an iterative solver provided by PETSc. We rely on the GridapPETSc satellite package to utilise PETSc. This provides the necessary structures to efficiently interface with the linear and nonlinear solvers provided by the PETSc library. To call GridapPETSc we change line 1 of Script 2 to
 
 ```julia
-using Gridap, GridapPETSc, SparseMatricesCSR, LevelSetTopOpt
+using Gridap, GridapPETSc, SparseMatricesCSR, GridapTopOpt
 ```
 
 We also use `SparseMatricesCSR` as PETSc is based on the `SparseMatrixCSR` datatype. We then replace line 52 and 63 with
@@ -655,13 +655,13 @@ respectively. Here we specify that the `SparseMatrixAssembler` should be based o
 
 Finally, we wrap the entire script in a function and call it inside a `GridapPETSc.with` block. This ensures that PETSc is safely initialised. This should take the form
 ```Julia
-using Gridap, GridapPETSc, SparseMatricesCSR, LevelSetTopOpt
+using Gridap, GridapPETSc, SparseMatricesCSR, GridapTopOpt
 
 function main()
   ...
 end
 
-solver_options = "-pc_type gamg -ksp_type cg -ksp_error_if_not_converged true 
+solver_options = "-pc_type gamg -ksp_type cg -ksp_error_if_not_converged true
   -ksp_converged_reason -ksp_rtol 1.0e-12"
 GridapPETSc.with(args=split(solver_options)) do
   main()
@@ -675,7 +675,7 @@ We utilise a conjugate gradient method with geometric algebraic multigrid precon
 ```
 
 ```julia
-using Gridap, GridapPETSc, SparseMatricesCSR, LevelSetTopOpt
+using Gridap, GridapPETSc, SparseMatricesCSR, GridapTopOpt
 
 function main()
   # FE parameters
@@ -769,7 +769,7 @@ function main()
     "H(phi)"=>(H ∘ φh),"|nabla(phi)|"=>(norm ∘ ∇(φh)),"uh"=>uh])
 end
 
-solver_options = "-pc_type gamg -ksp_type cg -ksp_error_if_not_converged true 
+solver_options = "-pc_type gamg -ksp_type cg -ksp_error_if_not_converged true
   -ksp_converged_reason -ksp_rtol 1.0e-12"
 GridapPETSc.with(args=split(solver_options)) do
   main()
@@ -788,10 +788,10 @@ We can run this script and visualise the initial and final structures using Para
 
 ### Serial to MPI
 
-Script 3 contains no parallelism to enable further speedup or scalability. To enable MPI-based computing we rely on the tools implemented in PartitionedArrays and GridapDistributed. Further information regarding these packages and how they interface with LevelSetTopOpt can be found [here](../usage/mpi-mode.md). To add these packages we adjust the first line of our script: 
+Script 3 contains no parallelism to enable further speedup or scalability. To enable MPI-based computing we rely on the tools implemented in PartitionedArrays and GridapDistributed. Further information regarding these packages and how they interface with GridapTopOpt can be found [here](../usage/mpi-mode.md). To add these packages we adjust the first line of our script:
 
 ```julia
-using Gridap, GridapPETSc, GridapDistributed, PartitionedArrays, SparseMatricesCSR, LevelSetTopOpt
+using Gridap, GridapPETSc, GridapDistributed, PartitionedArrays, SparseMatricesCSR, GridapTopOpt
 ```
 
 Before we change any parts of the function `main`, we adjust the end of the script to safely launch MPI inside a Julia `do` block. We replace lines 95-99 in Script 3 with
@@ -799,7 +799,7 @@ Before we change any parts of the function `main`, we adjust the end of the scri
 ```julia
 with_mpi() do distribute
   mesh_partition = (2,2,2)
-  solver_options = "-pc_type gamg -ksp_type cg -ksp_error_if_not_converged true 
+  solver_options = "-pc_type gamg -ksp_type cg -ksp_error_if_not_converged true
     -ksp_converged_reason -ksp_rtol 1.0e-12"
   GridapPETSc.with(args=split(solver_options)) do
     main(mesh_partition,distribute)
@@ -838,7 +838,7 @@ That's it! These are the only changes that are necessary to run your application
 ```
 
 ```julia
-using Gridap, GridapPETSc, GridapDistributed, PartitionedArrays, SparseMatricesCSR, LevelSetTopOpt
+using Gridap, GridapPETSc, GridapDistributed, PartitionedArrays, SparseMatricesCSR, GridapTopOpt
 
 function main(mesh_partition,distribute)
   ranks = distribute(LinearIndices((prod(mesh_partition),)))
@@ -936,7 +936,7 @@ end
 
 with_mpi() do distribute
   mesh_partition = (2,2,2)
-  solver_options = "-pc_type gamg -ksp_type cg -ksp_error_if_not_converged true 
+  solver_options = "-pc_type gamg -ksp_type cg -ksp_error_if_not_converged true
     -ksp_converged_reason -ksp_rtol 1.0e-12"
   GridapPETSc.with(args=split(solver_options)) do
     main(mesh_partition,distribute)
@@ -980,7 +980,7 @@ As we're considering a 2D problem, we consider modifications of Script 1 as foll
 κ(u) = exp(-u)                                          # Diffusivity
 ```
 
-We then replace the `a` and `l` on line 48 and 49 by the residual `R` given by 
+We then replace the `a` and `l` on line 48 and 49 by the residual `R` given by
 ```julia
 R(u,v,φ,dΩ,dΓ_N) = ∫((I ∘ φ)*(κ ∘ u)*∇(u)⋅∇(v))dΩ - ∫(g*v)dΓ_N
 ```
@@ -991,7 +991,7 @@ state_map = NonlinearFEStateMap(R,U,V,V_φ,U_reg,φh,dΩ,dΓ_N)
 ```
 This by default implements a standard `NewtonSolver` from GridapSolvers while utilising an LU solver for intermediate linear solves involving the Jacobian. As with other `FEStateMap` types, this constructor can optionally take assemblers and different solvers (e.g., PETSc solvers).
 
-Next, we replace the objective functional on line 52 with 
+Next, we replace the objective functional on line 52 with
 
 ```julia
 J(u,φ,dΩ,dΓ_N) = ∫((I ∘ φ)*(κ ∘ u)*∇(u)⋅∇(u))dΩ
@@ -1009,7 +1009,7 @@ Notice that the argument `analytic_dJ=...` has been removed, this enables the AD
 ```
 
 ```julia
-using Gridap, LevelSetTopOpt
+using Gridap, GridapTopOpt
 
 # FE parameters
 order = 1                                               # Finite element order
@@ -1103,11 +1103,11 @@ A 3D example of a nonlinear thermal conductivity problem can be found under `scr
 
 ## References
 > 1. *Z. Guo, X. Cheng, and Z. Xia. Least dissipation principle of heat transport potential capacity and its application in heat conduction  optimization. Chinese Science Bulletin, 48(4):406–410, Feb 2003. ISSN 1861-9541. doi: 10.1007/BF03183239.*
-> 
+>
 > 2. *C. Zhuang, Z. Xiong, and H. Ding. A level set method for topology optimization of heat conduction problem under multiple load cases. Computer Methods in Applied Mechanics and Engineering, 196(4–6):1074–1084, Jan 2007. ISSN 00457825. doi: 10.1016/j.cma.2006.08.005.*
 >
 > 3. *Allaire G, Jouve F, Toader AM (2004) Structural optimization using sensitivity analysis and a level-set method. Journal of Computational Physics 194(1):363–393. doi: 10.1016/j.jcp.2003.09.032*
-> 
+>
 > 4. *Allaire G, Dapogny C, Jouve F (2021) Shape and topology optimization, vol 22, Elsevier, p 1–132. doi: 10.1016/bs.hna.2020.10.004*
 >
 > 5. *Osher S, Fedkiw R (2006) Level Set Methods and Dynamic Implicit Surfaces, 1st edn. Applied Mathematical Sciences, Springer Science & Business Media. doi: 10.1007/b98879*
