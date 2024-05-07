@@ -5,7 +5,7 @@ This branch contains the scripts and results for the referenced paper below. The
 
 **Note**:
 - Currently we include the `Manifest.toml` to ensure the correct branch of `GridapSolvers` is included when instantiating the package. This will be removed in future.
-- This branch is protected to ensure the code in `src/` matches that of the paper (TODO).
+- This branch is locked to ensure the code in `src/` matches that of the paper (TODO).
 
 ---
 
