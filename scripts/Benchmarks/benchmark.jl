@@ -11,11 +11,13 @@ global NAME = ARGS[1]
 global WRITE_DIR = ARGS[2]
 global PROB_TYPE = ARGS[3]
 global BMARK_TYPE = ARGS[4]
-global N = parse(Int,ARGS[5])
-global N_EL = parse(Int,ARGS[6])
-global ORDER = parse(Int,ARGS[7])
-global VERBOSE = parse(Int,ARGS[8])
-global NREPS = parse(Int,ARGS[9])
+global Nx = parse(Int,ARGS[5])
+global Ny = parse(Int,ARGS[6])
+global Nz = parse(Int,ARGS[7])
+global N_EL = parse(Int,ARGS[8])
+global ORDER = parse(Int,ARGS[9])
+global VERBOSE = parse(Int,ARGS[10])
+global NREPS = parse(Int,ARGS[11])
 
 function nl_elast(mesh_partition,ranks,el_size,order,verbose)
   # FE parameters
@@ -360,7 +362,7 @@ end
 
 with_mpi() do distribute
   # Setup
-  mesh_partition = (N,N,N)
+  mesh_partition = (Nx,Ny,Nz)
   ranks = distribute(LinearIndices((prod(mesh_partition),)))
   el_size = (N_EL,N_EL,N_EL)
   verbose = Bool(VERBOSE) ? i_am_main(ranks) : false; 

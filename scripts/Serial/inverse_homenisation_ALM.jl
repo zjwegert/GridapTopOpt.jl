@@ -7,10 +7,10 @@ using Gridap, LevelSetTopOpt
       Min J(Ω) = -κ(Ω)
         Ω
     s.t., Vol(Ω) = vf,
-          ⎡For unique εᴹᵢ, find uᵢ∈V=H¹ₚₑᵣ(Ω)ᵈ, 
+          ⎡For unique εᴹᵢ, find uᵢ∈V=H¹ₚₑᵣ(Ω)ᵈ,
           ⎣∫ ∑ᵢ C ⊙ ε(uᵢ) ⊙ ε(vᵢ) dΩ = ∫ -∑ᵢ C ⊙ ε⁰ᵢ ⊙ ε(vᵢ) dΩ, ∀v∈V.
-""" 
-function main()
+"""
+function main(path="./results/inverse_homenisation_ALM/")
   ## Parameters
   order = 1
   xmax,ymax=(1.0,1.0)
@@ -24,9 +24,8 @@ function main()
   η_coeff = 2
   α_coeff = 4max_steps*γ
   vf = 0.5
-  path = dirname(dirname(@__DIR__))*"/results/inverse_homenisation_ALM/"
   iter_mod = 10
-  mkdir(path)
+  mkpath(path)
 
   ## FE Setup
   model = CartesianDiscreteModel(dom,el_size,isperiodic=(true,true))
@@ -81,7 +80,7 @@ function main()
   α = α_coeff*maximum(el_Δ)
   a_hilb(p,q) =∫(α^2*∇(p)⋅∇(q) + p*q)dΩ
   vel_ext = VelocityExtension(a_hilb,U_reg,V_reg)
-  
+
   ## Optimiser
   optimiser = AugmentedLagrangian(pcfs,ls_evo,vel_ext,φh;
     γ,γ_reinit,verbose=true,constraint_names=[:Vol])

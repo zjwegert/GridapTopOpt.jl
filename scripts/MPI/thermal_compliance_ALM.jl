@@ -1,5 +1,7 @@
 using Gridap, GridapDistributed, GridapPETSc, PartitionedArrays, LevelSetTopOpt
 
+global write_dir = ARGS[1]
+
 """
   (MPI) Minimum thermal compliance with augmented Lagrangian method in 2D.
 
@@ -10,7 +12,7 @@ using Gridap, GridapDistributed, GridapPETSc, PartitionedArrays, LevelSetTopOpt
           ⎡u∈V=H¹(Ω;u(Γ_D)=0),
           ⎣∫ κ*∇(u)⋅∇(v) dΩ = ∫ v dΓ_N, ∀v∈V.
 """
-function main(mesh_partition,distribute)
+function main(mesh_partition,distribute,path)
   ranks = distribute(LinearIndices((prod(mesh_partition),)))
 
   ## Parameters
@@ -28,9 +30,8 @@ function main(mesh_partition,distribute)
   η_coeff = 2
   α_coeff = 4max_steps*γ
   vf = 0.4
-  path = dirname(dirname(@__DIR__))*"/results/thermal_compliance_ALM_MPI/"
   iter_mod = 10
-  i_am_main(ranks) && mkdir(path)
+  i_am_main(ranks) && mkpath(path)
 
   ## FE Setup
   model = CartesianDiscreteModel(ranks,mesh_partition,dom,el_size);
@@ -96,5 +97,5 @@ function main(mesh_partition,distribute)
 end
 
 with_mpi() do distribute
-  main((2,2),distribute)
+  main((2,2),distribute,write_dir)
 end

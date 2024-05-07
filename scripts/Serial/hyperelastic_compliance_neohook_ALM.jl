@@ -2,8 +2,8 @@ using Gridap, LevelSetTopOpt
 
 """
   (Serial) Minimum hyperelastic (neohookean) compliance with augmented Lagrangian method in 2D.
-""" 
-function main()
+"""
+function main(path="./results/hyperelastic_compliance_neohook_ALM/")
   ## Parameters
   order = 1
   xmax,ymax=2.0,1.0
@@ -17,9 +17,8 @@ function main()
   η_coeff = 2
   α_coeff = 4max_steps*γ
   vf = 0.6
-  path = dirname(dirname(@__DIR__))*"/results/hyperelastic_compliance_neohook_ALM/"
   iter_mod = 10
-  mkdir(path)
+  mkpath(path)
 
   ## FE Setup
   model = CartesianDiscreteModel(dom,el_size);
@@ -95,7 +94,7 @@ function main()
   α = α_coeff*maximum(el_Δ)
   a_hilb(p,q) =∫(α^2*∇(p)⋅∇(q) + p*q)dΩ
   vel_ext = VelocityExtension(a_hilb,U_reg,V_reg)
-  
+
   ## Optimiser
   optimiser = AugmentedLagrangian(pcfs,ls_evo,vel_ext,φh;
     γ,γ_reinit,verbose=true,constraint_names=[:Vol])

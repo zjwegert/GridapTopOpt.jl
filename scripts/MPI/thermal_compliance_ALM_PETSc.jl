@@ -1,5 +1,7 @@
-using Gridap, GridapDistributed, GridapPETSc, GridapSolvers, 
+using Gridap, GridapDistributed, GridapPETSc, GridapSolvers,
   PartitionedArrays, LevelSetTopOpt, SparseMatricesCSR
+
+global write_dir = ARGS[1]
 
 """
   (MPI) Minimum thermal compliance with augmented Lagrangian method in 2D.
@@ -11,7 +13,7 @@ using Gridap, GridapDistributed, GridapPETSc, GridapSolvers,
           ⎡u∈V=H¹(Ω;u(Γ_D)=0),
           ⎣∫ κ*∇(u)⋅∇(v) dΩ = ∫ v dΓ_N, ∀v∈V.
 """
-function main(mesh_partition,distribute,el_size)
+function main(mesh_partition,distribute,el_size,path)
   ranks = distribute(LinearIndices((prod(mesh_partition),)))
 
   ## Parameters
@@ -28,9 +30,8 @@ function main(mesh_partition,distribute,el_size)
   η_coeff = 2
   α_coeff = 4max_steps*γ
   vf = 0.4
-  path = dirname(dirname(@__DIR__))*"/results/thermal_compliance_ALM_MPI+PETSc/"
   iter_mod = 10
-  i_am_main(ranks) && mkdir(path)
+  i_am_main(ranks) && mkpath(path)
 
   ## FE Setup
   model = CartesianDiscreteModel(ranks,mesh_partition,dom,el_size);
@@ -78,7 +79,7 @@ function main(mesh_partition,distribute,el_size)
   Tm = SparseMatrixCSR{0,PetscScalar,PetscInt}
   Tv = Vector{PetscScalar}
   solver = PETScLinearSolver()
-  
+
   state_map = AffineFEStateMap(
     a,l,U,V,V_φ,U_reg,φh,dΩ,dΓ_N;
     assem_U = SparseMatrixAssembler(Tm,Tv,U,V),
@@ -112,10 +113,10 @@ end
 with_mpi() do distribute
   mesh_partition = (2,2)
   el_size = (400,400)
-  solver_options = "-pc_type gamg -ksp_type cg -ksp_error_if_not_converged true 
+  solver_options = "-pc_type gamg -ksp_type cg -ksp_error_if_not_converged true
     -ksp_converged_reason -ksp_rtol 1.0e-12"
-  
+
   GridapPETSc.with(args=split(solver_options)) do
-    main(mesh_partition,distribute,el_size)
+    main(mesh_partition,distribute,el_size,write_dir)
   end
 end

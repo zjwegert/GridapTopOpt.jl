@@ -1,5 +1,7 @@
-using Gridap, Gridap.MultiField, GridapDistributed, GridapPETSc, GridapSolvers, 
+using Gridap, Gridap.MultiField, GridapDistributed, GridapPETSc, GridapSolvers,
   PartitionedArrays, LevelSetTopOpt, SparseMatricesCSR
+
+global write_dir = ARGS[1]
 
 """
   (MPI) Minimum thermal compliance with augmented Lagrangian method in 2D with nonlinear diffusivity.
@@ -10,10 +12,10 @@ using Gridap, Gridap.MultiField, GridapDistributed, GridapPETSc, GridapSolvers,
     s.t., Vol(Ω) = vf,
           ⎡u∈V=H¹(Ω;u(Γ_D)=0),
           ⎣∫ κ(u)*∇(u)⋅∇(v) dΩ = ∫ v dΓ_N, ∀v∈V.
-  
+
   In this example κ(u) = κ0*(exp(ξ*u))
-""" 
-function main(mesh_partition,distribute,el_size)
+"""
+function main(mesh_partition,distribute,el_size,path)
   ranks = distribute(LinearIndices((prod(mesh_partition),)))
   ## Parameters
   order = 1
@@ -28,16 +30,15 @@ function main(mesh_partition,distribute,el_size)
   η_coeff = 2
   α_coeff = 4max_steps*γ
   vf = 0.4
-  path = dirname(dirname(@__DIR__))*"/results/nonlinear_thermal_compliance_ALM_MPI/"
   iter_mod = 10
-  mkdir(path)
+  mkpath(path)
 
   ## FE Setup
   model = CartesianDiscreteModel(ranks,mesh_partition,dom,el_size);
   el_Δ = get_el_Δ(model)
-  f_Γ_D(x) = (x[1] ≈ 0.0 && (x[2] <= ymax*prop_Γ_D + eps() || 
+  f_Γ_D(x) = (x[1] ≈ 0.0 && (x[2] <= ymax*prop_Γ_D + eps() ||
       x[2] >= ymax-ymax*prop_Γ_D - eps()));
-  f_Γ_N(x) = (x[1] ≈ xmax && ymax/2-ymax*prop_Γ_N/2 - eps() <= x[2] <= 
+  f_Γ_N(x) = (x[1] ≈ xmax && ymax/2-ymax*prop_Γ_N/2 - eps() <= x[2] <=
       ymax/2+ymax*prop_Γ_N/2 + eps());
   update_labels!(1,model,f_Γ_D,"Gamma_D")
   update_labels!(2,model,f_Γ_N,"Gamma_N")
@@ -85,7 +86,7 @@ function main(mesh_partition,distribute,el_size)
   α = α_coeff*maximum(el_Δ)
   a_hilb(p,q) =∫(α^2*∇(p)⋅∇(q) + p*q)dΩ
   vel_ext = VelocityExtension(a_hilb,U_reg,V_reg)
-  
+
   ## Optimiser
   optimiser = AugmentedLagrangian(pcfs,ls_evo,vel_ext,φh;
     γ,γ_reinit,verbose=i_am_main(ranks),constraint_names=[:Vol])
@@ -99,5 +100,5 @@ function main(mesh_partition,distribute,el_size)
 end
 
 with_mpi() do distribute
-  main((2,2),distribute,(200,200))
+  main((2,2),distribute,(200,200),write_dir)
 end

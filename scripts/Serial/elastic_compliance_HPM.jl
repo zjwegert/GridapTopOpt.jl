@@ -7,10 +7,10 @@ using Gridap, LevelSetTopOpt
       Min J(Ω) = ∫ C ⊙ ε(u) ⊙ ε(v) dΩ
         Ω
     s.t., Vol(Ω) = vf,
-          ⎡u∈V=H¹(Ω;u(Γ_D)=0)ᵈ, 
+          ⎡u∈V=H¹(Ω;u(Γ_D)=0)ᵈ,
           ⎣∫ C ⊙ ε(u) ⊙ ε(v) dΩ = ∫ v⋅g dΓ_N, ∀v∈V.
-""" 
-function main()
+"""
+function main(path="./results/elastic_compliance_HPM/")
   ## Parameters
   order = 1
   xmax,ymax=(2.0,1.0)
@@ -26,15 +26,14 @@ function main()
   α_coeff = 4max_steps*γ
   vf = 0.4
   g = VectorValue(0,-1)
-  path = dirname(dirname(@__DIR__))*"/results/elastic_compliance_HPM/"
   iter_mod = 10
-  mkdir(path)
+  mkpath(path)
 
   ## FE Setup
   model = CartesianDiscreteModel(dom,el_size)
   el_Δ = get_el_Δ(model)
   f_Γ_D(x) = (x[1] ≈ 0.0)
-  f_Γ_N(x) = (x[1] ≈ xmax && ymax/2-ymax*prop_Γ_N/2 - eps() <= x[2] <= 
+  f_Γ_N(x) = (x[1] ≈ xmax && ymax/2-ymax*prop_Γ_N/2 - eps() <= x[2] <=
     ymax/2+ymax*prop_Γ_N/2 + eps())
   update_labels!(1,model,f_Γ_D,"Gamma_D")
   update_labels!(2,model,f_Γ_N,"Gamma_N")
@@ -82,7 +81,7 @@ function main()
   α = α_coeff*maximum(el_Δ)
   a_hilb(p,q) =∫(α^2*∇(p)⋅∇(q) + p*q)dΩ;
   vel_ext = VelocityExtension(a_hilb,U_reg,V_reg)
-  
+
   ## Optimiser
   optimiser = HilbertianProjection(pcfs,ls_evo,vel_ext,φh;
     γ,γ_reinit,verbose=true,constraint_names=[:Vol])

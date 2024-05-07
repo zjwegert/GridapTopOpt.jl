@@ -6,10 +6,10 @@ using Gridap, LevelSetTopOpt
   Optimisation problem:
       Min J(Ω) = ∫ C ⊙ ε(u) ⊙ ε(v) + ξ dΩ
         Ω
-    s.t., ⎡u∈V=H¹(Ω;u(Γ_D)=0)ᵈ, 
+    s.t., ⎡u∈V=H¹(Ω;u(Γ_D)=0)ᵈ,
           ⎣∫ C ⊙ ε(u) ⊙ ε(v) dΩ = ∫ v⋅g dΓ_N, ∀v∈V.
-""" 
-function main()
+"""
+function main(path="./results/elastic_compliance_LM/")
   ## Parameters
   order = 1
   xmax,ymax=(2.0,1.0)
@@ -24,15 +24,14 @@ function main()
   η_coeff = 2
   α_coeff = 4max_steps*γ
   g = VectorValue(0,-1)
-  path = dirname(dirname(@__DIR__))*"/results/elastic_compliance_LM/"
   iter_mod = 10
-  mkdir(path)
+  mkpath(path)
 
   ## FE Setup
   model = CartesianDiscreteModel(dom,el_size)
   el_Δ = get_el_Δ(model)
   f_Γ_D(x) = iszero(x[1])
-  f_Γ_N(x) = (x[1] ≈ xmax && ymax/2-ymax*prop_Γ_N/2 - eps() <= x[2] <= 
+  f_Γ_N(x) = (x[1] ≈ xmax && ymax/2-ymax*prop_Γ_N/2 - eps() <= x[2] <=
     ymax/2+ymax*prop_Γ_N/2 + eps())
   update_labels!(1,model,f_Γ_D,"Gamma_D")
   update_labels!(2,model,f_Γ_N,"Gamma_N")
@@ -78,7 +77,7 @@ function main()
   α = α_coeff*maximum(el_Δ)
   a_hilb(p,q) =∫(α^2*∇(p)⋅∇(q) + p*q)dΩ;
   vel_ext = VelocityExtension(a_hilb,U_reg,V_reg)
-  
+
   ## Optimiser
   optimiser = AugmentedLagrangian(pcfs,ls_evo,vel_ext,φh;γ,γ_reinit,verbose=true)
   for (it, uh, φh) in optimiser
