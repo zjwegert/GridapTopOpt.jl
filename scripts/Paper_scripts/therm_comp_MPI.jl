@@ -25,7 +25,7 @@ function main(mesh_partition,distribute,write_dir)
   vf = 0.4                                        # Volume fraction constraint
   lsf_func = initial_lsf(4,0.2)                   # Initial level set function
   iter_mod = 10                                   # VTK Output modulo
-  path = "$write_dir/results/therm_comp_MPI/"     # Output path
+  path = "$write_dir/therm_comp_MPI/"     # Output path
   i_am_main(ranks) && mkpath(path)                # Create path
   # Model
   model = CartesianDiscreteModel(ranks,mesh_partition,dom,el_size);
