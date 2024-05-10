@@ -1,4 +1,4 @@
-using LevelSetTopOpt, Gridap, GridapDistributed, GridapPETSc, PartitionedArrays, 
+using GridapTopOpt, Gridap, GridapDistributed, GridapPETSc, PartitionedArrays,
   SparseMatricesCSR
 
 function main(mesh_partition,distribute,write_dir)
@@ -96,7 +96,7 @@ end
 with_mpi() do distribute
   mesh_partition = (2,2)
   write_dir = ARGS[1]
-  solver_options = "-pc_type gamg -ksp_type cg -ksp_error_if_not_converged true 
+  solver_options = "-pc_type gamg -ksp_type cg -ksp_error_if_not_converged true
     -ksp_converged_reason -ksp_rtol 1.0e-12"
   GridapPETSc.with(args=split(solver_options)) do
     main(mesh_partition,distribute,write_dir)

@@ -1,4 +1,4 @@
-using LevelSetTopOpt, Gridap, GridapDistributed, GridapPETSc, PartitionedArrays, 
+using GridapTopOpt, Gridap, GridapDistributed, GridapPETSc, PartitionedArrays,
   SparseMatricesCSR
 
 using GridapSolvers: NewtonSolver
@@ -65,7 +65,7 @@ function main(mesh_partition,distribute,write_dir)
   F(∇u) = one(∇u) + ∇u'
   ## Volume change
   J(F) = sqrt(det(C(F)))
-  ## Residual  
+  ## Residual
   res(u,v,φ,dΩ,dΓ_N) = ∫( (I ∘ φ)*((dE ∘ (∇(v),∇(u))) ⊙ (S ∘ ∇(u))) )*dΩ - ∫(g⋅v)dΓ_N
   Tm = SparseMatrixCSR{0,PetscScalar,PetscInt}
   Tv = Vector{PetscScalar}
@@ -113,7 +113,7 @@ end
 with_mpi() do distribute
   mesh_partition = (4,6,6)
   write_dir = ARGS[1]
-  solver_options = "-pc_type gamg -ksp_type cg -ksp_error_if_not_converged true 
+  solver_options = "-pc_type gamg -ksp_type cg -ksp_error_if_not_converged true
     -ksp_converged_reason -ksp_rtol 1.0e-12"
   GridapPETSc.with(args=split(solver_options)) do
     main(mesh_partition,distribute,write_dir)

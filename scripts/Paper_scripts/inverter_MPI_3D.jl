@@ -1,4 +1,4 @@
-using LevelSetTopOpt, Gridap, GridapDistributed, GridapPETSc, PartitionedArrays, 
+using GridapTopOpt, Gridap, GridapDistributed, GridapPETSc, PartitionedArrays,
   SparseMatricesCSR
 
 function main(mesh_partition,distribute,write_dir)
@@ -13,7 +13,7 @@ function main(mesh_partition,distribute,write_dir)
   f_Γ_out(x) = (x[1] ≈ 1.0) &&                    # Γ_out indicator function
     (0.4 - eps() <= x[2] <= 0.6 + eps()) && (0.4 - eps() <= x[3] <= 0.6 + eps())
   f_Γ_out_ext(x) = ~f_Γ_out(x) &&                 # Γ_out_ext indicator function
-    (0.9 <= x[1] <= 1.0) && (0.35 - eps() <= x[2] <= 0.65 + eps()) && 
+    (0.9 <= x[1] <= 1.0) && (0.35 - eps() <= x[2] <= 0.65 + eps()) &&
     (0.35 - eps() <= x[3] <= 0.65 + eps())
   f_Γ_D(x) = (x[1] ≈ 0.0)  &&                     # Γ_D indicator function
     (x[2] <= 0.1 || x[2] >= 0.9) && (x[3] <= 0.1 || x[3] >= 0.9)
@@ -112,7 +112,7 @@ end
 with_mpi() do distribute
   mesh_partition = (4,6,6)
   write_dir = ARGS[1]
-  solver_options = "-pc_type gamg -ksp_type cg -ksp_error_if_not_converged true 
+  solver_options = "-pc_type gamg -ksp_type cg -ksp_error_if_not_converged true
     -ksp_converged_reason -ksp_rtol 1.0e-12"
   GridapPETSc.with(args=split(solver_options)) do
     main(mesh_partition,distribute,write_dir)

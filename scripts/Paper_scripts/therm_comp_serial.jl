@@ -1,4 +1,4 @@
-using LevelSetTopOpt, Gridap
+using GridapTopOpt, Gridap
 
 function main(write_dir)
   # FE parameters
