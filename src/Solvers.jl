@@ -1,4 +1,4 @@
-## TODO: @Jordi, are these going into GridapSolvers or should I write documentation?
+## This will be moved into GridapSolvers in a future release
 
 struct ElasticitySolver{A} <: LinearSolver
   space ::A
@@ -31,7 +31,7 @@ function get_dof_coordinates(space::GridapDistributed.DistributedSingleFieldFESp
     owner = part_id(dof_indices)
     own_indices   = OwnIndices(ngdofs,owner,own_to_global(dof_indices))
     ghost_indices = GhostIndices(ngdofs,Int64[],Int32[]) # We only consider owned dofs
-    OwnAndGhostIndices(own_indices,ghost_indices)   
+    OwnAndGhostIndices(own_indices,ghost_indices)
   end
   return PVector(coords,indices)
 end
@@ -126,7 +126,7 @@ _num_dims(space::GridapDistributed.DistributedSingleFieldFESpace) = getany(map(_
 function Gridap.Algebra.numerical_setup(ss::ElasticitySymbolicSetup,_A::PSparseMatrix)
   s = ss.solver
 
-  # Create ns 
+  # Create ns
   A = convert(PETScMatrix,_A)
   X = convert(PETScVector,allocate_in_domain(_A))
   B = convert(PETScVector,allocate_in_domain(_A))
@@ -139,7 +139,7 @@ function Gridap.Algebra.numerical_setup(ss::ElasticitySymbolicSetup,_A::PSparseM
   # Create matrix nullspace
   @check_error_code GridapPETSc.PETSC.MatNullSpaceCreateRigidBody(dof_coords.vec[],ns.null)
   @check_error_code GridapPETSc.PETSC.MatSetNearNullSpace(ns.A.mat[],ns.null[])
-  
+
   # Setup solver and preconditioner
   @check_error_code GridapPETSc.PETSC.KSPCreate(ns.A.comm,ns.ksp)
   @check_error_code GridapPETSc.PETSC.KSPSetOperators(ns.ksp[],ns.A.mat[],ns.A.mat[])
@@ -162,81 +162,4 @@ function Algebra.solve!(x::AbstractVector{PetscScalar},ns::ElasticityNumericalSe
   @check_error_code GridapPETSc.PETSC.KSPSolve(ns.ksp[],B.vec[],X.vec[])
   copy!(x,X)
   return x
-end
-
-# MUMPS solver
-
-function mumps_ksp_setup(ksp)
-  pc       = Ref{GridapPETSc.PETSC.PC}()
-  mumpsmat = Ref{GridapPETSc.PETSC.Mat}()
-  @check_error_code GridapPETSc.PETSC.KSPView(ksp[],C_NULL)
-  @check_error_code GridapPETSc.PETSC.KSPSetType(ksp[],GridapPETSc.PETSC.KSPPREONLY)
-  @check_error_code GridapPETSc.PETSC.KSPGetPC(ksp[],pc)
-  @check_error_code GridapPETSc.PETSC.PCSetType(pc[],GridapPETSc.PETSC.PCLU)
-  @check_error_code GridapPETSc.PETSC.PCFactorSetMatSolverType(pc[],GridapPETSc.PETSC.MATSOLVERMUMPS)
-  @check_error_code GridapPETSc.PETSC.PCFactorSetUpMatSolverType(pc[])
-  @check_error_code GridapPETSc.PETSC.PCFactorGetMatrix(pc[],mumpsmat)
-  @check_error_code GridapPETSc.PETSC.MatMumpsSetIcntl(mumpsmat[],  4, 1) # Level of printing
-  @check_error_code GridapPETSc.PETSC.MatMumpsSetIcntl(mumpsmat[],  7, 0) # Perm type
-# @check_error_code GridapPETSc.PETSC.MatMumpsSetIcntl(mumpsmat[], 14, 1000)
-  @check_error_code GridapPETSc.PETSC.MatMumpsSetIcntl(mumpsmat[], 28, 2) # Seq or parallel analysis
-  @check_error_code GridapPETSc.PETSC.MatMumpsSetIcntl(mumpsmat[], 29, 2) # Parallel ordering
-  @check_error_code GridapPETSc.PETSC.MatMumpsSetCntl(mumpsmat[], 3, 1.0e-6) # Absolute pivoting threshold
-end
-
-function MUMPSSolver()
-  return PETScLinearSolver(mumps_ksp_setup)
-end
-
-# Block diagonal preconditioner
-
-struct BlockDiagonalPreconditioner{N,A} <: Gridap.Algebra.LinearSolver
-  solvers :: A
-  function BlockDiagonalPreconditioner(solvers::AbstractArray{<:Gridap.Algebra.LinearSolver})
-    N = length(solvers)
-    A = typeof(solvers)
-    return new{N,A}(solvers)
-  end
-end
-
-struct BlockDiagonalPreconditionerSS{A,B} <: Gridap.Algebra.SymbolicSetup
-  solver   :: A
-  block_ss :: B
-end
-
-function Gridap.Algebra.symbolic_setup(solver::BlockDiagonalPreconditioner,mat::AbstractBlockMatrix)
-  mat_blocks = diag(blocks(mat))
-  block_ss   = map(symbolic_setup,solver.solvers,mat_blocks)
-  return BlockDiagonalPreconditionerSS(solver,block_ss)
-end
-
-struct BlockDiagonalPreconditionerNS{A,B} <: Gridap.Algebra.NumericalSetup
-  solver   :: A
-  block_ns :: B
-end
-
-function Gridap.Algebra.numerical_setup(ss::BlockDiagonalPreconditionerSS,mat::AbstractBlockMatrix)
-  solver     = ss.solver
-  mat_blocks = diag(blocks(mat))
-  block_ns   = map(numerical_setup,ss.block_ss,mat_blocks)
-  return BlockDiagonalPreconditionerNS(solver,block_ns)
-end
-
-function Gridap.Algebra.numerical_setup!(ns::BlockDiagonalPreconditionerNS,mat::AbstractBlockMatrix)
-  mat_blocks = diag(blocks(mat))
-  map(numerical_setup!,ns.block_ns,mat_blocks)
-end
-
-function Gridap.Algebra.solve!(x::AbstractBlockVector,ns::BlockDiagonalPreconditionerNS,b::AbstractBlockVector)
-  @check blocklength(x) == blocklength(b) == length(ns.block_ns)
-  for (iB,bns) in enumerate(ns.block_ns)
-    xi = x[Block(iB)]
-    bi = b[Block(iB)]
-    solve!(xi,bns,bi)
-  end
-  return x
-end
-
-function LinearAlgebra.ldiv!(x,ns::BlockDiagonalPreconditionerNS,b)
-  solve!(x,ns,b)
 end

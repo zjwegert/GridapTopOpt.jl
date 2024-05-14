@@ -61,8 +61,6 @@ export reinit!
 
 include("Solvers.jl")
 export ElasticitySolver
-export BlockDiagonalPreconditioner
-export MUMPSSolver
 
 include("VelocityExtension.jl")
 export VelocityExtension
