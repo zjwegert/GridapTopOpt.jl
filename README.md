@@ -16,11 +16,10 @@ Scripts can then be run from `.../GridapTopOpt.jl/` with the `--project` flag. E
 
 *: We include the `Manifest.toml` file to ensure the correct branch of `GridapSolvers` is included when instantiating the package. This will be removed in future.
 
----
+## Software versions
+Results in the paper were generated with the following software versions on Gadi:
+- `Julia v1.9.4`
+- `PETSc v3.19.5`
+- `Intel MPI v2021.10.0`
 
-GridapTopOpt is computational toolbox for level set-based topology optimisation implemented in Julia and the [Gridap](https://github.com/gridap/Gridap.jl) package ecosystem. See the documentation and following publication for further details:
-
-> Zachary J. Wegert, Jordi Manyer, Connor Mallon, Santiago Badia, and Vivien J. Challis (2024). "GridapTopOpt.jl: A scalable Julia toolbox for level set-based topology optimisation". In preparation.
-
-## Citation
-In order to give credit to the `GridapTopOpt` contributors, we ask that you please reference the above paper along with the required citations for [Gridap](https://github.com/gridap/Gridap.jl?tab=readme-ov-file#how-to-cite-gridap).
+Package versions are as in the Manifest/Project files.

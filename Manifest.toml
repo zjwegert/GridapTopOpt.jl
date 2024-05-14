@@ -588,7 +588,9 @@ version = "2.8.1+2"
 
 [[deps.P4est_wrapper]]
 deps = ["CEnum", "Libdl", "MPI", "P4est_jll"]
-git-tree-sha1 = "149b5fa81221f2e51498428b688e4510e4a74d79"
+git-tree-sha1 = "908cfcee3d0d21eb877b5f0d52a6d24d8bcd65cf"
+repo-rev = "master"
+repo-url = "https://github.com/gridap/P4est_wrapper.jl.git"
 uuid = "3743d7c0-8adf-11ea-380b-7d33b0ecc1da"
 version = "0.2.2"
 
