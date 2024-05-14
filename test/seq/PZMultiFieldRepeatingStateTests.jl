@@ -4,10 +4,10 @@ using Test
 using Gridap, GridapDistributed, GridapPETSc, GridapSolvers,
   PartitionedArrays, GridapTopOpt, SparseMatricesCSR
 
-using Gridap.TensorValues, Gridap.Helpers
+using Gridap.TensorValues, Gridap.Helpers, Gridap.MultiField
 
 ## Parameters
-function main(;AD)
+function main(;AD,use_mfs)
   el_size = (20,20)
   order = 1
   xmax,ymax=(1.0,1.0)
@@ -38,8 +38,14 @@ function main(;AD)
   U = TrialFESpace(V,VectorValue(0.0,0.0))
   Q = TestFESpace(model,reffe_scalar;conformity=:H1,dirichlet_tags=["origin"])
   P = TrialFESpace(Q,0)
-  UP = MultiFieldFESpace([U,P])
-  VQ = MultiFieldFESpace([V,Q])
+  if use_mfs
+    mfs = BlockMultiFieldStyle()
+    UP = MultiFieldFESpace([U,P];style=mfs)
+    VQ = MultiFieldFESpace([V,Q];style=mfs)
+  else
+    UP = MultiFieldFESpace([U,P])
+    VQ = MultiFieldFESpace([V,Q])
+  end
 
   V_φ = TestFESpace(model,reffe_scalar)
   V_reg = TestFESpace(model,reffe_scalar)
@@ -187,5 +193,7 @@ end
 # Test that these run successfully
 @test main(;AD=true)
 @test main(;AD=false)
+@test main(;AD=true,use_mfs=true)
+@test main(;AD=false,use_mfs=true)
 
 end # module
