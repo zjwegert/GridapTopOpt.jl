@@ -1,6 +1,6 @@
 # Velocity extension
 
 ```@autodocs
-Modules = [LevelSetTopOpt]
+Modules = [GridapTopOpt]
 Pages = ["VelocityExtension.jl"]
 ```

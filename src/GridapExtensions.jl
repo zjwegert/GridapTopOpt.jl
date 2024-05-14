@@ -60,36 +60,26 @@ end
 
 # Assembly addons
 
-function Gridap.FESpaces.allocate_matrix(a::Function,assem::Assembler,U::FESpace,V::FESpace)
-  v = get_fe_basis(V)
-  u = get_trial_fe_basis(U)
-  allocate_matrix(assem,collect_cell_matrix(U,V,a(u,v)))
+get_local_matrix_type(a::Assembler) = get_matrix_type(a)
+get_local_vector_type(a::Assembler) = get_vector_type(a)
+get_local_assembly_strategy(a::Assembler) = get_assembly_strategy(a)
+
+function get_local_matrix_type(a::GridapDistributed.DistributedSparseMatrixAssembler)
+  return getany(map(get_matrix_type,a.assems))
+end
+function get_local_vector_type(a::GridapDistributed.DistributedSparseMatrixAssembler)
+  return getany(map(get_vector_type,a.assems))
+end
+function get_local_assembly_strategy(a::GridapDistributed.DistributedSparseMatrixAssembler)
+  return get_assembly_strategy(a)
 end
 
-function Gridap.FESpaces.allocate_vector(l::Function,assem::Assembler,V::FESpace)
-  v = get_fe_basis(V)
-  allocate_vector(assem,collect_cell_vector(V,l(v)))
+function get_local_matrix_type(a::MultiField.BlockSparseMatrixAssembler)
+  return get_local_matrix_type(first(a.block_assemblers))
 end
-
-function Gridap.FESpaces.assemble_matrix_and_vector!(
-    a::Function,l::Function,A::AbstractMatrix,b::AbstractVector,assem::Assembler,U::FESpace,V::FESpace,uhd)
-  v = get_fe_basis(V)
-  u = get_trial_fe_basis(U)
-  assemble_matrix_and_vector!(A,b,assem,collect_cell_matrix_and_vector(U,V,a(u,v),l(v),uhd))
+function get_local_vector_type(a::MultiField.BlockSparseMatrixAssembler)
+  return get_local_vector_type(first(a.block_assemblers))
 end
-
-# PETScNonlinearSolver override
-
-function Gridap.Algebra.solve!(x::T,nls::PETScNonlinearSolver,op::Gridap.Algebra.NonlinearOperator,
-    cache::GridapPETSc.PETScNonlinearSolverCache{<:T}) where T <: AbstractVector
-  @check_error_code GridapPETSc.PETSC.SNESSolve(cache.snes[],C_NULL,cache.x_petsc.vec[])
-  copy!(x,cache.x_petsc)
-  cache
-end
-
-# Stuff from ODE refactor 
-
-function (+)(a::Gridap.CellData.DomainContribution,b::GridapDistributed.DistributedDomainContribution)
-  @assert iszero(Gridap.CellData.num_domains(a))
-  return b
+function get_local_assembly_strategy(a::MultiField.BlockSparseMatrixAssembler)
+  return get_local_assembly_strategy(first(a.block_assemblers))
 end

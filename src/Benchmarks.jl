@@ -73,8 +73,38 @@ function benchmark_optimizer(m::Optimiser, niter, ranks; nreps = 10)
 
   φ0 = copy(get_free_dof_values(m.φ0))
   function opt_reset!(m::Optimiser)
+    u = get_free_dof_values(get_state(m.problem));
+    fill!(u,zero(eltype(u)))
     copy!(get_free_dof_values(m.φ0), φ0)
     reset!(get_history(m))
+  end
+  return benchmark(f, (m,), ranks; nreps, reset! = opt_reset!)
+end
+
+"""
+    benchmark_single_iteration(m::Optimiser, ranks; nreps)
+
+Given an optimiser `m`, benchmark a single iteration after 0th iteration.
+"""
+function benchmark_single_iteration(m::Optimiser,ranks; nreps = 10)
+  _,state = iterate(m)
+  function f(m)
+    iterate(m,state)
+  end
+
+  φ0 = copy(get_free_dof_values(m.φ0))
+  λ0 = copy(state.λ); Λ0 = copy(state.Λ) 
+  dL0 = copy(state.dL)
+  function opt_reset!(m::Optimiser)
+    u = get_free_dof_values(get_state(m.problem));
+    fill!(u,zero(eltype(u)))
+    copy!(get_free_dof_values(m.φ0), φ0)
+    copy!(get_free_dof_values(state.φh), φ0)
+    copy!(state.λ,λ0)
+    copy!(state.Λ,Λ0)
+    copy!(state.dL,dL0)
+    reset!(get_history(m))
+    get_history(m).niter = state.it - 1 # <- due to compilation
   end
   return benchmark(f, (m,), ranks; nreps, reset! = opt_reset!)
 end
@@ -97,15 +127,15 @@ function benchmark_forward_problem(m::AbstractFEStateMap, φh, ranks; nreps = 10
 end
 
 """
-    benchmark_advection(stencil::AdvectionStencil, φ0, v0, γ, ranks; nreps)
+    benchmark_advection(stencil::LevelSetEvolution, φ0, v0, γ, ranks; nreps)
 
 Benchmark solving the Hamilton-Jacobi evolution equation given a `stencil`,
 level-set function `φ0`, velocity function `v0`, and time step coefficient `γ`. 
-See [`advect!`](@ref) for input types.
+See [`evolve!`](@ref) for input types.
 """
-function benchmark_advection(stencil::AdvectionStencil, φ0, v0, γ, ranks; nreps = 10)
+function benchmark_advection(stencil::LevelSetEvolution, φ0, v0, γ, ranks; nreps = 10)
   function f(stencil,φ,v,γ)
-    advect!(stencil,φ,v,γ)
+    evolve!(stencil,φ,v,γ)
   end
   function reset!(stencil,φ,v,γ)
     copy!(φ,φ0)
@@ -117,12 +147,12 @@ function benchmark_advection(stencil::AdvectionStencil, φ0, v0, γ, ranks; nrep
 end
 
 """
-    benchmark_reinitialisation(stencil::AdvectionStencil, φ0, γ_reinit, ranks; nreps)
+    benchmark_reinitialisation(stencil::LevelSetEvolution, φ0, γ_reinit, ranks; nreps)
 
 Benchmark solving the reinitialisation equation given a `stencil`, level-set function
 `φ0`, and time step coefficient `γ`. See [`reinit!`](@ref) for input types.
 """
-function benchmark_reinitialisation(stencil::AdvectionStencil, φ0, γ_reinit, ranks; nreps = 10)
+function benchmark_reinitialisation(stencil::LevelSetEvolution, φ0, γ_reinit, ranks; nreps = 10)
   function f(stencil,φ,γ_reinit)
     reinit!(stencil,φ,γ_reinit)
   end

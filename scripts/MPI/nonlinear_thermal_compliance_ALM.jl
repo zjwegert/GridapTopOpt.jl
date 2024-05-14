@@ -1,7 +1,10 @@
-using Gridap, GridapTopOpt
+using Gridap, Gridap.MultiField, GridapDistributed, GridapPETSc, GridapSolvers,
+  PartitionedArrays, GridapTopOpt, SparseMatricesCSR
+
+global write_dir = ARGS[1]
 
 """
-  (Serial) Minimum thermal compliance with augmented Lagrangian method in 2D with nonlinear diffusivity.
+  (MPI) Minimum thermal compliance with augmented Lagrangian method in 2D with nonlinear diffusivity.
 
   Optimisation problem:
       Min J(Ω) = ∫ κ(u)*∇(u)⋅∇(u) dΩ
@@ -12,14 +15,14 @@ using Gridap, GridapTopOpt
 
   In this example κ(u) = κ0*(exp(ξ*u))
 """
-function main(path="./results/nonlinear_thermal_compliance_ALM/")
+function main(mesh_partition,distribute,el_size,path)
+  ranks = distribute(LinearIndices((prod(mesh_partition),)))
   ## Parameters
   order = 1
   xmax=ymax=1.0
   prop_Γ_N = 0.2
   prop_Γ_D = 0.2
   dom = (0,xmax,0,ymax)
-  el_size = (200,200)
   γ = 0.1
   γ_reinit = 0.5
   max_steps = floor(Int,order*minimum(el_size)/10)
@@ -31,7 +34,7 @@ function main(path="./results/nonlinear_thermal_compliance_ALM/")
   mkpath(path)
 
   ## FE Setup
-  model = CartesianDiscreteModel(dom,el_size);
+  model = CartesianDiscreteModel(ranks,mesh_partition,dom,el_size);
   el_Δ = get_el_Δ(model)
   f_Γ_D(x) = (x[1] ≈ 0.0 && (x[2] <= ymax*prop_Γ_D + eps() ||
       x[2] >= ymax-ymax*prop_Γ_D - eps()));
@@ -86,14 +89,16 @@ function main(path="./results/nonlinear_thermal_compliance_ALM/")
 
   ## Optimiser
   optimiser = AugmentedLagrangian(pcfs,ls_evo,vel_ext,φh;
-    γ,γ_reinit,verbose=true,constraint_names=[:Vol])
+    γ,γ_reinit,verbose=i_am_main(ranks),constraint_names=[:Vol])
   for (it, uh, φh) in optimiser
     data = ["φ"=>φh,"H(φ)"=>(H ∘ φh),"|∇(φ)|"=>(norm ∘ ∇(φh)),"uh"=>uh]
     iszero(it % iter_mod) && writevtk(Ω,path*"out$it",cellfields=data)
-    write_history(path*"/history.txt",optimiser.history)
+    write_history(path*"/history.txt",optimiser.history;ranks=ranks)
   end
   it = get_history(optimiser).niter; uh = get_state(pcfs)
   writevtk(Ω,path*"out$it",cellfields=["φ"=>φh,"H(φ)"=>(H ∘ φh),"|∇(φ)|"=>(norm ∘ ∇(φh)),"uh"=>uh])
 end
 
-main()
+with_mpi() do distribute
+  main((2,2),distribute,(200,200),write_dir)
+end

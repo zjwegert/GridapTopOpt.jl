@@ -1,8 +1,8 @@
 """
     abstract type Optimiser
 
-Optimisers in LevelSetTopOpt.jl are implemented as iterators.
-Your own optimiser can be implemented by implementing 
+Optimisers in GridapTopOpt.jl are implemented as iterators.
+Your own optimiser can be implemented by implementing
 concrete functionality of the below.
 """
 abstract type Optimiser end
@@ -43,7 +43,7 @@ get_history(::Optimiser) :: OptimiserHistory = @abstractmethod
 """
     converged(::Optimiser)
 
-Return a `Bool` that is true if the `Optimiser` has 
+Return a `Bool` that is true if the `Optimiser` has
 converged, otherwise false.
 """
 function converged(::Optimiser) :: Bool
@@ -59,7 +59,7 @@ function finished(m::Optimiser) :: Bool
   return A || B
 end
 
-function print_msg(opt::Optimiser,msg::String;kwargs...) 
+function print_msg(opt::Optimiser,msg::String;kwargs...)
   print_msg(get_history(opt),msg;kwargs...)
 end
 
@@ -203,7 +203,7 @@ end
 
 """
     write_history(path::String,h::OptimiserHistory;ranks=nothing)
-  
+
 Write the contents of an `OptimiserHistory` object to a `path`.
 Provide MPI `ranks` when running in parallel.
 """
@@ -211,7 +211,7 @@ function write_history(path::String,h::OptimiserHistory;ranks=nothing)
   if i_am_main(ranks)
     open(path,"w") do f
       write(f,h)
-    end  
+    end
   end
 end
 
@@ -224,7 +224,7 @@ end
 """
     struct OptimiserHistorySlice{T} end
 
-A read-only wrapper of OptimiserHistory for IO display 
+A read-only wrapper of OptimiserHistory for IO display
 of iteration history at a specific iteration.
 """
 struct OptimiserHistorySlice{T}

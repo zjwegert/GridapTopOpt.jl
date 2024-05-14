@@ -1,5 +1,7 @@
-using Gridap, Gridap.MultiField, GridapDistributed, GridapPETSc, GridapSolvers, 
-  PartitionedArrays, LevelSetTopOpt, SparseMatricesCSR
+using Gridap, Gridap.MultiField, GridapDistributed, GridapPETSc, GridapSolvers,
+  PartitionedArrays, GridapTopOpt, SparseMatricesCSR
+
+global write_dir = ARGS[1]
 
 """
   (MPI) Minimum elastic compliance with augmented Lagrangian method in 2D.
@@ -8,10 +10,10 @@ using Gridap, Gridap.MultiField, GridapDistributed, GridapPETSc, GridapSolvers,
       Min J(Ω) = ∫ C ⊙ ε(u) ⊙ ε(v) + ξ dΩ
         Ω
     s.t., Vol(Ω) = vf,
-          ⎡u∈V=H¹(Ω;u(Γ_D)=0)ᵈ, 
+          ⎡u∈V=H¹(Ω;u(Γ_D)=0)ᵈ,
           ⎣∫ C ⊙ ε(u) ⊙ ε(v) dΩ = ∫ v⋅g dΓ_N, ∀v∈V.
 """
-function main(mesh_partition,distribute,el_size)
+function main(mesh_partition,distribute,el_size,path)
   ranks = distribute(LinearIndices((prod(mesh_partition),)))
 
   ## Parameters
@@ -21,15 +23,15 @@ function main(mesh_partition,distribute,el_size)
   dom = (0,xmax,0,ymax)
   γ = 0.1
   γ_reinit = 0.5
-  max_steps = floor(Int,minimum(el_size)/10)
+  max_steps = floor(Int,order*minimum(el_size)/10)
   tol = 1/(5order^2)/minimum(el_size)
   C = isotropic_elast_tensor(2,1.,0.3)
   g = VectorValue(0,-1)
   η_coeff = 2
-  α_coeff = 4
+  α_coeff = 4max_steps*γ
   vf = 0.4
-  path = dirname(dirname(@__DIR__))*"/results/elastic_compliance_ALM_MPI"
-  i_am_main(ranks) && mkdir(path)
+  iter_mod = 10
+  i_am_main(ranks) && mkpath(path)
 
   ## FE Setup
   model = CartesianDiscreteModel(ranks,mesh_partition,dom,el_size)
@@ -73,13 +75,13 @@ function main(mesh_partition,distribute,el_size)
   dVol(q,u,φ,dΩ,dΓ_N) = ∫(-1/vol_D*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
 
   ## Finite difference solver and level set function
-  stencil = AdvectionStencil(FirstOrderStencil(2,Float64),model,V_φ,tol,max_steps)
+  ls_evo = HamiltonJacobiEvolution(FirstOrderStencil(2,Float64),model,V_φ,tol,max_steps)
 
   ## Setup solver and FE operators
   Tm = SparseMatrixCSR{0,PetscScalar,PetscInt}
   Tv = Vector{PetscScalar}
   solver = ElasticitySolver(V)
-  
+
   state_map = AffineFEStateMap(
     a,l,U,V,V_φ,U_reg,φh,dΩ,dΓ_N;
     assem_U = SparseMatrixAssembler(Tm,Tv,U,V),
@@ -97,24 +99,24 @@ function main(mesh_partition,distribute,el_size)
     ls=PETScLinearSolver())
 
   ## Optimiser
-  optimiser = AugmentedLagrangian(pcfs,stencil,vel_ext,φh;
+  optimiser = AugmentedLagrangian(pcfs,ls_evo,vel_ext,φh;
     γ,γ_reinit,verbose=i_am_main(ranks),constraint_names=[:Vol])
   for (it, uh, φh) in optimiser
-    write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi)|"=>(norm ∘ ∇(φh)),"uh"=>uh])
+    data = ["φ"=>φh,"H(φ)"=>(H ∘ φh),"|∇(φ)|"=>(norm ∘ ∇(φh)),"uh"=>uh]
+    iszero(it % iter_mod) && writevtk(Ω,path*"out$it",cellfields=data)
     write_history(path*"/history.txt",optimiser.history;ranks=ranks)
   end
   it = get_history(optimiser).niter; uh = get_state(pcfs)
-  write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi)|"=>(norm ∘ ∇(φh)),"uh"=>uh];iter_mod=1)
+  writevtk(Ω,path*"out$it",cellfields=["φ"=>φh,"H(φ)"=>(H ∘ φh),"|∇(φ)|"=>(norm ∘ ∇(φh)),"uh"=>uh])
 end
 
 with_mpi() do distribute
   mesh_partition = (2,2)
   el_size = (200,100)
-  hilb_solver_options = "-pc_type gamg -ksp_type cg -ksp_error_if_not_converged true 
-    -ksp_converged_reason -ksp_rtol 1.0e-12 -mat_block_size 3
-    -mg_levels_ksp_type chebyshev -mg_levels_esteig_ksp_type cg -mg_coarse_sub_pc_type cholesky"
-    
+  hilb_solver_options = "-pc_type gamg -ksp_type cg -ksp_error_if_not_converged true
+    -ksp_converged_reason -ksp_rtol 1.0e-12"
+
   GridapPETSc.with(args=split(hilb_solver_options)) do
-    main(mesh_partition,distribute,el_size)
+    main(mesh_partition,distribute,el_size,write_dir)
   end
 end

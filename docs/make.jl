@@ -1,39 +1,29 @@
+## Local generate
+# cd("./docs/")
+# using Pkg; Pkg.activate(".")
+
 using Documenter
-using LevelSetTopOpt
+using GridapTopOpt
 
 makedocs(
-    sitename = "LevelSetTopOpt.jl",
+    sitename = "GridapTopOpt.jl",
     format = Documenter.HTML(
       prettyurls = false,
-      collapselevel = 1,
+      # collapselevel = 1,
     ),
-    modules = [LevelSetTopOpt],
+    modules = [GridapTopOpt],
     pages = [
       "Home" => "index.md",
-      "Usage" => [
-        "usage/getting-started.md",
-        "usage/ad.md",
-        "usage/petsc.md",
-        "usage/mpi-mode.md",
-      ],
-      "Tutorials" => [
-        "tutorials/minimum_thermal_compliance.md",
-        "tutorials/minimum_elastic_compliance.md",
-        "tutorials/inverter_mechanism.md",
-        "tutorials/inverse_homogenisation.md",
-      ],
+      "Getting Started" => "getting-started.md",
       "Reference" => [
         "reference/optimisers.md",
         "reference/chainrules.md",
-        "reference/advection.md",
+        "reference/levelsetevolution.md",
         "reference/velext.md",
         "reference/io.md",
         "reference/utilities.md",
         "reference/benchmarking.md"
       ],
-      "Developer Notes" => [
-        "dev/shape_der.md",
-      ]
     ],
 )
 

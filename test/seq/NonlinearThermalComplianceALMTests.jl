@@ -1,3 +1,6 @@
+module NonlinearThermalComplianceALMTests
+using Test
+
 using Gridap, GridapTopOpt
 
 """
@@ -12,14 +15,14 @@ using Gridap, GridapTopOpt
 
   In this example κ(u) = κ0*(exp(ξ*u))
 """
-function main(path="./results/nonlinear_thermal_compliance_ALM/")
+function main()
   ## Parameters
   order = 1
   xmax=ymax=1.0
   prop_Γ_N = 0.2
   prop_Γ_D = 0.2
   dom = (0,xmax,0,ymax)
-  el_size = (200,200)
+  el_size = (20,20)
   γ = 0.1
   γ_reinit = 0.5
   max_steps = floor(Int,order*minimum(el_size)/10)
@@ -27,8 +30,6 @@ function main(path="./results/nonlinear_thermal_compliance_ALM/")
   η_coeff = 2
   α_coeff = 4max_steps*γ
   vf = 0.4
-  iter_mod = 10
-  mkpath(path)
 
   ## FE Setup
   model = CartesianDiscreteModel(dom,el_size);
@@ -87,13 +88,14 @@ function main(path="./results/nonlinear_thermal_compliance_ALM/")
   ## Optimiser
   optimiser = AugmentedLagrangian(pcfs,ls_evo,vel_ext,φh;
     γ,γ_reinit,verbose=true,constraint_names=[:Vol])
-  for (it, uh, φh) in optimiser
-    data = ["φ"=>φh,"H(φ)"=>(H ∘ φh),"|∇(φ)|"=>(norm ∘ ∇(φh)),"uh"=>uh]
-    iszero(it % iter_mod) && writevtk(Ω,path*"out$it",cellfields=data)
-    write_history(path*"/history.txt",optimiser.history)
-  end
-  it = get_history(optimiser).niter; uh = get_state(pcfs)
-  writevtk(Ω,path*"out$it",cellfields=["φ"=>φh,"H(φ)"=>(H ∘ φh),"|∇(φ)|"=>(norm ∘ ∇(φh)),"uh"=>uh])
+
+  # Do a few iterations
+  vars, state = iterate(optimiser)
+  vars, state = iterate(optimiser,state)
+  true
 end
 
-main()
+# Test that these run successfully
+@test main()
+
+end # module

@@ -1,4 +1,4 @@
-using Gridap, LevelSetTopOpt
+using Gridap, GridapTopOpt
 
 """
   (Serial) Inverter mechanism with Hilbertian projection method in 2D.
@@ -7,32 +7,32 @@ using Gridap, LevelSetTopOpt
       Min J(Ω) = ηᵢₙ*∫ u⋅e₁ dΓᵢₙ/Vol(Γᵢₙ)
         Ω
     s.t., Vol(Ω) = vf,
-            C(Ω) = 0, 
-          ⎡u∈V=H¹(Ω;u(Γ_D)=0)ᵈ, 
+            C(Ω) = 0,
+          ⎡u∈V=H¹(Ω;u(Γ_D)=0)ᵈ,
           ⎣∫ C ⊙ ε(u) ⊙ ε(v) dΩ + ∫ kₛv⋅u dΓₒᵤₜ = ∫ v⋅g dΓᵢₙ , ∀v∈V.
-        
+
     where C(Ω) = ∫ -u⋅e₁-δₓ dΓₒᵤₜ/Vol(Γₒᵤₜ). We assume symmetry in the problem to aid
      convergence.
-""" 
-function main()
+"""
+function main(path="./results/inverter_HPM/")
   ## Parameters
   order = 1
   dom = (0,1,0,0.5)
   el_size = (200,100)
   γ = 0.1
   γ_reinit = 0.5
-  max_steps = floor(Int,minimum(el_size)/10)
+  max_steps = floor(Int,order*minimum(el_size)/10)
   tol = 1/(5order^2)/minimum(el_size)
   C = isotropic_elast_tensor(2,1.0,0.3)
   η_coeff = 2
-  α_coeff = 4
+  α_coeff = 4max_steps*γ
   vf = 0.4
   δₓ = 0.2
   ks = 0.1
   g = VectorValue(0.5,0)
-  path = dirname(dirname(@__DIR__))*"/results/inverter_HPM_osc"
-  mkdir(path)
-  
+  iter_mod = 10
+  mkpath(path)
+
   ## FE Setup
   model = CartesianDiscreteModel(dom,el_size)
   el_Δ = get_el_Δ(model)
@@ -86,7 +86,7 @@ function main()
   UΓ_out(u,φ,dΩ,dΓ_in,dΓ_out) = ∫((u⋅-e₁-δₓ)/vol_Γ_out)dΓ_out
 
   ## Finite difference solver and level set function
-  stencil = AdvectionStencil(FirstOrderStencil(2,Float64),model,V_φ,tol,max_steps)
+  ls_evo = HamiltonJacobiEvolution(FirstOrderStencil(2,Float64),model,V_φ,tol,max_steps)
 
   ## Setup solver and FE operators
   state_map = AffineFEStateMap(a,l,U,V,V_φ,U_reg,φh,dΩ,dΓ_in,dΓ_out)
@@ -96,17 +96,18 @@ function main()
   α = α_coeff*maximum(el_Δ)
   a_hilb(p,q) = ∫(α^2*∇(p)⋅∇(q) + p*q)dΩ;
   vel_ext = VelocityExtension(a_hilb,U_reg,V_reg)
-  
+
   ## Optimiser
   ls_enabled=false # Setting to true will use a line search instead of oscillation detection
-  optimiser = HilbertianProjection(pcfs,stencil,vel_ext,φh;
+  optimiser = HilbertianProjection(pcfs,ls_evo,vel_ext,φh;
     γ,γ_reinit,α_min=0.4,ls_enabled,verbose=true,constraint_names=[:Vol,:UΓ_out])
   for (it,uh,φh) in optimiser
-    write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi)|"=>(norm ∘ ∇(φh)),"uh"=>uh])
+    data = ["φ"=>φh,"H(φ)"=>(H ∘ φh),"|∇(φ)|"=>(norm ∘ ∇(φh)),"uh"=>uh]
+    iszero(it % iter_mod) && writevtk(Ω,path*"out$it",cellfields=data)
     write_history(path*"/history.txt",optimiser.history)
   end
   it = get_history(optimiser).niter; uh = get_state(pcfs)
-  write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi)|"=>(norm ∘ ∇(φh)),"uh"=>uh];iter_mod=1)
+  writevtk(Ω,path*"out$it",cellfields=["φ"=>φh,"H(φ)"=>(H ∘ φh),"|∇(φ)|"=>(norm ∘ ∇(φh)),"uh"=>uh])
 end
 
 main()

@@ -22,17 +22,24 @@ function ``\\varphi`` and ``I`` is an indicator function.
 - To update η and/or ϵ in an instance `m`, take `m.η .= <VALUE>`. 
 - A conviencence constructor is provided to create an instance given `η<:Number` and `ϵ<:Number`.
 """
-Base.@kwdef struct SmoothErsatzMaterialInterpolation{M<:Vector{<:Number},N<:Vector{<:Number}}
+struct SmoothErsatzMaterialInterpolation{M<:Vector{<:Number},N<:Vector{<:Number}}
   η::M
   ϵ::N
-  H = x -> H_η(x,first(η))
-  DH = x -> DH_η(x,first(η))
-  I = φ -> (1 - H(φ)) + first(ϵ)*H(φ)
-  ρ = φ -> 1 - H(φ)
-end
+  H
+  DH
+  I
+  ρ
+  function SmoothErsatzMaterialInterpolation(;
+      η::M,
+      ϵ::N = 10^-3,
+      H = x -> H_η(x,first(η)),
+      DH = x -> DH_η(x,first(η)),
+      I = φ -> (1 - H(φ)) + first(ϵ)*H(φ),
+      ρ = φ -> 1 - H(φ)
+    ) where {M<:Number,N<:Number}
 
-function SmoothErsatzMaterialInterpolation(;η::M,ϵ::N=10^-3) where {M<:Number,N<:Number}
-  return SmoothErsatzMaterialInterpolation{Vector{M},Vector{N}}(η=[η],ϵ=[ϵ])
+    new{Vector{M},Vector{N}}([η],[ϵ],H,DH,I,ρ)
+  end
 end
 
 function H_η(t,η)
@@ -214,27 +221,14 @@ function isotropic_elast_tensor(D::Int,E::Number,v::Number)
   end
 end
 
-"""
-    write_vtk(Ω,path,it,entries::Vector{<:Pair};iter_mod=10)
-
-Write a VTK file to `path`. This functions in a similar way to
-Gridap's `writevtk` function except we 
-
-!!! note
-    This may be removed in future and replaced by
-
-    ```(isone(it) || iszero(it % iter_mod)) && writevtk(Ω,path,cellfields=entries)```
-
-    or 
-    
-    ```iszero(it-1 % iter_mod) && writevtk(Ω,path,cellfields=entries)```
-"""
-function write_vtk(Ω,path,it,entries::Vector{<:Pair};iter_mod=10) # TODO: Rename to writevtk?
-  if isone(it) || iszero(it % iter_mod) 
-    writevtk(Ω,path,cellfields=entries)
-  end
-
-  if iszero(it % 10*iter_mod)
-    GC.gc() # TODO: Test in Julia 1.10.0 and check if fixed.
-  end 
+#   function zerocrossing_period
+#
+# Find the period of oscillations based on a zero crossing algorithm.
+#
+# This is based on the zero crossing method from ChaosTools.jl 
+# See (https://github.com/JuliaDynamics/ChaosTools.jl)  
+function _zerocrossing_period(v;t=0:length(v)-1,line=sum(v)/length(v))
+  inds = findall(@. ≥(line, $@view(v[2:end])) & <(line, $@view(v[1:end-1])))
+  difft = diff(t[inds])
+  sum(difft)/length(difft)
 end

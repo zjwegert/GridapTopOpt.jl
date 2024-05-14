@@ -1,5 +1,5 @@
 """
-    struct AugmentedLagrangian{N,O} <: Optimiser
+    struct AugmentedLagrangian <: Optimiser
 
 An augmented Lagrangian method based on Nocedal and Wright, 2006
 ([link](https://doi.org/10.1007/978-0-387-40065-5)). Note that
@@ -8,9 +8,8 @@ are defined in `problem::PDEConstrainedFunctionals`.
 
 # Parameters
 
-- `problem::PDEConstrainedFunctionals{N}`: The objective and constraint setup.
-- `stencil::AdvectionStencil{O}`: The finite difference stencil for 
-  solving the evolution and reinitisation equations.
+- `problem::PDEConstrainedFunctionals`: The objective and constraint setup.
+- `ls_evolver::LevelSetEvolution`: Solver for the evolution and reinitisation equations.
 - `vel_ext::VelocityExtension`: The velocity-extension method for extending 
   shape sensitivities onto the computational domain.
 - `history::OptimiserHistory{Float64}`: Historical information for optimisation problem.
@@ -22,9 +21,9 @@ The `has_oscillations` function has been added to avoid oscillations in the
 iteration history. By default this uses a mean zero crossing algorithm as implemented
 in ChaosTools. Oscillations checking can be disabled by taking `has_oscillations = (args...) -> false`.
 """
-struct AugmentedLagrangian{N,O} <: Optimiser
-  problem           :: PDEConstrainedFunctionals{N}
-  stencil           :: AdvectionStencil{O}
+struct AugmentedLagrangian <: Optimiser
+  problem           :: PDEConstrainedFunctionals
+  ls_evolver        :: LevelSetEvolution
   vel_ext           :: VelocityExtension
   history           :: OptimiserHistory{Float64}
   converged         :: Function
@@ -34,11 +33,11 @@ struct AugmentedLagrangian{N,O} <: Optimiser
   
   @doc """
       AugmentedLagrangian(
-        problem :: PDEConstrainedFunctionals{N},
-        stencil :: AdvectionStencil{O},
-        vel_ext :: VelocityExtension,
+        problem    :: PDEConstrainedFunctionals{N},
+        ls_evolver :: LevelSetEvolution,
+        vel_ext    :: VelocityExtension,
         φ0;
-        Λ_max = 5.0, ζ = 1.1, update_mod = 5, γ = 0.1, γ_reinit = 0.5, os_γ_mult = 0.75,
+        Λ_max = 10^10, ζ = 1.1, update_mod = 5, γ = 0.1, γ_reinit = 0.5, os_γ_mult = 0.75,
         maxiter = 1000, verbose=false, constraint_names = map(i -> Symbol("C_\$i"),1:N),
         converged::Function = default_al_converged, debug = false,
         has_oscillations::Function = default_has_oscillations
@@ -48,9 +47,8 @@ struct AugmentedLagrangian{N,O} <: Optimiser
 
   # Required
 
-  - `problem::PDEConstrainedFunctionals{N}`: The objective and constraint setup.
-  - `stencil::AdvectionStencil{O}`: The finite difference stencil for 
-    solving the evolution and reinitisation equations.
+  - `problem::PDEConstrainedFunctionals`: The objective and constraint setup.
+  - `ls_evolver::LevelSetEvolution`: Solver for the evolution and reinitisation equations.
   - `vel_ext::VelocityExtension`: The velocity-extension method for extending 
     shape sensitivities onto the computational domain.
   - `φ0`: An initial level-set function defined as a FEFunction or GridapDistributed equivilent.
@@ -75,16 +73,16 @@ struct AugmentedLagrangian{N,O} <: Optimiser
   - `debug = false`: Debug flag.
   """
   function AugmentedLagrangian(
-    problem :: PDEConstrainedFunctionals{N},
-    stencil :: AdvectionStencil{O},
-    vel_ext :: VelocityExtension,
+    problem    :: PDEConstrainedFunctionals{N},
+    ls_evolver :: LevelSetEvolution,
+    vel_ext    :: VelocityExtension,
     φ0;
-    Λ_max = 5.0, ζ = 1.1, update_mod = 5, reinit_mod = 1, γ = 0.1, γ_reinit = 0.5, 
+    Λ_max = 10^10, ζ = 1.1, update_mod = 5, reinit_mod = 1, γ = 0.1, γ_reinit = 0.5, 
     os_γ_mult = 0.75, maxiter = 1000, verbose=false, constraint_names = map(i -> Symbol("C_$i"),1:N),
     converged::Function = default_al_converged, debug = false,
     has_oscillations::Function = default_has_oscillations,
     initial_parameters::Function = default_al_init_params
-  ) where {N,O}
+  ) where N
 
     constraint_names = map(Symbol,constraint_names)
     λ_names = map(i -> Symbol("λ$i"),1:N)
@@ -94,21 +92,22 @@ struct AugmentedLagrangian{N,O} <: Optimiser
     history = OptimiserHistory(Float64,al_keys,al_bundles,maxiter,verbose)
 
     params = (;Λ_max,ζ,update_mod,reinit_mod,γ,γ_reinit,os_γ_mult,debug,initial_parameters)
-    new{N,O}(problem,stencil,vel_ext,history,converged,has_oscillations,params,φ0)
+    new(problem,ls_evolver,vel_ext,history,converged,has_oscillations,params,φ0)
   end
 end
 
 get_history(m::AugmentedLagrangian) = m.history
 
-function default_has_oscillations(m::AugmentedLagrangian,os_it;itlength=25,algo=:zerocrossing)
+function default_has_oscillations(m::AugmentedLagrangian,os_it;itlength=25,
+    itstart=2itlength)
   h  = m.history
   it = get_last_iteration(h)
-  if it < 2itlength || it < os_it + itlength + 1
+  if it < itstart || it < os_it + itlength + 1
     return false
   end
 
   L = h[:L]
-  return ~isnan(estimate_period(L[it-itlength+1:it+1],algo))
+  return ~isnan(_zerocrossing_period(L[it-itlength+1:it+1]))
 end
 
 function default_al_init_params(J,C)
@@ -124,8 +123,8 @@ end
 
 function default_al_converged(
   m::AugmentedLagrangian;
-  L_tol = 0.05*maximum(m.stencil.params.Δ),
-  C_tol = 0.001
+  L_tol = 0.01*maximum(get_dof_Δ(m.ls_evolver))/(length(get_dof_Δ(m.ls_evolver))-1),
+  C_tol = 0.01
 )
   h  = m.history
   it = get_last_iteration(h)
@@ -134,7 +133,7 @@ function default_al_converged(
   end
 
   Li, Ci = h[:L,it], h[:C,it]
-  L_prev = h[:L,it-10:it-1]
+  L_prev = h[:L,it-5:it-1]
   A = all(L -> abs(Li - L)/abs(Li) < L_tol, L_prev)
   B = all(C -> abs(C) < C_tol,Ci)
   return A && B
@@ -144,7 +143,7 @@ function Base.iterate(m::AugmentedLagrangian)
   φh, history, params = m.φ0, m.history, m.params
 
   ## Reinitialise as SDF
-  reinit!(m.stencil,φh,params.γ_reinit)
+  reinit!(m.ls_evolver,φh,params.γ_reinit)
 
   ## Compute FE problem and shape derivatives
   J, C, dJ, dC = evaluate!(m.problem,φh)
@@ -175,9 +174,12 @@ end
 function Base.iterate(m::AugmentedLagrangian,state)
   it, L, J, C, dL, dJ, dC, uh, φh, vel, λ, Λ, γ, os_it = state
   params, history = m.params, m.history
-  update_mod, reinit_mod, ζ, Λ_max, γ_reinit, os_γ_mult = params.update_mod, 
-    params.reinit_mod, params.ζ, params.Λ_max, params.γ_reinit, params.os_γ_mult
+  Λ_max,ζ,update_mod,reinit_mod,_,γ_reinit,os_γ_mult,_,_ = params
 
+  ## Periodicially call GC
+  iszero(it % 50) && GC.gc();
+
+  ## Check stopping criteria
   if finished(m)
     return nothing
   end
@@ -192,8 +194,8 @@ function Base.iterate(m::AugmentedLagrangian,state)
   U_reg = get_deriv_space(m.problem.state_map)
   V_φ = get_aux_space(m.problem.state_map)
   interpolate!(FEFunction(U_reg,dL),vel,V_φ)
-  advect!(m.stencil,φh,vel,γ)
-  iszero(it % reinit_mod) && reinit!(m.stencil,φh,γ_reinit)
+  evolve!(m.ls_evolver,φh,vel,γ)
+  iszero(it % reinit_mod) && reinit!(m.ls_evolver,φh,γ_reinit)
 
   ## Calculate objective, constraints, and shape derivatives
   J, C, dJ, dC = evaluate!(m.problem,φh)
@@ -205,8 +207,12 @@ function Base.iterate(m::AugmentedLagrangian,state)
 
   ## Augmented Lagrangian method
   λ .= λ .- Λ .* C
-  if iszero(it % update_mod) 
-    Λ .= @.(min(Λ*ζ,Λ_max))
+  if iszero(it % update_mod)
+    for i = 1:length(C)
+      if abs(C[i])>0.01
+        Λ[i] = min(Λ[i]*ζ,Λ_max)
+      end
+    end
   end
 
   ## Compute dL and it's projection
@@ -218,7 +224,7 @@ function Base.iterate(m::AugmentedLagrangian,state)
 
   ## Update history and build state
   push!(history,(L,J,C...,γ,λ...,Λ...))
-  state = (it+1,L,J,C,dL,dJ,dC,uh,φh,vel,λ,Λ,γ,os_it)
+  state = (;it=it+1,L,J,C,dL,dJ,dC,uh,φh,vel,λ,Λ,γ,os_it)
   vars  = params.debug ? (it,uh,φh,state) : (it,uh,φh)
   return vars, state
 end

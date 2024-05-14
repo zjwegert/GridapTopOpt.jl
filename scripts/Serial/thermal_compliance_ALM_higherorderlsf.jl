@@ -1,20 +1,23 @@
 using Gridap, GridapTopOpt
 
 """
-  (Serial) Minimum thermal compliance with augmented Lagrangian method in 2D with nonlinear diffusivity.
+  (Serial) Minimum thermal compliance with augmented Lagrangian method in 2D.
+
+  This problem uses a higher order level set function than the FE solution for
+  the state equation. In future, second order upwind schemes will require a
+  higher order FE function.
 
   Optimisation problem:
-      Min J(Ω) = ∫ κ(u)*∇(u)⋅∇(u) dΩ
+      Min J(Ω) = ∫ κ*∇(u)⋅∇(u) dΩ
         Ω
     s.t., Vol(Ω) = vf,
           ⎡u∈V=H¹(Ω;u(Γ_D)=0),
-          ⎣∫ κ(u)*∇(u)⋅∇(v) dΩ = ∫ v dΓ_N, ∀v∈V.
-
-  In this example κ(u) = κ0*(exp(ξ*u))
+          ⎣∫ κ*∇(u)⋅∇(v) dΩ = ∫ v dΓ_N, ∀v∈V.
 """
-function main(path="./results/nonlinear_thermal_compliance_ALM/")
+function main(path="./results/thermal_compliance_ALM_higherorderlsf/")
   ## Parameters
-  order = 1
+  fe_order = 1
+  order = 2
   xmax=ymax=1.0
   prop_Γ_N = 0.2
   prop_Γ_D = 0.2
@@ -23,10 +26,11 @@ function main(path="./results/nonlinear_thermal_compliance_ALM/")
   γ = 0.1
   γ_reinit = 0.5
   max_steps = floor(Int,order*minimum(el_size)/10)
-  tol = 1/(5order^2)/minimum(el_size)
+  tol = 1/(5*order^2)/minimum(el_size)
+  κ = 1
+  vf = 0.4
   η_coeff = 2
   α_coeff = 4max_steps*γ
-  vf = 0.4
   iter_mod = 10
   mkpath(path)
 
@@ -34,9 +38,9 @@ function main(path="./results/nonlinear_thermal_compliance_ALM/")
   model = CartesianDiscreteModel(dom,el_size);
   el_Δ = get_el_Δ(model)
   f_Γ_D(x) = (x[1] ≈ 0.0 && (x[2] <= ymax*prop_Γ_D + eps() ||
-      x[2] >= ymax-ymax*prop_Γ_D - eps()));
+      x[2] >= ymax-ymax*prop_Γ_D - eps()))
   f_Γ_N(x) = (x[1] ≈ xmax && ymax/2-ymax*prop_Γ_N/2 - eps() <= x[2] <=
-      ymax/2+ymax*prop_Γ_N/2 + eps());
+      ymax/2+ymax*prop_Γ_N/2 + eps())
   update_labels!(1,model,f_Γ_D,"Gamma_D")
   update_labels!(2,model,f_Γ_N,"Gamma_N")
 
@@ -48,11 +52,12 @@ function main(path="./results/nonlinear_thermal_compliance_ALM/")
   vol_D = sum(∫(1)dΩ)
 
   ## Spaces
-  reffe_scalar = ReferenceFE(lagrangian,Float64,order)
-  V = TestFESpace(model,reffe_scalar;dirichlet_tags=["Gamma_D"])
+  reffe = ReferenceFE(lagrangian,Float64,fe_order)
+  lsf_reffe = ReferenceFE(lagrangian,Float64,order)
+  V = TestFESpace(model,reffe;dirichlet_tags=["Gamma_D"])
   U = TrialFESpace(V,0.0)
-  V_φ = TestFESpace(model,reffe_scalar)
-  V_reg = TestFESpace(model,reffe_scalar;dirichlet_tags=["Gamma_N"])
+  V_φ = TestFESpace(model,lsf_reffe)
+  V_reg = TestFESpace(model,lsf_reffe;dirichlet_tags=["Gamma_N"])
   U_reg = TrialFESpace(V_reg,0)
 
   ## Create FE functions
@@ -62,13 +67,12 @@ function main(path="./results/nonlinear_thermal_compliance_ALM/")
   interp = SmoothErsatzMaterialInterpolation(η = η_coeff*maximum(el_Δ))
   I,H,DH,ρ = interp.I,interp.H,interp.DH,interp.ρ
 
-  κ0 = 1
-  ξ = -1
-  κ(u) = κ0*(exp(ξ*u))
-  res(u,v,φ,dΩ,dΓ_N) = ∫((I ∘ φ)*(κ ∘ u)*∇(u)⋅∇(v))dΩ - ∫(v)dΓ_N
+  a(u,v,φ,dΩ,dΓ_N) = ∫((I ∘ φ)*κ*∇(u)⋅∇(v))dΩ
+  l(v,φ,dΩ,dΓ_N) = ∫(v)dΓ_N
 
   ## Optimisation functionals
-  J(u,φ,dΩ,dΓ_N) = ∫((I ∘ φ)*(κ ∘ u)*∇(u)⋅∇(u))dΩ
+  J(u,φ,dΩ,dΓ_N) = ∫((I ∘ φ)*κ*∇(u)⋅∇(u))dΩ
+  dJ(q,u,φ,dΩ,dΓ_N) = ∫(κ*∇(u)⋅∇(u)*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ;
   Vol(u,φ,dΩ,dΓ_N) = ∫(((ρ ∘ φ) - vf)/vol_D)dΩ;
   dVol(q,u,φ,dΩ,dΓ_N) = ∫(-1/vol_D*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
 
@@ -76,18 +80,18 @@ function main(path="./results/nonlinear_thermal_compliance_ALM/")
   ls_evo = HamiltonJacobiEvolution(FirstOrderStencil(2,Float64),model,V_φ,tol,max_steps)
 
   ## Setup solver and FE operators
-  state_map = NonlinearFEStateMap(res,U,V,V_φ,U_reg,φh,dΩ,dΓ_N)
-  pcfs = PDEConstrainedFunctionals(J,[Vol],state_map,analytic_dC=[dVol])
+  state_map = AffineFEStateMap(a,l,U,V,V_φ,U_reg,φh,dΩ,dΓ_N)
+  pcfs = PDEConstrainedFunctionals(J,[Vol],state_map,analytic_dJ=dJ,analytic_dC=[dVol])
 
   ## Hilbertian extension-regularisation problems
   α = α_coeff*maximum(el_Δ)
-  a_hilb(p,q) =∫(α^2*∇(p)⋅∇(q) + p*q)dΩ
+  a_hilb(p,q) =∫(α^2*∇(p)⋅∇(q) + p*q)dΩ;
   vel_ext = VelocityExtension(a_hilb,U_reg,V_reg)
 
   ## Optimiser
   optimiser = AugmentedLagrangian(pcfs,ls_evo,vel_ext,φh;
     γ,γ_reinit,verbose=true,constraint_names=[:Vol])
-  for (it, uh, φh) in optimiser
+  for (it,uh,φh) in optimiser
     data = ["φ"=>φh,"H(φ)"=>(H ∘ φh),"|∇(φ)|"=>(norm ∘ ∇(φh)),"uh"=>uh]
     iszero(it % iter_mod) && writevtk(Ω,path*"out$it",cellfields=data)
     write_history(path*"/history.txt",optimiser.history)

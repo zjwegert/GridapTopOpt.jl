@@ -1,5 +1,13 @@
-using Gridap, Gridap.MultiField, GridapDistributed, GridapPETSc, GridapSolvers, 
-  PartitionedArrays, LevelSetTopOpt, SparseMatricesCSR
+using Gridap, Gridap.MultiField, GridapDistributed, GridapPETSc, GridapSolvers,
+  PartitionedArrays, GridapTopOpt, SparseMatricesCSR
+
+global elx       = parse(Int,ARGS[1])
+global ely       = parse(Int,ARGS[2])
+global elz       = parse(Int,ARGS[3])
+global Px        = parse(Int,ARGS[4])
+global Py        = parse(Int,ARGS[5])
+global Pz        = parse(Int,ARGS[6])
+global write_dir = ARGS[7]
 
 """
   (MPI) Maximum bulk modulus inverse homogenisation with augmented Lagrangian method in 3D.
@@ -8,10 +16,10 @@ using Gridap, Gridap.MultiField, GridapDistributed, GridapPETSc, GridapSolvers,
       Min J(Ω) = -κ(Ω)
         Ω
     s.t., Vol(Ω) = vf,
-          ⎡For unique εᴹᵢ, find uᵢ∈V=H¹ₚₑᵣ(Ω)ᵈ, 
+          ⎡For unique εᴹᵢ, find uᵢ∈V=H¹ₚₑᵣ(Ω)ᵈ,
           ⎣∫ ∑ᵢ C ⊙ ε(uᵢ) ⊙ ε(vᵢ) dΩ = ∫ -∑ᵢ C ⊙ ε⁰ᵢ ⊙ ε(vᵢ) dΩ, ∀v∈V.
-""" 
-function main(mesh_partition,distribute,el_size)
+"""
+function main(mesh_partition,distribute,el_size,path)
   ranks = distribute(LinearIndices((prod(mesh_partition),)))
 
   ## Parameters
@@ -20,14 +28,14 @@ function main(mesh_partition,distribute,el_size)
   dom = (0,xmax,0,ymax,0,zmax)
   γ = 0.1
   γ_reinit = 0.5
-  max_steps = floor(Int,minimum(el_size)/10)
+  max_steps = floor(Int,order*minimum(el_size)/10)
   tol = 1/(5order^2)/minimum(el_size)
   C = isotropic_elast_tensor(3,1.,0.3)
   η_coeff = 2
-  α_coeff = 4
+  α_coeff = 4max_steps*γ
   vf = 0.5
-  path = dirname(dirname(@__DIR__))*"/results/3d_inverse_homenisation_ALM"
-  i_am_main(ranks) && mkdir(path)
+  iter_mod = 10
+  i_am_main(ranks) && mkpath(path)
 
   ## FE Setup
   model = CartesianDiscreteModel(ranks,mesh_partition,dom,el_size,isperiodic=(true,true,true))
@@ -67,21 +75,17 @@ function main(mesh_partition,distribute,el_size)
   l = [(v,φ,dΩ) -> ∫(-(I ∘ φ) * C ⊙ εᴹ[i] ⊙ ε(v))dΩ for i in 1:6]
 
   ## Optimisation functionals
-  _C(C,ε_p,ε_q) = C ⊙ ε_p ⊙ ε_q;
-
-  _K(C,u,εᴹ) = (_C(C,ε(u[1])+εᴹ[1],εᴹ[1]) + _C(C,ε(u[2])+εᴹ[2],εᴹ[2]) + _C(C,ε(u[3])+εᴹ[3],εᴹ[3]) + 
-              2(_C(C,ε(u[1])+εᴹ[1],εᴹ[2]) + _C(C,ε(u[1])+εᴹ[1],εᴹ[3]) + _C(C,ε(u[2])+εᴹ[2],εᴹ[3])))/9 
-
-  _v_K(C,u,εᴹ) = (_C(C,ε(u[1])+εᴹ[1],ε(u[1])+εᴹ[1]) + _C(C,ε(u[2])+εᴹ[2],ε(u[2])+εᴹ[2]) + _C(C,ε(u[3])+εᴹ[3],ε(u[3])+εᴹ[3]) + 
-                2(_C(C,ε(u[1])+εᴹ[1],ε(u[2])+εᴹ[2]) + _C(C,ε(u[1])+εᴹ[1],ε(u[3])+εᴹ[3]) + _C(C,ε(u[2])+εᴹ[2],ε(u[3])+εᴹ[3])))/9 
-
-  J(u,φ,dΩ) = ∫(-(I ∘ φ)*_K(C,u,εᴹ))dΩ
-  dJ(q,u,φ,dΩ) = ∫(_v_K(C,u,εᴹ)*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
+  Cᴴ(r,s,u,φ,dΩ) = ∫((I ∘ φ)*(C ⊙ (ε(u[r])+εᴹ[r]) ⊙ εᴹ[s]))dΩ
+  dCᴴ(r,s,q,u,φ,dΩ) = ∫(-q*(C ⊙ (ε(u[r])+εᴹ[r]) ⊙ (ε(u[s])+εᴹ[s]))*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
+  κ(u,φ,dΩ) = -1/9*(Cᴴ(1,1,u,φ,dΩ)+Cᴴ(2,2,u,φ,dΩ)+Cᴴ(3,3,u,φ,dΩ)+
+    2*(Cᴴ(1,2,u,φ,dΩ)+Cᴴ(1,3,u,φ,dΩ)+Cᴴ(2,3,u,φ,dΩ)))
+  dκ(q,u,φ,dΩ) = -1/9*(dCᴴ(1,1,q,u,φ,dΩ)+dCᴴ(2,2,q,u,φ,dΩ)+dCᴴ(3,3,q,u,φ,dΩ)+
+    2*(dCᴴ(1,2,q,u,φ,dΩ)+dCᴴ(1,3,q,u,φ,dΩ)+dCᴴ(2,3,q,u,φ,dΩ)))
   Vol(u,φ,dΩ) = ∫(((ρ ∘ φ) - vf)/vol_D)dΩ;
   dVol(q,u,φ,dΩ) = ∫(-1/vol_D*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
 
   ## Finite difference solver and level set function
-  stencil = AdvectionStencil(FirstOrderStencil(3,Float64),model,V_φ,tol,max_steps)
+  ls_evo = HamiltonJacobiEvolution(FirstOrderStencil(3,Float64),model,V_φ,tol,max_steps)
 
   ## Setup solver and FE operators
   Tm = SparseMatrixCSR{0,PetscScalar,PetscInt}
@@ -95,7 +99,7 @@ function main(mesh_partition,distribute,el_size)
     assem_deriv = SparseMatrixAssembler(Tm,Tv,U_reg,U_reg),
     ls = solver, adjoint_ls = solver
   )
-  pcfs = PDEConstrainedFunctionals(J,[Vol],state_map;analytic_dJ=dJ,analytic_dC=[dVol])
+  pcfs = PDEConstrainedFunctionals(κ,[Vol],state_map;analytic_dJ=dκ,analytic_dC=[dVol])
 
   ## Hilbertian extension-regularisation problems
   α = α_coeff*maximum(el_Δ)
@@ -105,26 +109,26 @@ function main(mesh_partition,distribute,el_size)
     assem = SparseMatrixAssembler(Tm,Tv,U_reg,V_reg),
     ls = PETScLinearSolver()
   )
-  
+
   ## Optimiser
-  optimiser = AugmentedLagrangian(pcfs,stencil,vel_ext,φh;
+  optimiser = AugmentedLagrangian(pcfs,ls_evo,vel_ext,φh;
     γ,γ_reinit,verbose=i_am_main(ranks),constraint_names=[:Vol])
   for (it, uh, φh) in optimiser
-    write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi)|"=>(norm ∘ ∇(φh))])
+    data = ["φ"=>φh,"H(φ)"=>(H ∘ φh),"|∇(φ)|"=>(norm ∘ ∇(φh))]
+    iszero(it % iter_mod) && writevtk(Ω,path*"out$it",cellfields=data)
     write_history(path*"/history.txt",optimiser.history;ranks=ranks)
   end
   it = get_history(optimiser).niter; uh = get_state(pcfs)
-  write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi)|"=>(norm ∘ ∇(φh))];iter_mod=1)
+  writevtk(Ω,path*"out$it",cellfields=["φ"=>φh,"H(φ)"=>(H ∘ φh),"|∇(φ)|"=>(norm ∘ ∇(φh))])
 end
 
 with_mpi() do distribute
-  mesh_partition = (5,5,5)
-  el_size = (100,100,100)
-  hilb_solver_options = "-pc_type gamg -ksp_type cg -ksp_error_if_not_converged true 
-    -ksp_converged_reason -ksp_rtol 1.0e-12 -mat_block_size 3
-    -mg_levels_ksp_type chebyshev -mg_levels_esteig_ksp_type cg -mg_coarse_sub_pc_type cholesky"
-  
+  mesh_partition = (Px,Py,Pz)
+  el_size = (elx,ely,elz)
+  hilb_solver_options = "-pc_type gamg -ksp_type cg -ksp_error_if_not_converged true
+    -ksp_converged_reason -ksp_rtol 1.0e-12"
+
   GridapPETSc.with(args=split(hilb_solver_options)) do
-    main(mesh_partition,distribute,el_size)
+    main(mesh_partition,distribute,el_size,write_dir)
   end
 end

@@ -1,14 +1,13 @@
-using Gridap, Gridap.MultiField, GridapDistributed, GridapPETSc, GridapSolvers, 
-  PartitionedArrays, LevelSetTopOpt, SparseMatricesCSR
+using Gridap, Gridap.MultiField, GridapDistributed, GridapPETSc, GridapSolvers,
+  PartitionedArrays, GridapTopOpt, SparseMatricesCSR
 
-using GridapSolvers: NewtonSolver
-
-# global elx = parse(Int,ARGS[1])
-# global ely = parse(Int,ARGS[2])
-# global elz = parse(Int,ARGS[3])
-# global Px = parse(Int,ARGS[4])
-# global Py = parse(Int,ARGS[5])
-# global Pz = parse(Int,ARGS[6])
+global elx       = parse(Int,ARGS[1])
+global ely       = parse(Int,ARGS[2])
+global elz       = parse(Int,ARGS[3])
+global Px        = parse(Int,ARGS[4])
+global Py        = parse(Int,ARGS[5])
+global Pz        = parse(Int,ARGS[6])
+global write_dir = ARGS[7]
 
 """
   (MPI) Minimum thermal compliance with augmented Lagrangian method in 3D.
@@ -20,7 +19,7 @@ using GridapSolvers: NewtonSolver
           ⎡u∈V=H¹(Ω;u(Γ_D)=0),
           ⎣∫ κ*∇(u)⋅∇(v) dΩ = ∫ v dΓ_N, ∀v∈V.
 """
-function main(mesh_partition,distribute,el_size,coef,step)
+function main(mesh_partition,distribute,el_size,path)
   ranks = distribute(LinearIndices((prod(mesh_partition),)))
 
   ## Parameters
@@ -31,14 +30,14 @@ function main(mesh_partition,distribute,el_size,coef,step)
   dom = (0,xmax,0,ymax,0,zmax)
   γ = 0.1
   γ_reinit = 0.5
-  max_steps = floor(Int,minimum(el_size)/step)
+  max_steps = floor(Int,order*minimum(el_size)/10)
   tol = 1/(coef*order^2)/minimum(el_size)
   κ = 1
   η_coeff = 2
-  α_coeff = 4
+  α_coeff = 4max_steps*γ
   vf = 0.4
-  path = dirname(dirname(@__DIR__))*"/results/3d_thermal_compliance_ALM_Nx$(el_size[1])_Coef$(coef)_Step$(step)"
-  i_am_main(ranks) && mkdir(path)
+  iter_mod = 10
+  i_am_main(ranks) && mkpath(path)
 
   ## FE Setup
   model = CartesianDiscreteModel(ranks,mesh_partition,dom,el_size);
@@ -73,7 +72,7 @@ function main(mesh_partition,distribute,el_size,coef,step)
   I,H,DH,ρ = interp.I,interp.H,interp.DH,interp.ρ
 
   a(u,v,φ,dΩ,dΓ_N) = ∫((I ∘ φ)*κ*∇(u)⋅∇(v))dΩ
-  l(v,φ,dΩ,dΓ_N) = ∫(v)dΓ_N
+  l(v,φ,dΩ,dΓ_N) = ∫(10v)dΓ_N
 
   ## Optimisation functionals
   J(u,φ,dΩ,dΓ_N) = ∫((I ∘ φ)*κ*∇(u)⋅∇(u))dΩ
@@ -82,13 +81,13 @@ function main(mesh_partition,distribute,el_size,coef,step)
   dVol(q,u,φ,dΩ,dΓ_N) = ∫(-1/vol_D*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
 
   ## Finite difference solver and level set function
-  stencil = AdvectionStencil(FirstOrderStencil(3,Float64),model,V_φ,tol,max_steps)
+  ls_evo = HamiltonJacobiEvolution(FirstOrderStencil(3,Float64),model,V_φ,tol,max_steps)
 
   ## Setup solver and FE operators
   Tm = SparseMatrixCSR{0,PetscScalar,PetscInt}
   Tv = Vector{PetscScalar}
   solver = PETScLinearSolver()
-  
+
   state_map = AffineFEStateMap(
     a,l,U,V,V_φ,U_reg,φh,dΩ,dΓ_N;
     assem_U = SparseMatrixAssembler(Tm,Tv,U,V),
@@ -108,30 +107,24 @@ function main(mesh_partition,distribute,el_size,coef,step)
   )
 
   ## Optimiser
-  optimiser = AugmentedLagrangian(pcfs,stencil,vel_ext,φh;
+  optimiser = AugmentedLagrangian(pcfs,ls_evo,vel_ext,φh;
     γ,γ_reinit,verbose=i_am_main(ranks),constraint_names=[:Vol])
   for (it, uh, φh) in optimiser
-    write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi)|"=>(norm ∘ ∇(φh)),"uh"=>uh])
+    data = ["φ"=>φh,"H(φ)"=>(H ∘ φh),"|∇(φ)|"=>(norm ∘ ∇(φh)),"uh"=>uh]
+    iszero(it % iter_mod) && writevtk(Ω,path*"out$it",cellfields=data)
     write_history(path*"/history.txt",optimiser.history;ranks=ranks)
   end
   it = get_history(optimiser).niter; uh = get_state(pcfs)
-  write_vtk(Ω,path*"/struc_$it",it,["phi"=>φh,"H(phi)"=>(H ∘ φh),"|nabla(phi)|"=>(norm ∘ ∇(φh)),"uh"=>uh];iter_mod=1)
+  writevtk(Ω,path*"out$it",cellfields=["φ"=>φh,"H(φ)"=>(H ∘ φh),"|∇(φ)|"=>(norm ∘ ∇(φh)),"uh"=>uh])
 end
 
 with_mpi() do distribute
-  mesh_partition = (5,5,5)#(Px,Py,Pz)
-  el_size = (150,150,150)#(elx,ely,elz)
-  all_solver_options = "-pc_type gamg -ksp_type cg -ksp_error_if_not_converged true 
+  mesh_partition = (Px,Py,Pz)
+  el_size = (elx,ely,elz)
+  all_solver_options = "-pc_type gamg -ksp_type cg -ksp_error_if_not_converged true
     -ksp_converged_reason -ksp_rtol 1.0e-12"
-  
+
   GridapPETSc.with(args=split(all_solver_options)) do
-    main(mesh_partition,distribute,el_size,5,10)
-    main(mesh_partition,distribute,el_size,2,10)
-
-    main(mesh_partition,distribute,el_size,5,5)
-    main(mesh_partition,distribute,el_size,2,5)
-
-    main(mesh_partition,distribute,el_size,5,3)
-    main(mesh_partition,distribute,el_size,2,3)
+    main(mesh_partition,distribute,el_size,write_dir)
   end
 end;
