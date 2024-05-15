@@ -65,13 +65,13 @@ function _update_descent_direction!(m::HilbertianProjectionMap,θ,C,dC,K,θ_aux,
   θ .*= sqrt(1-∑α²)
   for (i,n) in enumerate(normsq)
     if !iszero(n)
-      θ .+= (α[i]/sqrt(n)) .* dC_orthog[i] 
+      θ .+= (α[i]/sqrt(n)) .* dC_orthog[i]
     end
   end
   return θ
 end
 
-# Form projection operator for Cperp: P_C⟂(θ) = θ - ∑[(̄vᵢ ⋅ m)/|̄vᵢ|² ̄vᵢ] 
+# Form projection operator for Cperp: P_C⟂(θ) = θ - ∑[(̄vᵢ ⋅ m)/|̄vᵢ|² ̄vᵢ]
 #  where ̄vᵢ spans C and ̄vᵢ ⋅ ̄vⱼ = δᵢⱼ. Returns P_C⟂(θ)/norm(P_C⟂(θ))
 function project_θ!(θ,dC_orthog,normsq,K,θ_aux)
   mul!(θ_aux,K,θ)
@@ -126,18 +126,18 @@ end
 """
     struct HilbertianProjection <: Optimiser
 
-A Hilbertian projection method as described by Wegert et al., 2023 
+A Hilbertian projection method as described by Wegert et al., 2023
 ([link](https://doi.org/10.1007/s00158-023-03663-0)).
 
 # Parameters
 
 - `problem::PDEConstrainedFunctionals{N}`: The objective and constraint setup.
 - `ls_evolver::LevelSetEvolution`: Solver for the evolution and reinitisation equations.
-- `vel_ext::VelocityExtension`: The velocity-extension method for extending 
+- `vel_ext::VelocityExtension`: The velocity-extension method for extending
   shape sensitivities onto the computational domain.
 - `projector::HilbertianProjectionMap`: Sensitivity information projector
 - `history::OptimiserHistory{Float64}`: Historical information for optimisation problem.
-- `converged::Function`: A function to check optimiser convergence. 
+- `converged::Function`: A function to check optimiser convergence.
 - `has_oscillations::Function`: A function to check for oscillations.
 - `params::NamedTuple`: Optimisation parameters.
 """
@@ -174,7 +174,7 @@ struct HilbertianProjection <: Optimiser
 
   - `problem::PDEConstrainedFunctionals{N}`: The objective and constraint setup.
   - `ls_evolver::LevelSetEvolution`: Solver for the evolution and reinitisation equations.
-  - `vel_ext::VelocityExtension`: The velocity-extension method for extending 
+  - `vel_ext::VelocityExtension`: The velocity-extension method for extending
     shape sensitivities onto the computational domain.
   - `φ0`: An initial level-set function defined as a FEFunction or GridapDistributed equivilent.
 
@@ -191,21 +191,21 @@ struct HilbertianProjection <: Optimiser
   - `os_γ_mult = 0.5`: Decrease multiplier for `γ` when `has_oscillations` returns true
   - `debug = false`: Debug flag.
   - `α_min ∈ [0,1] = 0.1`: Controls lower bound on on the projected objective descent coefficent.
-    `α_min = 1` ignores the objective function and instead solves a constraint satisfaction problem. 
+    `α_min = 1` ignores the objective function and instead solves a constraint satisfaction problem.
   - `α_max ∈ [0,1] = 1.0`: Controls the upper bound on the projected objective descent coeffient.
     Typically this shouldn't change unless wanting to approach the optimum 'slower'.
   - `λ = 0.5`: The rate of contraint decrease.
 
-  Note that in practice we usually only adjust `α_min` to control the balance between improving the 
-  objective or constraints. 
+  Note that in practice we usually only adjust `α_min` to control the balance between improving the
+  objective or constraints.
 
   # Line search defaults
 
   - `ls_enabled = true`: Set whether a line search is used.
-  - `ls_max_iters = 10`: Maximum number of line search iterations. 
+  - `ls_max_iters = 10`: Maximum number of line search iterations.
   - `ls_δ_inc = 1.1`: Increase multiplier for `γ` on acceptance.
   - `ls_δ_dec = 0.7`: Decrease multiplier for `γ` on rejection.
-  - `ls_ξ = 0.0025`: Line search tolerance for objective reduction. 
+  - `ls_ξ = 0.0025`: Line search tolerance for objective reduction.
   - `ls_ξ_reduce_coef = 0.1`: Coeffient on `ls_ξ` if constraints within tolerance (see below).
   - `ls_ξ_reduce_abs_tol = 0.01`: Tolerance on constraints to reduce `ls_ξ` via `ls_ξ_reduce_coef`.
   - `ls_γ_min = 0.001`: Minimum coeffient on the time step size for solving the HJ evolution equation.
@@ -215,8 +215,8 @@ struct HilbertianProjection <: Optimiser
 
   !!! note
       For some problems (e.g., inverter mechanism), we have observed that a simple oscillation
-      detection algorithm leads to better convergence compared to the line search. By default 
-      disabling the line search via `ls_enabled = false` will enable oscillation detection. 
+      detection algorithm leads to better convergence compared to the line search. By default
+      disabling the line search via `ls_enabled = false` will enable oscillation detection.
   """
     function HilbertianProjection(
     problem    :: PDEConstrainedFunctionals{N},
@@ -307,10 +307,10 @@ function Base.iterate(m::HilbertianProjection)
   project!(m.vel_ext,dJ)
   project!(m.vel_ext,dC)
   θ = update_descent_direction!(m.projector,dJ,C,dC,m.vel_ext.K)
-  
+
   # Update history and build state
   push!(history,(J,C...,params.γ))
-  state = (;it=0,J,C,θ,dJ,dC,uh,φh,vel,φ_tmp,params.γ,os_it=-1)
+  state = (;it=1,J,C,θ,dJ,dC,uh,φh,vel,φ_tmp,params.γ,os_it=-1)
   vars  = params.debug ? (0,uh,φh,state) : (0,uh,φh)
   return vars, state
 end
@@ -327,7 +327,7 @@ function Base.iterate(m::HilbertianProjection,state)
   if finished(m)
     return nothing
   end
-  
+
   ## Oscillation detection
   if (γ > 0.001) && m.has_oscillations(m,os_it)
     os_it = it + 1
@@ -339,13 +339,13 @@ function Base.iterate(m::HilbertianProjection,state)
   U_reg = get_deriv_space(m.problem.state_map)
   V_φ   = get_aux_space(m.problem.state_map)
   interpolate!(FEFunction(U_reg,θ),vel,V_φ)
-  
+
   ls_enabled = params.ls_enabled
   reinit_mod = params.reinit_mod
   ls_max_iters,δ_inc,δ_dec = params.ls_max_iters,params.ls_δ_inc,params.ls_δ_dec
   ξ, ξ_reduce, ξ_reduce_tol = params.ls_ξ, params.ls_ξ_reduce_coef, params.ls_ξ_reduce_abs_tol
   γ_min, γ_max = params.ls_γ_min,params.ls_γ_max
-  
+
   ls_it = 0; done = false
   φ = get_free_dof_values(φh); copy!(φ_tmp,φ)
   while !done && (ls_it <= ls_max_iters)
@@ -400,20 +400,22 @@ function debug_print(orthog,dV,dC,dC_orthog,K,P,nullity,debug_code,debug)
     end
     mul!(P,K,dV)
     proj_norm = maximum(map(dCi -> dot(dCi,P),dC_orthog))
-    println("  ↱----------------------------------------------------------↰")
-    print("                   ")
-    printstyled("Hilbertian Projection Method\n\n",color=:yellow,underline=true);
-    println("      -->         Orthog. method: $(typeof(orthog))");
-    @printf("      --> Orthogonality inf-norm: %e\n",orth_norm)
-    @printf("      -->    Projection inf-norm: %e\n",proj_norm)
-    println("      -->          Basis nullity: ",nullity)
-    if iszero(debug_code)
-      println("      --> Constraints satisfied: ∑α² ≈ 0.")
-    elseif isone(debug_code)
-      println("      -->            ∑α² > α_max: scaling λ")
-    elseif isequal(debug_code,2)
-      println("      -->            ∑α² < α_max: scaling λ")
+    if i_am_main(local_views(P))
+      println("  ↱----------------------------------------------------------↰")
+      print("                   ")
+      printstyled("Hilbertian Projection Method\n\n",color=:yellow,underline=true);
+      println("      -->         Orthog. method: $(typeof(orthog))");
+      @printf("      --> Orthogonality inf-norm: %e\n",orth_norm)
+      @printf("      -->    Projection inf-norm: %e\n",proj_norm)
+      println("      -->          Basis nullity: ",nullity)
+      if iszero(debug_code)
+        println("      --> Constraints satisfied: ∑α² ≈ 0.")
+      elseif isone(debug_code)
+        println("      -->            ∑α² > α_max: scaling λ")
+      elseif isequal(debug_code,2)
+        println("      -->            ∑α² < α_max: scaling λ")
+      end
+      print("  ↳----------------------------------------------------------↲\n")
     end
-    print("  ↳----------------------------------------------------------↲\n")
   end
 end

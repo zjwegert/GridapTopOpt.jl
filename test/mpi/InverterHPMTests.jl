@@ -102,7 +102,7 @@ function main(distribute,mesh_partition)
 
   ## Optimiser
   optimiser = HilbertianProjection(pcfs,ls_evo,vel_ext,φh;
-    γ,γ_reinit,verbose=i_am_main(ranks),debug=i_am_main(ranks),constraint_names=[:Vol,:UΓ_out])
+    γ,γ_reinit,verbose=i_am_main(ranks),debug=true,constraint_names=[:Vol,:UΓ_out])
 
   # Do a few iterations
   vars, state = iterate(optimiser)
