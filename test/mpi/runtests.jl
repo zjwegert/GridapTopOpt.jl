@@ -2,6 +2,10 @@ module LSTOMPITests
 
 using Test
 using MPI
+using GridapTopOpt
+
+using Gridap, GridapDistributed, GridapPETSc, GridapSolvers,
+  PartitionedArrays, SparseMatricesCSR
 
 testdir = @__DIR__
 istest(f) = endswith(f, ".jl") && !(f=="runtests.jl")
