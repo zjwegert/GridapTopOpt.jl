@@ -7,7 +7,7 @@ using Gridap, GridapDistributed, GridapPETSc, GridapSolvers,
 using Gridap.TensorValues, Gridap.Helpers, Gridap.MultiField
 
 ## Parameters
-function main(distribute,mesh_partition;AD,use_mfs)
+function main(distribute,mesh_partition;AD,use_mfs=false)
   ranks = distribute(LinearIndices((prod(mesh_partition),)))
   el_size = (10,10)
   order = 1

@@ -7,7 +7,7 @@ using Gridap, GridapDistributed, GridapPETSc, GridapSolvers,
 using Gridap.TensorValues, Gridap.Helpers, Gridap.MultiField
 
 ## Parameters
-function main(;AD,use_mfs)
+function main(;AD,use_mfs=false)
   el_size = (20,20)
   order = 1
   xmax,ymax=(1.0,1.0)
