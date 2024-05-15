@@ -38,5 +38,5 @@ More general tutorials for familiarising ones self with Gridap are available via
 
 ## Known issues
 - PETSc's GAMG preconditioner breaks for split Dirichlet DoFs (e.g., x constrained while y free for a single node). There is no simple fix for this. We recommend instead using MUMPS or another preconditioner for this case.
-- Currently, our implementation of automatic differentiation does not support multiplication and division of optimisation functionals. We plan to add this in a future release of `GridapTopOpt.jl` -- Issue [#38](https://github.com/zjwegert/GridapTopOpt/issues/38).
-- Analytic gradient breaks in parallel for integrals of certain measures -- Issue [#46](https://github.com/zjwegert/GridapTopOpt/issues/46)
+- Currently, our implementation of automatic differentiation does not support multiplication and division of optimisation functionals. We plan to add this in a future release of `GridapTopOpt.jl` -- Issue [#38](https://github.com/zjwegert/GridapTopOpt.jl/issues/38).
+- Analytic gradient breaks in parallel for integrals of certain measures -- Issue [#46](https://github.com/zjwegert/GridapTopOpt.jl/issues/46)

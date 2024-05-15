@@ -50,7 +50,7 @@ function Gridap.gradient(F::IntegrandWithMeasure,uh::Vector,K::Int)
   local_measures = map(local_views,F.dΩ) |> to_parray_of_arrays
   contribs = map(local_measures,local_fields) do dΩ,lf
     # TODO: Remove second term below, this is a fix for the problem discussed in
-    #  https://github.com/zjwegert/GridapTopOpt/issues/46
+    #  https://github.com/zjwegert/GridapTopOpt.jl/issues/46
     _f = u -> F.F(lf[1:K-1]...,u,lf[K+1:end]...,dΩ...) #+ ∑(∫(0)dΩ[i] for i = 1:length(dΩ))
     return Gridap.Fields.gradient(_f,lf[K])
   end
@@ -585,7 +585,7 @@ struct NonlinearFEStateMap{A,B,C,D,E,F} <: AbstractFEStateMap
     res = IntegrandWithMeasure(res,dΩ)
     if isnothing(jac)
       jacf = (u,du,v,φh) -> jacobian(res,[u,v,φh],1)
-    else 
+    else
       jacf = (u,du,v,φh) -> jac(u,du,v,φh,dΩ...)
     end
     spaces = (U,V,V_φ,U_reg)
