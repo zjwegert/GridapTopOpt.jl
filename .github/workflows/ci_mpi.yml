@@ -65,6 +65,7 @@ jobs:
       - run: julia --project=. -e 'using Pkg; Pkg.add("MPIPreferences")'
       - run: julia --project=. -e 'using MPIPreferences; MPIPreferences.use_system_binary()'
       - run: julia --project=. -e 'using Pkg; Pkg.build(); Pkg.precompile()'
+      - run: julia --project=. -e 'using GridapTopOpt'
       - run: julia --project=. --color=yes --check-bounds=yes test/mpi/runtests.jl
       - uses: codecov/codecov-action@v4
         with:
