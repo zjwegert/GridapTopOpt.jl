@@ -108,7 +108,7 @@ end
           ⎡u∈V=H¹(Ω;u(Γ_D)=0),
           ⎣∫ κ*∇(u)⋅∇(v) dΩ = ∫ v dΓ_N, ∀v∈V.
 """
-function main_3d(ranks,mesh_partition,;order)
+function main_3d(distribute,mesh_partition,;order)
   ranks = distribute(LinearIndices((prod(mesh_partition),)))
   ## Parameters
   xmax = ymax = zmax = 1.0
