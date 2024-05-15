@@ -193,7 +193,7 @@ with_mpi() do distribute
   @test main(distribute,(2,2);order=1,AD=true)
   @test main(distribute,(2,2);order=2,AD=true)
   @test main(distribute,(2,2);order=1,AD=false)
-  @test main_3d(distribute,(2,2);order=1)
+  @test main_3d(distribute,(2,2,1);order=1)
 end
 
 end # module

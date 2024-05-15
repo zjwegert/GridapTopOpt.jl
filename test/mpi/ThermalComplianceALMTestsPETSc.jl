@@ -222,7 +222,7 @@ with_mpi() do distribute
     -ksp_converged_reason -ksp_rtol 1.0e-12"
   GridapPETSc.with(args=split(solver_options)) do
     @test main(distribute,(2,2);order=1,AD=false)
-    @test main_3d(distribute,(2,2);order=1)
+    @test main_3d(distribute,(2,2,1);order=1)
   end
 end
 
