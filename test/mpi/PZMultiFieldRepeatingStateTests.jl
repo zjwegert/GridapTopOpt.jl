@@ -7,7 +7,7 @@ using Gridap, GridapDistributed, GridapPETSc, GridapSolvers,
 using Gridap.TensorValues, Gridap.Helpers, Gridap.MultiField
 
 ## Parameters
-function main(distribute,mesh_partition;AD,use_mfs=false)
+function main(distribute,mesh_partition;AD)
   ranks = distribute(LinearIndices((prod(mesh_partition),)))
   el_size = (10,10)
   order = 1
@@ -39,14 +39,8 @@ function main(distribute,mesh_partition;AD,use_mfs=false)
   U = TrialFESpace(V,VectorValue(0.0,0.0))
   Q = TestFESpace(model,reffe_scalar;conformity=:H1,dirichlet_tags=["origin"])
   P = TrialFESpace(Q,0)
-  if use_mfs
-    mfs = BlockMultiFieldStyle()
-    UP = MultiFieldFESpace([U,P];style=mfs)
-    VQ = MultiFieldFESpace([V,Q];style=mfs)
-  else
-    UP = MultiFieldFESpace([U,P])
-    VQ = MultiFieldFESpace([V,Q])
-  end
+  UP = MultiFieldFESpace([U,P])
+  VQ = MultiFieldFESpace([V,Q])
 
   V_φ = TestFESpace(model,reffe_scalar)
   V_reg = TestFESpace(model,reffe_scalar)
@@ -195,8 +189,6 @@ end
 with_mpi() do distribute
   @test main(distribute,(2,2);AD=true)
   @test main(distribute,(2,2);AD=false)
-  @test main(distribute,(2,2);AD=true,use_mfs=true)
-  @test main(distribute,(2,2);AD=false,use_mfs=true)
 end
 
 end # module
