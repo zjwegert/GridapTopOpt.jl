@@ -8,6 +8,7 @@ GridapTopOpt is computational toolbox for level set-based topology optimisation 
 ## Documentation
 
 - [**STABLE**](https://zjwegert.github.io/GridapTopOpt.jl/stable) &mdash; **Documentation for the most recently tagged version.**
+- [**DEVELOP**](https://zjwegert.github.io/GridapTopOpt.jl/dev) &mdash; *Documentation for the most recent in-development version.*
 
 ## Citation
 In order to give credit to the `GridapTopOpt` contributors, we ask that you please reference the above paper along with the required citations for [Gridap](https://github.com/gridap/Gridap.jl?tab=readme-ov-file#how-to-cite-gridap).
