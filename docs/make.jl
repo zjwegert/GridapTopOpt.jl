@@ -7,10 +7,10 @@ using GridapTopOpt
 
 makedocs(
     sitename = "GridapTopOpt.jl",
-    format = Documenter.HTML(
-      prettyurls = false,
-      # collapselevel = 1,
-    ),
+    # format = Documenter.HTML(
+    #   prettyurls = false,
+    #   # collapselevel = 1,
+    # ),
     modules = [GridapTopOpt],
     pages = [
       "Home" => "index.md",
@@ -30,6 +30,6 @@ makedocs(
 # Documenter can also automatically deploy documentation to gh-pages.
 # See "Hosting Documentation" and deploydocs() in the Documenter manual
 # for more information.
-#=deploydocs(
-    repo = "<repository url>"
-)=#
+deploydocs(
+    repo = "github.com/zjwegert/GridapTopOpt.jl.git",
+)

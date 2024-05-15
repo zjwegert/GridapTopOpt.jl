@@ -27,7 +27,7 @@ GridapTopOpt.OptimiserHistory
 GridapTopOpt.OptimiserHistorySlice
 ```
 
-## Custom `Optimiser`
+## Custom optimiser
 ```@docs
 GridapTopOpt.Optimiser
 GridapTopOpt.iterate(::GridapTopOpt.Optimiser)
