@@ -18,16 +18,16 @@ jobs:
           - x64
     steps:
       - uses: actions/checkout@v2
-      - name: Cache p4est
-        id: cache-p4est
-        uses: actions/cache@v2
-        with:
-         path: ${{env.P4EST_ROOT_DIR}}
-         key: ${{ runner.os }}-build-${{ env.P4EST_ROOT_DIR }}-
-         restore-keys: |
-           ${{ runner.os }}-build-${{ env.P4EST_ROOT_DIR }}-
-           ${{ runner.os }}-build-
-           ${{ runner.os }}-
+      # - name: Cache p4est
+      #   id: cache-p4est
+      #   uses: actions/cache@v2
+      #   with:
+      #    path: ${{env.P4EST_ROOT_DIR}}
+      #    key: ${{ runner.os }}-build-${{ env.P4EST_ROOT_DIR }}-
+      #    restore-keys: |
+      #      ${{ runner.os }}-build-${{ env.P4EST_ROOT_DIR }}-
+      #      ${{ runner.os }}-build-
+      #      ${{ runner.os }}-
       - uses: julia-actions/setup-julia@v1
         with:
           version: ${{ matrix.version }}
