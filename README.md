@@ -4,22 +4,19 @@ This branch contains the scripts and results for the referenced paper below and 
 - `results/` contains the benchmark results and job logs for Section 5 in `Benchmarks/`. The results for Section 4 are held in a [separate repository](https://github.com/zjwegert/Wegert_et_al_2024_Results) as the visualisation files (`.vtu`) are large.
 
 ## Installation/Usage
-Currently we expect this branch to be used as the Julia environment (see *). For first time setup:
-1. Clone/download this branch to a directory (e.g., `.../GridapTopOpt.jl/`).
-2. Launch Julia from inside `.../GridapTopOpt.jl/` with the `--project` flag.
-3. Run `pkg> instantiate` to install package dependencies.
-4. Install `mpiexecjl` as in the manuscript.
+We recommend using this branch of the package in develop mode, this ensures that files are readily available in `$HOME/.julia/dev/GridapTopOpt/`. For users who are familiarising themselves with Julia please follow the following installation instructions:
+1. Add the package in developer mode by pressing `]` and running `pkg> dev GridapTopOpt#Wegert_et_al_2024`.
+2. Copy scripts from `/scripts/Paper_scripts/` to a convenient directory. **Note**: from this point, usage/installation is as in the paper. We outline this below as well.
+3. Install the full set of package dependencies:
+    - Add packages by running `pkg> add MPI, GridapDistributed, GridapPETSc, GridapSolvers, PartitionedArrays, SparseMatricesCSR`.
+    - Install `mpiexecjl` via `using MPI; MPI.install_mpiexecjl()` and add `$HOME/.julia/bin/` to the system path.
 
-Scripts can then be run from `.../GridapTopOpt.jl/` with the `--project` flag. E.g.,
-- `julia --project ./scripts/Paper_scripts/therm_comp_serial.jl` for a serial TO problem; or
-- `mpiexecjl --project -n 4 julia ./scripts/Paper_scripts/therm_comp_serial_MPI.jl results/` for an MPI problem.
-
-*: We include the `Manifest.toml` file to ensure the correct branch of `GridapSolvers` is included when instantiating the package. This will be removed in future.
+Scripts can then be run from your convenient directory as in the paper. E.g.,
+- `julia therm_comp_serial.jl` for a serial topology optimisation problem; or
+- `mpiexecjl -n 4 julia therm_comp_serial_MPI.jl results/` for an MPI problem.
 
 ## Software versions
 Results in the paper were generated with the following software versions on Gadi:
 - `Julia v1.9.4`
 - `PETSc v3.19.5`
 - `Intel MPI v2021.10.0`
-
-Package versions are as in the Manifest/Project files.
