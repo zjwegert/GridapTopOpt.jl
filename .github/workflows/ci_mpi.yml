@@ -61,7 +61,6 @@ jobs:
       - uses: julia-actions/julia-buildpkg@latest
       - run: echo $PWD
       - run: julia --project=. -e 'using Pkg; Pkg.instantiate();'
-      - run: julia --project=. -e 'using Pkg; Pkg.add(name="GridapSolvers", rev="develop");'
       - run: julia --project=. -e 'using Pkg; Pkg.add("MPIPreferences")'
       - run: julia --project=. -e 'using MPIPreferences; MPIPreferences.use_system_binary()'
       - run: julia --project=. -e 'using Pkg; Pkg.build(); Pkg.precompile()'
