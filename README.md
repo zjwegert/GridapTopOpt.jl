@@ -6,13 +6,13 @@ This branch contains the scripts and results for the referenced paper below and 
 ## Installation/Usage
 Currently we expect this branch to be used as the Julia environment (see *). For first time setup:
 1. Clone/download this branch to a directory (e.g., `.../GridapTopOpt.jl/`).
-2. Launch Julia from inside `.../GridapTopOpt.jl/`.
-3. Run `pkg> activate .` followed by `pkg> instantiate`.
+2. Launch Julia from inside `.../GridapTopOpt.jl/` with the `--project` flag.
+3. Run `pkg> instantiate` to install package dependencies.
 4. Install `mpiexecjl` as in the manuscript.
 
 Scripts can then be run from `.../GridapTopOpt.jl/` with the `--project` flag. E.g.,
 - `julia --project ./scripts/Paper_scripts/therm_comp_serial.jl` for a serial TO problem; or
-- `mpiexecjl --project -n 4 julia ./scripts/Paper_scripts/therm_comp_serial.jl results/` for an MPI problem.
+- `mpiexecjl --project -n 4 julia ./scripts/Paper_scripts/therm_comp_serial_MPI.jl results/` for an MPI problem.
 
 *: We include the `Manifest.toml` file to ensure the correct branch of `GridapSolvers` is included when instantiating the package. This will be removed in future.
 
