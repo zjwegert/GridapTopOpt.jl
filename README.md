@@ -12,6 +12,3 @@ GridapTopOpt is computational toolbox for level set-based topology optimisation 
 
 ## Citation
 In order to give credit to the `GridapTopOpt` contributors, we ask that you please reference the above paper along with the required citations for [Gridap](https://github.com/gridap/Gridap.jl?tab=readme-ov-file#how-to-cite-gridap).
-
-## Known issues
-- We currently require the `develop` branch of `GridapSolvers` for `GridapTopOpt`. Ensure that this is correctly loaded via `pkg> add GridapSolvers#develop`.
