@@ -6,7 +6,7 @@ This branch contains the scripts and results for the referenced paper below and 
 ## Installation/Usage
 We recommend using this branch of the package in develop mode, this ensures that files are readily available in `$HOME/.julia/dev/GridapTopOpt/`. For users who are familiarising themselves with Julia please follow the following installation instructions:
 1. Add the package in developer mode by pressing `]` and running `pkg> dev GridapTopOpt#Wegert_et_al_2024`.
-2. Copy scripts from `/scripts/Paper_scripts/` to a convenient directory. **Note**: from this point, usage/installation is as in the paper. We outline this below as well.
+2. Copy scripts from `/scripts/Paper_scripts/` to a convenient directory. **Note**: from this point, usage/installation is as in the paper. We outline this below for completeness of this guide.
 3. Install the full set of package dependencies:
     - Add packages by running `pkg> add MPI, GridapDistributed, GridapPETSc, GridapSolvers, PartitionedArrays, SparseMatricesCSR`.
     - Install `mpiexecjl` via `using MPI; MPI.install_mpiexecjl()` and add `$HOME/.julia/bin/` to the system path.
