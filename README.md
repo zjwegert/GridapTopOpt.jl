@@ -15,8 +15,10 @@ Scripts can then be run from your convenient directory as in the paper. E.g.,
 - `julia therm_comp_serial.jl` for a serial topology optimisation problem; or
 - `mpiexecjl -n 4 julia therm_comp_serial_MPI.jl results/` for an MPI problem.
 
+**Note for Windows users**: You will need a bash shell to run `mpiexecjl`. A convenient shell is provided by [Git Bash](https://gitforwindows.org/).
+
 ## Software versions
-Results in the paper were generated with the following software versions on Gadi:
+Results in the paper were generated in Linux with the following software versions on Gadi@NCI:
 - `Julia v1.9.4`
 - `PETSc v3.19.5`
 - `Intel MPI v2021.10.0`
