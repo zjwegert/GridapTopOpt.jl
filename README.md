@@ -4,7 +4,7 @@ This branch contains the scripts and results for the referenced paper below and 
 - `results/` contains the benchmark results and job logs for Section 5 in `Benchmarks/`. The results for Section 4 are held in a [separate repository](https://github.com/zjwegert/Wegert_et_al_2024_Results) as the visualisation files (`.vtu`) are large.
 
 ## Installation/Usage
-We recommend using this branch of the package in develop mode, this ensures that files are readily available in `$HOME/.julia/dev/GridapTopOpt/`. For users who are familiarising themselves with Julia please follow the following installation instructions:
+We recommend using this branch of the package in develop mode, this ensures that files are readily available in `$HOME/.julia/dev/GridapTopOpt/`. For users who are familiarising themselves with Julia please follow these installation instructions:
 1. Add the package in developer mode by pressing `]` and running `pkg> dev GridapTopOpt#Wegert_et_al_2024`.
 2. Copy scripts from `/scripts/Paper_scripts/` to a convenient directory. **Note**: from this point, usage/installation is as in the paper. We outline this below for completeness of this guide.
 3. Install the full set of package dependencies:
