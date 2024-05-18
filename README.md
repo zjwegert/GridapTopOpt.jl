@@ -13,7 +13,7 @@ We recommend using this branch of the package in develop mode, this ensures that
 
 Scripts can then be run from your convenient directory as in the paper. E.g.,
 - `julia therm_comp_serial.jl` for a serial topology optimisation problem; or
-- `mpiexecjl -n 4 julia therm_comp_serial_MPI.jl results/` for an MPI problem.
+- `mpiexecjl -n 4 julia therm_comp_MPI.jl results/` for an MPI problem.
 
 **Note for Windows users**: You will need a bash shell to run `mpiexecjl`. A convenient shell is provided by [Git Bash](https://gitforwindows.org/).
 
