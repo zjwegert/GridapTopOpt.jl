@@ -1,7 +1,13 @@
 # GridapTopOpt - `Wegert_et_al_2024` branch
-This branch contains the scripts and results for the referenced paper below and is locked to ensure that scripts, source code, and results matches that of the paper. Scripts and results are available as follows:
+This branch contains the scripts and results for the paper
+
+> Zachary J. Wegert, Jordi Manyer, Connor Mallon, Santiago Badia, and Vivien J. Challis (2024). "GridapTopOpt.jl: A scalable Julia toolbox for level set-based topology optimisation". In preparation.
+
+The scripts and results are available as follows:
 - `scripts/` contains `Paper_scripts/` and `Benchmarks/` that are used to generate the results from Section 4 and 5, respectively.
 - `results/` contains the benchmark results and job logs for Section 5 in `Benchmarks/`. The results for Section 4 are held in a [separate repository](https://github.com/zjwegert/Wegert_et_al_2024_Results) as the visualisation files (`.vtu`) are large.
+
+This branch is locked to ensure that scripts, source code, and results matches that of the paper. 
 
 ## Installation/Usage
 We recommend using this branch of the package in develop mode, this ensures that files are readily available in `/.julia/dev/GridapTopOpt/`. Note that the `.julia` folder is located in the users home directory. For users who are familiarising themselves with Julia please follow these installation instructions:
