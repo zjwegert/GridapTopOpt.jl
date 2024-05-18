@@ -4,12 +4,13 @@ This branch contains the scripts and results for the referenced paper below and 
 - `results/` contains the benchmark results and job logs for Section 5 in `Benchmarks/`. The results for Section 4 are held in a [separate repository](https://github.com/zjwegert/Wegert_et_al_2024_Results) as the visualisation files (`.vtu`) are large.
 
 ## Installation/Usage
-We recommend using this branch of the package in develop mode, this ensures that files are readily available in `$HOME/.julia/dev/GridapTopOpt/`. For users who are familiarising themselves with Julia please follow these installation instructions:
-1. Add the package in developer mode by pressing `]` and running `pkg> dev GridapTopOpt#Wegert_et_al_2024`.
-2. Copy scripts from `/scripts/Paper_scripts/` to a convenient directory. **Note**: from this point, usage/installation is as in the paper. We outline this below for completeness of this guide.
-3. Install the full set of package dependencies:
+We recommend using this branch of the package in develop mode, this ensures that files are readily available in `/.julia/dev/GridapTopOpt/`. Note that the `.julia` folder is located in the users home directory. For users who are familiarising themselves with Julia please follow these installation instructions:
+1. Add the package in developer mode by pressing `]` and running `pkg> dev GridapTopOpt`.
+2. Switch to this branch by running `git checkout Wegert_et_al_2024` in `/.julia/dev/GridapTopOpt/`.
+3. Copy scripts from `/scripts/Paper_scripts/` to a convenient directory. **Note**: from this point, usage/installation is as in the paper. We outline this below for completeness of this guide.
+4. Install the full set of package dependencies:
     - Add packages by running `pkg> add MPI, GridapDistributed, GridapPETSc, GridapSolvers, PartitionedArrays, SparseMatricesCSR`.
-    - Install `mpiexecjl` via `using MPI; MPI.install_mpiexecjl()` and add `$HOME/.julia/bin/` to the system path.
+    - Install `mpiexecjl` via `using MPI; MPI.install_mpiexecjl()` and add `/.julia/bin/` to the system path.
 
 Scripts can then be run from your convenient directory as in the paper. E.g.,
 - `julia therm_comp_serial.jl` for a serial topology optimisation problem; or
