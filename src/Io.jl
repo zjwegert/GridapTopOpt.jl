@@ -43,7 +43,7 @@ a set of JLD2 files corresponding to each part.
 function psave(dir::AbstractString, x)
   ranks = get_parts(x)
   i_am_main(ranks) && mkpath(dir)
-  fetch(ranks)
+  PartitionedArrays.barrier(ranks)
   arr = to_local_storage(x)
   map(ranks,arr) do id, arr
     filename = joinpath(dir,basename(dir)*"_$id.jdl2")
