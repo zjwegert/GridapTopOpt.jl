@@ -37,7 +37,7 @@ end
 """
     psave(filename::AbstractString, x)
 
-Save a partitioned object `x` to a directory `dir` as 
+Save a partitioned object `x` to a directory `dir` as
 a set of JLD2 files corresponding to each part.
 """
 function psave(dir::AbstractString, x)
@@ -46,7 +46,7 @@ function psave(dir::AbstractString, x)
   arr = to_local_storage(x)
   map(ranks,arr) do id, arr
     filename = joinpath(dir,basename(dir)*"_$id.jdl2")
-    save_object(filename,arr)
+    jldsave(filename, IOStream; arr)
   end
 end
 
