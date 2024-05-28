@@ -62,7 +62,9 @@ function pload(dir::AbstractString, ranks::AbstractArray{<:Integer})
     filename = joinpath(dir,basename(dir)*"_$id.jdl2")
     load_object(filename)
   end
-  return from_local_storage(arr)
+  y = from_local_storage(arr)
+  consistent!(y) |> fetch
+  return y
 end
 
 """
