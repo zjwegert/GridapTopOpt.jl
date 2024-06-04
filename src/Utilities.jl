@@ -1,7 +1,7 @@
 """
     struct SmoothErsatzMaterialInterpolation{M<:Vector{<:Number},N<:Vector{<:Number}}
 
-A wrapper holding parameters and methods for interpolating an 
+A wrapper holding parameters and methods for interpolating an
 integrand across a single boundary ``\\partial\\Omega``.
 
 E.g., ``\\int f~\\mathrm{d}\\Omega = \\int I(\\varphi)f~\\mathrm{d}D`` where ``\\Omega\\subset D`` is described by a level-set
@@ -14,12 +14,12 @@ function ``\\varphi`` and ``I`` is an indicator function.
 - `H`: a smoothed Heaviside function
 - `DH`: the derivative of `H`
 - `I`: an indicator function
-- `ρ`: a function describing the volume density of ``\\Omega`` 
+- `ρ`: a function describing the volume density of ``\\Omega``
   (e.g., ``\\mathrm{Vol}(\\Omega) = \\int \\rho(\\varphi))~\\mathrm{d}D)``
 
 # Note
 - We store η and ϵ as length-one vectors so that updating these values propagates through H, DH, etc.
-- To update η and/or ϵ in an instance `m`, take `m.η .= <VALUE>`. 
+- To update η and/or ϵ in an instance `m`, take `m.η .= <VALUE>`.
 - A conviencence constructor is provided to create an instance given `η<:Number` and `ϵ<:Number`.
 """
 struct SmoothErsatzMaterialInterpolation{M<:Vector{<:Number},N<:Vector{<:Number}}
@@ -29,17 +29,17 @@ struct SmoothErsatzMaterialInterpolation{M<:Vector{<:Number},N<:Vector{<:Number}
   DH
   I
   ρ
-  function SmoothErsatzMaterialInterpolation(;
-      η::M,
-      ϵ::N = 10^-3,
-      H = x -> H_η(x,first(η)),
-      DH = x -> DH_η(x,first(η)),
-      I = φ -> (1 - H(φ)) + first(ϵ)*H(φ),
-      ρ = φ -> 1 - H(φ)
-    ) where {M<:Number,N<:Number}
+end
 
-    new{Vector{M},Vector{N}}([η],[ϵ],H,DH,I,ρ)
-  end
+function SmoothErsatzMaterialInterpolation(;η::M,ϵ::N = 10^-3) where {M<:Number,N<:Number}
+  _η = [η,]
+  _ϵ = [ϵ,]
+  H(x) = H_η(x,first(_η))
+  DH(x) = DH_η(x,first(_η))
+  I(φ) = (1 - H(φ)) + first(_ϵ)*H(φ)
+  ρ(φ) = 1 - H(φ)
+
+  return SmoothErsatzMaterialInterpolation{Vector{M},Vector{N}}(_η,_ϵ,H,DH,I,ρ)
 end
 
 function H_η(t,η)
@@ -165,7 +165,7 @@ initial_lsf(ξ,a;b=0) = x::VectorValue -> -1/4*prod(cos.(get_array(@.(ξ*pi*(x-b
     get_el_Δ(model)
 
 Given a CartesianDiscreteModel or DistributedDiscreteModel that is
-uniform, return the element size as a tuple. 
+uniform, return the element size as a tuple.
 """
 function get_el_Δ(model::CartesianDiscreteModel)
   desc = get_cartesian_descriptor(model)
@@ -183,7 +183,7 @@ end
     isotropic_elast_tensor(D::Int,E::M,v::M)
 
 Generate an isotropic `SymFourthOrderTensorValue` given
-a dimension `D`, Young's modulus `E`, and Poisson's ratio `v`. 
+a dimension `D`, Young's modulus `E`, and Poisson's ratio `v`.
 """
 function isotropic_elast_tensor(D::Int,E::Number,v::Number)
   if D == 2
@@ -225,8 +225,8 @@ end
 #
 # Find the period of oscillations based on a zero crossing algorithm.
 #
-# This is based on the zero crossing method from ChaosTools.jl 
-# See (https://github.com/JuliaDynamics/ChaosTools.jl)  
+# This is based on the zero crossing method from ChaosTools.jl
+# See (https://github.com/JuliaDynamics/ChaosTools.jl)
 function _zerocrossing_period(v;t=0:length(v)-1,line=sum(v)/length(v))
   inds = findall(@. ≥(line, $@view(v[2:end])) & <(line, $@view(v[1:end-1])))
   difft = diff(t[inds])
