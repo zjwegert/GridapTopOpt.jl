@@ -1,3 +1,5 @@
+abstract type AbstractIntegrandWithMeasure end
+
 """
     struct IntegrandWithMeasure{A,B<:Tuple}
 
@@ -9,7 +11,7 @@ differentation with `DistributedMeasure`.
 - `F  :: A`: A function that returns a `DomainContribution` or `DistributedDomainContribution`.
 - `dΩ :: B`: A tuple of measures.
 """
-struct IntegrandWithMeasure{A,B<:Tuple}
+struct IntegrandWithMeasure{A,B<:Tuple} <: AbstractIntegrandWithMeasure
   F  :: A
   dΩ :: B
 end
@@ -119,7 +121,7 @@ We assume that we have a `IntegrandWithMeasure` of the following form:
 where `u` and `φ` are each expected to inherit from `Union{FEFunction,MultiFieldFEFunction}`
 or the GridapDistributed equivalent.
 """
-struct StateParamIntegrandWithMeasure{A<:IntegrandWithMeasure,B,C,D}
+struct StateParamIntegrandWithMeasure{A<:AbstractIntegrandWithMeasure,B,C,D}
   F       :: A
   spaces  :: B
   assems  :: C
@@ -133,7 +135,7 @@ end
 Create an instance of `StateParamIntegrandWithMeasure`.
 """
 function StateParamIntegrandWithMeasure(
-  F::IntegrandWithMeasure,
+  F::AbstractIntegrandWithMeasure,
   U::FESpace,V_φ::FESpace,U_reg::FESpace,
   assem_U::Assembler,assem_deriv::Assembler
 )
@@ -409,7 +411,7 @@ function StateParamIntegrandWithMeasure(f::Function,φ_to_u::AbstractFEStateMap)
   StateParamIntegrandWithMeasure(F,φ_to_u)
 end
 
-function StateParamIntegrandWithMeasure(F::IntegrandWithMeasure,φ_to_u::AbstractFEStateMap)
+function StateParamIntegrandWithMeasure(F::AbstractIntegrandWithMeasure,φ_to_u::AbstractFEStateMap)
   U,V,V_φ,U_reg = φ_to_u.spaces
   assem_deriv = get_deriv_assembler(φ_to_u)
   assem_U = get_pde_assembler(φ_to_u)
@@ -457,18 +459,16 @@ struct AffineFEStateMap{A,B,C,D,E,F} <: AbstractFEStateMap
   Optional arguments enable specification of assemblers and linear solvers.
   """
     function AffineFEStateMap(
-    a::Function,l::Function,
-    U,V,V_φ,U_reg,φh,dΩ...;
-    assem_U = SparseMatrixAssembler(U,V),
-    assem_adjoint = SparseMatrixAssembler(V,U),
-    assem_deriv = SparseMatrixAssembler(U_reg,U_reg),
-    ls::LinearSolver = LUSolver(),
-    adjoint_ls::LinearSolver = LUSolver()
-  )
+      biform::AbstractIntegrandWithMeasure,liform::AbstractIntegrandWithMeasure,
+      U,V,V_φ,U_reg,φh,dΩ...;
+      assem_U = SparseMatrixAssembler(U,V),
+      assem_adjoint = SparseMatrixAssembler(V,U),
+      assem_deriv = SparseMatrixAssembler(U_reg,U_reg),
+      ls::LinearSolver = LUSolver(),
+      adjoint_ls::LinearSolver = LUSolver()
+    )
     # TODO: I really want to get rid of the φh argument...
 
-    biform = IntegrandWithMeasure(a,dΩ)
-    liform = IntegrandWithMeasure(l,dΩ)
     spaces = (U,V,V_φ,U_reg)
 
     ## Pullback cache
@@ -494,6 +494,12 @@ struct AffineFEStateMap{A,B,C,D,E,F} <: AbstractFEStateMap
     D,E,F = typeof(plb_caches),typeof(fwd_caches), typeof(adj_caches)
     return new{A,B,C,D,E,F}(biform,liform,spaces,plb_caches,fwd_caches,adj_caches)
   end
+end
+
+function AffineFEStateMap(a::Function,l::Function,U,V,V_φ,U_reg,φh,dΩ...;kwargs...)
+  biform = IntegrandWithMeasure(a,dΩ)
+  liform = IntegrandWithMeasure(l,dΩ)
+  AffineFEStateMap(biform,liform,U,V,V_φ,U_reg,φh,dΩ;kwargs...)
 end
 
 # Getters
@@ -574,20 +580,13 @@ struct NonlinearFEStateMap{A,B,C,D,E,F} <: AbstractFEStateMap
   Optional arguments enable specification of assemblers, nonlinear solver, and adjoint (linear) solver.
   """
   function NonlinearFEStateMap(
-    res::Function,U,V,V_φ,U_reg,φh,dΩ...;
-    jac = nothing,
+    res::AbstractIntegrandWithMeasure,jac,U,V,V_φ,U_reg,φh,dΩ...;
     assem_U = SparseMatrixAssembler(U,V),
     assem_adjoint = SparseMatrixAssembler(V,U),
     assem_deriv = SparseMatrixAssembler(U_reg,U_reg),
     nls::NonlinearSolver = NewtonSolver(LUSolver();maxiter=50,rtol=1.e-8,verbose=true),
     adjoint_ls::LinearSolver = LUSolver()
   )
-    res = IntegrandWithMeasure(res,dΩ)
-    if isnothing(jac)
-      jacf = (u,du,v,φh) -> jacobian(res,[u,v,φh],1)
-    else
-      jacf = (u,du,v,φh) -> jac(u,du,v,φh,dΩ...)
-    end
     spaces = (U,V,V_φ,U_reg)
 
     ## Pullback cache
@@ -599,21 +598,36 @@ struct NonlinearFEStateMap{A,B,C,D,E,F} <: AbstractFEStateMap
     ## Forward cache
     x = zero_free_values(U)
     _res(u,v) = res(u,v,φh)
-    _jac(u,du,v) = jacf(u,du,v,φh)
+    _jac(u,du,v) = jac(u,du,v,φh)
     op = get_algebraic_operator(FEOperator(_res,_jac,U,V,assem_U))
     nls_cache = instantiate_caches(x,nls,op)
     fwd_caches = (nls,nls_cache,x,assem_U)
 
     ## Adjoint cache
-    _jac_adj(du,v) = jacf(uhd,du,v,φh)
+    _jac_adj(du,v) = jac(uhd,du,v,φh)
     adjoint_K  = assemble_adjoint_matrix(_jac_adj,assem_adjoint,U,V)
     adjoint_x  = allocate_in_domain(adjoint_K); fill!(adjoint_x,zero(eltype(adjoint_x)))
     adjoint_ns = numerical_setup(symbolic_setup(adjoint_ls,adjoint_K),adjoint_K)
     adj_caches = (adjoint_ns,adjoint_K,adjoint_x,assem_adjoint)
-    A, B, C = typeof(res), typeof(jacf), typeof(spaces)
+    A, B, C = typeof(res), typeof(jac), typeof(spaces)
     D, E, F = typeof(plb_caches), typeof(fwd_caches), typeof(adj_caches)
-    return new{A,B,C,D,E,F}(res,jacf,spaces,plb_caches,fwd_caches,adj_caches)
+    return new{A,B,C,D,E,F}(res,jac,spaces,plb_caches,fwd_caches,adj_caches)
   end
+end
+
+function NonlinearFEStateMap(res::AbstractIntegrandWithMeasure,U,V,V_φ,U_reg,φh,dΩ...;jac::Nothing=nothing,kwargs...)
+  jacf = (u,du,v,φh) -> jacobian(res,[u,v,φh],1)
+  NonlinearFEStateMap(res,jacf,U,V,V_φ,U_reg,φh,dΩ;kwargs...)
+end
+
+function NonlinearFEStateMap(res::Function,U,V,V_φ,U_reg,φh,dΩ...;jac=nothing,kwargs...)
+  _res = IntegrandWithMeasure(res,dΩ)
+  if isnothing(jac)
+    _jac = (u,du,v,φh) -> jacobian(_res,[u,v,φh],1)
+  else
+    _jac = IntegrandWithMeasure(jac,dΩ)
+  end
+  NonlinearFEStateMap(_res,_jac,U,V,V_φ,U_reg,φh,dΩ;kwargs...)
 end
 
 get_state(m::NonlinearFEStateMap) = FEFunction(get_trial_space(m),m.fwd_caches[3])
@@ -702,7 +716,7 @@ struct RepeatingAffineFEStateMap{A,B,C,D,E,F,G} <: AbstractFEStateMap
     where each field corresponds to an entry in the vector of linear forms
   """
   function RepeatingAffineFEStateMap(
-    nblocks::Int,a::Function,l::Vector{<:Function},
+    nblocks::Int,biform::AbstractIntegrandWithMeasure,liforms::Vector{<:AbstractIntegrandWithMeasure},
     U0,V0,V_φ,U_reg,φh,dΩ...;
     assem_U = SparseMatrixAssembler(U0,V0),
     assem_adjoint = SparseMatrixAssembler(V0,U0),
@@ -710,13 +724,11 @@ struct RepeatingAffineFEStateMap{A,B,C,D,E,F,G} <: AbstractFEStateMap
     ls::LinearSolver = LUSolver(),
     adjoint_ls::LinearSolver = LUSolver()
   )
-    @check nblocks == length(l)
+    @check nblocks == length(liforms)
 
     spaces_0 = (U0,V0)
     assem_U0 = assem_U
 
-    biform = IntegrandWithMeasure(a,dΩ)
-    liforms = map(li -> IntegrandWithMeasure(li,dΩ),l)
     U, V = repeat_spaces(nblocks,U0,V0)
     spaces = (U,V,V_φ,U_reg)
     assem_U = SparseMatrixAssembler(
@@ -751,6 +763,14 @@ struct RepeatingAffineFEStateMap{A,B,C,D,E,F,G} <: AbstractFEStateMap
     E,F,G = typeof(plb_caches), typeof(fwd_caches), typeof(adj_caches)
     return new{A,B,C,D,E,F,G}(biform,liforms,spaces,spaces_0,plb_caches,fwd_caches,adj_caches)
   end
+end
+
+function RepeatingAffineFEStateMap(
+    nblocks::Int,a::Function,l::Vector{<:Function},
+    U0,V0,V_φ,U_reg,φh,dΩ...;kwargs...)
+  biform = IntegrandWithMeasure(a,dΩ)
+  liforms = map(li -> IntegrandWithMeasure(li,dΩ),l)
+  RepeatingAffineFEStateMap(nblocks::Int,biform,liforms,U0,V0,V_φ,U_reg,φh,dΩ...;kwargs...)
 end
 
 const MultiFieldSpaceTypes = Union{<:MultiField.MultiFieldFESpace,<:GridapDistributed.DistributedMultiFieldFESpace}
@@ -946,9 +966,9 @@ struct PDEConstrainedFunctionals{N,A}
   can be disabled by passing the shape derivative as a type `Function` to `analytic_dJ`
   and/or entires in `analytic_dC`.
   """
-    function PDEConstrainedFunctionals(
-      objective   :: Function,
-      constraints :: Vector{<:Function},
+  function PDEConstrainedFunctionals(
+      objective,   #:: Function,
+      constraints :: Vector,#{<:Function},
       state_map   :: AbstractFEStateMap;
       analytic_dJ = nothing,
       analytic_dC = fill(nothing,length(constraints)))
@@ -1040,10 +1060,17 @@ function Fields.evaluate!(pcf::PDEConstrainedFunctionals,φh)
     dF .+= dFdφ
     return j_val
   end
-  function ∇!(F::StateParamIntegrandWithMeasure,dF,dF_analytic)
+  function ∇!(F::StateParamIntegrandWithMeasure,dF,dF_analytic::Function)
     # Analytic shape derivative
     j_val = F(uh,φh)
     _dF(q) = dF_analytic(q,uh,φh,dΩ...)
+    assemble_vector!(_dF,dF,deriv_assem,U_reg)
+    return j_val
+  end
+  function ∇!(F::StateParamIntegrandWithMeasure,dF,dF_analytic::AbstractIntegrandWithMeasure)
+    # Analytic shape derivative
+    j_val = F(uh,φh)
+    _dF(q) = dF_analytic(q,uh,φh)
     assemble_vector!(_dF,dF,deriv_assem,U_reg)
     return j_val
   end
