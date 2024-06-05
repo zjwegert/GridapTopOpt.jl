@@ -992,8 +992,8 @@ end
 
 Create an instance of `PDEConstrainedFunctionals` when the problem has no constraints.
 """
-PDEConstrainedFunctionals(J::Function,state_map::AbstractFEStateMap;analytic_dJ=nothing) =
-  PDEConstrainedFunctionals(J,Function[],state_map;analytic_dJ = analytic_dJ,analytic_dC = Nothing[])
+PDEConstrainedFunctionals(J,state_map::AbstractFEStateMap;analytic_dJ=nothing) =
+  PDEConstrainedFunctionals(J,typeof(J)[],state_map;analytic_dJ = analytic_dJ,analytic_dC = Nothing[])
 
 get_state(m::PDEConstrainedFunctionals) = get_state(m.state_map)
 
