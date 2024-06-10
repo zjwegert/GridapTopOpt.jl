@@ -10,7 +10,7 @@ function main()
   γ = 0.1
   γ_reinit = 0.5
   max_steps = floor(Int,order*minimum(n)/10)
-  tol = 1/(1*order^2)/minimum(n)
+  tol = 1/(5*order^2)/minimum(n)
   vf = 0.4
   α_coeff = 4max_steps*γ
   iter_mod = 1
@@ -75,7 +75,7 @@ function main()
   ## Optimiser
   rm(path,force=true,recursive=true)
   mkpath(path)
-  optimiser = AugmentedLagrangian(pcfs,ls_evo,vel_ext,φh;
+  optimiser = AugmentedLagrangian(pcfs,ls_evo,vel_ext,φh;reinit_mod=5,
     γ,γ_reinit,verbose=true,constraint_names=[:Vol])
   for (it,uh,φh) in optimiser
     _Ω1,_,_Γ = get_embedded_triangulations(embedded_meas)
