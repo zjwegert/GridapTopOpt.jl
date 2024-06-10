@@ -4,7 +4,7 @@ using Gridap,GridapTopOpt
 include("embedded_measures.jl")
 
 function main()
-  path="./results/CellFEM_thermal_compliance_ALM/"
+  path="./results/UnfittedFEM_thermal_compliance_ALM/"
   n = 200
   order = 1
   γ = 0.1
