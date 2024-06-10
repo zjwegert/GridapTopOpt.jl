@@ -119,7 +119,7 @@ function get_embedded_measures(φ,s::EmbeddedMeasureCache)
   return s.measures
 end
 
-function get_embedded_triangulations(φ,s::EmbeddedMeasureCache)
+function get_embedded_triangulations(s::EmbeddedMeasureCache)
   return s.trians
 end
 

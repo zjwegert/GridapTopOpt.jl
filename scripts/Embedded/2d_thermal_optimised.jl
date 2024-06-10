@@ -50,7 +50,7 @@ function main()
   ## Optimisation functionals
   J(u,φ,dΩ,dΓ_N,dΩ1,dΩ2,dΓ) = ∫(∇(u)⋅∇(u))dΩ1
   dJ(q,u,φ,dΩ,dΓ_N,dΩ1,dΩ2,dΓ) = ∫(∇(u)⋅∇(u)*q)dΓ;
-  Vol(u,φ,dΩ,dΓ_N,dΩ1,dΩ2,dΓ) = ∫(1/vol_D)dΩ1 - ∫(vf)dΩ;
+  Vol(u,φ,dΩ,dΓ_N,dΩ1,dΩ2,dΓ) = ∫(1/vol_D)dΩ1 - ∫(vf/vol_D)dΩ;
   dVol(q,u,φ,dΩ,dΓ_N,dΩ1,dΩ2,dΓ) = ∫(-1/vol_D*q)dΓ
 
   ## IntegrandWithEmbeddedMeasure
@@ -79,17 +79,17 @@ function main()
   optimiser = AugmentedLagrangian(pcfs,ls_evo,vel_ext,φh;reinit_mod=5,
     γ,γ_reinit,verbose=true,constraint_names=[:Vol])
   for (it,uh,φh) in optimiser
-    dΩ1,_,dΓ = get_meas(φh)
+    _Ω1,_,_Γ = get_embedded_triangulations(embedded_meas)
     if iszero(it % iter_mod)
-      writevtk(dΩ1.quad.trian,path*"Omega_out$it",cellfields=["φ"=>φh,"|∇(φ)|"=>(norm ∘ ∇(φh)),"uh"=>uh])
-      writevtk(dΓ.quad.trian,path*"Gamma_out$it",cellfields=["normal"=>get_normal_vector(dΓ.quad.trian)])
+      writevtk(_Ω1,path*"Omega_out$it",cellfields=["φ"=>φh,"|∇(φ)|"=>(norm ∘ ∇(φh)),"uh"=>uh])
+      writevtk(_Γ,path*"Gamma_out$it",cellfields=["normal"=>get_normal_vector(_Γ)])
     end
     write_history(path*"/history.txt",optimiser.history)
   end
   it = get_history(optimiser).niter; uh = get_state(pcfs)
-  dΩ1,_,dΓ = get_meas(φh)
-  writevtk(dΩ1.quad.trian,path*"Omega_out$it",cellfields=["φ"=>φh,"|∇(φ)|"=>(norm ∘ ∇(φh)),"uh"=>uh])
-  writevtk(dΓ.quad.trian,path*"Gamma_out$it",cellfields=["normal"=>get_normal_vector(dΓ.quad.trian)])
+  _Ω1,_,_Γ = get_embedded_triangulations(embedded_meas)
+  writevtk(_Ω1,path*"Omega_out$it",cellfields=["φ"=>φh,"|∇(φ)|"=>(norm ∘ ∇(φh)),"uh"=>uh])
+  writevtk(_Γ,path*"Gamma_out$it",cellfields=["normal"=>get_normal_vector(_Γ)])
 end
 
 main()
