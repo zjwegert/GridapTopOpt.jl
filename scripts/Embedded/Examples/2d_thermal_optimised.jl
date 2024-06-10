@@ -1,12 +1,10 @@
+using Pkg; Pkg.activate()
+
 using Gridap,GridapTopOpt,GridapEmbedded
-using GridapDistributed, GridapPETSc, PartitionedArrays
+include("../embedded_measures.jl")
 
-include("embedded_measures.jl")
-
-function main(parts,distribute)
-  ranks = distribute(LinearIndices((prod(parts),)))
-
-  path="./results/UnfittedFEM_thermal_compliance_ALM_Optimised_MPI_test/"
+function main()
+  path="./results/UnfittedFEM_thermal_compliance_ALM_Optimised_test/"
   n = 200
   order = 1
   γ = 0.1
@@ -17,10 +15,8 @@ function main(parts,distribute)
   vf = 0.4
   α_coeff = 4max_steps*γ
   iter_mod = 1
-  i_am_main(ranks) && rm(path,force=true,recursive=true)
-  i_am_main(ranks) && mkpath(path)
 
-  model = CartesianDiscreteModel(ranks,parts,(0,1,0,1),(n,n));
+  model = CartesianDiscreteModel((0,1,0,1),(n,n));
   el_Δ = get_el_Δ(model)
   f_Γ_D(x) = (x[1] ≈ 0.0 && (x[2] <= 0.2 + eps() || x[2] >= 0.8 - eps()))
   f_Γ_N(x) = (x[1] ≈ 1 && 0.4 - eps() <= x[2] <= 0.6 + eps())
@@ -54,7 +50,7 @@ function main(parts,distribute)
   ## Optimisation functionals
   J(u,φ,dΩ,dΓ_N,dΩ1,dΩ2,dΓ) = ∫(∇(u)⋅∇(u))dΩ1
   dJ(q,u,φ,dΩ,dΓ_N,dΩ1,dΩ2,dΓ) = ∫(∇(u)⋅∇(u)*q)dΓ;
-  Vol(u,φ,dΩ,dΓ_N,dΩ1,dΩ2,dΓ) = ∫(1/vol_D)dΩ1 - ∫(vf)dΩ;
+  Vol(u,φ,dΩ,dΓ_N,dΩ1,dΩ2,dΓ) = ∫(1/vol_D)dΩ1 - ∫(vf/vol_D)dΩ;
   dVol(q,u,φ,dΩ,dΓ_N,dΩ1,dΩ2,dΓ) = ∫(-1/vol_D*q)dΓ
 
   ## IntegrandWithEmbeddedMeasure
@@ -78,15 +74,17 @@ function main(parts,distribute)
   vel_ext = VelocityExtension(a_hilb,U_reg,V_reg)
 
   ## Optimiser
+  rm(path,force=true,recursive=true)
+  mkpath(path)
   optimiser = AugmentedLagrangian(pcfs,ls_evo,vel_ext,φh;reinit_mod=5,
-    γ,γ_reinit,verbose=i_am_main(ranks),constraint_names=[:Vol])
+    γ,γ_reinit,verbose=true,constraint_names=[:Vol])
   for (it,uh,φh) in optimiser
     _Ω1,_,_Γ = get_embedded_triangulations(embedded_meas)
     if iszero(it % iter_mod)
       writevtk(_Ω1,path*"Omega_out$it",cellfields=["φ"=>φh,"|∇(φ)|"=>(norm ∘ ∇(φh)),"uh"=>uh])
       writevtk(_Γ,path*"Gamma_out$it",cellfields=["normal"=>get_normal_vector(_Γ)])
     end
-    write_history(path*"/history.txt",optimiser.history;ranks)
+    write_history(path*"/history.txt",optimiser.history)
   end
   it = get_history(optimiser).niter; uh = get_state(pcfs)
   _Ω1,_,_Γ = get_embedded_triangulations(embedded_meas)
@@ -94,7 +92,4 @@ function main(parts,distribute)
   writevtk(_Γ,path*"Gamma_out$it",cellfields=["normal"=>get_normal_vector(_Γ)])
 end
 
-with_mpi() do distribute
-  parts = (3,3);
-  main(parts,distribute)
-end
+main()

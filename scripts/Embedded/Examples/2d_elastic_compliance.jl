@@ -1,7 +1,7 @@
 using Pkg; Pkg.activate()
 
 using Gridap,GridapTopOpt
-include("embedded_measures.jl")
+include("../embedded_measures.jl")
 
 function main(path="./results/UnfittedFEM_elastic_compliance_ALM/")
   ## Parameters
@@ -23,12 +23,10 @@ function main(path="./results/UnfittedFEM_elastic_compliance_ALM/")
   mkpath(path)
 
   ## FE Setup
-  model = CartesianDiscreteModel(dom,el_size)
+  model = CartesianDiscreteModel(dom,el_size,isperiodic=(true,true))
   el_Δ = get_el_Δ(model)
-  f_Γ_D(x) = (x[1] ≈ 0.0)
-  f_Γ_N(x) = (x[1] ≈ xmax && ymax/2-ymax*prop_Γ_N/2 - eps() <= x[2] <= ymax/2+ymax*prop_Γ_N/2 + eps())
-  update_labels!(1,model,f_Γ_D,"Gamma_D")
-  update_labels!(2,model,f_Γ_N,"Gamma_N")
+  f_Γ_D(x) = iszero(x)
+  update_labels!(1,model,f_Γ_D,"origin")
 
   ## Triangulations and measures
   Ω = Triangulation(model)
@@ -52,10 +50,7 @@ function main(path="./results/UnfittedFEM_elastic_compliance_ALM/")
   update_meas(φ) = update_embedded_measures!(φ,embedded_meas)
   get_meas(φ) = get_embedded_measures(φ,embedded_meas)
 
-  ## Interpolation and weak form
-  interp = SmoothErsatzMaterialInterpolation(η = η_coeff*maximum(el_Δ))
-  I,H,DH,ρ = interp.I,interp.H,interp.DH,interp.ρ
-
+  ## Weak form
   a(u,v,φ,dΩ,dΓ_N,dΩ1,dΩ2,dΓ) = ∫(C ⊙ ε(u) ⊙ ε(v))dΩ1 + ∫((10^-6*C) ⊙ ε(u) ⊙ ε(v))dΩ2
   l(v,φ,dΩ,dΓ_N,dΩ1,dΩ2,dΓ) = ∫(v⋅g)dΓ_N
 
