@@ -9,7 +9,7 @@ function main(path="./results/UnfittedFEM_inverse_homenisation_ALM/")
   xmax,ymax=(1.0,1.0)
   dom = (0,xmax,0,ymax)
   el_size = (200,200)
-  γ = 0.1
+  γ = 0.05
   γ_reinit = 0.5
   max_steps = floor(Int,order*minimum(el_size)/10)
   tol = 1/(5order^2)/minimum(el_size)
@@ -17,6 +17,7 @@ function main(path="./results/UnfittedFEM_inverse_homenisation_ALM/")
   α_coeff = 4max_steps*γ
   vf = 0.4
   iter_mod = 1
+  rm(path,force=true,recursive=true)
   mkpath(path)
 
   ## FE Setup
@@ -51,7 +52,7 @@ function main(path="./results/UnfittedFEM_inverse_homenisation_ALM/")
         TensorValue(0.,1/2,1/2,0.))   # ϵᵢⱼ⁽¹²⁾≡ϵᵢⱼ⁽³⁾
 
   a(u,v,φ,dΩ,dΩ1,dΩ2,dΓ) = ∫(C ⊙ ε(u) ⊙ ε(v) )dΩ1 + ∫((10^-6*C) ⊙ ε(u) ⊙ ε(v) )dΩ2
-  l = [(v,φ,dΩ,dΩ1,dΩ2,dΓ) -> ∫(-C ⊙ εᴹ[i] ⊙ ε(v))dΩ1 for i in 1:3]
+  l = [(v,φ,dΩ,dΩ1,dΩ2,dΓ) -> ∫(-C ⊙ εᴹ[i] ⊙ ε(v))dΩ1 + ∫(-(10^-6*C) ⊙ εᴹ[i] ⊙ ε(v))dΩ2 for i in 1:3]
 
   ## Optimisation functionals
   Cᴴ(r,s,u,dΩ1,dΩ2,dΓ) = ∫(C ⊙ (ε(u[r])+εᴹ[r]) ⊙ εᴹ[s])dΩ1
@@ -81,8 +82,6 @@ function main(path="./results/UnfittedFEM_inverse_homenisation_ALM/")
   vel_ext = VelocityExtension(a_hilb,U_reg,V_reg)
 
   ## Optimiser
-  rm(path,force=true,recursive=true)
-  mkpath(path)
   optimiser = AugmentedLagrangian(pcfs,ls_evo,vel_ext,φh;reinit_mod=5,
     γ,γ_reinit,verbose=true,constraint_names=[:Vol])
   for (it,uh,φh) in optimiser
