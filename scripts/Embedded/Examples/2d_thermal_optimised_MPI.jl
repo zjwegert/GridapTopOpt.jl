@@ -1,7 +1,7 @@
 using Gridap,GridapTopOpt,GridapEmbedded
 using GridapDistributed, GridapPETSc, PartitionedArrays
 
-include("../embedded_measures.jl")
+include("../embedded_measures_AD_DISABLED.jl")
 
 function main(parts,distribute)
   ranks = distribute(LinearIndices((prod(parts),)))

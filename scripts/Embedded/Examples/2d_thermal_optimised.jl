@@ -1,7 +1,7 @@
 using Pkg; Pkg.activate()
 
 using Gridap,GridapTopOpt,GridapEmbedded
-include("../embedded_measures.jl")
+include("../embedded_measures_AD_DISABLED.jl")
 
 function main()
   path="./results/UnfittedFEM_thermal_compliance_ALM_Optimised_test/"
