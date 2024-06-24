@@ -139,7 +139,8 @@ function StateParamIntegrandWithMeasure(
   U::FESpace,V_φ::FESpace,U_reg::FESpace,
   assem_U::Assembler,assem_deriv::Assembler
 )
-  φ₀, u₀ = zero(V_φ), zero(U)
+  # TODO: Find alternative to this later, is a fix for grad of embedded FEs
+  φ₀, u₀ = interpolate(x->-sqrt((x[1]-1/2)^2+(x[2]-1/2)^2)+0.2,V_φ), zero(U)
   ∂j∂u_vecdata = collect_cell_vector(U,∇(F,[u₀,φ₀],1))
   ∂j∂φ_vecdata = collect_cell_vector(U_reg,∇(F,[u₀,φ₀],2))
   ∂j∂u_vec = allocate_vector(assem_U,∂j∂u_vecdata)

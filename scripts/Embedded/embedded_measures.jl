@@ -72,7 +72,10 @@ function get_embedded_measures(s::EmbeddedMeasureCache,args...)
   return s.measures
 end
 
-function get_embedded_triangulations(s::EmbeddedMeasureCache)
+function get_embedded_triangulations(s::EmbeddedMeasureCache,φ)
+  trians, measures = get_geo_params(φ,s.space)
+  s.measures = measures
+  s.trians = trians
   return s.trians
 end
 
@@ -106,8 +109,8 @@ function Gridap.gradient(F::IntegrandWithEmbeddedMeasure,uh::Vector,K::Int)
   if K == length(uh)
     # Need to test. My hope is that locally this will work - ghosts will be wrong but
     #  will be thrown away later.
-    contribs = map(local_measures,local_views(uh[end]),local_fields) do dΩ,φh,lf
-      _f = u -> F.F(lf[1:K-1]...,u,lf[K+1:end]...,dΩ...,F.get_embedded_dΩ(φh,get_fe_space(φh))...)
+    contribs = map(local_measures,local_fields) do dΩ,lf
+      _f = u -> F.F(lf[1:K-1]...,u,lf[K+1:end]...,dΩ...,F.get_embedded_dΩ(u,get_fe_space(lf[K]))...)
       return Gridap.Fields.gradient(_f,lf[K])
     end
   else
