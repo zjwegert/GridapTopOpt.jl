@@ -21,7 +21,7 @@ BUILD_DIR=$SOURCES_DIR/build
 git clone git@github.com:cburstedde/p4est.git $SOURCES_DIR
 cd $SOURCES_DIR
 # git checkout v2.2
-# git submodule init && git submodule update
+git submodule init && git submodule update
 ./bootstrap
 ./configure --prefix=$P4EST_INSTALL $CONFIGURE_FLAGS --without-blas --without-lapack --enable-mpi --disable-dependency-tracking
 make
