@@ -40,6 +40,7 @@ where `SLURM_JOB_NUM_NODES` and `SLURM_NTASKS` are set via
 #SBATCH --ntasks-per-node=128
 #SBATCH --exclusive
 ```
+Note that `SLURM_JOB_NUM_NODES` is automatically populated at job runtime.
 
 Here we exclusively use full nodes. There is another example of shared nodes in `TestEnvironment/job.sh`. See this [link](https://pawsey.atlassian.net/wiki/spaces/US/pages/51927426/Example+Slurm+Batch+Scripts+for+Setonix+on+CPU+Compute+Nodes#ExampleSlurmBatchScriptsforSetonixonCPUComputeNodes-Exclusiveaccesstothenode.1) for further info.
 
