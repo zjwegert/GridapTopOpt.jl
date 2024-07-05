@@ -101,7 +101,7 @@ for jobs in jobs_by_phys
   for job in vcat(strong_jobs,weak_jobs)
     name = job[1]
     content = job[2]
-    open(job_output_path*"$name.pbs","w") do f
+    open(job_output_path*"$name.sh","w") do f
       write(f,content)
     end
   end
