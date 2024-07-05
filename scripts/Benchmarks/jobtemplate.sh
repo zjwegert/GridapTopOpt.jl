@@ -19,7 +19,7 @@ export MPICH_OFI_VERBOSE=1
 #export MPICH_ENV_DISPLAY=1
 #export MPICH_MEMORY_REPORT=1
 
-srun -N $SLURM_JOB_NUM_NODES -n $SLURM_NTASKS julia --project=$PROJECT_DIR --check-bounds no -O3 \
+srun -N $SLURM_JOB_NUM_NODES -n $SLURM_NTASKS julia --project=$PROJECT_DIR \
     $PROJECT_DIR/scripts/Benchmarks/benchmark.jl \
     {{:name}} \
     {{{:write_dir}}} \
