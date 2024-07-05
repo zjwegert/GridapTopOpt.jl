@@ -1,12 +1,12 @@
 # Install p4est from sources
-# Requires two environment variables to be setup: 
+# Requires two environment variables to be setup:
 #   - P4EST_VERSION   :: P4est version
 #   - MPI_VERSION     :: MPI version and library
 #   - CONFIGURE_FLAGS :: --with-xxx style flags for compiler configuration
 
 CURR_DIR=$(pwd)
 PACKAGE=p4est
-INSTALL_ROOT=$HOME/bin
+INSTALL_ROOT=$MYSOFTWARE
 P4EST_INSTALL=$INSTALL_ROOT/$PACKAGE/$P4EST_VERSION-$MPI_VERSION
 TAR_FILE=$PACKAGE-$P4EST_VERSION.tar.gz
 URL="https://github.com/p4est/p4est.github.io/raw/master/release"
