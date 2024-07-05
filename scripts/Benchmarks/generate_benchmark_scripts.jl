@@ -89,7 +89,7 @@ phys_types = [
 ];
 
 # Template
-template = read("$(ENV["SCRATCH"])/$dir_name/scripts/Benchmarks/jobtemplate.sh",String)
+template = read("jobtemplate.sh",String)
 
 ## Generate Jobs
 jobs_by_phys = map(x->(x[1],generate_jobs(template,x[1],x[2],x[3])),phys_types);
