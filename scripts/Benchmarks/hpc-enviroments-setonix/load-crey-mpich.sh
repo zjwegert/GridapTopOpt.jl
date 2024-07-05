@@ -1,4 +1,3 @@
-module purge
 module load cray-mpich
 
 export P4EST_VERSION='2.8.5'
