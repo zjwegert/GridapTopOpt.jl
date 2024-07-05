@@ -12,9 +12,9 @@ Three environment variables are required for everything to work:
 
 These variables are setup like in `load-configs.sh`, and you should probably have them in your `.bashrc`. Although not compulsory, we also recommend setting up your Julia depot like in `load-configs.sh` or you might run with memory problems in your home folder when compiling.
 
-After these variables have been setup, you can load the necessary modules for MPI with the scripts `load-intel.sh` (Intel MPI) or `load-ompi.sh` (OpenMPI).
+After these variables have been setup, you can load the necessary modules for MPI with the script `load-cray-mpich.sh` (Cray MPICH).
 
-We also provide scripts `install-p4est.sh` and `install-petsc.sh` that using the given variables installs the selected configuration for teh libraries in your home directory `$HOME/bin/library/version-mpiversion`.
+We also provide scripts `install-p4est.sh` and `install-petsc.sh` that using the given variables installs the selected configuration for the libraries in your software directory `$MYSOFTWARE/library/version-mpiversion`.
 
 To load julia, you might add `module load julia/X.Y.Z` to your `.bashrc` or setup your own binaries in `$HOME/bin/julia/X.Y.Z` and then add it to your path.
 

@@ -4,6 +4,9 @@ using DrWatson
 using Gridap, GridapDistributed, GridapPETSc, GridapGmsh, GridapP4est
 using PartitionedArrays
 
+import Gridap.Adaptivity: refine
+import GridapDistributed: redistribute
+
 export OPTIONS_CG_JACOBI, OPTIONS_CG_AMG, OPTIONS_MUMPS, OPTIONS_NEUTON_MUMPS, OPTIONS_MINRES
 export main_poisson, main_p4est
 
