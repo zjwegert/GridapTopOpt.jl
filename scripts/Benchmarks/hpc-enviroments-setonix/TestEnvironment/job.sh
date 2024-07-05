@@ -19,7 +19,7 @@ source $SLURM_SUBMIT_DIR/../load-cray-mpich.sh
 #export MPICH_ENV_DISPLAY=1
 #export MPICH_MEMORY_REPORT=1
 
-srun -N $SLURM_JOB_NUM_NODES -n $SLURM_NTASKS julia --project=$SLURM_SUBMIT_DIR -JTestEnvironment -e'
+srun -N $SLURM_JOB_NUM_NODES -n $SLURM_NTASKS julia --project=$SLURM_SUBMIT_DIR -J$SLURM_SUBMIT_DIR.so -e'
   using TestEnvironment;
   main_poisson(;nprocs=(2,2),ncells=(100,100))
 '
