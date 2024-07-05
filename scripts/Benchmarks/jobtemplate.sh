@@ -1,7 +1,7 @@
 #!/bin/bash
 
 #PBS -P np01
-#PBS -q normal 
+#PBS -q normal
 #PBS -N "{{:name}}"
 #PBS -l ncpus={{:ncpus}}
 #PBS -l mem={{:mem}}GB
@@ -12,7 +12,7 @@ source $HOME/hpc-environments/gadi/load-intel.sh
 PROJECT_DIR=$SCRATCH/{{:dir_name}}/
 
 mpiexec -n {{:ncpus}} julia --project=$PROJECT_DIR --check-bounds no -O3 \
-    $PROJECT_DIR/scripts/Benchmarks/benchmark_gadi.jl \
+    $PROJECT_DIR/scripts/Benchmarks/benchmark.jl \
     {{:name}} \
     {{{:write_dir}}} \
     {{:type}} \
