@@ -1,4 +1,4 @@
-export P4EST_VERSION='2.8.5'
+export P4EST_VERSION='2.8.6'
 export PETSC_VERSION='3.19.5'
 export PROJECT="pawsey1076"
 

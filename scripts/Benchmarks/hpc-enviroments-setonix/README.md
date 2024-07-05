@@ -57,3 +57,6 @@ salloc -p debug --nodes=1 --ntasks=1 --cpus-per-task=1 --mem=16G
 - Hold a job: `qhold <job id>` -> `scontrol hold <job id>`
 - Release a job: `qrls <job id>` -> `scontrol release <job id>`
 - Cluster status: `qstat -B` -> `sinfo`
+
+## Issues
+- P4est 2.8.6 or greater must be installed. Previous version do not find the `srun` command and fail to configure.
