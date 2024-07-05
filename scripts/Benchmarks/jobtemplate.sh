@@ -1,17 +1,25 @@
-#!/bin/bash
+#!/bin/bash --login
+#SBATCH --account=pawsey1076
+#SBATCH --partition=work
+#SBATCH --ntasks={{:ncpus}}
+#SBATCH --ntasks-per-node=128
+#SBATCH --exclusive
+#SBATCH --time={{:wallhr}}:00:00
 
-#PBS -P np01
-#PBS -q normal 
-#PBS -N "{{:name}}"
-#PBS -l ncpus={{:ncpus}}
-#PBS -l mem={{:mem}}GB
-#PBS -l walltime={{:wallhr}}:00:00
-#PBS -j oe
+# Load Julia/MPI/PETSc enviroment variables
+source $MYSCRATCH/GridapTopOpt.jl/scripts/hpc-enviroments-setonix/load-configs.sh
+source $MYSCRATCH/GridapTopOpt.jl/scripts/hpc-enviroments-setonix/load-crey-mpich.sh
+export PROJECT_DIR=$MYSCRATCH/GridapTopOpt.jl/
 
-source $HOME/hpc-environments/gadi/load-intel.sh
-PROJECT_DIR=$SCRATCH/{{:dir_name}}/
+# Set MPI related environment variables. (Not all need to be set)
+# Main variables for multi-node jobs (activate for multinode jobs)
+export MPICH_OFI_STARTUP_CONNECT=1
+export MPICH_OFI_VERBOSE=1
+#Ask MPI to provide useful runtime information (activate if debugging)
+#export MPICH_ENV_DISPLAY=1
+#export MPICH_MEMORY_REPORT=1
 
-mpiexec -n {{:ncpus}} julia --project=$PROJECT_DIR --check-bounds no -O3 \
+srun -N $SLURM_JOB_NUM_NODES -n $SLURM_NTASKS julia --project=$PROJECT_DIR --check-bounds no -O3 \
     $PROJECT_DIR/scripts/Benchmarks/benchmark_gadi.jl \
     {{:name}} \
     {{{:write_dir}}} \

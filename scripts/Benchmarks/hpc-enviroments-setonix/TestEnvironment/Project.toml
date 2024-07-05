@@ -1,0 +1,16 @@
+name = "TestEnvironment"
+uuid = "98cfc141-7c22-4daa-8504-b7d7df96482b"
+authors = ["JordiManyer <jordi.manyer@monash.edu>"]
+version = "0.1.0"
+
+[deps]
+DrWatson = "634d3b9d-ee7a-5ddf-bec9-22491ea816e1"
+Gridap = "56d4f2e9-7ea1-5844-9cf6-b9c51ca7ce8e"
+GridapDistributed = "f9701e48-63b3-45aa-9a63-9bc6c271f355"
+GridapGmsh = "3025c34a-b394-11e9-2a55-3fee550c04c8"
+GridapP4est = "c2c8e14b-f5fd-423d-9666-1dd9ad120af9"
+GridapPETSc = "bcdc36c2-0c3e-11ea-095a-c9dadae499f1"
+PartitionedArrays = "5a9dfac6-5c52-46f7-8278-5e2210713be9"
+
+[extras]
+MPIPreferences = "3da0fdf6-3ccc-4f1b-acd9-58baa6c99267"

@@ -1,0 +1,14 @@
+module purge
+module load cray-mpich
+
+export P4EST_VERSION='2.8.5'
+export PETSC_VERSION='3.19.5'
+export PROJECT="pawsey1076"
+
+export MPI_VERSION="CRAY-MPICH-$CRAY_MPICH_VERSION"
+export JULIA_MPI_PATH=$CRAY_MPICH_DIR
+
+export JULIA_PETSC_LIBRARY="$HOME/bin/petsc/$PETSC_VERSION-$MPI_VERSION/lib/libpetsc"
+export P4EST_ROOT_DIR="$HOME/bin/p4est/$P4EST_VERSION-$MPI_VERSION"
+
+export OMP_NUM_THREADS=1

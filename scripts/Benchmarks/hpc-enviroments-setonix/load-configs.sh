@@ -1,0 +1,6 @@
+export P4EST_VERSION='2.8.5'
+export PETSC_VERSION='3.19.5'
+export PROJECT="pawsey1076"
+
+export SCRATCH=$MYSCRATCH
+export JULIA_DEPOT_PATH="$MYSCRATCH/.julia"
