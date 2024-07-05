@@ -19,6 +19,10 @@ We also provide scripts `install-p4est.sh` and `install-petsc.sh` that using the
 To load julia, you might add `module load julia/X.Y.Z` to your `.bashrc` or setup your own binaries in `$HOME/bin/julia/X.Y.Z` and then add it to your path.
 
 ## MPICH Usage
+Setonix uses Cray-MPICH. To tell MPI.jl that this is the case, use
+```julia
+MPIPreferences.use_system_binary(mpiexec="srun", vendor="cray")
+```
 
 When running multi-node jobs the following enviroment variables must be set:
 ```bash
