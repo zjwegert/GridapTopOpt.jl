@@ -8,7 +8,7 @@ mesh_partitions = [(4,4,8),(4,8,8),(6,8,8),(8,8,8),(10,8,8),(12,8,8),(14,8,8),
   (16,8,8),(12,12,8),(8,10,16),(16,8,11),(8,12,16),(16,8,13),(8,14,16),
   (10,12,16),(16,16,8),(8,16,17),(12,12,16),(8,16,19),(16,16,10)]
 
-@assert Int.(prod.(mesh_partitions)/48) == collect(1:length(mesh_partitions))
+@assert Int.(prod.(mesh_partitions)/128) == collect(1:length(mesh_partitions))
 
 function generate(
     template,
