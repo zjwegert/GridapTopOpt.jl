@@ -9,7 +9,7 @@
 
 # Load Julia/MPI/PETSc enviroment variables
 source $SLURM_SUBMIT_DIR/../load-configs.sh
-source $SLURM_SUBMIT_DIR/../load-crey-mpich.sh
+source $SLURM_SUBMIT_DIR/../load-cray-mpich.sh
 
 # Set MPI related environment variables. (Not all need to be set)
 # Main variables for multi-node jobs (activate for multinode jobs)

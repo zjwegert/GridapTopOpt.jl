@@ -8,7 +8,7 @@
 
 # Load Julia/MPI/PETSc enviroment variables
 source $MYSCRATCH/GridapTopOpt.jl/scripts/hpc-enviroments-setonix/load-configs.sh
-source $MYSCRATCH/GridapTopOpt.jl/scripts/hpc-enviroments-setonix/load-crey-mpich.sh
+source $MYSCRATCH/GridapTopOpt.jl/scripts/hpc-enviroments-setonix/load-cray-mpich.sh
 export PROJECT_DIR=$MYSCRATCH/GridapTopOpt.jl/
 
 # Set MPI related environment variables. (Not all need to be set)
