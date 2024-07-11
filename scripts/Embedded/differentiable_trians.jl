@@ -1,5 +1,5 @@
 
-using Gridap.CellData, Gridap.Geometry, Gridap.Helpers
+using Gridap.CellData, Gridap.Geometry, Gridap.Helpers, Gridap.Arrays
 
 function CellData.get_contribution(a::DomainContribution,trian::Geometry.AppendedTriangulation)
   if haskey(a.dict,trian)
@@ -15,6 +15,11 @@ function CellData.get_contribution(a::DomainContribution,trian::Geometry.Appende
   end
 end
 
+function FESpaces._compute_cell_ids(uh,ttrian::AppendedTriangulation)
+  ids_a = FESpaces._compute_cell_ids(uh,ttrian.a)
+  ids_b = FESpaces._compute_cell_ids(uh,ttrian.b)
+  lazy_append(ids_a,ids_b)
+end
 
 # DifferentiableTriangulation
 
@@ -38,7 +43,7 @@ function update_trian!(trian::DifferentiableTriangulation,φh)
   return trian
 end
 
-function Gridap.FESpaces._change_argument(
+function FESpaces._change_argument(
   op,f,trian::DifferentiableTriangulation,uh::SingleFieldFEFunction
 )
   U = get_fe_space(uh)
@@ -51,16 +56,27 @@ function Gridap.FESpaces._change_argument(
   g
 end
 
+function FESpaces._compute_cell_ids(uh,ttrian::DifferentiableTriangulation)
+  FESpaces._compute_cell_ids(uh,ttrian.state)
+end
+
+function Geometry.get_background_model(t::DifferentiableTriangulation)
+  get_background_model(t.state)
+end
+
+Geometry.get_glue(ttrian::DifferentiableTriangulation,val::Val{d}) where d = get_glue(ttrian.state,val)
+
 # Mutable measure
 
 mutable struct MutableMeasure <: Measure
   state :: Measure
-  params 
+  trian :: Triangulation
+  params
 end
 
 function Measure(trian::DifferentiableTriangulation,args...;kwargs...)
   state = Measure(trian.state,args...;kwargs...)
-  meas  = MutableMeasure(state,(args,kwargs))
+  meas  = MutableMeasure(state, trian,(args,kwargs))
   push!(trian.children, objectid(meas) => meas)
   return meas
 end
@@ -71,4 +87,9 @@ function update_measure!(meas::MutableMeasure,trian::Triangulation)
   return meas
 end
 
-CellData.integrate(f,b::MutableMeasure) = integrate(f,b.state)
+function CellData.integrate(f,b::MutableMeasure)
+  c = integrate(f,b.state.quad)
+  cont = DomainContribution()
+  add_contribution!(cont,b.trian,c)
+  cont
+end
