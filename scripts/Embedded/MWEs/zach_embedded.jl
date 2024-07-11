@@ -6,7 +6,7 @@ using GridapEmbedded.LevelSetCutters
 using Gridap.Geometry, Gridap.FESpaces, Gridap.CellData
 import Gridap.Geometry: get_node_coordinates, collect1d
 
-include("../differentiable_trians.jl")
+include("../differentiable_trians_zachs_ver.jl")
 
 order = 1
 model = CartesianDiscreteModel((0,1,0,1),(30,30))
