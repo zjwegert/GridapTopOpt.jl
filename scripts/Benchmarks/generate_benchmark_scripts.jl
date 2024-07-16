@@ -77,7 +77,7 @@ fe_order= 1;
 verbose= 1;
 write_dir = "\$SCRATCH/$dir_name/results/benchmarks/"
 
-parts = mesh_partitions[1:4]
+parts = mesh_partitions[1:8]
 strong_dof=(100+1)^3*3; # Number of dofs for strong scaling
 
 # Phys type and number of dofs per node, and what to benchmark
@@ -98,7 +98,7 @@ for jobs in jobs_by_phys
   strong_jobs,weak_jobs,dof_sanity_check = jobs[2]
 
   println("$(jobs[1]): Weak dofs = $(dof_sanity_check[1])\n     Error = $(dof_sanity_check[2])\n")
-  for job in vcat(strong_jobs,weak_jobs)
+  for job in weak_jobs#vcat(strong_jobs,weak_jobs)
     name = job[1]
     content = job[2]
     open(job_output_path*"$name.sh","w") do f
