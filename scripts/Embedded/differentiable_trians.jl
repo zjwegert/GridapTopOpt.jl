@@ -21,6 +21,52 @@ function FESpaces._compute_cell_ids(uh,ttrian::AppendedTriangulation)
   lazy_append(ids_a,ids_b)
 end
 
+using Gridap.Geometry
+using Gridap.Geometry: num_nodes
+
+function GridapEmbedded.LevelSetCutters._get_value_at_coords(φh::CellField,model::DiscreteModel{Dc,Dp}) where {Dc,Dp}
+  @assert DomainStyle(φh) == ReferenceDomain()
+  # Cell-to-node map for the original model
+  c2n_map = collect1d(get_cell_node_ids(model))
+
+  # Cell-wise node coordinates (in ReferenceDomain coordinates)
+  cell_reffe = get_cell_reffe(model)
+  cell_node_coords = lazy_map(get_node_coordinates,cell_reffe)
+
+  weights = fill(0.0,num_nodes(model))
+  for cell in eachindex(c2n_map)
+    for node in c2n_map[cell]
+      weights[node] += 1.0
+    end
+  end
+  for node in 1:num_nodes(model)
+    weights[node] = 1.0 / weights[node]
+  end
+
+  # Get cell data
+  φh_data = CellData.get_data(φh)
+  T = return_type(testitem(CellData.get_data(φh)),testitem(testitem(cell_node_coords)))
+  values  =zeros(T,num_nodes(model))
+  cell_node_coords_cache = array_cache(cell_node_coords)
+  # Loop over cells
+  for cell in eachindex(c2n_map)
+    field = φh_data[cell]
+    node_coords = getindex!(cell_node_coords_cache,cell_node_coords,cell)
+    for (iN,node) in enumerate(c2n_map[cell])
+      val = field(node_coords[iN])
+      values[node] += val * weights[node]
+    end
+  end
+
+  for node in 1:num_nodes(model)
+    if iszero(values[node])
+      values[node] -= eps(T)
+    end
+  end
+
+  return values
+end
+
 # DifferentiableTriangulation
 
 mutable struct DifferentiableTriangulation{Dc,Dp} <: Triangulation{Dc,Dp}
