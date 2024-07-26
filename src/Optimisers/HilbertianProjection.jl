@@ -222,7 +222,7 @@ struct HilbertianProjection{A} <: Optimiser
 
   !!! note
       The line search has been adjusted so that it is only enforced once the constraints
-      are within a set tolerance. This generally leads to better optimisation histories, especically
+      are within a set tolerance. This generally leads to better optimisation histories, especially
       for problems where constraints are far from saturation and the objective must decrease to
       improve the constraints.
 
