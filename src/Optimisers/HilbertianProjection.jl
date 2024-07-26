@@ -123,6 +123,13 @@ function compute_α(C,dC_orthog,dC,normsq,K,P,λ,α_min,α_max)
   return α, ∑α², debug_flag
 end
 
+# Enable optimisations when not using auto diff. Without autodiff, we can compute
+#   sensitivities with a small cost and avoid recomputing the whole forward problem
+#   after the line search. When using AD we solve an adjoint problem for each constraint
+#   which is costly if done at each iteration of the line search.
+struct WithAutoDiff end
+struct NoAutoDiff end
+
 """
     struct HilbertianProjection <: Optimiser
 
@@ -141,7 +148,7 @@ A Hilbertian projection method as described by Wegert et al., 2023
 - `has_oscillations::Function`: A function to check for oscillations.
 - `params::NamedTuple`: Optimisation parameters.
 """
-struct HilbertianProjection <: Optimiser
+struct HilbertianProjection{A} <: Optimiser
   problem           :: PDEConstrainedFunctionals
   ls_evolver        :: LevelSetEvolution
   vel_ext           :: VelocityExtension
@@ -205,8 +212,8 @@ struct HilbertianProjection <: Optimiser
   - `ls_max_iters = 10`: Maximum number of line search iterations.
   - `ls_δ_inc = 1.1`: Increase multiplier for `γ` on acceptance.
   - `ls_δ_dec = 0.7`: Decrease multiplier for `γ` on rejection.
-  - `ls_ξ = 0.0025`: Line search tolerance for objective reduction.
-  - `ls_ξ_reduce_coef = 0.1`: Coeffient on `ls_ξ` if constraints within tolerance (see below).
+  - `ls_ξ = 1.0`: Line search tolerance for objective reduction.
+  - `ls_ξ_reduce_coef = 0.0025`: Coeffient on `ls_ξ` if constraints within tolerance (see below).
   - `ls_ξ_reduce_abs_tol = 0.01`: Tolerance on constraints to reduce `ls_ξ` via `ls_ξ_reduce_coef`.
   - `ls_γ_min = 0.001`: Minimum coeffient on the time step size for solving the HJ evolution equation.
   - `ls_γ_max = 0.1`: Maximum coeffient on the time step size for solving the HJ evolution equation.
@@ -214,9 +221,12 @@ struct HilbertianProjection <: Optimiser
   A more concervative evolution of the boundary can be achieved by decreasing `ls_γ_max`.
 
   !!! note
-      For some problems (e.g., inverter mechanism), we have observed that a simple oscillation
-      detection algorithm leads to better convergence compared to the line search. By default
-      disabling the line search via `ls_enabled = false` will enable oscillation detection.
+      The line search has been adjusted so that it is only enforced once the constraints
+      are within a set tolerance. This generally leads to better optimisation histories, especially
+      for problems where constraints are far from saturation and the objective must decrease to
+      improve the constraints.
+
+      This can be set to always be enfored by taking `ls_ξ = 0.0025` and `ls_ξ_reduce_coef = 0.1`.
   """
     function HilbertianProjection(
     problem    :: PDEConstrainedFunctionals{N},
@@ -226,7 +236,7 @@ struct HilbertianProjection <: Optimiser
     orthog = HPModifiedGramSchmidt(),
     λ=0.5, α_min=0.1, α_max=1.0, γ=0.1, γ_reinit=0.5, reinit_mod = 1,
     ls_enabled = true, ls_max_iters = 10, ls_δ_inc = 1.1, ls_δ_dec = 0.7,
-    ls_ξ = 0.0025, ls_ξ_reduce_coef = 0.1, ls_ξ_reduce_abs_tol = 0.01,
+    ls_ξ = 1, ls_ξ_reduce_coef = 0.0025, ls_ξ_reduce_abs_tol = 0.01,
     ls_γ_min = 0.001, ls_γ_max = 0.1,
     maxiter = 1000, verbose=false, constraint_names = map(i -> Symbol("C_$i"),1:N),
     converged::Function = default_hp_converged, debug = false,
@@ -240,12 +250,15 @@ struct HilbertianProjection <: Optimiser
     al_keys = [:J,constraint_names...,:γ]
     al_bundles = Dict(:C => constraint_names)
     history = OptimiserHistory(Float64,al_keys,al_bundles,maxiter,verbose)
-
     projector = HilbertianProjectionMap(N,orthog,vel_ext;λ,α_min,α_max,debug)
+
+    # Optimisation when not using AD
+    A = ((typeof(problem.analytic_dJ) <: Function) &&
+      all(@. typeof(problem.analytic_dC) <: Function)) ? NoAutoDiff : WithAutoDiff;
+
     params = (;debug,γ,γ_reinit,reinit_mod,ls_enabled,ls_max_iters,ls_δ_inc,ls_δ_dec,ls_ξ,
                ls_ξ_reduce_coef,ls_ξ_reduce_abs_tol,ls_γ_min,ls_γ_max,os_γ_mult)
-    new(problem,ls_evolver,vel_ext,projector,history,converged,
-      has_oscillations,params,φ0)
+    new{A}(problem,ls_evolver,vel_ext,projector,history,converged,has_oscillations,params,φ0)
   end
 end
 
@@ -339,9 +352,26 @@ function Base.iterate(m::HilbertianProjection,state)
   U_reg = get_deriv_space(m.problem.state_map)
   V_φ   = get_aux_space(m.problem.state_map)
   interpolate!(FEFunction(U_reg,θ),vel,V_φ)
+  J, C, dJ, dC, γ = _linesearch!(m,state)
 
-  ls_enabled = params.ls_enabled
-  reinit_mod = params.reinit_mod
+  ## Hilbertian extension-regularisation
+  project!(m.vel_ext,dJ)
+  project!(m.vel_ext,dC)
+  θ = update_descent_direction!(m.projector,dJ,C,dC,m.vel_ext.K)
+
+  ## Update history and build state
+  push!(history,(J,C...,γ))
+  uh = get_state(m.problem)
+  state = (;it=it+1, J, C, θ, dJ, dC, uh, φh, vel, φ_tmp, γ, os_it)
+  vars  = params.debug ? (it,uh,φh,state) : (it,uh,φh)
+  return vars, state
+end
+
+function _linesearch!(m::HilbertianProjection{WithAutoDiff},state)
+  it, J, C, θ, dJ, dC, uh, φh, vel, φ_tmp, γ, os_it = state
+
+  params = m.params; history = m.history
+  ls_enabled = params.ls_enabled; reinit_mod = params.reinit_mod
   ls_max_iters,δ_inc,δ_dec = params.ls_max_iters,params.ls_δ_inc,params.ls_δ_dec
   ξ, ξ_reduce, ξ_reduce_tol = params.ls_ξ, params.ls_ξ_reduce_coef, params.ls_ξ_reduce_abs_tol
   γ_min, γ_max = params.ls_γ_min,params.ls_γ_max
@@ -375,18 +405,52 @@ function Base.iterate(m::HilbertianProjection,state)
 
   ## Calculate objective, constraints, and shape derivatives after line search
   J, C, dJ, dC = Gridap.evaluate!(m.problem,φh)
-  uh = get_state(m.problem)
 
-  ## Hilbertian extension-regularisation
-  project!(m.vel_ext,dJ)
-  project!(m.vel_ext,dC)
-  θ = update_descent_direction!(m.projector,dJ,C,dC,m.vel_ext.K)
+  return J, C, dJ, dC, γ
+end
 
-  ## Update history and build state
-  push!(history,(J,C...,γ))
-  state = (;it=it+1, J, C, θ, dJ, dC, uh, φh, vel, φ_tmp, γ, os_it)
-  vars  = params.debug ? (it,uh,φh,state) : (it,uh,φh)
-  return vars, state
+function _linesearch!(m::HilbertianProjection{NoAutoDiff},state)
+  it, J, C, θ, dJ, dC, uh, φh, vel, φ_tmp, γ, os_it = state
+
+  params = m.params; history = m.history
+  ls_enabled = params.ls_enabled; reinit_mod = params.reinit_mod
+  ls_max_iters,δ_inc,δ_dec = params.ls_max_iters,params.ls_δ_inc,params.ls_δ_dec
+  ξ, ξ_reduce, ξ_reduce_tol = params.ls_ξ, params.ls_ξ_reduce_coef, params.ls_ξ_reduce_abs_tol
+  γ_min, γ_max = params.ls_γ_min,params.ls_γ_max
+
+  ls_it = 0; done = false
+  φ = get_free_dof_values(φh); copy!(φ_tmp,φ)
+  while !done && (ls_it <= ls_max_iters)
+    # Advect  & Reinitialise
+    evolve!(m.ls_evolver,φ,vel,γ)
+    iszero(it % reinit_mod) && reinit!(m.ls_evolver,φ,params.γ_reinit)
+
+    # Check enabled
+    if ~ls_enabled
+      J, C, dJ, dC = Gridap.evaluate!(m.problem,φh)
+      return J, C, dJ, dC, γ
+    end
+
+    # Calcuate new objective and constraints
+    J_interm, C_interm, dJ_interm, dC_interm = Gridap.evaluate!(m.problem,φh)
+
+    # Reduce line search parameter if constraints close to saturation
+    _ξ = all(Ci -> abs(Ci) < ξ_reduce_tol, C_interm) ? ξ*ξ_reduce : ξ
+
+    # Accept/reject
+    if (J_interm < J + _ξ*abs(J)) || (γ <= γ_min)
+      γ = min(δ_inc*γ, γ_max)
+      done = true
+      print_msg(history,"  Accepted iteration with γ = $(γ) \n";color=:yellow)
+      J, C, dJ, dC = J_interm, C_interm, dJ_interm, dC_interm
+    else
+      γ = max(δ_dec*γ, γ_min)
+      copy!(φ,φ_tmp)
+      print_msg(history,"  Reject iteration with γ = $(γ) \n";color=:red)
+    end
+  end
+
+  return J, C, dJ, dC, γ
 end
 
 function debug_print(orthog,dV,dC,dC_orthog,K,P,nullity,debug_code,debug)
