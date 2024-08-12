@@ -1,4 +1,4 @@
-# GridapTopOpt
+# <img src="/assets/logo.svg" alt="drawing" width="200" align="left"/> <br/><br/>GridapTopOpt
 
 [![](https://img.shields.io/badge/docs-stable-blue.svg)](https://zjwegert.github.io/GridapTopOpt.jl/stable) [![Build Status](https://github.com/zjwegert/GridapTopOpt.jl/actions/workflows/ci.yml/badge.svg)](https://github.com/zjwegert/GridapTopOpt.jl/actions) [![Codecov](https://codecov.io/gh/zjwegert/GridapTopOpt.jl/branch/main/graph/badge.svg)](https://codecov.io/gh/zjwegert/GridapTopOpt.jl)
 
