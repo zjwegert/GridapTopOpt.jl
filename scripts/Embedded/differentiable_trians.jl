@@ -28,67 +28,83 @@ function get_edge_list(poly::Polytope)
   ltcell_to_lpoints, simplex = simplexify(poly)
   simplex_edges = get_faces(simplex,1,0)
   ltcell_to_edges = map(pts -> map(e -> pts[e], simplex_edges), ltcell_to_lpoints)
-  return unique(sort,vcat(ltcell_to_edges...))
+  return collect(Vector{Int8},unique(sort,vcat(ltcell_to_edges...)))
 end
 
-function belongs_to_edge(p,edge,bgpts)
-  p1,p2 = bgpts[edge]
-  return iszero(cross(p-p1,p2-p1))
+function belongs_to_edge(
+  p::Point{D,T},edge::Vector{<:Integer},bgpts::Vector{Point{D,T}}
+) where {D,T}
+  tol = 10*eps(T)
+  p1, p2 = bgpts[edge]
+  return abs(cross(p-p1,p2-p1)) < tol
 end
 
-function compute_coords(
-  coords ::Vector{<:Point{Dp,Tp}},
-  rcoords::Vector{<:Point{Dp,Tp}},
+struct DualizeCoordsMap <: Map end
+
+function Arrays.return_cache(
+  k::DualizeCoordsMap,
+  coords::Vector{<:Point{Dp,Tp}},
   bg_coords::Vector{<:Point{Dp,Tp}},
-  bg_rcoords::Vector{<:Point{Dp,Tp}},
   values::Vector{Tv},
-  edges
+  edges::Vector{Int8},
+  edge_list::Vector{Vector{Int8}}
 ) where {Dp,Tp,Tv}
   T = Point{Dp,Tv}
-  new_coords = Vector{T}(undef,length(coords))
-  new_rcoords = Vector{T}(undef,length(rcoords))
-  for (i,(q,p)) in enumerate(zip(coords,rcoords))
-    if p ∈ bg_rcoords
-      new_coords[i] = q
-      new_rcoords[i] = p
-      continue
+  return CachedArray(zeros(T, length(coords)))
+end
+
+function Arrays.evaluate!(
+  cache,
+  k::DualizeCoordsMap,
+  coords::Vector{<:Point{Dp,Tp}},
+  bg_coords::Vector{<:Point{Dp,Tp}},
+  values::Vector{Tv},
+  edges::Vector{Int8},
+  edge_list::Vector{Vector{Int8}}
+) where {Dp,Tp,Tv}
+  setsize!(cache,(length(coords),))
+  new_coords = cache.array
+  for (i,e) in enumerate(edges)
+    if e == -1
+      new_coords[i] = coords[i]
+    else
+      n1, n2 = edge_list[e]
+      q1, q2 = bg_coords[n1], bg_coords[n2]
+      v1, v2 = abs(values[n1]), abs(values[n2])
+      λ = v1/(v1+v2)
+      new_coords[i] = q1 + λ*(q2-q1)
     end
-    e = findfirst(edge -> belongs_to_edge(p,edge,bg_rcoords), edges)
-    n1, n2 = edges[e]
-    q1, q2 = bg_coords[n1], bg_coords[n2]
-    p1, p2 = bg_rcoords[n1], bg_rcoords[n2]
-    v1, v2 = values[n1], values[n2]
-    w1, w2 = abs(v1), abs(v2)
-    λ = w1/(w1+w2)
-    new_coords[i] = q1 + λ*(q2-q1)
-    new_rcoords[i] = p1 + λ*(p2-p1)
   end
-  return new_coords, new_rcoords
+  return new_coords
 end
 
-function compute_coords(
-  cell_to_coords::AbstractVector{<:AbstractVector{<:Point{Dp,Tp}}},
-  cell_to_rcoords::AbstractVector{<:AbstractVector{<:Point{Dp,Tp}}},
-  cell_to_bgcoords::AbstractVector{<:AbstractVector{<:Point{Dp,Tp}}},
-  cell_to_bg_rcoords::AbstractVector{<:AbstractVector{<:Point{Dp,Tp}}},
-  cell_to_values::AbstractVector{<:AbstractVector{Tv}},
-  cell_to_edges
-) where {Dp,Tp,Tv}
-  T = Point{Dp,Tv}
-  results = lazy_map(compute_coords,cell_to_coords,cell_to_rcoords,cell_to_bgcoords,cell_to_bg_rcoords,cell_to_values,cell_to_edges)
-  cache = array_cache(results)
-  ncells = length(cell_to_coords)
-  new_cell_to_coords = Vector{Vector{T}}(undef,ncells)
-  new_cell_to_rcoords = Vector{Vector{T}}(undef,ncells)
-  for cell in 1:ncells
-    new_coords, new_rcoords = getindex!(cache,results,cell)
-    new_cell_to_coords[cell] = new_coords
-    new_cell_to_rcoords[cell] = new_rcoords
+function precompute_cut_edge_ids(
+  rcoords::Vector{<:Point{Dp,Tp}},
+  bg_rcoords::Vector{<:Point{Dp,Tp}},
+  edge_list::Vector{<:Vector{<:Integer}}
+) where {Dp,Tp}
+  tol = 10*eps(Tp)
+  edges = Vector{Int8}(undef,length(rcoords))
+  for (i,p) in enumerate(rcoords)
+    if any(q -> norm(q-p) < tol, bg_rcoords)
+      edges[i] = Int8(-1)
+    else
+      e = findfirst(edge -> belongs_to_edge(p,edge,bg_rcoords), edge_list)
+      edges[i] = Int8(e)
+    end
   end
-  return new_cell_to_coords, new_cell_to_rcoords
+  return edges
 end
 
-function compute_dual_values(
+function precompute_cut_edge_ids(
+  cell_to_rcoords::AbstractArray,
+  cell_to_bg_rcoords::AbstractArray,
+  cell_to_edge_list::AbstractArray
+)
+  collect(lazy_map(precompute_cut_edge_ids,cell_to_rcoords,cell_to_bg_rcoords,cell_to_edge_list))
+end
+
+function dualize_cell_coordinates(
   trian::GridapEmbedded.Interfaces.SubCellTriangulation,
   φh::CellField
 )
@@ -100,27 +116,27 @@ function compute_dual_values(
   point_to_rcoords = subcells.point_to_rcoords
   point_to_coords  = subcells.point_to_coords
 
-  ctypes = get_cell_type(bgmodel)
-  bgcell_to_polys = expand_cell_data(get_polytopes(bgmodel),ctypes)
+  bg_ctypes = get_cell_type(bgmodel)
+
+  bgcell_to_polys = expand_cell_data(get_polytopes(bgmodel),bg_ctypes)
   bgcell_to_coords = get_cell_coordinates(bgmodel)
   bgcell_to_rcoords = lazy_map(get_vertex_coordinates,bgcell_to_polys)
-  bgcell_to_edges = lazy_map(get_edge_list,bgcell_to_polys)
+  bgcell_to_edge_lists = lazy_map(get_edge_list,bgcell_to_polys)
   bgcell_to_values = lazy_map(evaluate,CellData.get_data(φh),bgcell_to_rcoords)
   
   cell_to_reffes = Fill(LagrangianRefFE(Float64,TRI,1),length(cell_to_points))
   cell_to_bgcoords = lazy_map(Reindex(bgcell_to_coords),cell_to_bgcell)
   cell_to_bgrcoords = lazy_map(Reindex(bgcell_to_rcoords),cell_to_bgcell)
   cell_to_values = lazy_map(Reindex(bgcell_to_values),cell_to_bgcell)
-  cell_to_edges = lazy_map(Reindex(bgcell_to_edges),cell_to_bgcell)
+  cell_to_edge_lists = lazy_map(Reindex(bgcell_to_edge_lists),cell_to_bgcell)
   
   old_cell_to_rcoords = lazy_map(Broadcasting(Reindex(point_to_rcoords)),cell_to_points)
   old_cell_to_coords = lazy_map(Broadcasting(Reindex(point_to_coords)),cell_to_points)
+
+  cell_to_edges = precompute_cut_edge_ids(old_cell_to_rcoords,cell_to_bgrcoords,cell_to_edge_lists)
   
-  new_cell_to_coords, new_cell_to_rcoords = compute_coords(
-    old_cell_to_coords,old_cell_to_rcoords,cell_to_bgcoords,cell_to_bgrcoords,cell_to_values,cell_to_edges
-  )
-  #@assert all(new_cell_to_rcoords .== old_cell_to_rcoords)
-  #@assert all(new_cell_to_coords .== old_cell_to_coords)
+  new_cell_to_coords = lazy_map(DualizeCoordsMap(),old_cell_to_coords,cell_to_bgcoords,cell_to_values,cell_to_edges,cell_to_edge_lists)
+  new_cell_to_rcoords = lazy_map(DualizeCoordsMap(),old_cell_to_rcoords,cell_to_bgrcoords,cell_to_values,cell_to_edges,cell_to_edge_lists)
   
   new_cmaps = compute_cell_maps(new_cell_to_coords,cell_to_reffes)
   new_ref_cmaps = compute_cell_maps(new_cell_to_rcoords,cell_to_reffes)
@@ -156,7 +172,7 @@ end
 (t::DifferentiableTriangulation)(φh) = update_trian!(t,φh)
 
 function update_trian!(trian::DifferentiableTriangulation,φh)
-  trian.state = compute_dual_values(trian.trian,φh)
+  trian.state = dualize_cell_coordinates(trian.trian,φh)
   return trian
 end
 
