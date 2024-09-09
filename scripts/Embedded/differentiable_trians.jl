@@ -70,6 +70,18 @@ function Arrays.evaluate!(
     else
       n1, n2 = edge_list[e]
       q1, q2 = bg_coords[n1], bg_coords[n2]
+      # v1, v2 = values[n1], values[n2]
+      # if v1 > 0 && v2 < 0
+      #   w1 = min(v1, 1)
+      #   w2 = max(v2, -1)
+      #   λ = w1/(w1-w2)
+      #   new_coords[i] = q1 + λ*(q2-q1)
+      # else
+      #   w1 = max(v1, -1)
+      #   w2 = min(v2, 1)
+      #   λ = w2/(w2-w1)
+      #   new_coords[i] = q2 + λ*(q1-q2)
+      # end
       v1, v2 = abs(values[n1]), abs(values[n2])
       λ = v1/(v1+v2)
       new_coords[i] = q1 + λ*(q2-q1)
@@ -101,7 +113,7 @@ function precompute_autodiff_caches(
 )
   bgmodel = get_background_model(trian)
   subcells = trian.subcells
-  
+
   cell_to_bgcell   = subcells.cell_to_bgcell
   cell_to_points   = subcells.cell_to_points
   point_to_rcoords = subcells.point_to_rcoords
@@ -115,7 +127,7 @@ function precompute_autodiff_caches(
   bgcell_to_polys = expand_cell_data(get_polytopes(bgmodel),bg_ctypes)
   bgcell_to_coords = get_cell_coordinates(bgmodel)
   bgcell_to_rcoords = lazy_map(get_vertex_coordinates,bgcell_to_polys)
-  
+
   cell_to_bgcoords = lazy_map(Reindex(bgcell_to_coords),cell_to_bgcell)
   cell_to_bgrcoords = lazy_map(Reindex(bgcell_to_rcoords),cell_to_bgcell)
   cell_to_rcoords = lazy_map(Broadcasting(Reindex(point_to_rcoords)),cell_to_points)
@@ -124,13 +136,13 @@ function precompute_autodiff_caches(
   bgcell_to_edge_lists = lazy_map(get_edge_list,bgcell_to_polys)
   cell_to_edge_lists = lazy_map(Reindex(bgcell_to_edge_lists),cell_to_bgcell)
   cell_to_edges = collect(lazy_map(precompute_cut_edge_ids,cell_to_rcoords,cell_to_bgrcoords,cell_to_edge_lists))
-  
+
   cache = (;
     cell_to_rcoords,
     cell_to_coords,
     cell_to_bgrcoords,
     cell_to_bgcoords,
-    cell_to_edges, 
+    cell_to_edges,
     cell_to_edge_lists
   )
   return cache
@@ -148,7 +160,7 @@ function extract_dualized_cell_values(
   bgcell_to_rcoords = lazy_map(get_vertex_coordinates,bgcell_to_polys)
   bgcell_to_fields = CellData.get_data(φh)
   bgcell_to_values = lazy_map(evaluate,bgcell_to_fields,bgcell_to_rcoords)
-  
+
   cell_to_bgcell   = subcells.cell_to_bgcell
   cell_to_values = lazy_map(Reindex(bgcell_to_values),cell_to_bgcell)
   return cell_to_values
