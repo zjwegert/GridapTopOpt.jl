@@ -36,7 +36,7 @@ function belongs_to_edge(
 ) where {D,T}
   tol = 10*eps(T)
   p1, p2 = bgpts[edge]
-  return abs(cross(p-p1,p2-p1)) < tol
+  return norm(cross(p-p1,p2-p1)) < tol
 end
 
 struct DualizeCoordsMap <: Map end
@@ -70,21 +70,21 @@ function Arrays.evaluate!(
     else
       n1, n2 = edge_list[e]
       q1, q2 = bg_coords[n1], bg_coords[n2]
-      # v1, v2 = values[n1], values[n2]
-      # if v1 > 0 && v2 < 0
-      #   w1 = min(v1, 1)
-      #   w2 = max(v2, -1)
-      #   λ = w1/(w1-w2)
-      #   new_coords[i] = q1 + λ*(q2-q1)
-      # else
-      #   w1 = max(v1, -1)
-      #   w2 = min(v2, 1)
-      #   λ = w2/(w2-w1)
-      #   new_coords[i] = q2 + λ*(q1-q2)
-      # end
-      v1, v2 = abs(values[n1]), abs(values[n2])
-      λ = v1/(v1+v2)
-      new_coords[i] = q1 + λ*(q2-q1)
+      v1, v2 = values[n1], values[n2]
+      if v1 > 0 && v2 < 0
+        w1 = min(v1, 1)
+        w2 = max(v2, -1)
+        λ = w1/(w1-w2)
+        new_coords[i] = q1 + λ*(q2-q1)
+      else
+        w1 = max(v1, -1)
+        w2 = min(v2, 1)
+        λ = w2/(w2-w1)
+        new_coords[i] = q2 + λ*(q1-q2)
+      end
+      # v1, v2 = abs(values[n1]), abs(values[n2])
+      # λ = v1/(v1+v2)
+      # new_coords[i] = q1 + λ*(q2-q1)
     end
   end
   return new_coords
