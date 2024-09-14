@@ -255,7 +255,7 @@ end
 
 function Geometry.get_glue(ttrian::DifferentiableTriangulation{Dc},val::Val{d}) where {Dc,d}
   if isnothing(ttrian.cell_values)
-    get_glue(ttrian.trian,val)
+    return get_glue(ttrian.trian,val)
   end
   if d != Dc
     return nothing

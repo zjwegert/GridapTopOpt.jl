@@ -49,17 +49,17 @@ cutgeo = cut(model,geo)
 diff_Ωin = DifferentiableTriangulation(Ωin)
 diff_Ωout = DifferentiableTriangulation(Ωout)
 
-f(x)=x[1]+x[2]
-fh = interpolate(f,V_φ)
+fh = interpolate(x->x[1]+x[2],V_φ)
 
 dΩin = Measure(diff_Ωin,2*order)
-j_in(φ) = ∫(f)dΩin # <- Cannot take fh due to missing method?
+j_in(φ) = ∫(fh)dΩin
+# j_in(φ) = ∫(cos ∘ fh)dΩin # <- this breaks
 dj_in = gradient(j_in,φh)
 dj_vec_in = assemble_vector(dj_in,V_φ)
 norm(dj_vec_in)
 
 dΩout = Measure(diff_Ωout,2*order)
-j_out(φ) = ∫(f)dΩout
+j_out(φ) = ∫(fh)dΩout
 dj_out = gradient(j_out,φh)
 dj_vec_out = -assemble_vector(dj_out,V_φ)
 norm(dj_vec_out)
@@ -128,17 +128,16 @@ cutgeo = cut(model,geo)
 diff_Ωin = DifferentiableTriangulation(Ωin)
 diff_Ωout = DifferentiableTriangulation(Ωout)
 
-f(x)=x[1]+x[2]+x[3]
-fh = interpolate(f,V_φ)
+fh = interpolate(x->x[1]+x[2]+x[3],V_φ)
 
 dΩin = Measure(diff_Ωin,2*order)
-j_in(φ) = ∫(f)dΩin # <- Cannot take fh due to missing method?
+j_in(φ) = ∫(fh)dΩin # <- Cannot take fh due to missing method?
 dj_in = gradient(j_in,φh)
 dj_vec_in = assemble_vector(dj_in,V_φ)
 norm(dj_vec_in)
 
 dΩout = Measure(diff_Ωout,2*order)
-j_out(φ) = ∫(f)dΩout
+j_out(φ) = ∫(fh)dΩout
 dj_out = gradient(j_out,φh)
 dj_vec_out = -assemble_vector(dj_out,V_φ)
 norm(dj_vec_out)
