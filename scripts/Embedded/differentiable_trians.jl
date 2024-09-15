@@ -270,3 +270,15 @@ function Geometry.get_glue(ttrian::DifferentiableTriangulation{Dc},val::Val{d}) 
   tface_to_mface_map = ref_cell_map
   FaceToFaceGlue(tface_to_mface,tface_to_mface_map,nothing)
 end
+
+function CellData.change_domain(a::CellField,strian::DifferentiableTriangulation,sds::ReferenceDomain,ttrian::Triangulation,tds::ReferenceDomain)
+  change_domain(a,strian.trian,sds,ttrian,tds)
+end
+
+function CellData.change_domain(a::CellField,strian::DifferentiableTriangulation,sds::ReferenceDomain,ttrian::DifferentiableTriangulation,tds::ReferenceDomain)
+  change_domain(a,strian.trian,sds,ttrian.trian,tds)
+end
+
+function CellData.change_domain(a::CellField,strian::Triangulation,sds::ReferenceDomain,ttrian::DifferentiableTriangulation,tds::ReferenceDomain)
+  change_domain(a,strian,sds,ttrian.trian,tds)
+end
