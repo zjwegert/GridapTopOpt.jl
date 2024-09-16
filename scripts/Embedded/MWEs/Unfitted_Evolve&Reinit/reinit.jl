@@ -1,3 +1,11 @@
+# Based on:
+# @article{
+#   Mallon_Thornton_Hill_Badia,
+#   title={NEURAL LEVEL SET TOPOLOGY OPTIMIZATION USING UNFITTED FINITE ELEMENTS},
+#   author={Mallon, Connor N and Thornton, Aaron W and Hill, Matthew R and Badia, Santiago},
+#   language={en}
+# }
+
 using GridapTopOpt
 
 using Gridap
@@ -7,7 +15,7 @@ using GridapEmbedded.LevelSetCutters
 using Gridap.Geometry, Gridap.FESpaces, Gridap.CellData
 import Gridap.Geometry: get_node_coordinates, collect1d
 
-include("../differentiable_trians.jl")
+include("../../differentiable_trians.jl")
 
 order = 1
 n = 101

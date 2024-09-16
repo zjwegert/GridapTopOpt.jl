@@ -14,8 +14,8 @@ n = 101
 N = 16
 a = 1
 begin
-model = CartesianDiscreteModel((0,1,0,1),(n,n))
-model = simplexify(model)
+_model = CartesianDiscreteModel((0,1,0,1),(n,n))
+model = simplexify(_model)
 Ω = Triangulation(model)
 dΩ = Measure(Ω,2*order)
 
@@ -28,8 +28,8 @@ V_φ = TestFESpace(model,reffe_scalar)
 # φh = interpolate(x->(1+0.25)abs(x[1]-0.5)+0abs(x[2]-0.5)-0.25,V_φ) # Straight lines with scaling
 # φh = interpolate(x->abs(x[1]-0.5)+0abs(x[2]-0.5)-0.25/(1+0.25),V_φ) # Straight lines without scaling
 # φh = interpolate(x->tan(-pi/3)*(x[1]-0.5)+(x[2]-0.5),V_φ) # Angled interface
-φh = interpolate(x->sqrt((x[1]-0.5)^2+(x[2]-0.5)^2)-0.25,V_φ) # Circle
-# φh = interpolate(x->a*(cos(2π*x[1])*cos(2π*x[2])-0.11),V_φ) # "Regular" LSF
+# φh = interpolate(x->sqrt((x[1]-0.5)^2+(x[2]-0.5)^2)-0.25,V_φ) # Circle
+φh = interpolate(x->a*(cos(2π*x[1])*cos(2π*x[2])-0.11),V_φ) # "Regular" LSF
 x_φ = get_free_dof_values(φh)
 
 if any(isapprox(0.0;atol=10^-10),x_φ)
@@ -52,20 +52,20 @@ diff_Ωout = DifferentiableTriangulation(Ωout)
 fh = interpolate(x->x[1]+x[2],V_φ)
 
 dΩin = Measure(diff_Ωin,2*order)
-j_in(φ) = ∫(cos ∘ fh)dΩin
+j_in(φ) = ∫(fh)dΩin
 dj_in = gradient(j_in,φh)
 dj_vec_in = assemble_vector(dj_in,V_φ)
 norm(dj_vec_in)
 
 dΩout = Measure(diff_Ωout,2*order)
-j_out(φ) = ∫(cos ∘ fh)dΩout
+j_out(φ) = ∫(fh)dΩout
 dj_out = gradient(j_out,φh)
 dj_vec_out = -assemble_vector(dj_out,V_φ)
 norm(dj_vec_out)
 
 Γ = EmbeddedBoundary(cutgeo)
 dΓ = Measure(Γ,2*order)
-dj_expected(q) = ∫(-(cos ∘ fh)*q/(norm ∘ (∇(φh))))dΓ
+dj_expected(q) = ∫(-(fh)*q/(norm ∘ (∇(φh))))dΓ
 dj_exp_vec = assemble_vector(dj_expected,V_φ)
 norm(dj_exp_vec)
 
@@ -108,6 +108,7 @@ V_φ = TestFESpace(model,reffe_scalar)
 # φh = interpolate(x->tan(-pi/3)*(x[1]-0.5)+(x[2]-0.5),V_φ) # Angled interface
 # φh = interpolate(x->sqrt((x[1]-0.5)^2+(x[2]-0.5)^2+(x[3]-0.5)^2)-0.25,V_φ) # Sphere
 φh = interpolate(x->a*(cos(2π*x[1])*cos(2π*x[2])*cos(2π*x[3])-0.11),V_φ) # "Regular" LSF
+# φh = interpolate(x->0.3(cos(2π*(x[1]-0.5))*cos(2π*(x[2]-0.5))*cos(2π*(x[3]-0.5)))+0.2(cos(2π*(x[1]-0.5))+cos(2π*(x[2]-0.5))+cos(2π*(x[3]-0.5)))+0.1(cos(2π*2*(x[1]-0.5))*cos(2π*2*(x[2]-0.5))*cos(2π*2*(x[3]-0.5)))+0.1(cos(2π*2*(x[1]-0.5))+cos(2π*2*(x[2]-0.5))+cos(2π*2*(x[3]-0.5)))+0.05(cos(2π*3*(x[1]-0.5))+cos(2π*3*(x[2]-0.5))+cos(2π*3*(x[3]-0.5)))+0.1(cos(2π*(x[1]-0.5))*cos(2π*(x[2]-0.5))+cos(2π*(x[2]-0.5))*cos(2π*(x[3]-0.5))+cos(2π*(x[3]-0.5))*cos(2π*(x[1]-0.5))),V_φ)
 x_φ = get_free_dof_values(φh)
 
 if any(isapprox(0.0;atol=10^-10),x_φ)
@@ -130,7 +131,7 @@ diff_Ωout = DifferentiableTriangulation(Ωout)
 fh = interpolate(x->x[1]+x[2]+x[3],V_φ)
 
 dΩin = Measure(diff_Ωin,2*order)
-j_in(φ) = ∫(fh)dΩin # <- Cannot take fh due to missing method?
+j_in(φ) = ∫(fh)dΩin
 dj_in = gradient(j_in,φh)
 dj_vec_in = assemble_vector(dj_in,V_φ)
 norm(dj_vec_in)
