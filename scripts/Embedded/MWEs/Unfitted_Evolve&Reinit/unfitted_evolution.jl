@@ -51,9 +51,9 @@ function GridapTopOpt.evolve!(s::UnfittedFEEvolution,φh,vel,γ)
 
   ϵ = 1e-20
 
-  geo = DiscreteGeometry(φh,model)
-  F = EmbeddedFacetDiscretization(LevelSetCutter(),model,geo)
-  FΓ = SkeletonTriangulation(F)
+  # geo = DiscreteGeometry(φh,model)
+  # F = EmbeddedFacetDiscretization(LevelSetCutter(),model,geo)
+  FΓ = SkeletonTriangulation(get_triangulation(φh))#F)
   dFΓ = Measure(FΓ,2*order)
   n = get_normal_vector(FΓ)
 
