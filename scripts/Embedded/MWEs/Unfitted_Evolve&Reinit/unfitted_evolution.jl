@@ -42,7 +42,7 @@ function GridapTopOpt.evolve!(s::UnfittedFEEvolution,φh,vel,γ)
   NT, h, c, dΩ = params.NT, params.h, params.c, params.dΩ
   # ode_solver = s.ode_solver
   Tf = γ*NT
-  velh = FEFunction(V_φ,vel)
+  velh = FEFunction(V_φ,vel) # <- needs to be normalised by Hilbertian projection norm
 
   # This is temp as can't update γ in ode_solver yet
   ode_ls = LUSolver()
@@ -92,7 +92,7 @@ function GridapTopOpt.reinit!(s::UnfittedFEEvolution,φh,args...)
   reinit_nls = s.reinit_nls
 
   γd = 20
-  cₐ = 0.5 # <- 3 in connor's paper
+  cₐ = 3.0 # 0.5 # <- 3 in connor's paper
   ϵ = 1e-20
 
   # Tmp
