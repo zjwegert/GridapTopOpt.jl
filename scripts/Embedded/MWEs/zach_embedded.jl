@@ -165,3 +165,13 @@ writevtk(
   Triangulation(cutgeo,PHYSICAL_OUT),"results/trian_out3d"
 )
 end
+
+## Surface functionals
+# We should have something like the following for J(φ)=∫_∂Ω(φ) f ds:
+#   dJ(φ)(w) = lim_{t->0} (J(φₜ)-J(φ))/t = -∫_∂Ω (n⋅∇f)w/|∂ₙφ| dS - ∑(...)
+# The first term is easy, the second term not so much...
+
+# Need [[fm]]=f₁m₁ + f₂m₂, where mₖ is the co-normal for τ = 0 with
+#                   mₖ = tₖˢ×n_{∂Ω(φ(0))∩S}
+# where tₖˢ is the tangent vector along the edge ∂Ω(φ(0))∩S and fₖ is
+# the limit of f on S defined by fₖ(x)=lim_{ϵ->0⁺} f(x-ϵmₖ) for x ∈ ∂Ω∩S.
