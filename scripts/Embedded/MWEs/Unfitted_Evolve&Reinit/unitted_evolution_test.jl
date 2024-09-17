@@ -4,7 +4,7 @@ using Gridap
 
 using GridapEmbedded
 using GridapEmbedded.LevelSetCutters
-using Gridap.Geometry, Gridap.FESpaces, Gridap.CellData, Gridap.ODEs
+using Gridap.Geometry, Gridap.FESpaces, Gridap.CellData, Gridap.ODEs, Gridap.Adaptivity
 import Gridap.Geometry: get_node_coordinates, collect1d
 
 include("unfitted_evolution.jl")
@@ -15,9 +15,12 @@ n = 101
 
 _model = CartesianDiscreteModel((0,1,0,1),(n,n))
 cd = Gridap.Geometry.get_cartesian_descriptor(_model)
+base_model = UnstructuredDiscreteModel(_model)
+ref_model = refine(base_model, refinement_method = "barycentric")
+model = ref_model.model
+# model = simplexify(_model)
 h = maximum(cd.sizes)
 
-model = simplexify(_model)
 Ω = Triangulation(model)
 dΩ = Measure(Ω,2*order)
 reffe_scalar = ReferenceFE(lagrangian,Float64,order)
