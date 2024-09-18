@@ -75,7 +75,8 @@ bgcell_to_inoutcut = compute_bgcell_to_inoutcut(model,geo)
 
 writevtk(
   Ω,"results/test",
-  cellfields=["φh"=>φh,"∇φh"=>∇(φh),"dj_in"=>FEFunction(V_φ,dj_vec_in),"dj_expected"=>FEFunction(V_φ,dj_exp_vec),"dj_out"=>FEFunction(V_φ,dj_vec_out)],
+  cellfields=["φh"=>φh,"∇φh"=>∇(φh),"dj_in"=>FEFunction(V_φ,dj_vec_in),
+    "dj_expected"=>FEFunction(V_φ,dj_exp_vec),"dj_out"=>FEFunction(V_φ,dj_vec_out)],
   celldata=["inoutcut"=>bgcell_to_inoutcut]
 )
 
@@ -87,6 +88,46 @@ writevtk(
 )
 end
 
+## Surface functionals
+# We should have something like the following for J(φ)=∫_∂Ω(φ) f ds:
+#   dJ(φ)(w) = lim_{t->0} (J(φₜ)-J(φ))/t = -∫_∂Ω (n⋅∇f)w/|∂ₙφ| dS - ∑(...)
+# The first term is easy, the second term not so much...
+
+# Need [[fm]]=f₁m₁ + f₂m₂, where mₖ is the co-normal for τ = 0 with
+#                   mₖ = tₖˢ×n_{∂Ω(φ(0))∩S}
+# where tₖˢ is the tangent vector along the edge ∂Ω(φ(0))∩S and fₖ is
+# the limit of f on S defined by fₖ(x)=lim_{ϵ->0⁺} f(x-ϵmₖ) for x ∈ ∂Ω∩S.
+
+# In 2D:
+# Take triangulation T with edges P. Let K₁ and K₂ be adjacent TRI elements
+#  with intersection S = K₁ ∩ K₂. Let ∂Ω denote the boundary of the linear
+#  cut that passes through K₁ ∪ K₂. We define n_{∂Ω ∩ Kₖ} as the normal along
+#  the cut in the respective elements K₁ and K₂. We choose the tangent to S
+#  tˢₖ to lie out of the page, namely tˢ₁ = -e₃ and t²₂ = e₃. The co-normal
+#  (or bi-normal) is then defined as
+#                       mₖ = tˢₖ × n_{∂Ω ∩ Kₖ}
+n = get_normal_vector(Γ)
+# _n(∇φ) = ∇φ/(10^-20+norm(∇φ));
+# n = _n ∘ ∇(φh)
+m(n) = VectorValue(-n[2],n[1]);
+m₁ = m ∘ n
+m₂ = -(m ∘ n)
+# do it manually
+
+
+cell_normal = get_facet_normal(Γ)
+get_normal_vector(trian,cell_normal)
+
+writevtk(
+  Γ,
+  "results/test_bndr",
+  cellfields=["φh"=>φh,"m1"=>n.⁺,"m2"=>n.⁻]
+)
+
+# n_{∂Ω(φ(0))∩Kₖ}
+
+
+## 3D
 order = 1
 n = 101
 N = 16
@@ -108,7 +149,12 @@ V_φ = TestFESpace(model,reffe_scalar)
 # φh = interpolate(x->tan(-pi/3)*(x[1]-0.5)+(x[2]-0.5),V_φ) # Angled interface
 # φh = interpolate(x->sqrt((x[1]-0.5)^2+(x[2]-0.5)^2+(x[3]-0.5)^2)-0.25,V_φ) # Sphere
 φh = interpolate(x->a*(cos(2π*x[1])*cos(2π*x[2])*cos(2π*x[3])-0.11),V_φ) # "Regular" LSF
-# φh = interpolate(x->0.3(cos(2π*(x[1]-0.5))*cos(2π*(x[2]-0.5))*cos(2π*(x[3]-0.5)))+0.2(cos(2π*(x[1]-0.5))+cos(2π*(x[2]-0.5))+cos(2π*(x[3]-0.5)))+0.1(cos(2π*2*(x[1]-0.5))*cos(2π*2*(x[2]-0.5))*cos(2π*2*(x[3]-0.5)))+0.1(cos(2π*2*(x[1]-0.5))+cos(2π*2*(x[2]-0.5))+cos(2π*2*(x[3]-0.5)))+0.05(cos(2π*3*(x[1]-0.5))+cos(2π*3*(x[2]-0.5))+cos(2π*3*(x[3]-0.5)))+0.1(cos(2π*(x[1]-0.5))*cos(2π*(x[2]-0.5))+cos(2π*(x[2]-0.5))*cos(2π*(x[3]-0.5))+cos(2π*(x[3]-0.5))*cos(2π*(x[1]-0.5))),V_φ)
+# φh = interpolate(x->0.3(cos(2π*(x[1]-0.5))*cos(2π*(x[2]-0.5))*cos(2π*(x[3]-0.5)))+
+  #0.2(cos(2π*(x[1]-0.5))+cos(2π*(x[2]-0.5))+cos(2π*(x[3]-0.5)))+0.1(cos(2π*2*(x[1]-
+  #0.5))*cos(2π*2*(x[2]-0.5))*cos(2π*2*(x[3]-0.5)))+0.1(cos(2π*2*(x[1]-0.5))+
+  #cos(2π*2*(x[2]-0.5))+cos(2π*2*(x[3]-0.5)))+0.05(cos(2π*3*(x[1]-0.5))+
+  #cos(2π*3*(x[2]-0.5))+cos(2π*3*(x[3]-0.5)))+0.1(cos(2π*(x[1]-0.5))*cos(2π*(x[2]-0.5))+
+  #cos(2π*(x[2]-0.5))*cos(2π*(x[3]-0.5))+cos(2π*(x[3]-0.5))*cos(2π*(x[1]-0.5))),V_φ)
 x_φ = get_free_dof_values(φh)
 
 if any(isapprox(0.0;atol=10^-10),x_φ)
@@ -165,13 +211,3 @@ writevtk(
   Triangulation(cutgeo,PHYSICAL_OUT),"results/trian_out3d"
 )
 end
-
-## Surface functionals
-# We should have something like the following for J(φ)=∫_∂Ω(φ) f ds:
-#   dJ(φ)(w) = lim_{t->0} (J(φₜ)-J(φ))/t = -∫_∂Ω (n⋅∇f)w/|∂ₙφ| dS - ∑(...)
-# The first term is easy, the second term not so much...
-
-# Need [[fm]]=f₁m₁ + f₂m₂, where mₖ is the co-normal for τ = 0 with
-#                   mₖ = tₖˢ×n_{∂Ω(φ(0))∩S}
-# where tₖˢ is the tangent vector along the edge ∂Ω(φ(0))∩S and fₖ is
-# the limit of f on S defined by fₖ(x)=lim_{ϵ->0⁺} f(x-ϵmₖ) for x ∈ ∂Ω∩S.

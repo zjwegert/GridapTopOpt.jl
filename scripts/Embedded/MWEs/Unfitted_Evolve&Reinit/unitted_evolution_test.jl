@@ -25,14 +25,14 @@ h = maximum(cd.sizes)
 dΩ = Measure(Ω,2*order)
 reffe_scalar = ReferenceFE(lagrangian,Float64,order)
 V_φ = TestFESpace(model,reffe_scalar)
-Ut_φ = TransientTrialFESpace(V_φ,t -> (x->-1))
+Ut_φ = TransientTrialFESpace(V_φ)
 
 α = 2.0*h
 a_hilb(p,q) = ∫(α^2*∇(p)⋅∇(q) + p*q)dΩ;
 vel_ext = VelocityExtension(a_hilb,V_φ,V_φ)
 
 # φh = interpolate(x->-sqrt((x[1]-0.5)^2+(x[2]-0.5)^2)+0.25,V_φ) # <- Already SDF
-φh = interpolate(x->cos(2π*x[1])*cos(2π*x[2])-0.11,V_φ)
+φh = interpolate(x->cos(4π*x[1])*cos(4π*x[2])-0.11,V_φ)
 
 function compute_test_velh(φh)
   geo = DiscreteGeometry(φh,model)
