@@ -113,15 +113,27 @@ m(n) = VectorValue(-n[2],n[1]);
 m₁ = m ∘ n
 m₂ = -(m ∘ n)
 # do it manually
+facet_to_bgcell = Γ.subfacets.facet_to_bgcell
+facet_to_normal = Γ.subfacets.facet_to_normal
+facet_to_points = Γ.subfacets.facet_to_points
+point_to_coords = Γ.subfacets.point_to_coords
+point_to_rcoords = Γ.subfacets.point_to_rcoords
 
-
-cell_normal = get_facet_normal(Γ)
-get_normal_vector(trian,cell_normal)
+Γg = GhostSkeleton(cutgeo,CUT) # These are edges with points ∂Ω ∩ S (2D)
+nₖ = get_normal_vector(Γg) # This gives us nₖ and so we can compute nˢ via cross
+# nₖ×tₖˢ = (tₖˢ×nˢ)×tₖˢ = -(tₖˢ⋅nˢ)tₖˢ + (tₖˢ⋅tₖˢ)nˢ = 0tₖˢ + nˢ = +nˢ
+nˢ = (m ∘ nₖ.⁻)
 
 writevtk(
-  Γ,
+  Γg,
   "results/test_bndr",
-  cellfields=["φh"=>φh,"m1"=>n.⁺,"m2"=>n.⁻]
+  cellfields=["n1"=>nₖ.⁺,"n2"=>nₖ.⁻,"ns"=>nˢ]
+)
+
+bgcell_to_inoutcut = compute_bgcell_to_inoutcut(model,geo)
+writevtk(
+  Ω,"results/test",
+  celldata=["inoutcut"=>bgcell_to_inoutcut]
 )
 
 # n_{∂Ω(φ(0))∩Kₖ}
