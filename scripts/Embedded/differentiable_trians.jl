@@ -152,6 +152,7 @@ function extract_dualized_cell_values(
   trian::GridapEmbedded.Interfaces.SubCellTriangulation,
   φh::CellField,
 )
+  @assert isa(DomainStyle(φh),ReferenceDomain)
   bgmodel = get_background_model(trian)
   subcells = trian.subcells
 
@@ -161,7 +162,7 @@ function extract_dualized_cell_values(
   bgcell_to_fields = CellData.get_data(φh)
   bgcell_to_values = lazy_map(evaluate,bgcell_to_fields,bgcell_to_rcoords)
 
-  cell_to_bgcell   = subcells.cell_to_bgcell
+  cell_to_bgcell = subcells.cell_to_bgcell
   cell_to_values = lazy_map(Reindex(bgcell_to_values),cell_to_bgcell)
   return cell_to_values
 end
@@ -255,7 +256,7 @@ end
 
 function Geometry.get_glue(ttrian::DifferentiableTriangulation{Dc},val::Val{d}) where {Dc,d}
   if isnothing(ttrian.cell_values)
-    get_glue(ttrian.trian,val)
+    return get_glue(ttrian.trian,val)
   end
   if d != Dc
     return nothing

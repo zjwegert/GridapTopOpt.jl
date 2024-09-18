@@ -10,11 +10,11 @@ import Gridap.Geometry: get_node_coordinates, collect1d
 include("../differentiable_trians.jl")
 
 order = 1
-n = 201
-N = 16
+n = 20
+N = 8
 
-begin
 model = CartesianDiscreteModel((0,1,0,1),(n,n))
+model = simplexify(model)
 Ω = Triangulation(model)
 dΩ = Measure(Ω,2*order)
 
@@ -23,8 +23,8 @@ V_φ = TestFESpace(model,reffe_scalar)
 # ls_evo = HamiltonJacobiEvolution(FirstOrderStencil(2,Float64),model,V_φ,1/(10n),0)
 
 # φh = interpolate(x->max(abs(x[1]-0.5),abs(x[2]-0.5))-0.25,V_φ) # Square
-φh = interpolate(x->((x[1]-0.5)^N+(x[2]-0.5)^N)^(1/N)-0.25,V_φ) # Curved corner example
-# φh = interpolate(x->abs(x[1]-0.5)+abs(x[2]-0.5)-0.25-0/n/10,V_φ) # Diamond
+# φh = interpolate(x->((x[1]-0.5)^N+(x[2]-0.5)^N)^(1/N)-0.25,V_φ) # Curved corner example
+φh = interpolate(x->abs(x[1]-0.5)+abs(x[2]-0.5)-0.25-0/n/10,V_φ) # Diamond
 # φh = interpolate(x->(1+0.25)abs(x[1]-0.5)+0abs(x[2]-0.5)-0.25,V_φ) # Straight lines with scaling
 # φh = interpolate(x->abs(x[1]-0.5)+0abs(x[2]-0.5)-0.25/(1+0.25),V_φ) # Straight lines without scaling
 # φh = interpolate(x->tan(-pi/4)*(x[1]-0.5)+(x[2]-0.5),V_φ) # Angled interface
@@ -50,23 +50,44 @@ cutgeo = cut(model,geo)
 diff_Ωin = DifferentiableTriangulation(Ωin)
 diff_Ωout = DifferentiableTriangulation(Ωout)
 
-dΩin = Measure(diff_Ωin,2*order)
+oh = interpolate(1.0,V_φ)
+
+dΩin = Measure(diff_Ωin,3*order)
 j_in(φ) = ∫(1)dΩin
 dj_in = gradient(j_in,φh)
 dj_vec_in = assemble_vector(dj_in,V_φ)
 norm(dj_vec_in)
 
-dΩout = Measure(diff_Ωout,2*order)
-j_out(φ) = ∫(1)dΩout
+dΩout = Measure(diff_Ωout,3*order)
+j_out(φ) = ∫(oh)dΩout
 dj_out = gradient(j_out,φh)
 dj_vec_out = -assemble_vector(dj_out,V_φ)
 norm(dj_vec_out)
 
 Γ = EmbeddedBoundary(cutgeo)
-dΓ = Measure(Γ,2*order)
+dΓ = Measure(Γ,3*order)
 dj_expected(q) = ∫(-q)dΓ
 dj_exp_vec = assemble_vector(dj_expected,V_φ)
 norm(dj_exp_vec)
+
+trian = Ωin
+dtrian = DifferentiableTriangulation(trian)
+update_trian!(dtrian,φh)
+meas = Measure(dtrian,2*order)
+quad = meas.quad
+pts = quad.cell_point
+
+f(dΩ) = sum(∫(1)dΩ)
+f(meas)
+f(Measure(trian,2*order))
+
+for (i,(a,b)) in enumerate(zip(dj_exp_vec,dj_vec_in))
+  if abs(a) < 1.e-10
+    @assert abs(b) < 1.e-10
+  else
+    println(i," - ",a/b)
+  end
+end
 
 # α = 10^-2
 # vel_ext = VelocityExtension((u,v)->∫(α^2*∇(u)⋅∇(v) + u⊙v )dΩ,V_φ,V_φ)
@@ -96,7 +117,6 @@ writevtk(
 writevtk(
   Triangulation(cutgeo,PHYSICAL_OUT),"results/trian_out"
 )
-end
 
 meas = dΩin.state
 quad = meas.quad
