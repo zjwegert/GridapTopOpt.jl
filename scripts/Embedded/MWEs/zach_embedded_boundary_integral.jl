@@ -50,7 +50,9 @@ base_model = UnstructuredDiscreteModel(_model)
 ref_model = refine(base_model, refinement_method = "barycentric")
 model = ref_model.model
 # model = simplexify(_model)
-# model = _model # NOTE: currently broken for this example, caused by find_intersect
+# model = _model # NOTE: currently broken:
+#  If we really want this, then need to check that point is on
+#  boundary of bgcell when computing maps ..._Γ_facet_to_points.
 
 Ω = Triangulation(model)
 dΩ = Measure(Ω,2*order)
@@ -61,6 +63,8 @@ V_φ = TestFESpace(model,reffe_scalar)
 # φh = interpolate(x->max(abs(x[1]-0.5),abs(x[2]-0.5))-0.25,V_φ) # Square # NOTE: currently broken for this example (find_intersect), all others work as expected
 # φh = interpolate(x->((x[1]-0.5)^N+(x[2]-0.5)^N)^(1/N)-0.25,V_φ) # Curved corner example
 # φh = interpolate(x->abs(x[1]-0.5)+abs(x[2]-0.5)-0.25-0/n/10,V_φ) # Diamond
+# φh = interpolate(x->(1+0.25)abs(x[1]-0.5)+0abs(x[2]-0.5)-0.25,V_φ) # Straight lines with scaling
+# φh = interpolate(x->abs(x[1]-0.5)+0abs(x[2]-0.5)-0.25/(1+0.25),V_φ) # Straight lines without scaling
 # φh = interpolate(x->tan(-pi/3)*(x[1]-0.5)+(x[2]-0.5),V_φ) # Angled interface
 # φh = interpolate(x->sqrt((x[1]-0.5)^2+(x[2]-0.5)^2)-0.25,V_φ) # Circle
 φh = interpolate(x->cos(2π*x[1])*cos(2π*x[2])-0.11,V_φ) # "Regular" LSF
@@ -76,6 +80,7 @@ any(x -> x > 0,x_φ)
 
 geo = DiscreteGeometry(φh,model)
 cutgeo = cut(model,geo)
+Ω_cut = Triangulation(cutgeo,PHYSICAL)
 Γ = EmbeddedBoundary(cutgeo)
 Γg = GhostSkeleton(cutgeo,CUT)
 dΓ = Measure(Γ,2*order)
@@ -160,6 +165,13 @@ nˢ = map(v->v(Point(0)),nˢ)
 Γ_ghost_skel_edges_to_Γ_facet_Γ_ghost_intersect_ref = map((ab,abref)->find_intersect(ab[1],ab[2],abref[1],abref[2]),
   Γ_ghost_skel_edges_to_Γ_facet_to_points,Γ_ghost_skel_edges_to_Γ_facet_to_rpoints)
 
+# debugging
+# for i ∈ eachindex(Γ_ghost_skel_edges_to_Γ_facet_to_points)
+#   @show i
+#   find_intersect(Γ_ghost_skel_edges_to_Γ_facet_to_points[i][1],Γ_ghost_skel_edges_to_Γ_facet_to_points[i][2],
+#     Γ_ghost_skel_edges_to_Γ_facet_to_rpoints[i][1],Γ_ghost_skel_edges_to_Γ_facet_to_rpoints[i][2])
+# end
+
 ## Construct map: S edge → ∇φh on adjacent faces and map: S edge → f on adjacent faces
 ∇φh_data = ∇(φh)
 # map: S edge → ∇φh on adjacent faces (ref coords)
@@ -230,6 +242,7 @@ writevtk(
 
 # Boundary and normal vector
 writevtk(
+  # Ω_cut.a,
   Γ,
   "results/Boundary",
   cellfields=["n"=>get_normal_vector(Γ)]
