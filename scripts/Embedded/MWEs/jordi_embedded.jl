@@ -70,36 +70,51 @@ dj_expected(q) = ∫(-q)dΓ
 dj_exp_vec = assemble_vector(dj_expected,V_φ)
 norm(dj_exp_vec)
 
-trian = Ωin
-dtrian = DifferentiableTriangulation(trian)
-update_trian!(dtrian,φh)
-meas = Measure(dtrian,2*order)
-quad = meas.quad
-pts = quad.cell_point
+Λ_ghost = GhostSkeleton(cutgeo)
 
-f(dΩ) = sum(∫(1)dΩ)
-f(meas)
-f(Measure(trian,2*order))
+cutfacets = cut_facets(model,geo)
+Γ2 = Boundary(cutfacets)
+Λ2 = Skeleton(cutfacets)
 
-for (i,(a,b)) in enumerate(zip(dj_exp_vec,dj_vec_in))
-  if abs(a) < 1.e-10
-    @assert abs(b) < 1.e-10
-  else
-    println(i," - ",a/b)
-  end
+Λ = Skeleton(Γ)
+
+cut_face_grid = Γ.subgrid
+cut_face_model = UnstructuredDiscreteModel(cut_face_grid)
+cut_node_grid = Grid(ReferenceFE{0},cut_face_model)
+
+node_coordinates = collect1d(get_node_coordinates(cut_face_model))
+cell_to_nodes = Table(get_face_nodes(cut_face_model,0))
+cell_to_type = collect1d(get_face_type(cut_face_model,0))
+reffes = get_reffaces(ReferenceFE{0},cut_face_model)
+
+#####
+
+subfacets = Γ.subfacets
+facet_to_points = subfacets.facet_to_points
+point_to_coords = subfacets.point_to_coords
+
+used_point_to_coords = view(point_to_coords,facet_to_points.data)
+perm = sortperm(used_point_to_coords)
+unique_used_coords = fill
+
+
+
+ncpoints = length(cpoints_to_points)
+ptrs = fill(0,ncpoints+1)
+for p in facet_to_points.data
+  cp = points_to_cpoints[p]
+  ptrs[cp+1] += 1
 end
+Arrays.length_to_ptrs!(ptrs)
 
-# α = 10^-2
-# vel_ext = VelocityExtension((u,v)->∫(α^2*∇(u)⋅∇(v) + u⊙v )dΩ,V_φ,V_φ)
-# project!(vel_ext,dj_exp_vec)
-# project!(vel_ext,dj_vec_in)
+cpoints_to_facets = Table(ptrs,data)
 
-# l2(u) = norm(u)
-# l2(u) = sqrt(sum( ∫( u⊙u )dΩ))
-# vel_extnorm(u) = sqrt(sum( ∫(α^2*∇(u)⋅∇(u) + u⊙u )dΩ))
 
-# l2_norm = l2(dj_exp_vec-dj_vec_in)/l2(dj_exp_vec)
-# l2_norm = l2(FEFunction(V_φ,dj_exp_vec)-FEFunction(V_φ,dj_vec_in))/l2(FEFunction(V_φ,dj_exp_vec))
+BoundaryTriangulation(bmodel)
+
+Skeleton(Γ.subgrid)
+
+
 
 norm(dj_vec_in-dj_exp_vec)
 norm(dj_vec_out-dj_exp_vec)
@@ -117,6 +132,16 @@ writevtk(
 writevtk(
   Triangulation(cutgeo,PHYSICAL_OUT),"results/trian_out"
 )
+writevtk(
+  Γ,"results/gamma"
+)
+writevtk(
+  Λ2.plus,"results/gamma2"
+)
+writevtk(
+  Λ_ghost,"results/lambda_ghost"
+)
+
 
 meas = dΩin.state
 quad = meas.quad
