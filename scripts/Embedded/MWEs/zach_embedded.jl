@@ -4,7 +4,7 @@ using Gridap
 
 using GridapEmbedded
 using GridapEmbedded.LevelSetCutters
-using Gridap.Geometry, Gridap.FESpaces, Gridap.CellData
+using Gridap.Geometry, Gridap.FESpaces, Gridap.CellData, Gridap.Adaptivity
 import Gridap.Geometry: get_node_coordinates, collect1d
 
 include("../differentiable_trians.jl")
@@ -15,7 +15,11 @@ N = 16
 a = 1
 begin
 _model = CartesianDiscreteModel((0,1,0,1),(n,n))
-model = simplexify(_model)
+base_model = UnstructuredDiscreteModel(_model)
+ref_model = refine(base_model, refinement_method = "barycentric")
+model = ref_model.model
+# model = simplexify(_model)
+
 Ω = Triangulation(model)
 dΩ = Measure(Ω,2*order)
 
@@ -88,58 +92,7 @@ writevtk(
 )
 end
 
-## Surface functionals
-# We should have something like the following for J(φ)=∫_∂Ω(φ) f ds:
-#   dJ(φ)(w) = lim_{t->0} (J(φₜ)-J(φ))/t = -∫_∂Ω (n⋅∇f)w/|∂ₙφ| dS - ∑(...)
-# The first term is easy, the second term not so much...
-
-# Need [[fm]]=f₁m₁ + f₂m₂, where mₖ is the co-normal for τ = 0 with
-#                   mₖ = tₖˢ×n_{∂Ω(φ(0))∩S}
-# where tₖˢ is the tangent vector along the edge ∂Ω(φ(0))∩S and fₖ is
-# the limit of f on S defined by fₖ(x)=lim_{ϵ->0⁺} f(x-ϵmₖ) for x ∈ ∂Ω∩S.
-
-# In 2D:
-# Take triangulation T with edges P. Let K₁ and K₂ be adjacent TRI elements
-#  with intersection S = K₁ ∩ K₂. Let ∂Ω denote the boundary of the linear
-#  cut that passes through K₁ ∪ K₂. We define n_{∂Ω ∩ Kₖ} as the normal along
-#  the cut in the respective elements K₁ and K₂. We choose the tangent to S
-#  tˢₖ to lie out of the page, namely tˢ₁ = -e₃ and t²₂ = e₃. The co-normal
-#  (or bi-normal) is then defined as
-#                       mₖ = tˢₖ × n_{∂Ω ∩ Kₖ}
-n = get_normal_vector(Γ)
-# _n(∇φ) = ∇φ/(10^-20+norm(∇φ));
-# n = _n ∘ ∇(φh)
-m(n) = VectorValue(-n[2],n[1]);
-m₁ = m ∘ n
-m₂ = -(m ∘ n)
-# do it manually
-facet_to_bgcell = Γ.subfacets.facet_to_bgcell
-facet_to_normal = Γ.subfacets.facet_to_normal
-facet_to_points = Γ.subfacets.facet_to_points
-point_to_coords = Γ.subfacets.point_to_coords
-point_to_rcoords = Γ.subfacets.point_to_rcoords
-
-Γg = GhostSkeleton(cutgeo,CUT) # These are edges with points ∂Ω ∩ S (2D)
-nₖ = get_normal_vector(Γg) # This gives us nₖ and so we can compute nˢ via cross
-# nₖ×tₖˢ = (tₖˢ×nˢ)×tₖˢ = -(tₖˢ⋅nˢ)tₖˢ + (tₖˢ⋅tₖˢ)nˢ = 0tₖˢ + nˢ = +nˢ
-nˢ = (m ∘ nₖ.⁻)
-
-writevtk(
-  Γg,
-  "results/test_bndr",
-  cellfields=["n1"=>nₖ.⁺,"n2"=>nₖ.⁻,"ns"=>nˢ]
-)
-
-bgcell_to_inoutcut = compute_bgcell_to_inoutcut(model,geo)
-writevtk(
-  Ω,"results/test",
-  celldata=["inoutcut"=>bgcell_to_inoutcut]
-)
-
-# n_{∂Ω(φ(0))∩Kₖ}
-
-
-## 3D
+# 3D
 order = 1
 n = 101
 N = 16
