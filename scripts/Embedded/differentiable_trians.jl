@@ -117,33 +117,65 @@ function precompute_autodiff_caches(
   cell_to_bgcell   = subcells.cell_to_bgcell
   cell_to_points   = subcells.cell_to_points
   point_to_rcoords = subcells.point_to_rcoords
-
-  cell_to_bgcell   = subcells.cell_to_bgcell
-  cell_to_points   = subcells.cell_to_points
-  point_to_rcoords = subcells.point_to_rcoords
   point_to_coords  = subcells.point_to_coords
 
+  precompute_autodiff_caches(
+    bgmodel,
+    cell_to_bgcell,
+    cell_to_points,
+    point_to_rcoords,
+    point_to_coords,
+  )
+end
+
+function precompute_autodiff_caches(
+  trian::GridapEmbedded.Interfaces.SubFacetTriangulation
+)
+  bgmodel = get_background_model(trian)
+  subfacets = trian.subfacets
+
+  facet_to_bgcell  = subfacets.facet_to_bgcell
+  facet_to_points  = subfacets.facet_to_points
+  point_to_rcoords = subfacets.point_to_rcoords
+  point_to_coords  = subfacets.point_to_coords
+
+  precompute_autodiff_caches(
+    bgmodel,
+    facet_to_bgcell,
+    facet_to_points,
+    point_to_rcoords,
+    point_to_coords,
+  )
+end
+
+function precompute_autodiff_caches(
+  bgmodel,
+  face_to_bgcell,
+  face_to_points,
+  point_to_rcoords,
+  point_to_coords,
+)
   bg_ctypes = get_cell_type(bgmodel)
   bgcell_to_polys = expand_cell_data(get_polytopes(bgmodel),bg_ctypes)
   bgcell_to_coords = get_cell_coordinates(bgmodel)
   bgcell_to_rcoords = lazy_map(get_vertex_coordinates,bgcell_to_polys)
 
-  cell_to_bgcoords = lazy_map(Reindex(bgcell_to_coords),cell_to_bgcell)
-  cell_to_bgrcoords = lazy_map(Reindex(bgcell_to_rcoords),cell_to_bgcell)
-  cell_to_rcoords = lazy_map(Broadcasting(Reindex(point_to_rcoords)),cell_to_points)
-  cell_to_coords = lazy_map(Broadcasting(Reindex(point_to_coords)),cell_to_points)
+  face_to_bgcoords = lazy_map(Reindex(bgcell_to_coords),face_to_bgcell)
+  face_to_bgrcoords = lazy_map(Reindex(bgcell_to_rcoords),face_to_bgcell)
+  face_to_rcoords = lazy_map(Broadcasting(Reindex(point_to_rcoords)),face_to_points)
+  face_to_coords = lazy_map(Broadcasting(Reindex(point_to_coords)),face_to_points)
 
   bgcell_to_edge_lists = lazy_map(get_edge_list,bgcell_to_polys)
-  cell_to_edge_lists = lazy_map(Reindex(bgcell_to_edge_lists),cell_to_bgcell)
-  cell_to_edges = collect(lazy_map(precompute_cut_edge_ids,cell_to_rcoords,cell_to_bgrcoords,cell_to_edge_lists))
+  face_to_edge_lists = lazy_map(Reindex(bgcell_to_edge_lists),face_to_bgcell)
+  face_to_edges = collect(lazy_map(precompute_cut_edge_ids,face_to_rcoords,face_to_bgrcoords,face_to_edge_lists))
 
   cache = (;
-    cell_to_rcoords,
-    cell_to_coords,
-    cell_to_bgrcoords,
-    cell_to_bgcoords,
-    cell_to_edges,
-    cell_to_edge_lists
+    face_to_rcoords,
+    face_to_coords,
+    face_to_bgrcoords,
+    face_to_bgcoords,
+    face_to_edges,
+    face_to_edge_lists
   )
   return cache
 end
@@ -154,17 +186,39 @@ function extract_dualized_cell_values(
 )
   @assert isa(DomainStyle(φh),ReferenceDomain)
   bgmodel = get_background_model(trian)
-  subcells = trian.subcells
+  bgcell_to_values = extract_dualized_cell_values(bgmodel,φh)
 
+  subcells = trian.subcells
+  cell_to_bgcell = subcells.cell_to_bgcell
+  cell_to_values = lazy_map(Reindex(bgcell_to_values),cell_to_bgcell)
+  return cell_to_values
+end
+
+function extract_dualized_cell_values(
+  trian::GridapEmbedded.Interfaces.SubFacetTriangulation,
+  φh::CellField,
+)
+  @assert isa(DomainStyle(φh),ReferenceDomain)
+  bgmodel = get_background_model(trian)
+  bgcell_to_values = extract_dualized_cell_values(bgmodel,φh)
+
+  subfacets = trian.subfacets
+  facet_to_bgcell = subfacets.facet_to_bgcell
+  facet_to_values = lazy_map(Reindex(bgcell_to_values),facet_to_bgcell)
+  return facet_to_values
+end
+
+function extract_dualized_cell_values(
+  bgmodel::DiscreteModel,
+  φh::CellField,
+)
+  @assert isa(DomainStyle(φh),ReferenceDomain)
   bg_ctypes = get_cell_type(bgmodel)
   bgcell_to_polys = expand_cell_data(get_polytopes(bgmodel),bg_ctypes)
   bgcell_to_rcoords = lazy_map(get_vertex_coordinates,bgcell_to_polys)
   bgcell_to_fields = CellData.get_data(φh)
   bgcell_to_values = lazy_map(evaluate,bgcell_to_fields,bgcell_to_rcoords)
-
-  cell_to_bgcell = subcells.cell_to_bgcell
-  cell_to_values = lazy_map(Reindex(bgcell_to_values),cell_to_bgcell)
-  return cell_to_values
+  return bgcell_to_values
 end
 
 function GridapEmbedded.LevelSetCutters._get_value_at_coords(
@@ -237,8 +291,8 @@ function CellData.get_cell_points(ttrian::DifferentiableTriangulation)
   end
   c = ttrian.caches
   cell_values = ttrian.cell_values
-  cell_to_rcoords = lazy_map(DualizeCoordsMap(),c.cell_to_rcoords,c.cell_to_bgrcoords,cell_values,c.cell_to_edges,c.cell_to_edge_lists)
-  cell_to_coords = lazy_map(DualizeCoordsMap(),c.cell_to_coords,c.cell_to_bgcoords,cell_values,c.cell_to_edges,c.cell_to_edge_lists)
+  cell_to_rcoords = lazy_map(DualizeCoordsMap(),c.face_to_rcoords,c.face_to_bgrcoords,cell_values,c.face_to_edges,c.face_to_edge_lists)
+  cell_to_coords = lazy_map(DualizeCoordsMap(),c.face_to_coords,c.face_to_bgcoords,cell_values,c.face_to_edges,c.face_to_edge_lists)
   return CellPoint(cell_to_rcoords, cell_to_coords, ttrian, ReferenceDomain())
 end
 
@@ -248,7 +302,7 @@ function Geometry.get_cell_map(ttrian::DifferentiableTriangulation)
   end
   c = ttrian.caches
   cell_values = ttrian.cell_values
-  cell_to_coords = lazy_map(DualizeCoordsMap(),c.cell_to_coords,c.cell_to_bgcoords,cell_values,c.cell_to_edges,c.cell_to_edge_lists)
+  cell_to_coords = lazy_map(DualizeCoordsMap(),c.face_to_coords,c.face_to_bgcoords,cell_values,c.face_to_edges,c.face_to_edge_lists)
   cell_reffe = get_cell_reffe(ttrian)
   cell_map = compute_cell_maps(cell_to_coords,cell_reffe)
   return cell_map
@@ -263,7 +317,7 @@ function Geometry.get_glue(ttrian::DifferentiableTriangulation{Dc},val::Val{d}) 
   end
   c = ttrian.caches
   cell_values = ttrian.cell_values
-  cell_to_rcoords = lazy_map(DualizeCoordsMap(),c.cell_to_rcoords,c.cell_to_bgrcoords,cell_values,c.cell_to_edges,c.cell_to_edge_lists)
+  cell_to_rcoords = lazy_map(DualizeCoordsMap(),c.face_to_rcoords,c.face_to_bgrcoords,cell_values,c.face_to_edges,c.face_to_edge_lists)
   cell_reffe = get_cell_reffe(ttrian)
   ref_cell_map = compute_cell_maps(cell_to_rcoords,cell_reffe)
 
