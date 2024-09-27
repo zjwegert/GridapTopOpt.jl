@@ -43,7 +43,7 @@ end
 
 order = 1
 n = 101
-N = 16
+N = 8
 _model = CartesianDiscreteModel((0,1,0,1),(n,n))
 cd = Gridap.Geometry.get_cartesian_descriptor(_model)
 base_model = UnstructuredDiscreteModel(_model)
@@ -61,13 +61,13 @@ reffe_scalar = ReferenceFE(lagrangian,Float64,order)
 V_φ = TestFESpace(model,reffe_scalar)
 
 # φh = interpolate(x->max(abs(x[1]-0.5),abs(x[2]-0.5))-0.25,V_φ) # Square # NOTE: currently broken for this example (find_intersect), all others work as expected
-# φh = interpolate(x->((x[1]-0.5)^N+(x[2]-0.5)^N)^(1/N)-0.25,V_φ) # Curved corner example
+φh = interpolate(x->((x[1]-0.5)^N+(x[2]-0.5)^N)^(1/N)-0.25,V_φ) # Curved corner example
 # φh = interpolate(x->abs(x[1]-0.5)+abs(x[2]-0.5)-0.25-0/n/10,V_φ) # Diamond
 # φh = interpolate(x->(1+0.25)abs(x[1]-0.5)+0abs(x[2]-0.5)-0.25,V_φ) # Straight lines with scaling
 # φh = interpolate(x->abs(x[1]-0.5)+0abs(x[2]-0.5)-0.25/(1+0.25),V_φ) # Straight lines without scaling
 # φh = interpolate(x->tan(-pi/3)*(x[1]-0.5)+(x[2]-0.5),V_φ) # Angled interface
 # φh = interpolate(x->sqrt((x[1]-0.5)^2+(x[2]-0.5)^2)-0.25,V_φ) # Circle
-φh = interpolate(x->cos(2π*x[1])*cos(2π*x[2])-0.11,V_φ) # "Regular" LSF
+# φh = interpolate(x->cos(2π*x[1])*cos(2π*x[2])-0.11,V_φ) # "Regular" LSF
 x_φ = get_free_dof_values(φh)
 
 if any(isapprox(0.0;atol=10^-10),x_φ)
@@ -206,7 +206,9 @@ for i ∈ Ω.tface_to_mface
   data_contribs = D_S[Γg_contrib_idxs]
   # Evaluate basis for cell i at cut points
   basis_vals = map(v->evaluate(dv_cell_data,v),bgcell_rpoints)
-  contrib[i] .= sum(map(*,data_contribs,basis_vals))
+  contrib[i] .= 1/2*sum(map(*,data_contribs,basis_vals))
+  # Factor of 1/2 is due to adding up twice the
+  #   number of contributions on each face
 end
 dom_contrib_t2 = DomainContribution()
 Gridap.CellData.add_contribution!(dom_contrib_t2,Ω,contrib,-)
