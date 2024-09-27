@@ -218,13 +218,22 @@ dom_contrib_t1 = ∫(-(_n⋅∇(fh))*dv/(norm ∘ (∇(φh))))dΓ
 
 # Construct DomainContribution and assemble
 dom_contrib = dom_contrib_t1 + dom_contrib_t2
-dj2_exp_vec = assemble_vector(dom_contrib,V_φ)
+djΓ_exp_vec = assemble_vector(dom_contrib,V_φ)
 
-# Visualisation
+### Visualisation and testing
+# AD
+diff_Γ = DifferentiableTriangulation(Γ)
+dΓ2 = Measure(diff_Γ,2*order)
+jΓ(φ) = ∫(1)dΓ2
+djΓ = gradient(jΓ,φh)
+djΓ_contrib = DomainContribution()
+Gridap.CellData.add_contribution!(djΓ_contrib,diff_Γ.trian,get_array(djΓ),+)
+djΓ_vec_out = assemble_vector(djΓ_contrib,V_φ)
+
 bgcell_to_inoutcut = compute_bgcell_to_inoutcut(model,geo)
 writevtk(
   Ω,"results/Result",
-  cellfields=["φh"=>φh,"∇φ"=>∇(φh),"dj2"=>FEFunction(V_φ,dj2_exp_vec)],
+  cellfields=["φh"=>φh,"∇φ"=>∇(φh),"djΓ_analytic"=>FEFunction(V_φ,djΓ_exp_vec),"djΓ"=>FEFunction(V_φ,djΓ_vec_out)],
   celldata=["inoutcut"=>bgcell_to_inoutcut]
 )
 
