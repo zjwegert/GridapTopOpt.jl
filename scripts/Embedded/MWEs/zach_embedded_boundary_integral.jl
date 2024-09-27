@@ -138,7 +138,6 @@ m(n) = VectorValue(n[2],-n[1]);
 Γ_ghost_skel_edges_to_Γ_conormals = map(v->[m(v[1]),-m(v[2])],Γ_ghost_skel_edges_to_Γ_normals)
 
 ## Construct map: S edge → nˢ (vector parallel to S, orthogonal to S normals, outward facing from ∂Ω)
-# TODO: Need to check whether this should be plus or minus
 S_normal = get_facet_normal(Γg.plus)
 nˢ = lazy_map(Operation(v->(-m(v))),S_normal)
 nˢ = map(v->v(Point(0)),nˢ)
