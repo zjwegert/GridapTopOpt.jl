@@ -111,7 +111,8 @@ writevtk(
   "n1"=>n1,"n2"=>n2,
   "n_∂Ω_plus"=>n_∂Ω_plus,"n_∂Ω_minus"=>n_∂Ω_minus,
   "ns"=>nˢ,
-  "∇φh_Γs_plus"=>∇φh_Γs_plus,"∇φh_Γs_minus"=>∇φh_Γs_minus]
+  "∇φh_Γs_plus"=>∇φh_Γs.plus,"∇φh_Γs_minus"=>∇φh_Γs.minus,
+  "jump"=>jump(∇φh_Γs)]
 )
 writevtk(
   Ω,
