@@ -97,6 +97,7 @@ end
 
 order = 1
 n = 51
+N = 4
 _model = CartesianDiscreteModel((0,1,0,1),(n,n))
 cd = Gridap.Geometry.get_cartesian_descriptor(_model)
 base_model = UnstructuredDiscreteModel(_model)
@@ -108,7 +109,19 @@ dΩ = Measure(Ω,2*order)
 
 reffe_scalar = ReferenceFE(lagrangian,Float64,order)
 V_φ = TestFESpace(model,reffe_scalar)
+# φh = interpolate(x->max(abs(x[1]-0.5),abs(x[2]-0.5))-0.25,V_φ) # Square
+# φh = interpolate(x->((x[1]-0.5)^N+(x[2]-0.5)^N)^(1/N)-0.25,V_φ) # Curved corner example
+# φh = interpolate(x->abs(x[1]-0.5)+abs(x[2]-0.5)-0.25-0/n/10,V_φ) # Diamond
+# φh = interpolate(x->(1+0.25)abs(x[1]-0.5)+0abs(x[2]-0.5)-0.25,V_φ) # Straight lines with scaling
+# φh = interpolate(x->abs(x[1]-0.5)+0abs(x[2]-0.5)-0.25/(1+0.25),V_φ) # Straight lines without scaling
+# φh = interpolate(x->tan(-pi/3)*(x[1]-0.5)+(x[2]-0.5),V_φ) # Angled interface
 φh = interpolate(x->sqrt((x[1]-0.5)^2+(x[2]-0.5)^2)-0.25,V_φ) # Circle
+
+## Issues
+# φh = interpolate(x->max(abs(x[1]-0.5),abs(x[2]-0.5))-0.25,V_φ) # take n = 5, breaks because skeletons not one-to-one anymore!
+# φh = interpolate(x->sqrt((x[1]-0.5)^2+(x[2]-0.5)^2)-0.51,V_φ) # Intersect bounding box, issue with AD result
+# φh = interpolate(x->cos(2π*x[1])*cos(2π*x[2])-0.11,V_φ) # Breaks for n = 51
+
 x_φ = get_free_dof_values(φh)
 
 if any(isapprox(0.0;atol=10^-10),x_φ)
@@ -204,11 +217,14 @@ writevtk(
   "∇φh_Γs_plus"=>∇φh_Γs.plus,"∇φh_Γs_minus"=>∇φh_Γs.minus,
   "m.minus"=>m.minus,"m.plus"=>m.plus]
 )
+bgcell_to_inoutcut = compute_bgcell_to_inoutcut(model,geo)
   writevtk(
   Ω,
   "results/Background",
-  cellfields=["φh"=>∇(φh),"dj"=>FEFunction(V_φ,djΓ_exp_vec),"dj_AD"=>FEFunction(V_φ,djΓ_vec_out)]
-)
+  cellfields=["φh"=>∇(φh)]#,"dj"=>FEFunction(V_φ,djΓ_exp_vec),"dj_AD"=>FEFunction(V_φ,djΓ_vec_out)]
+  ,
+  celldata=["inoutcut"=>bgcell_to_inoutcut]
+  )
 writevtk(
   Γ,
   "results/Boundary"
