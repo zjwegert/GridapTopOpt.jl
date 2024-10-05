@@ -111,19 +111,51 @@ function Geometry.get_grid(t::SubFacetSkeletonTriangulation)
   get_grid(t.cell_skeleton)
 end
 
+# Domain changes
+
 function Geometry.get_glue(ttrian::SubFacetSkeletonTriangulation{Di,Df,Dp},::Val{D}) where {D,Di,Df,Dp}
-  if D == Dp
-    get_glue(ttrian.cell_skeleton,Val(D)) # Maps to bgmodel
-  elseif D == Df
-    get_glue(ttrian.face_skeleton,Val(D)) # Maps to SubFacetTriangulation
+  get_glue(ttrian.cell_skeleton,Val(D))
+end
+
+function Geometry.is_change_possible(
+  strian::SubFacetTriangulation,ttrian::SubFacetSkeletonTriangulation
+)
+  return strian === ttrian.face_trian
+end
+
+function CellData.change_domain(
+  a::CellField,ttrian::SubFacetSkeletonTriangulation,tdomain::DomainStyle
+)
+  strian = get_triangulation(a)
+  if strian === ttrian
+    # 1) CellField defined on the skeleton
+    return change_domain(a,DomainStyle(a),tdomain)
+  end
+  
+  if is_change_possible(strian,ttrian.cell_skeleton)
+    # 2) CellField defined on the bgmodel
+    b = change_domain(a,ttrian.cell_skeleton,tdomain)
+  elseif strian === ttrian.face_trian
+    # 3) CellField defined on the cut facets
+    itrian = Triangulation(ttrian.face_model)
+    _a = CellData.similar_cell_field(a,CellData.get_data(a),itrian,DomainStyle(a))
+    b = change_domain(_a,ttrian.face_skeleton,tdomain)
   else
     @notimplemented
   end
+  return CellData.similar_cell_field(b,CellData.get_data(b),ttrian,DomainStyle(b))
+end
+
+function CellData.change_domain(
+  f::CellData.OperationCellField,ttrian::SubFacetSkeletonTriangulation,tdomain::DomainStyle
+)
+  args = map(i->change_domain(i,ttrian,tdomain),f.args)
+  CellData.OperationCellField(f.op,args...)
 end
 
 # Normal vector to the cut facets , n_∂Ω
 function get_subfacet_normal_vector(trian::SubFacetSkeletonTriangulation) 
-  return get_normal_vector(trian.face_skeleton)
+  return get_normal_vector(trian.face_trian)
 end
 
 # Normal vector to the ghost facets, n_k
@@ -136,7 +168,10 @@ function get_ghost_normal_vector(trian::SubFacetSkeletonTriangulation)
 end
 
 # Tangent vector to a skeleton triangulation
-function get_tangent_vector(trian::SkeletonTriangulation{1})
+function get_tangent_vector(
+  trian::SkeletonTriangulation{1};
+  ttrian = trian
+)
   # TODO: Can we create this in the ReferenceDomain? 
   # If so, we need to be careful to orient both sides so that their physical 
   # representations are consistent.
@@ -145,20 +180,20 @@ function get_tangent_vector(trian::SkeletonTriangulation{1})
     t = c[2] - c[1]
     return t/norm(t)
   end
-  data = lazy_map(t,get_cell_coordinates(trian))
-  plus = GenericCellField(data,trian.plus,PhysicalDomain())
-  minus = GenericCellField(data,trian.minus,PhysicalDomain())
+  data = lazy_map(ConstantField,lazy_map(t,get_cell_coordinates(trian)))
+  plus = GenericCellField(data,ttrian,PhysicalDomain())
+  minus = GenericCellField(data,ttrian,PhysicalDomain())
   return SkeletonPair(plus,minus)
 end
 
 # Normal vector to the cut interface, n_S
 function CellData.get_normal_vector(trian::SubFacetSkeletonTriangulation{Di}) where {Di}
   if Di == 0
-    n_S = get_tangent_vector(trian.ghost_skeleton)
+    n_S = get_tangent_vector(trian.ghost_skeleton;ttrian=trian)
   elseif Di == 1
     n_k = get_ghost_normal_vector(trian)
-    t_S = get_tangent_vector(trian.cell_skeleton)
-    return Operation(cross)(n_k,t_S) # nk = tS x nS -> nS = nk x tS (eq 6.25)
+    t_S = get_tangent_vector(trian.cell_skeleton;ttrian=trian)
+    n_S = Operation(cross)(n_k,t_S) # nk = tS x nS -> nS = nk x tS (eq 6.25)
   else
     @notimplemented
   end
@@ -188,8 +223,33 @@ function get_conormal_vector(trian::SubFacetSkeletonTriangulation{Di}) where {Di
   return m_k
 end
 
+# This will go to Gridap
+
 function Arrays.evaluate!(cache,k::Operation,a::SkeletonPair{<:CellField})
   plus = k(a.plus)
   minus = k(a.minus)
   SkeletonPair(plus,minus)
+end
+
+function Arrays.evaluate!(cache,k::Operation,a::SkeletonPair{<:CellField},b::SkeletonPair{<:CellField})
+  plus = k(a.plus,b.plus)
+  minus = k(a.minus,b.minus)
+  SkeletonPair(plus,minus)
+end
+
+import Gridap.TensorValues: inner, outer
+import LinearAlgebra: dot
+import Base: abs, *, +, -, /
+
+for op in (:/,)
+  @eval begin
+    ($op)(a::CellField,b::SkeletonPair{<:CellField}) = Operation($op)(a,b)
+    ($op)(a::SkeletonPair{<:CellField},b::CellField) = Operation($op)(a,b)
+  end
+end
+
+for op in (:outer,:*,:dot,:/)
+  @eval begin
+    ($op)(a::SkeletonPair{<:CellField},b::SkeletonPair{<:CellField}) = Operation($op)(a,b)
+  end
 end

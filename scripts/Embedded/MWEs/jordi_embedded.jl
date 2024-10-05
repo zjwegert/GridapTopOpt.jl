@@ -79,11 +79,31 @@ include("../SubFacetSkeletons.jl")
 Γ = EmbeddedBoundary(cutgeo)
 Λ = Skeleton(Γ)
 
+dΓ = Measure(Γ,3*order)
+dΛ = Measure(Λ,2*order)
+
+Γpts = get_cell_points(Γ)
+Λpts = get_cell_points(Λ)
+
 n_∂Ω = get_subfacet_normal_vector(Λ)
 n_k = get_ghost_normal_vector(Λ)
 #t_S = get_tangent_vector(Λ)
 n_S = get_normal_vector(Λ)
 m_k = get_conormal_vector(Λ)
+
+fh = interpolate(x->1,V_φ)
+∇ˢφ = Operation(abs)(n_S ⋅ ∇(φh))
+dJ2(w) = ∫(n_S ⋅ (jump(fh*m_k) * w / ∇ˢφ))dΛ
+dj2 = assemble_vector(dJ2,V_φ)
+
+is_change_possible(Ω,Γ)
+is_change_possible(Γ,Ω)
+
+is_change_possible(Ω,Λ)
+is_change_possible(Λ,Ω)
+
+is_change_possible(Γ,Λ)
+is_change_possible(Λ,Γ)
 
 ############################################################################################
 
