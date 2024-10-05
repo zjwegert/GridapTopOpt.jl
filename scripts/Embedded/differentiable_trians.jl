@@ -114,17 +114,12 @@ function precompute_autodiff_caches(
   bgmodel = get_background_model(trian)
   subcells = trian.subcells
 
-  cell_to_bgcell   = subcells.cell_to_bgcell
-  cell_to_points   = subcells.cell_to_points
-  point_to_rcoords = subcells.point_to_rcoords
-  point_to_coords  = subcells.point_to_coords
-
   precompute_autodiff_caches(
     bgmodel,
-    cell_to_bgcell,
-    cell_to_points,
-    point_to_rcoords,
-    point_to_coords,
+    subcells.cell_to_bgcell,
+    subcells.cell_to_points,
+    subcells.point_to_rcoords,
+    subcells.point_to_coords,
   )
 end
 
@@ -134,17 +129,12 @@ function precompute_autodiff_caches(
   bgmodel = get_background_model(trian)
   subfacets = trian.subfacets
 
-  facet_to_bgcell  = subfacets.facet_to_bgcell
-  facet_to_points  = subfacets.facet_to_points
-  point_to_rcoords = subfacets.point_to_rcoords
-  point_to_coords  = subfacets.point_to_coords
-
   precompute_autodiff_caches(
     bgmodel,
-    facet_to_bgcell,
-    facet_to_points,
-    point_to_rcoords,
-    point_to_coords,
+    subfacets.facet_to_bgcell,
+    subfacets.facet_to_points,
+    subfacets.point_to_rcoords,
+    subfacets.point_to_coords,
   )
 end
 
