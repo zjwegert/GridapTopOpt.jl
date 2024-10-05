@@ -62,7 +62,7 @@ function generate_ghost_trian(
   cell_to_face = get_faces(topo,Dc,Dc-1)
 
   n_bgfaces = num_faces(bgmodel,1)
-  n_faces = num_cells(cell_skeleton)
+  n_faces = num_cells(trian)
   ghost_faces = zeros(Int32,n_faces)
   p_lcell = ones(Int8,n_bgfaces)
   m_lcell = ones(Int8,n_bgfaces)
@@ -81,9 +81,10 @@ function generate_ghost_trian(
   minus = BoundaryTriangulation(bgmodel,ghost_faces,m_lcell)
   return SkeletonTriangulation(plus,minus)
 end
+
 struct SubFacetSkeletonTriangulation{Di,Df,Dp} <: Triangulation{Di,Dp}
   cell_skeleton::CompositeTriangulation{Di,Dp} # Interface -> BG Cell pair
-  face_skeleton::SkeletonTriangulation{Df,Dp}  # Interface -> Cut Facet pair
+  face_skeleton::SkeletonTriangulation{Di,Dp}  # Interface -> Cut Facet pair
   ghost_skeleton::SkeletonTriangulation{Df,Dp} # Ghost Facet -> BG Cell pair
   face_trian::SubFacetTriangulation{Df,Dp}     # Cut Facet -> BG Cell
   face_model::UnstructuredDiscreteModel{Df,Dp}
@@ -128,9 +129,9 @@ end
 # Normal vector to the ghost facets, n_k
 function get_ghost_normal_vector(trian::SubFacetSkeletonTriangulation)
   n_out = get_normal_vector(trian.ghost_skeleton)
-  n_in  = (-1) * n_out
-  plus  =  GenericCellField(CellData.get_data(n_in.plus),trian.cell_skeleton.plus,ReferenceDomain())
-  minus = GenericCellField(CellData.get_data(n_in.minus),trian.cell_skeleton.minus,ReferenceDomain())
+  n_in  = SkeletonPair((-1) * n_out.plus, (-1) * n_out.minus)
+  plus  = GenericCellField(CellData.get_data(n_in.plus),trian,ReferenceDomain())
+  minus = GenericCellField(CellData.get_data(n_in.minus),trian,ReferenceDomain())
   return SkeletonPair(plus,minus)
 end
 
@@ -144,15 +145,14 @@ function get_tangent_vector(trian::SkeletonTriangulation{1})
     t = c[2] - c[1]
     return t/norm(t)
   end
-  edge_coords = get_cell_coordinates(trian)
-  data = lazy_map(t,CellData.get_data(edge_coords))
+  data = lazy_map(t,get_cell_coordinates(trian))
   plus = GenericCellField(data,trian.plus,PhysicalDomain())
   minus = GenericCellField(data,trian.minus,PhysicalDomain())
   return SkeletonPair(plus,minus)
 end
 
 # Normal vector to the cut interface, n_S
-function get_normal_vector(trian::SubFacetSkeletonTriangulation{Di}) where {Di}
+function CellData.get_normal_vector(trian::SubFacetSkeletonTriangulation{Di}) where {Di}
   if Di == 0
     n_S = get_tangent_vector(trian.ghost_skeleton)
   elseif Di == 1
@@ -175,7 +175,7 @@ end
 
 # Conormal vectors, m_k = t_S x n_∂Ω
 function get_conormal_vector(trian::SubFacetSkeletonTriangulation{Di}) where {Di}
-  op = Operation(GridapEmbedded._normal_vector)
+  op = Operation(GridapEmbedded.LevelSetCutters._normal_vector)
   n_∂Ω = get_subfacet_normal_vector(trian)
   if Di == 0 # 2D 
     m_k = op(n_∂Ω)
@@ -186,4 +186,10 @@ function get_conormal_vector(trian::SubFacetSkeletonTriangulation{Di}) where {Di
     @notimplemented
   end
   return m_k
+end
+
+function Arrays.evaluate!(cache,k::Operation,a::SkeletonPair{<:CellField})
+  plus = k(a.plus)
+  minus = k(a.minus)
+  SkeletonPair(plus,minus)
 end

@@ -1,6 +1,6 @@
 using Gridap
 using Gridap.Geometry, Gridap.Adaptivity, Gridap.Algebra, Gridap.Arrays, Gridap.FESpaces
-  Gridap.CellData, Gridap.Fields, Gridap.Helpers, Gridap.ReferenceFEs, Gridap.Polynomials
+using Gridap.CellData, Gridap.Fields, Gridap.Helpers, Gridap.ReferenceFEs, Gridap.Polynomials
 
 using GridapEmbedded
 using GridapEmbedded.Interfaces
@@ -18,12 +18,14 @@ function SubFacetSkeletonTriangulation(trian::SubFacetTriangulation{Dc,Dp}) wher
   if Dp == 2
     Γ_facet_to_points = map(Reindex(subfacets.point_to_coords),subfacets.facet_to_points)
     Γ_pts = unique(x -> round(x;sigdigits=12),reduce(vcat,Γ_facet_to_points))
-    Γ_facet_to_pts = convert(Vector{Vector{Int32}},map(v->indexin(round.(v;sigdigits=12),
-      round.(Γ_pts;sigdigits=12)),Γ_facet_to_points))
+    Γ_facet_to_pts = Table(convert(
+      Vector{Vector{Int32}},
+      map(v->indexin(round.(v;sigdigits=12),round.(Γ_pts;sigdigits=12)),Γ_facet_to_points)
+    ))
 
-    grid_top = GridTopology(Γ.subgrid,Table(Γ_facet_to_pts),IdentityVector(length(Γ_pts)))
+    grid_top = GridTopology(Γ.subgrid,Γ_facet_to_pts,IdentityVector(length(Γ_pts)))
     grid = UnstructuredGrid(
-      Γ_pts,Table(Γ_facet_to_pts),
+      Γ_pts,Γ_facet_to_pts,
       Γ.subgrid.reffes,
       Γ.subgrid.cell_types,
       Γ.subgrid.orientation_style,
@@ -96,7 +98,7 @@ function orient(a::VectorValue{2,T},b::VectorValue{2,T}) where T
 end
 
 order = 1
-n = 51
+n = 10
 N = 4
 _model = CartesianDiscreteModel((0,1,0,1),(n,n))
 cd = Gridap.Geometry.get_cartesian_descriptor(_model)
@@ -139,6 +141,9 @@ dΓ = Measure(Γ,2*order)
 dΓs = Measure(Γs,2)
 fh = interpolate(x->1,V_φ)
 
+# Jordi: I think this is equivalent to the _normal_vector & _orthogonal_vector methods 
+# in GridapEmbedded/LevelSetCutters/LookupTables - line 333/350
+# There it is generalised to 3D and 4D.
 _2d_cross(n) = VectorValue(n[2],-n[1]);
 
 Γg_to_Γs = Γg_to_Γs_perm(Γs,Γg)
@@ -215,21 +220,25 @@ writevtk(
   "n_∂Ω_plus"=>n_∂Ω_plus,"n_∂Ω_minus"=>n_∂Ω_minus,
   "ns"=>nˢ,
   "∇φh_Γs_plus"=>∇φh_Γs.plus,"∇φh_Γs_minus"=>∇φh_Γs.minus,
-  "m.minus"=>m.minus,"m.plus"=>m.plus]
+  "m.minus"=>m.minus,"m.plus"=>m.plus];
+  append=false
 )
 bgcell_to_inoutcut = compute_bgcell_to_inoutcut(model,geo)
-  writevtk(
+writevtk(
   Ω,
   "results/Background",
   cellfields=["φh"=>∇(φh)]#,"dj"=>FEFunction(V_φ,djΓ_exp_vec),"dj_AD"=>FEFunction(V_φ,djΓ_vec_out)]
   ,
-  celldata=["inoutcut"=>bgcell_to_inoutcut]
-  )
+  celldata=["inoutcut"=>bgcell_to_inoutcut];
+  append=false
+)
 writevtk(
   Γ,
-  "results/Boundary"
+  "results/Boundary";
+  append=false
 )
 writevtk(
   Γg,
-  "results/GhostSkel"
+  "results/GhostSkel";
+  append=false
 )
