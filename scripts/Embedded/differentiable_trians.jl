@@ -70,21 +70,9 @@ function Arrays.evaluate!(
     else
       n1, n2 = edge_list[e]
       q1, q2 = bg_coords[n1], bg_coords[n2]
-      v1, v2 = values[n1], values[n2]
-      if v1 > 0 && v2 < 0
-        w1 = min(v1, 1)
-        w2 = max(v2, -1)
-        λ = w1/(w1-w2)
-        new_coords[i] = q1 + λ*(q2-q1)
-      else
-        w1 = max(v1, -1)
-        w2 = min(v2, 1)
-        λ = w2/(w2-w1)
-        new_coords[i] = q2 + λ*(q1-q2)
-      end
-      # v1, v2 = abs(values[n1]), abs(values[n2])
-      # λ = v1/(v1+v2)
-      # new_coords[i] = q1 + λ*(q2-q1)
+      v1, v2 = abs(values[n1]), abs(values[n2])
+      λ = v1/(v1+v2)
+      new_coords[i] = q1 + λ*(q2-q1)
     end
   end
   return new_coords
@@ -228,10 +216,16 @@ end
 
 # DifferentiableTriangulation
 
-mutable struct DifferentiableTriangulation{Dc,Dp} <: Triangulation{Dc,Dp}
-  trian :: Triangulation{Dc,Dp}
+mutable struct DifferentiableTriangulation{Dc,Dp,A} <: Triangulation{Dc,Dp}
+  trian :: A
   cell_values
   caches
+  function DifferentiableTriangulation(
+    trian :: Triangulation{Dc,Dp},cell_values,caches
+  ) where {Dc,Dp}
+    A = typeof(trian)
+    new{Dc,Dp,A}(trian,cell_values,caches)
+  end
 end
 
 function DifferentiableTriangulation(trian::Triangulation)
@@ -298,33 +292,26 @@ function Geometry.get_cell_map(ttrian::DifferentiableTriangulation)
   return cell_map
 end
 
-function Geometry.get_glue(ttrian::DifferentiableTriangulation{Dc},val::Val{d}) where {Dc,d}
-  if isnothing(ttrian.cell_values)
-    return get_glue(ttrian.trian,val)
+function Geometry.get_glue(ttrian::DifferentiableTriangulation,val::Val{D}) where {D}
+  glue = get_glue(ttrian.trian,val)
+  if isnothing(glue) || isnothing(ttrian.cell_values)
+    return glue
   end
-  if d != Dc
-    return nothing
-  end
+
+  # New reference maps 
   c = ttrian.caches
   cell_values = ttrian.cell_values
   cell_to_rcoords = lazy_map(DualizeCoordsMap(),c.face_to_rcoords,c.face_to_bgrcoords,cell_values,c.face_to_edges,c.face_to_edge_lists)
   cell_reffe = get_cell_reffe(ttrian)
   ref_cell_map = compute_cell_maps(cell_to_rcoords,cell_reffe)
 
-  tface_to_mface = ttrian.trian.subcells.cell_to_bgcell
-  tface_to_mface_map = ref_cell_map
-  FaceToFaceGlue(tface_to_mface,tface_to_mface_map,nothing)
+  return FaceToFaceGlue(
+    glue.tface_to_mface,
+    ref_cell_map,
+    glue.mface_to_tface,
+  )
 end
 
-# This was meant to fix the case of having something like j_in(φ) = ∫(fh*fh)dΩin but it breaks stuff!!
-# function CellData.change_domain(a::CellField,strian::DifferentiableTriangulation,sds::ReferenceDomain,ttrian::Triangulation,tds::ReferenceDomain)
-#   change_domain(a,strian.trian,sds,ttrian,tds)
-# end
-
-# function CellData.change_domain(a::CellField,strian::DifferentiableTriangulation,sds::ReferenceDomain,ttrian::DifferentiableTriangulation,tds::ReferenceDomain)
-#   change_domain(a,strian.trian,sds,ttrian.trian,tds)
-# end
-
-# function CellData.change_domain(a::CellField,strian::Triangulation,sds::ReferenceDomain,ttrian::DifferentiableTriangulation,tds::ReferenceDomain)
-#   change_domain(a,strian,sds,ttrian.trian,tds)
-# end
+function FESpaces.get_cell_fe_data(fun,f,ttrian::DifferentiableTriangulation)
+  FESpaces.get_cell_fe_data(fun,f,ttrian.trian)
+end

@@ -9,7 +9,7 @@ import Gridap.Geometry: get_node_coordinates, collect1d
 include("../differentiable_trians.jl")
 
 order = 1
-n = 10
+n = 2
 N = 8
 
 model = CartesianDiscreteModel((0,1,0,1),(n,n))
@@ -92,18 +92,15 @@ n_S = get_normal_vector(Λ)
 m_k = get_conormal_vector(Λ)
 
 fh = interpolate(x->1,V_φ)
-∇ˢφ = Operation(abs)(n_S ⋅ ∇(φh))
-dJ2(w) = ∫(n_S ⋅ (jump(fh*m_k) * w / ∇ˢφ))dΛ
+∇ˢφ = Operation(abs)(n_S ⋅ ∇(φh).plus)
+dJ2(w) = ∫(n_S ⋅ (jump(fh*m_k) * mean(w) / ∇ˢφ))dΛ
 dj2 = assemble_vector(dJ2,V_φ)
 
-is_change_possible(Ω,Γ)
-is_change_possible(Γ,Ω)
-
-is_change_possible(Ω,Λ)
-is_change_possible(Λ,Ω)
-
-is_change_possible(Γ,Λ)
-is_change_possible(Λ,Γ)
+diff_Γ = DifferentiableTriangulation(Γ)
+dΓ_AD = Measure(diff_Γ,2*order)
+J2(φ) = ∫(fh)dΓ_AD
+dJ2_AD = gradient(J2,φh)
+dj2_AD = assemble_vector(dJ2_AD,V_φ)
 
 ############################################################################################
 

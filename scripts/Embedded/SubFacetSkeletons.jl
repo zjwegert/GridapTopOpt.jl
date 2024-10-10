@@ -155,7 +155,10 @@ end
 
 # Normal vector to the cut facets , n_∂Ω
 function get_subfacet_normal_vector(trian::SubFacetSkeletonTriangulation) 
-  return get_normal_vector(trian.face_trian)
+  n_∂Ω = get_normal_vector(trian.face_trian)
+  plus = change_domain(n_∂Ω.plus,trian,ReferenceDomain())
+  minus = change_domain(-n_∂Ω.minus,trian,ReferenceDomain())
+  return SkeletonPair(plus,minus)
 end
 
 # Normal vector to the ghost facets, n_k
@@ -167,22 +170,48 @@ function get_ghost_normal_vector(trian::SubFacetSkeletonTriangulation)
   return SkeletonPair(plus,minus)
 end
 
-# Tangent vector to a skeleton triangulation
+"""
+# Returns a consistent tangent vector in the ReferenceDomain. Consistency 
+# is achieved by choosing it's direction as going from the node with the
+# smallest id to the one with the largest id.
 function get_tangent_vector(
-  trian::SkeletonTriangulation{1};
+  trian::BoundaryTriangulation{1};
   ttrian = trian
 )
-  # TODO: Can we create this in the ReferenceDomain? 
-  # If so, we need to be careful to orient both sides so that their physical 
-  # representations are consistent.
-  function t(c) 
+  flip(e,t::T) where T = (e[1] < e[2]) ? t : -t :: T
+  bgmodel = get_background_model(trian)
+  topo = get_grid_topology(bgmodel)
+  glue = trian.glue
+  cell_to_poly = lazy_map(get_polytope,get_cell_reffe(bgmodel))
+  cell_to_ltangents = lazy_map(get_edge_tangent,cell_to_poly)
+  edge_to_ltangents = lazy_map(Reindex(cell_to_ltangents),glue.face_to_cell)
+  edge_to_tangent = lazy_map(getindex,edge_to_ltangents,glue.face_to_lface)
+  edge_to_nodes = lazy_map(Reindex(get_faces(topo,1,0)),glue.face_to_bgface)
+  data = lazy_map(ConstantField,lazy_map(flip,edge_to_nodes,edge_to_tangent))
+  return GenericCellField(data,ttrian,ReferenceDomain())
+end
+"""
+
+# Returns the tangent vector in the PhysicalDomain
+function get_tangent_vector(
+  trian::BoundaryTriangulation{1};
+  ttrian = trian
+)
+  function t(c)
     @assert length(c) == 2
     t = c[2] - c[1]
     return t/norm(t)
   end
-  data = lazy_map(ConstantField,lazy_map(t,get_cell_coordinates(trian)))
-  plus = GenericCellField(data,ttrian,PhysicalDomain())
-  minus = GenericCellField(data,ttrian,PhysicalDomain())
+  data = lazy_map(constant_field,lazy_map(t,get_cell_coordinates(trian)))
+  return GenericCellField(data,ttrian,ReferenceDomain())
+end
+
+function get_tangent_vector(
+  trian::SkeletonTriangulation{1};
+  ttrian = trian
+)
+  plus = get_tangent_vector(trian.plus;ttrian=ttrian)
+  minus = get_tangent_vector(trian.minus;ttrian=ttrian)
   return SkeletonPair(plus,minus)
 end
 
@@ -197,10 +226,12 @@ function CellData.get_normal_vector(trian::SubFacetSkeletonTriangulation{Di}) wh
   else
     @notimplemented
   end
-  return n_S
+  # We pick the plus side. Consistency is given by later
+  # computing t_S as t_S = n_S x n_k
+  return n_S.plus
 end
 
-# Tangent vector to the cut interface, t_S
+# Tangent vector to the cut interface, t_S = n_S x n_k
 function get_tangent_vector(trian::SubFacetSkeletonTriangulation{Di}) where {Di}
   @notimplementedif Di != 1
   n_S = get_normal_vector(trian)
@@ -252,4 +283,10 @@ for op in (:outer,:*,:dot,:/)
   @eval begin
     ($op)(a::SkeletonPair{<:CellField},b::SkeletonPair{<:CellField}) = Operation($op)(a,b)
   end
+end
+
+function CellData.change_domain(a::SkeletonPair, ::ReferenceDomain, ::PhysicalDomain)
+  plus = change_domain(a.plus,ReferenceDomain(),PhysicalDomain())
+  minus = change_domain(a.minus,ReferenceDomain(),PhysicalDomain())
+  return SkeletonPair(plus,minus)
 end
