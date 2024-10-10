@@ -163,10 +163,9 @@ end
 
 # Normal vector to the ghost facets, n_k
 function get_ghost_normal_vector(trian::SubFacetSkeletonTriangulation)
-  n_out = get_normal_vector(trian.ghost_skeleton)
-  n_in  = SkeletonPair((-1) * n_out.plus, (-1) * n_out.minus)
-  plus  = GenericCellField(CellData.get_data(n_in.plus),trian,ReferenceDomain())
-  minus = GenericCellField(CellData.get_data(n_in.minus),trian,ReferenceDomain())
+  n = get_normal_vector(trian.ghost_skeleton)
+  plus  = GenericCellField(CellData.get_data(n.plus),trian,ReferenceDomain())
+  minus = GenericCellField(CellData.get_data(n.minus),trian,ReferenceDomain())
   return SkeletonPair(plus,minus)
 end
 
