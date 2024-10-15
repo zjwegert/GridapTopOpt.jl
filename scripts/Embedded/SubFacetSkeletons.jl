@@ -61,7 +61,7 @@ function generate_ghost_trian(
   face_to_cell = get_faces(topo,Dc-1,Dc)
   cell_to_face = get_faces(topo,Dc,Dc-1)
 
-  n_bgfaces = num_faces(bgmodel,1)
+  n_bgfaces = num_faces(bgmodel,Dc-1)
   n_faces = num_cells(trian)
   ghost_faces = zeros(Int32,n_faces)
   p_lcell = ones(Int8,n_bgfaces)
@@ -131,7 +131,7 @@ function CellData.change_domain(
     # 1) CellField defined on the skeleton
     return change_domain(a,DomainStyle(a),tdomain)
   end
-  
+
   if is_change_possible(strian,ttrian.cell_skeleton)
     # 2) CellField defined on the bgmodel
     b = change_domain(a,ttrian.cell_skeleton,tdomain)
@@ -154,23 +154,44 @@ function CellData.change_domain(
 end
 
 # Normal vector to the cut facets , n_∂Ω
-function get_subfacet_normal_vector(trian::SubFacetSkeletonTriangulation) 
+function get_subfacet_normal_vector(trian::SubFacetSkeletonTriangulation{0})
   n_∂Ω = get_normal_vector(trian.face_trian)
   plus = change_domain(n_∂Ω.plus,trian,ReferenceDomain())
   minus = change_domain(-n_∂Ω.minus,trian,ReferenceDomain())
   return SkeletonPair(plus,minus)
 end
+function get_subfacet_normal_vector(trian::SubFacetSkeletonTriangulation{1})
+  n_∂Ω = get_normal_vector(trian.face_trian)
+  plus = change_domain(n_∂Ω.plus,trian,ReferenceDomain())
+  minus = change_domain(n_∂Ω.minus,trian,ReferenceDomain()) # This needs to be postive for mk to be correctly oriented in 3d
+  return SkeletonPair(plus,minus)
+end
 
 # Normal vector to the ghost facets, n_k
-function get_ghost_normal_vector(trian::SubFacetSkeletonTriangulation)
+# function get_ghost_normal_vector(trian::SubFacetSkeletonTriangulation)
+#   n = get_normal_vector(trian.ghost_skeleton)
+#   plus  = GenericCellField(CellData.get_data(n.plus),trian,ReferenceDomain())
+#   minus = GenericCellField(CellData.get_data(n.minus),trian,ReferenceDomain())
+#   return SkeletonPair(plus,minus)
+# end
+# The above fails as fields defined on SubFacetSkeletonTriangulation have 1 input in 3d points
+#   but fields defined on ghost skeleton have 2 inputs. Should change_domain fix this?
+
+function get_ghost_normal_vector(trian::SubFacetSkeletonTriangulation{0})
   n = get_normal_vector(trian.ghost_skeleton)
-  plus  = GenericCellField(CellData.get_data(n.plus),trian,ReferenceDomain())
-  minus = GenericCellField(CellData.get_data(n.minus),trian,ReferenceDomain())
+  plus  = CellField(evaluate(get_data(n.plus),Point(0,)),trian,ReferenceDomain())
+  minus = CellField(evaluate(get_data(n.minus),Point(0,)),trian,ReferenceDomain())
+  return SkeletonPair(plus,minus)
+end
+function get_ghost_normal_vector(trian::SubFacetSkeletonTriangulation{1})
+  n = get_normal_vector(trian.ghost_skeleton)
+  plus  = CellField(evaluate(get_data(n.plus),Point(0,0)),trian,ReferenceDomain())
+  minus = CellField(evaluate(get_data(n.minus),Point(0,0)),trian,ReferenceDomain())
   return SkeletonPair(plus,minus)
 end
 
 """
-# Returns a consistent tangent vector in the ReferenceDomain. Consistency 
+# Returns a consistent tangent vector in the ReferenceDomain. Consistency
 # is achieved by choosing it's direction as going from the node with the
 # smallest id to the one with the largest id.
 function get_tangent_vector(
@@ -214,14 +235,26 @@ function get_tangent_vector(
   return SkeletonPair(plus,minus)
 end
 
+_2d_cross(n) = VectorValue(-n[2],n[1]);
+function normalise(v) # <- Double check RE if this neccessary?
+  m = sqrt(inner(v,v))
+  if m < eps()
+    return zero(v)
+  else
+    return v/m
+  end
+end
+
 # Normal vector to the cut interface, n_S
 function CellData.get_normal_vector(trian::SubFacetSkeletonTriangulation{Di}) where {Di}
   if Di == 0
-    n_S = get_tangent_vector(trian.ghost_skeleton;ttrian=trian)
+    n_k = get_ghost_normal_vector(trian)
+    n_S = Operation(_2d_cross)(n_k) # nS = nk x tS and tS = ±e₃ in 2D
+    # n_S = get_tangent_vector(trian.ghost_skeleton;ttrian=trian) # Not oriented correctly in 2d. # TODO: understand why!?
   elseif Di == 1
     n_k = get_ghost_normal_vector(trian)
-    t_S = get_tangent_vector(trian.cell_skeleton;ttrian=trian)
-    n_S = Operation(cross)(n_k,t_S) # nk = tS x nS -> nS = nk x tS (eq 6.25)
+    t_S = get_tangent_vector(trian.face_skeleton;ttrian=trian)
+    n_S = Operation(normalise ∘ cross)(n_k,t_S) # nk = tS x nS -> nS = nk x tS (eq 6.25)
   else
     @notimplemented
   end
@@ -229,20 +262,40 @@ function CellData.get_normal_vector(trian::SubFacetSkeletonTriangulation{Di}) wh
   # computing t_S as t_S = n_S x n_k
   return n_S.plus
 end
+# function alt_get_normal_vector(trian::SubFacetSkeletonTriangulation{Di}) where {Di}
+#   if Di == 0
+#     n_k = alt_get_ghost_normal_vector(trian)
+#     n_S = Operation(_2d_cross)(n_k) # nS = nk x tS and tS = ±e₃ in 2D
+#   elseif Di == 1
+#     n_k = alt_get_ghost_normal_vector(trian)
+#     t_S = alt_get_tangent_vector(trian)
+#     n_S = Operation(cross)(n_k,t_S) # nk = tS x nS -> nS = nk x tS (eq 6.25)
+#   else
+#     @notimplemented
+#   end
+#   # We pick the plus side. Consistency is given by later
+#   # computing t_S as t_S = n_S x n_k
+#   return n_S.plus
+# end
 
 # Tangent vector to the cut interface, t_S = n_S x n_k
 function get_tangent_vector(trian::SubFacetSkeletonTriangulation{Di}) where {Di}
   @notimplementedif Di != 1
   n_S = get_normal_vector(trian)
   n_k = get_ghost_normal_vector(trian)
-  return Operation(cross)(n_S,n_k)
+  return Operation(normalise ∘ cross)(n_S,n_k)
 end
+# function alt_get_tangent_vector(trian::SubFacetSkeletonTriangulation{1})
+#   n_∂Ω = get_subfacet_normal_vector(trian)
+#   n_k = get_ghost_normal_vector(trian)
+#   return Operation(normalise ∘ cross)(n_k,n_∂Ω) # t_S = n_k × n_∂Ω # <- need to show this if we wanted to actually use it!
+# end
 
 # Conormal vectors, m_k = t_S x n_∂Ω
 function get_conormal_vector(trian::SubFacetSkeletonTriangulation{Di}) where {Di}
   op = Operation(GridapEmbedded.LevelSetCutters._normal_vector)
   n_∂Ω = get_subfacet_normal_vector(trian)
-  if Di == 0 # 2D 
+  if Di == 0 # 2D
     m_k = op(n_∂Ω)
   elseif Di == 1 # 3D
     t_S = get_tangent_vector(trian)
@@ -252,6 +305,19 @@ function get_conormal_vector(trian::SubFacetSkeletonTriangulation{Di}) where {Di
   end
   return m_k
 end
+# function alt_get_conormal_vector(trian::SubFacetSkeletonTriangulation{Di}) where {Di}
+#   op = Operation(GridapEmbedded.LevelSetCutters._normal_vector)
+#   n_∂Ω = get_subfacet_normal_vector(trian)
+#   if Di == 0 # 2D
+#     m_k = op(n_∂Ω)
+#   elseif Di == 1 # 3D
+#     t_S = alt_get_tangent_vector(trian)
+#     m_k = op(t_S,n_∂Ω) # m_k = t_S x n_∂Ω (eq 6.26)
+#   else
+#     @notimplemented
+#   end
+#   return m_k
+# end
 
 # This will go to Gridap
 
