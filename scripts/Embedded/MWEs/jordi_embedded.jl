@@ -9,7 +9,7 @@ import Gridap.Geometry: get_node_coordinates, collect1d
 include("../differentiable_trians.jl")
 
 order = 1
-n = 2
+n = 3
 N = 8
 
 # _model = CartesianDiscreteModel((0,1,0,1),(n,n))
@@ -33,7 +33,7 @@ V_φ = TestFESpace(model,reffe_scalar)
 # φh = interpolate(x->tan(-pi/4)*(x[1]-0.5)+(x[2]-0.5),V_φ) # Angled interface
 
 # φh = interpolate(x->sqrt((x[1]-0.5)^2+(x[2]-0.5)^2)-0.303,V_φ) # Circle
-φh = interpolate(x->sqrt((x[1]-0.5)^2+(x[2]-0.5)^2+(x[3]-0.5)^2)-0.303,V_φ) # Sphere
+φh = interpolate(x->sqrt((x[1]-0.5)^2+(x[2]-0.5)^2+(x[3]-0.5)^2)-0.25,V_φ) # Sphere
 
 fh = interpolate(x->cos(x[1]*x[2]),V_φ)
 
@@ -106,7 +106,7 @@ J2(φ) = ∫(fh)dΓ_AD
 dJ2_AD = gradient(J2,φh)
 dj2_AD = assemble_vector(dJ2_AD,V_φ) # TODO: Why is this +ve but AD on volume is -ve???
 
-dj2 - dj2_AD
+norm(dj2 - dj2_AD)
 
 ############################################################################################
 

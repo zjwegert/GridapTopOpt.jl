@@ -82,6 +82,57 @@ function generate_ghost_trian(
   return SkeletonTriangulation(plus,minus)
 end
 
+"""
+    get_ghost_mask(
+      face_trian::SubFacetTriangulation{Df,Dc},
+      face_model::UnstructuredDiscreteModel{Df,Dc}
+    ) where {Df,Dc}
+
+    get_ghost_mask(face_trian::SubFacetTriangulation) = get_ghost_mask(face_trian,get_active_model(face_trian))
+
+  Returns a mask for ghost faces. We define ghost faces as the interfaces between two 
+  different cut facets that are located in different background cells.
+
+  The second condition is important: In 3D, some cuts subcells may not be simplices. 
+  In this case, we simplexify the subcell. This creates extra cut interfaces that are 
+  interior to a background cell. These are not considered ghost faces.
+
+  - In 2D: Dc = 2, Df = 1 -> Ghost faces have dimension 0 (i.e interface points)
+  - In 3D: Dc = 3, Df = 2 -> Ghost faces have dimension 1 (i.e interface edges)
+"""
+function get_ghost_mask(
+  face_trian::SubFacetTriangulation{Df,Dc},
+  face_model::UnstructuredDiscreteModel{Df,Dc}
+) where {Df,Dc}
+  topo = get_grid_topology(face_model)
+  face_to_facets = get_faces(topo,Df-1,Df)
+
+  subfacets = face_trian.subfacets
+  facet_to_bgcell = subfacets.facet_to_bgcell
+  
+  n_faces = num_faces(topo,Df-1)
+  face_is_ghost = zeros(Bool,n_faces)
+  for face in 1:n_faces
+    facets = view(face_to_facets,face)
+    is_boundary = isone(length(facets))
+    if !is_boundary
+      @assert length(facets) == 2
+      bgcells = view(facet_to_bgcell,facets)
+      is_ghost = (bgcells[1] != bgcells[2])
+      face_is_ghost[face] = is_ghost
+    end
+  end
+
+  return face_is_ghost
+end
+
+function get_ghost_mask(
+  face_trian::SubFacetTriangulation
+)
+  face_model = get_active_model(face_trian)
+  return get_ghost_mask(face_trian,face_model)
+end
+
 struct SubFacetSkeletonTriangulation{Di,Df,Dp} <: Triangulation{Di,Dp}
   cell_skeleton::CompositeTriangulation{Di,Dp} # Interface -> BG Cell pair
   face_skeleton::SkeletonTriangulation{Di,Dp}  # Interface -> Cut Facet pair
@@ -90,10 +141,12 @@ struct SubFacetSkeletonTriangulation{Di,Df,Dp} <: Triangulation{Di,Dp}
   face_model::UnstructuredDiscreteModel{Df,Dp}
 end
 
-function SkeletonTriangulation(face_trian::SubFacetTriangulation)
+function Geometry.SkeletonTriangulation(face_trian::SubFacetTriangulation)
   bgmodel = get_background_model(face_trian)
   face_model = get_active_model(face_trian)
-  face_skeleton = SkeletonTriangulation(face_model)
+
+  ghost_mask = get_ghost_mask(face_trian,face_model)
+  face_skeleton = SkeletonTriangulation(face_model,ghost_mask)
   cell_skeleton = CompositeTriangulation(face_trian,face_skeleton)
   ghost_skeleton = generate_ghost_trian(cell_skeleton,bgmodel)
   return SubFacetSkeletonTriangulation(cell_skeleton,face_skeleton,ghost_skeleton,face_trian,face_model)
