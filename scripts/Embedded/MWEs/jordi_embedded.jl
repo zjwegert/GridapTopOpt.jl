@@ -9,11 +9,11 @@ import Gridap.Geometry: get_node_coordinates, collect1d
 include("../differentiable_trians.jl")
 
 order = 1
-n = 3
+n = 40
 N = 8
 
-# _model = CartesianDiscreteModel((0,1,0,1),(n,n))
-_model = CartesianDiscreteModel((0,1,0,1,0,1),(n,n,n))
+_model = CartesianDiscreteModel((0,1,0,1),(n,n))
+#_model = CartesianDiscreteModel((0,1,0,1,0,1),(n,n,n))
 cd = Gridap.Geometry.get_cartesian_descriptor(_model)
 base_model = UnstructuredDiscreteModel(_model)
 ref_model = refine(base_model, refinement_method = "barycentric")
@@ -32,8 +32,8 @@ V_φ = TestFESpace(model,reffe_scalar)
 # φh = interpolate(x->abs(x[1]-0.5)+0abs(x[2]-0.5)-0.25/(1+0.25),V_φ) # Straight lines without scaling
 # φh = interpolate(x->tan(-pi/4)*(x[1]-0.5)+(x[2]-0.5),V_φ) # Angled interface
 
-# φh = interpolate(x->sqrt((x[1]-0.5)^2+(x[2]-0.5)^2)-0.303,V_φ) # Circle
-φh = interpolate(x->sqrt((x[1]-0.5)^2+(x[2]-0.5)^2+(x[3]-0.5)^2)-0.25,V_φ) # Sphere
+φh = interpolate(x->sqrt((x[1]-0.5)^2+(x[2]-0.5)^2)-0.5223,V_φ) # Circle
+# φh = interpolate(x->sqrt((x[1]-0.5)^2+(x[2]-0.5)^2+(x[3]-0.5)^2)-0.25,V_φ) # Sphere
 
 fh = interpolate(x->cos(x[1]*x[2]),V_φ)
 
@@ -94,7 +94,7 @@ n_k = get_ghost_normal_vector(Λ)
 n_S = get_normal_vector(Λ)
 m_k = get_conormal_vector(Λ)
 
-fh = interpolate(x->cos(x[1]),V_φ)
+fh = interpolate(x->1.0,V_φ)
 ∇ˢφ = Operation(abs)(n_S ⋅ ∇(φh).plus)
 _n = get_normal_vector(Γ)
 dJ2(w) = ∫((-_n⋅∇(fh))*w/(norm ∘ (∇(φh))))dΓ + ∫(-n_S ⋅ (jump(fh*m_k) * mean(w) / ∇ˢφ))dΛ
@@ -107,6 +107,29 @@ dJ2_AD = gradient(J2,φh)
 dj2_AD = assemble_vector(dJ2_AD,V_φ) # TODO: Why is this +ve but AD on volume is -ve???
 
 norm(dj2 - dj2_AD)
+
+############################################################################################
+
+bgmodel = get_background_model(Γ)
+Σ = Boundary(Γ)
+Σg = generate_ghost_trian(Σ,bgmodel)
+
+n_S_Σ = get_tangent_vector(Σg;ttrian=Σ)
+
+itrian = Triangulation(Λ.face_model)
+_n_∂Ω = get_normal_vector(Λ.face_trian)
+_n_∂Ω = CellData.similar_cell_field(_n_∂Ω,CellData.get_data(_n_∂Ω),itrian,DomainStyle(_n_∂Ω))
+_n_∂Ω = change_domain(_n_∂Ω,Boundary(Λ.face_model),ReferenceDomain())
+n_∂Ω_Σ = CellData.similar_cell_field(_n_∂Ω,CellData.get_data(_n_∂Ω),Σ,DomainStyle(_n_∂Ω))
+
+m_k_Σ = Operation(GridapEmbedded.LevelSetCutters._normal_vector)(n_∂Ω_Σ)
+∇ˢφ_Σ = Operation(abs)(n_S_Σ ⋅ ∇(φh))
+
+dΣ = Measure(Σ,2*order)
+dJ3(w) = dJ2(w) + ∫(-n_S_Σ ⋅ (fh*m_k_Σ * w / ∇ˢφ_Σ))dΣ
+dj3 = assemble_vector(dJ3,V_φ)
+
+norm(dj3 - dj2_AD)
 
 ############################################################################################
 
@@ -129,7 +152,11 @@ writevtk(
 bgcell_to_inoutcut = compute_bgcell_to_inoutcut(model,geo)
 writevtk(
   Ω,"results/test",
-  cellfields=["φh"=>φh,"∇φh"=>∇(φh),"dj2_in"=>FEFunction(V_φ,dj2_AD),"dj_expected"=>FEFunction(V_φ,dj2)],
+  cellfields=[
+    "φh"=>φh,"∇φh"=>∇(φh),
+    "dj2_in"=>FEFunction(V_φ,dj2_AD),"dj_expected"=>FEFunction(V_φ,dj2),
+    "dj_expected_corrected"=>FEFunction(V_φ,dj3)
+  ],
   celldata=["inoutcut"=>bgcell_to_inoutcut];
   append=false
 )

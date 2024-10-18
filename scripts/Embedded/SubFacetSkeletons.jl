@@ -56,7 +56,14 @@ function generate_ghost_trian(
   bgmodel::UnstructuredDiscreteModel{Dc}
 ) where {Dc}
   cell_glue = get_glue(trian,Val(Dc))
+  return generate_ghost_trian(trian,bgmodel,cell_glue)
+end
 
+function generate_ghost_trian(
+  trian::CompositeTriangulation,
+  bgmodel::UnstructuredDiscreteModel{Dc},
+  cell_glue::SkeletonPair{<:FaceToFaceGlue}
+) where {Dc}
   topo = get_grid_topology(bgmodel)
   face_to_cell = get_faces(topo,Dc-1,Dc)
   cell_to_face = get_faces(topo,Dc,Dc-1)
@@ -80,6 +87,29 @@ function generate_ghost_trian(
   plus = BoundaryTriangulation(bgmodel,ghost_faces,p_lcell)
   minus = BoundaryTriangulation(bgmodel,ghost_faces,m_lcell)
   return SkeletonTriangulation(plus,minus)
+end
+
+function generate_ghost_trian(
+  trian::CompositeTriangulation,
+  bgmodel::UnstructuredDiscreteModel{Dc},
+  cell_glue::FaceToFaceGlue
+) where {Dc}
+  topo = get_grid_topology(bgmodel)
+  face_to_cell = get_faces(topo,Dc-1,Dc)
+  cell_to_face = get_faces(topo,Dc,Dc-1)
+  is_boundary(f) = isone(length(view(face_to_cell,f)))
+
+  n_faces = num_cells(trian)
+  ghost_faces = zeros(Int32,n_faces)
+  for (i,cell) in enumerate(cell_glue.tface_to_mface)
+    faces = filter(is_boundary,view(cell_to_face,cell))
+    @assert length(faces) == 1 # TODO: This will break if we are in a corner
+    face = first(faces)
+    ghost_faces[i] = face
+  end
+
+  # NOTE: lcell is always 1 for boundary facets
+  return BoundaryTriangulation(bgmodel,ghost_faces)
 end
 
 """
