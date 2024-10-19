@@ -112,17 +112,9 @@ norm(dj2 - dj2_AD)
 
 bgmodel = get_background_model(Γ)
 Σ = Boundary(Γ)
-Σg = generate_ghost_trian(Σ,bgmodel)
 
-n_S_Σ = get_tangent_vector(Σg;ttrian=Σ)
-
-itrian = Triangulation(Λ.face_model)
-_n_∂Ω = get_normal_vector(Λ.face_trian)
-_n_∂Ω = CellData.similar_cell_field(_n_∂Ω,CellData.get_data(_n_∂Ω),itrian,DomainStyle(_n_∂Ω))
-_n_∂Ω = change_domain(_n_∂Ω,Boundary(Λ.face_model),ReferenceDomain())
-n_∂Ω_Σ = CellData.similar_cell_field(_n_∂Ω,CellData.get_data(_n_∂Ω),Σ,DomainStyle(_n_∂Ω))
-
-m_k_Σ = Operation(GridapEmbedded.LevelSetCutters._normal_vector)(n_∂Ω_Σ)
+n_S_Σ = get_normal_vector(Σ)
+m_k_Σ = get_conormal_vector(Σ)
 ∇ˢφ_Σ = Operation(abs)(n_S_Σ ⋅ ∇(φh))
 
 dΣ = Measure(Σ,2*order)

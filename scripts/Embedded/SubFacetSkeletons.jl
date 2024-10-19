@@ -260,40 +260,13 @@ end
 # The above fails as fields defined on SubFacetSkeletonTriangulation have 1 input in 3d points
 #   but fields defined on ghost skeleton have 2 inputs. Should change_domain fix this?
 
-function get_ghost_normal_vector(trian::SubFacetSkeletonTriangulation{0})
+function get_ghost_normal_vector(trian::SubFacetSkeletonTriangulation{Di}) where Di
   n = get_normal_vector(trian.ghost_skeleton)
-  plus  = CellField(evaluate(get_data(n.plus),Point(0,)),trian,ReferenceDomain())
-  minus = CellField(evaluate(get_data(n.minus),Point(0,)),trian,ReferenceDomain())
+  z = zero(VectorValue{Di+1,Float64})
+  plus  = CellField(evaluate(get_data(n.plus),z),trian,ReferenceDomain())
+  minus = CellField(evaluate(get_data(n.minus),z),trian,ReferenceDomain())
   return SkeletonPair(plus,minus)
 end
-function get_ghost_normal_vector(trian::SubFacetSkeletonTriangulation{1})
-  n = get_normal_vector(trian.ghost_skeleton)
-  plus  = CellField(evaluate(get_data(n.plus),Point(0,0)),trian,ReferenceDomain())
-  minus = CellField(evaluate(get_data(n.minus),Point(0,0)),trian,ReferenceDomain())
-  return SkeletonPair(plus,minus)
-end
-
-"""
-# Returns a consistent tangent vector in the ReferenceDomain. Consistency
-# is achieved by choosing it's direction as going from the node with the
-# smallest id to the one with the largest id.
-function get_tangent_vector(
-  trian::BoundaryTriangulation{1};
-  ttrian = trian
-)
-  flip(e,t::T) where T = (e[1] < e[2]) ? t : -t :: T
-  bgmodel = get_background_model(trian)
-  topo = get_grid_topology(bgmodel)
-  glue = trian.glue
-  cell_to_poly = lazy_map(get_polytope,get_cell_reffe(bgmodel))
-  cell_to_ltangents = lazy_map(get_edge_tangent,cell_to_poly)
-  edge_to_ltangents = lazy_map(Reindex(cell_to_ltangents),glue.face_to_cell)
-  edge_to_tangent = lazy_map(getindex,edge_to_ltangents,glue.face_to_lface)
-  edge_to_nodes = lazy_map(Reindex(get_faces(topo,1,0)),glue.face_to_bgface)
-  data = lazy_map(ConstantField,lazy_map(flip,edge_to_nodes,edge_to_tangent))
-  return GenericCellField(data,ttrian,ReferenceDomain())
-end
-"""
 
 # Returns the tangent vector in the PhysicalDomain
 function get_tangent_vector(
@@ -345,21 +318,6 @@ function CellData.get_normal_vector(trian::SubFacetSkeletonTriangulation{Di}) wh
   # computing t_S as t_S = n_S x n_k
   return n_S.plus
 end
-# function alt_get_normal_vector(trian::SubFacetSkeletonTriangulation{Di}) where {Di}
-#   if Di == 0
-#     n_k = alt_get_ghost_normal_vector(trian)
-#     n_S = Operation(_2d_cross)(n_k) # nS = nk x tS and tS = ±e₃ in 2D
-#   elseif Di == 1
-#     n_k = alt_get_ghost_normal_vector(trian)
-#     t_S = alt_get_tangent_vector(trian)
-#     n_S = Operation(cross)(n_k,t_S) # nk = tS x nS -> nS = nk x tS (eq 6.25)
-#   else
-#     @notimplemented
-#   end
-#   # We pick the plus side. Consistency is given by later
-#   # computing t_S as t_S = n_S x n_k
-#   return n_S.plus
-# end
 
 # Tangent vector to the cut interface, t_S = n_S x n_k
 function get_tangent_vector(trian::SubFacetSkeletonTriangulation{Di}) where {Di}
@@ -368,11 +326,6 @@ function get_tangent_vector(trian::SubFacetSkeletonTriangulation{Di}) where {Di}
   n_k = get_ghost_normal_vector(trian)
   return Operation(normalise ∘ cross)(n_S,n_k)
 end
-# function alt_get_tangent_vector(trian::SubFacetSkeletonTriangulation{1})
-#   n_∂Ω = get_subfacet_normal_vector(trian)
-#   n_k = get_ghost_normal_vector(trian)
-#   return Operation(normalise ∘ cross)(n_k,n_∂Ω) # t_S = n_k × n_∂Ω # <- need to show this if we wanted to actually use it!
-# end
 
 # Conormal vectors, m_k = t_S x n_∂Ω
 function get_conormal_vector(trian::SubFacetSkeletonTriangulation{Di}) where {Di}
@@ -388,20 +341,141 @@ function get_conormal_vector(trian::SubFacetSkeletonTriangulation{Di}) where {Di
   end
   return m_k
 end
-# function alt_get_conormal_vector(trian::SubFacetSkeletonTriangulation{Di}) where {Di}
-#   op = Operation(GridapEmbedded.LevelSetCutters._normal_vector)
-#   n_∂Ω = get_subfacet_normal_vector(trian)
-#   if Di == 0 # 2D
-#     m_k = op(n_∂Ω)
-#   elseif Di == 1 # 3D
-#     t_S = alt_get_tangent_vector(trian)
-#     m_k = op(t_S,n_∂Ω) # m_k = t_S x n_∂Ω (eq 6.26)
-#   else
-#     @notimplemented
-#   end
-#   return m_k
-# end
 
+############################################################################################
+# SubFacetBoundaryTriangulation
+
+# TODO: In the future, I imagine unifying both structures, and simply having the Boundary one 
+# that can be filtered depending on which interfaces we are aiming at, and the 
+# skeleton just being two of those (kinda like gridap does it). For now, let's 
+# keep them separate until we figure out all the tangent/normal/conormal stuff.
+
+struct SubFacetBoundaryTriangulation{Di,Df,Dp} <: Triangulation{Di,Dp}
+  cell_boundary::CompositeTriangulation{Di,Dp} # Interface -> BG Cell
+  face_boundary::BoundaryTriangulation{Di,Dp}  # Interface -> Cut Facet
+  ghost_boundary::BoundaryTriangulation{Df,Dp} # Ghost Facet -> BG Cell
+  face_trian::SubFacetTriangulation{Df,Dp}     # Cut Facet -> BG Cell
+  face_model::UnstructuredDiscreteModel{Df,Dp}
+end
+
+function Geometry.BoundaryTriangulation(face_trian::SubFacetTriangulation)
+  bgmodel = get_background_model(face_trian)
+  face_model = get_active_model(face_trian)
+
+  face_boundary = BoundaryTriangulation(face_model)
+  cell_boundary = CompositeTriangulation(face_trian,face_boundary)
+  ghost_boundary = generate_ghost_trian(cell_boundary,bgmodel)
+  return SubFacetBoundaryTriangulation(cell_boundary,face_boundary,ghost_boundary,face_trian,face_model)
+end
+
+function Geometry.get_background_model(t::SubFacetBoundaryTriangulation)
+  get_background_model(t.cell_boundary)
+end
+
+function Geometry.get_active_model(t::SubFacetBoundaryTriangulation)
+  get_active_model(t.cell_boundary)
+end
+
+function Geometry.get_grid(t::SubFacetBoundaryTriangulation)
+  get_grid(t.cell_boundary)
+end
+
+# Domain changes
+
+function Geometry.get_glue(ttrian::SubFacetBoundaryTriangulation{Di,Df,Dp},::Val{D}) where {D,Di,Df,Dp}
+  get_glue(ttrian.cell_boundary,Val(D))
+end
+
+function Geometry.is_change_possible(
+  strian::SubFacetTriangulation,ttrian::SubFacetBoundaryTriangulation
+)
+  return strian === ttrian.face_trian
+end
+
+function CellData.change_domain(
+  a::CellField,ttrian::SubFacetBoundaryTriangulation,tdomain::DomainStyle
+)
+  strian = get_triangulation(a)
+  if strian === ttrian
+    # 1) CellField defined on the skeleton
+    return change_domain(a,DomainStyle(a),tdomain)
+  end
+
+  if is_change_possible(strian,ttrian.cell_boundary)
+    # 2) CellField defined on the bgmodel
+    b = change_domain(a,ttrian.cell_boundary,tdomain)
+  elseif strian === ttrian.face_trian
+    # 3) CellField defined on the cut facets
+    itrian = Triangulation(ttrian.face_model)
+    _a = CellData.similar_cell_field(a,CellData.get_data(a),itrian,DomainStyle(a))
+    b = change_domain(_a,ttrian.face_boundary,tdomain)
+  else
+    @notimplemented
+  end
+  return CellData.similar_cell_field(b,CellData.get_data(b),ttrian,DomainStyle(b))
+end
+
+function CellData.change_domain(
+  f::CellData.OperationCellField,ttrian::SubFacetBoundaryTriangulation,tdomain::DomainStyle
+)
+  args = map(i->change_domain(i,ttrian,tdomain),f.args)
+  CellData.OperationCellField(f.op,args...)
+end
+
+# Normal vector to the cut facets , n_∂Ω
+function get_subfacet_normal_vector(trian::SubFacetBoundaryTriangulation)
+  n_∂Ω = get_normal_vector(trian.face_trian)
+  return change_domain(n_∂Ω,trian,ReferenceDomain())
+end
+
+function get_ghost_normal_vector(trian::SubFacetBoundaryTriangulation{Di}) where Di
+  n = get_normal_vector(trian.ghost_boundary)
+  z = zero(VectorValue{Di+1,Float64})
+  return CellField(evaluate(get_data(n.plus),z),trian,ReferenceDomain())
+end
+
+# Normal vector to the cut interface, n_S
+function CellData.get_normal_vector(trian::SubFacetBoundaryTriangulation{Di}) where {Di}
+  if Di == 0
+    n_k = get_ghost_normal_vector(trian)
+    n_S = Operation(_2d_cross)(n_k) # nS = nk x tS and tS = ±e₃ in 2D
+    # n_S = get_tangent_vector(trian.ghost_skeleton;ttrian=trian) # Not oriented correctly in 2d. # TODO: understand why!?
+  elseif Di == 1
+    n_k = get_ghost_normal_vector(trian)
+    t_S = get_tangent_vector(trian.face_skeleton;ttrian=trian)
+    n_S = Operation(normalise ∘ cross)(n_k,t_S) # nk = tS x nS -> nS = nk x tS (eq 6.25)
+  else
+    @notimplemented
+  end
+  # We pick the plus side. Consistency is given by later
+  # computing t_S as t_S = n_S x n_k
+  return n_S
+end
+
+# Tangent vector to the cut interface, t_S = n_S x n_k
+function get_tangent_vector(trian::SubFacetBoundaryTriangulation{Di}) where {Di}
+  @notimplementedif Di != 1
+  n_S = get_normal_vector(trian)
+  n_k = get_ghost_normal_vector(trian)
+  return Operation(normalise ∘ cross)(n_S,n_k)
+end
+
+# Conormal vectors, m_k = t_S x n_∂Ω
+function get_conormal_vector(trian::SubFacetBoundaryTriangulation{Di}) where {Di}
+  op = Operation(GridapEmbedded.LevelSetCutters._normal_vector)
+  n_∂Ω = get_subfacet_normal_vector(trian)
+  if Di == 0 # 2D
+    m_k = op(n_∂Ω)
+  elseif Di == 1 # 3D
+    t_S = get_tangent_vector(trian)
+    m_k = op(t_S,n_∂Ω) # m_k = t_S x n_∂Ω (eq 6.26)
+  else
+    @notimplemented
+  end
+  return m_k
+end
+
+############################################################################################
 # This will go to Gridap
 
 function Arrays.evaluate!(cache,k::Operation,a::SkeletonPair{<:CellField})
