@@ -120,11 +120,11 @@ end
 
     get_ghost_mask(face_trian::SubFacetTriangulation) = get_ghost_mask(face_trian,get_active_model(face_trian))
 
-  Returns a mask for ghost faces. We define ghost faces as the interfaces between two 
+  Returns a mask for ghost faces. We define ghost faces as the interfaces between two
   different cut facets that are located in different background cells.
 
-  The second condition is important: In 3D, some cuts subcells may not be simplices. 
-  In this case, we simplexify the subcell. This creates extra cut interfaces that are 
+  The second condition is important: In 3D, some cuts subcells may not be simplices.
+  In this case, we simplexify the subcell. This creates extra cut interfaces that are
   interior to a background cell. These are not considered ghost faces.
 
   - In 2D: Dc = 2, Df = 1 -> Ghost faces have dimension 0 (i.e interface points)
@@ -139,7 +139,7 @@ function get_ghost_mask(
 
   subfacets = face_trian.subfacets
   facet_to_bgcell = subfacets.facet_to_bgcell
-  
+
   n_faces = num_faces(topo,Df-1)
   face_is_ghost = zeros(Bool,n_faces)
   for face in 1:n_faces
@@ -345,9 +345,9 @@ end
 ############################################################################################
 # SubFacetBoundaryTriangulation
 
-# TODO: In the future, I imagine unifying both structures, and simply having the Boundary one 
-# that can be filtered depending on which interfaces we are aiming at, and the 
-# skeleton just being two of those (kinda like gridap does it). For now, let's 
+# TODO: In the future, I imagine unifying both structures, and simply having the Boundary one
+# that can be filtered depending on which interfaces we are aiming at, and the
+# skeleton just being two of those (kinda like gridap does it). For now, let's
 # keep them separate until we figure out all the tangent/normal/conormal stuff.
 
 struct SubFacetBoundaryTriangulation{Di,Df,Dp} <: Triangulation{Di,Dp}
@@ -442,7 +442,7 @@ function CellData.get_normal_vector(trian::SubFacetBoundaryTriangulation{Di}) wh
     # n_S = get_tangent_vector(trian.ghost_skeleton;ttrian=trian) # Not oriented correctly in 2d. # TODO: understand why!?
   elseif Di == 1
     n_k = get_ghost_normal_vector(trian)
-    t_S = get_tangent_vector(trian.face_skeleton;ttrian=trian)
+    t_S = get_tangent_vector(trian.face_boundary;ttrian=trian)
     n_S = Operation(normalise ∘ cross)(n_k,t_S) # nk = tS x nS -> nS = nk x tS (eq 6.25)
   else
     @notimplemented
