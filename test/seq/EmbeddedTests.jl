@@ -132,16 +132,16 @@ function main(
     )
   
     writevtk(
-      Ω, "$(path)_bulk"; append = false
+      Ω, "$(path)_omega"; append = false
     )
     writevtk(
-      Γ, "$(path)_boundary"; append = false
+      Γ, "$(path)_gamma"; append = false
     )
 
     n_∂Ω_Λ = get_subfacet_normal_vector(Λ)
     n_k_Λ  = get_ghost_normal_vector(Λ)
     writevtk(
-      Λ, "$(path)_skeleton",
+      Λ, "$(path)_lambda",
       cellfields = [
         "n_∂Ω.plus" => n_∂Ω_Λ.plus,"n_∂Ω.minus" => n_∂Ω_Λ.minus,
         "n_k.plus" => n_k_Λ.plus,"n_k.minus" => n_k_Λ.minus,
@@ -158,7 +158,7 @@ function main(
       n_∂Ω_Σ = get_subfacet_normal_vector(Σ)
       n_k_Σ  = get_ghost_normal_vector(Σ)
       writevtk(
-        Σ, "$(path)_skeleton",
+        Σ, "$(path)_sigma",
         cellfields = [
           "n_∂Ω" => n_∂Ω_Σ, "n_k" => n_k_Σ,
           "n_S" => n_S_Σ, "m_k" => m_k_Σ,
@@ -169,6 +169,8 @@ function main(
     end
   end
 end
+
+#######################
 
 D = 2
 n = 10
