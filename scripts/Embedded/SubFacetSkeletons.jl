@@ -240,7 +240,7 @@ end
 function get_subfacet_normal_vector(trian::SubFacetSkeletonTriangulation{0})
   n_∂Ω = get_normal_vector(trian.face_trian)
   plus = change_domain(n_∂Ω.plus,trian,ReferenceDomain())
-  minus = change_domain(-n_∂Ω.minus,trian,ReferenceDomain())
+  minus = change_domain(n_∂Ω.minus,trian,ReferenceDomain())
   return SkeletonPair(plus,minus)
 end
 function get_subfacet_normal_vector(trian::SubFacetSkeletonTriangulation{1})
@@ -301,19 +301,23 @@ function normalise(v) # <- Double check RE if this neccessary?
   end
 end
 
+_orient(n_S_hat,n_∂Ω) = n_S_hat*sign(n_S_hat ⋅ n_∂Ω)
+
 # Normal vector to the cut interface, n_S
 function CellData.get_normal_vector(trian::SubFacetSkeletonTriangulation{Di}) where {Di}
+  n_∂Ω = get_subfacet_normal_vector(trian)
   if Di == 0
     n_k = get_ghost_normal_vector(trian)
-    n_S = Operation(_2d_cross)(n_k) # nS = nk x tS and tS = ±e₃ in 2D
+    n_S_hat = Operation(_2d_cross)(n_k) # nS = nk x tS and tS = ±e₃ in 2D
     # n_S = get_tangent_vector(trian.ghost_skeleton;ttrian=trian) # Not oriented correctly in 2d. # TODO: understand why!?
   elseif Di == 1
     n_k = get_ghost_normal_vector(trian)
     t_S = get_tangent_vector(trian.face_skeleton;ttrian=trian)
-    n_S = Operation(normalise ∘ cross)(n_k,t_S) # nk = tS x nS -> nS = nk x tS (eq 6.25)
+    n_S_hat = Operation(normalise ∘ cross)(n_k,t_S) # nk = tS x nS -> nS = nk x tS (eq 6.25)
   else
     @notimplemented
   end
+  n_S = Operation(_orient)(n_S_hat,n_∂Ω.plus)
   # We pick the plus side. Consistency is given by later
   # computing t_S as t_S = n_S x n_k
   return n_S.plus
@@ -330,9 +334,13 @@ end
 # Conormal vectors, m_k = t_S x n_∂Ω
 function get_conormal_vector(trian::SubFacetSkeletonTriangulation{Di}) where {Di}
   op = Operation(GridapEmbedded.LevelSetCutters._normal_vector)
+  #op = Operation(_2d_cross)
   n_∂Ω = get_subfacet_normal_vector(trian)
   if Di == 0 # 2D
-    m_k = op(n_∂Ω)
+    m_k_hat = op(n_∂Ω)
+    n_S_hat = Operation(_2d_cross)(n_k)
+    sgn = Operation(sign)(dot(n_S_hat,n_∂Ω.plus))
+    m_k = sgn * m_k_hat
   elseif Di == 1 # 3D
     t_S = get_tangent_vector(trian)
     m_k = op(t_S,n_∂Ω) # m_k = t_S x n_∂Ω (eq 6.26)
