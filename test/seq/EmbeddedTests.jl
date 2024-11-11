@@ -17,7 +17,7 @@ function generate_model(D,n)
   return model
 end
 
-function level_set(shape::Symbol)
+function level_set(shape::Symbol;N=4)
   if shape == :square
     x -> max(abs(x[1]-0.5),abs(x[2]-0.5))-0.25 # Square
   elseif shape == :corner_2d
