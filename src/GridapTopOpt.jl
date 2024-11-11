@@ -4,17 +4,17 @@ using GridapPETSc, GridapPETSc.PETSC
 using GridapPETSc: PetscScalar, PetscInt, PETSC,  @check_error_code
 
 using MPI
-using BlockArrays
-using CircularArrays
+using BlockArrays, CircularArrays, FillArrays
 using LinearAlgebra
 using ChainRulesCore
 using DelimitedFiles, Printf
 
 using Gridap
 using Gridap.Helpers, Gridap.Algebra, Gridap.TensorValues
-using Gridap.Geometry, Gridap.CellData, Gridap.Fields
+using Gridap.Geometry, Gridap.CellData, Gridap.Fields, Gridap.Arrays
 using Gridap.ReferenceFEs, Gridap.FESpaces,  Gridap.MultiField
-using Gridap.Geometry: get_faces
+
+using Gridap.Geometry: get_faces, num_nodes
 using Gridap.FESpaces: get_assembly_strategy
 using Gridap: writevtk
 
@@ -31,6 +31,10 @@ using GridapSolvers
 using GridapSolvers.LinearSolvers, GridapSolvers.NonlinearSolvers, GridapSolvers.BlockSolvers
 using GridapSolvers.SolverInterfaces: SolverVerboseLevel, SOLVER_VERBOSE_NONE, SOLVER_VERBOSE_LOW, SOLVER_VERBOSE_HIGH
 
+using GridapEmbedded
+using GridapEmbedded.LevelSetCutters, GridapEmbedded.Interfaces
+using GridapEmbedded.Interfaces: SubFacetData, SubCellTriangulation, SubFacetTriangulation
+
 using JLD2: save_object, load_object, jldsave
 
 import Base: +
@@ -45,6 +49,11 @@ export RepeatingAffineFEStateMap
 export get_state
 export evaluate_functionals!
 export evaluate_derivatives!
+
+include("Embedded/Embedded.jl")
+export DifferentiableTriangulation
+export SubFacetBoundaryTriangulation
+export SubFacetSkeletonTriangulation
 
 include("Utilities.jl")
 export SmoothErsatzMaterialInterpolation
