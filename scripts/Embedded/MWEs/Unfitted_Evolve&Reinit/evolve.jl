@@ -81,3 +81,28 @@ writevtk(
   Ω,"results/test_evolve",
   cellfields=["φh"=>φh,"φh_expected_contour"=>φh_expected_contour,"|∇φh|"=>norm ∘ ∇(φh)]
 )
+
+
+sol,state = Base.iterate(uht)
+_tF = state[2][1]
+_stateF = state[2][2]
+_state0 = state[2][3]
+_uF = state[2][4]
+_odecache = state[2][5]
+
+_odeslvrcache, _odeopcache = _odecache
+
+_odeslvrcache
+_odeopcache.const_forms # contains linear systems
+
+# For each call of evolve need to:
+# 1. set _tF to zero
+# 2. copy φh to state0
+# 3. reassemble matrices in _odeopcache.const_forms
+# 4. solve
+# 5. copy stateF to φh
+
+# User struct: `UnfittedFEEvolution <: LevelSetEvolution` with methods evolve! and reinit!
+# Internal structs: `CutFEMEvolve <: Evolver`, `PicardReinit <: Reinitialiser`
+# Types that inherit from `UnfittedFEMethod` iterate to re-use cache etc.
+
