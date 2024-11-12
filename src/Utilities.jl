@@ -232,3 +232,13 @@ function _zerocrossing_period(v;t=0:length(v)-1,line=sum(v)/length(v))
   difft = diff(t[inds])
   sum(difft)/length(difft)
 end
+
+import Gridap.ReferenceFEs: get_order
+function get_order(space::FESpace)
+  return get_order(first(Gridap.CellData.get_data(get_fe_basis(space))))
+end
+
+function get_order(space::DistributedFESpace)
+  order = map(get_order,local_views(space))
+  return getany(order)
+end
