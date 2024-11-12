@@ -304,6 +304,12 @@ function get_subfacet_facet_normal(
   return n_i
 end
 
+"""
+  There is still something sweaty about this... 
+  Why do we apply the sign change but at the same time call `get_edge_tangents` in the 
+  creation of conormal vectors in 3D? It's like we are cancelling the sign change...
+  There is more to think about here.
+"""
 function get_interface_sign(
   itrian::CompositeTriangulation{Di,Dc}, # Interface -> BG Cell
   ftrian::SubFacetTriangulation{Df,Dc},  # Cut Facet -> BG Cell
