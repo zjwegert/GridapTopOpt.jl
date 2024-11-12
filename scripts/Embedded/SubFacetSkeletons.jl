@@ -237,16 +237,10 @@ function CellData.change_domain(
 end
 
 # Normal vector to the cut facets , n_∂Ω
-function get_subfacet_normal_vector(trian::SubFacetSkeletonTriangulation{0})
+function get_subfacet_normal_vector(trian::SubFacetSkeletonTriangulation)
   n_∂Ω = get_normal_vector(trian.face_trian)
   plus = change_domain(n_∂Ω.plus,trian,ReferenceDomain())
   minus = change_domain(n_∂Ω.minus,trian,ReferenceDomain())
-  return SkeletonPair(plus,minus)
-end
-function get_subfacet_normal_vector(trian::SubFacetSkeletonTriangulation{1})
-  n_∂Ω = get_normal_vector(trian.face_trian)
-  plus = change_domain(n_∂Ω.plus,trian,ReferenceDomain())
-  minus = change_domain(n_∂Ω.minus,trian,ReferenceDomain()) # This needs to be postive for mk to be correctly oriented in 3d
   return SkeletonPair(plus,minus)
 end
 
