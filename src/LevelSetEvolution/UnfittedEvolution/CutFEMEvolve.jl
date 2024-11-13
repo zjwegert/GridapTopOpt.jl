@@ -46,7 +46,10 @@ get_measure(s::CutFEMEvolve) = s.dΩ
 get_params(s::CutFEMEvolve) = s.params
 get_cache(s::CutFEMEvolve) = s.cache
 
-function get_stiffness_matrix_map(φh,velh,dΩ,model,order,Γg,h)
+function get_transient_operator(φh,velh,s::CutFEMEvolve)
+  model, V_φ, dΩ, assembler, params = s.model, s.space, s.dΩ, s.assembler, s.params
+  Γg, h, order = params.Γg, params.h, params.order
+
   geo = DiscreteGeometry(φh,model)
   cutgeo = cut(model,geo)
   Ω_act = Triangulation(cutgeo,ACTIVE)
@@ -56,22 +59,33 @@ function get_stiffness_matrix_map(φh,velh,dΩ,model,order,Γg,h)
   ϵ = 1e-20
 
   β = velh*∇(φh)/(ϵ + norm ∘ ∇(φh))
-  return (t,u,v) -> ∫((β ⋅ ∇(u)) * v)dΩ + ∫(Γg*h^2*jump(∇(u) ⋅ n)*jump(∇(v) ⋅ n))dF_act
+  stiffness(t,u,v) = ∫((β ⋅ ∇(u)) * v)dΩ + ∫(Γg*h^2*jump(∇(u) ⋅ n)*jump(∇(v) ⋅ n))dF_act
+  mass(t, ∂ₜu, v) = ∫(∂ₜu * v)dΩ
+  forcing(t,v) = ∫(0v)dΩ
+  Ut_φ = TransientTrialFESpace(V_φ)
+  ode_op = TransientLinearFEOperator((stiffness,mass),forcing,Ut_φ,V_φ;
+    constant_forms=(false,true),assembler)
+  return ode_op
+end
+
+function update_reuse!(state,reuse_new;zero_tF=false)
+  U, (tF, stateF, state0, uF, odecache) = state
+  odeslvrcache, odeopcache = odecache
+  _, ui_pre, slopes, J, r, sysslvrcaches = odeslvrcache
+
+  odeslvrcache_new = (reuse_new, ui_pre, slopes, J, r, sysslvrcaches)
+  odecache_new = odeslvrcache_new, odeopcache
+  _tF = zero_tF ? 0.0 : tF
+  return U, (_tF, stateF, state0, uF, odecache_new)
 end
 
 function solve!(s::CutFEMEvolve,φh,velh,γ,cache::Nothing)
-  ode_solver, model, V_φ, dΩ, assembler = s.ode_solver, s.model, s.space, s.dΩ, s.assembler
-  Γg, h, max_steps, order = s.params
-
-  # Weak form
-  stiffness = get_stiffness_matrix_map(φh,velh,dΩ,model,order,Γg,h)
-  mass(t, ∂ₜu, v) = ∫(∂ₜu * v)dΩ
-  forcing(t,v) = ∫(0v)dΩ
+  ode_solver = get_ode_solver(s)
+  params = get_params(s)
+  h, max_steps = params.h, params.max_steps
 
   # Setup FE operator and solver
-  Ut_φ = TransientTrialFESpace(V_φ)
-  ode_op = TransientLinearFEOperator((stiffness,mass),forcing,Ut_φ,V_φ;
-    constant_forms=(true,true),assembler)
+  ode_op = get_transient_operator(φh,velh,s)
   dt = _compute_Δt(h,γ,get_free_dof_values(velh))
   ode_solver.dt = dt
   ode_sol = solve(ode_solver,ode_op,0.0,dt*max_steps,φh)
@@ -79,48 +93,56 @@ function solve!(s::CutFEMEvolve,φh,velh,γ,cache::Nothing)
   # March
   march = Base.iterate(ode_sol)
   data, state = march
-  while march !== nothing
-    data, state = march
-    march = Base.iterate(ode_sol,state)
+  state_new = update_reuse!(state,true)
+  march_new = data, state_new
+  while march_new !== nothing
+    data, state_new = march_new
+    march_new = Base.iterate(ode_sol,state_new)
   end
 
   # Update φh and cache
   _, φhF = data
   copy!(get_free_dof_values(φh),get_free_dof_values(φhF))
-  s.cache = (ode_op, state)
+  s.cache = state_new
   
   return φh
 end
 
 function solve!(s::CutFEMEvolve,φh,velh,γ,cache)
-  ode_solver, model, dΩ, V_φ, assembler, = s.ode_solver, s.model, s.dΩ, s.space, s.assembler
-  Γg, h, max_steps, order = s.params
-  ode_op, state0 = cache
+  ode_solver = get_ode_solver(s)
+  params = get_params(s)
+  h, max_steps = params.h, params.max_steps
 
-  U, (tF, stateF, state0, uF, odecache) = state0
-  odeslvrcache, odeopcache = odecache
-  K, M = odeopcache.const_forms
-
-  # Update odeopcache and solver
-  stiffness = get_stiffness_matrix_map(φh,velh,dΩ,model,order,Γg,h)
-  assemble_matrix!((u,v)->stiffness(0.0,u,v),K,assembler,V_φ,V_φ)
-  state = U, (0.0, stateF, state0, uF, odecache)
+  ## Update state
+  # `get_transient_operator` re-creates the entire TransientLinearFEOperator wrapper.
+  #   We do this so that the first iterate of ODESolution always recomputes the 
+  #   stiffness matrix and associated the Jacboian, numerical setups, etc via
+  #   `constant_forms = (false,true)`.
+  ode_op = get_transient_operator(φh,velh,s)
+  # Between the first iterate and subsequent iterates we use the function 
+  #   `update_reuse!` to update the iterator state so that we re-use
+  #   the stiffness matrix, etc. The Optional argument `zero_tF` indicates 
+  #   whether we are solving a new ODE with the same functional form but
+  #   updated coefficients in the weak form. If so, we want to re-use the cache.
+  state_inter = update_reuse!(cache,false;zero_tF=true)
   dt = _compute_Δt(h,γ,get_free_dof_values(velh))
   ode_solver.dt = dt
 
-  # March
+  ## March
   ode_sol = solve(ode_solver,ode_op,0.0,dt*max_steps,φh)
-  march = Base.iterate(ode_sol,state)
+  march = Base.iterate(ode_sol,state_inter) # First step includes stiffness matrix update
   data, state = march
-  while march !== nothing
-    data, state = march
-    march = Base.iterate(ode_sol,state)
+  state_updated = update_reuse!(state,true) # Fix the stiffness matrix for remaining march
+  march_updated = data, state_updated
+  while march_updated !== nothing
+    data, state_updated = march_updated
+    march_updated = Base.iterate(ode_sol,state_updated)
   end
 
-  # Update φh and cache
+  ## Update φh and cache
   _, φhF = data
   copy!(get_free_dof_values(φh),get_free_dof_values(φhF))
-  s.cache = (ode_op, state)
+  s.cache = state_updated
   
   return φh
 end

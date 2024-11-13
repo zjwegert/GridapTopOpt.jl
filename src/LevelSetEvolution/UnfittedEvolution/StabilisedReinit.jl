@@ -9,7 +9,15 @@ Interior jump penalty approach (`InteriorPenalty`) adapted from that work and re
 the artifical viscosity term with an interior jump penalty term.  
 
 # Parameters
--  
+- `nls::NonlinearSolver`: Nonlinear solver for solving the reinitialisation equation
+- `stabilisation_method::A`: A `StabilisationMethod` method for stabilising the problem 
+- `model::B`: FE model
+- `space::C`: FE space for level-set function
+- `dΩ::D`: Background mesh measure
+- `assembler::Assembler`: Assembler for LS FE space 
+- `params::E`: Tuple of Nitsche parameter `γd`, mesh size `h`, 
+  and FE space `order`
+- `cache`: Cache for evolver, initially `nothing`.
 
 """
 mutable struct StabilisedReinit{A,B,C,D,E} <: Reinitialiser

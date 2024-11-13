@@ -37,3 +37,4 @@ end
 
 include("Stencil.jl")
 include("HamiltonJacobiEvolution.jl")
+include("UnfittedEvolution/UnfittedEvolution.jl")

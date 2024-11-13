@@ -14,5 +14,6 @@ using Test
   include("EmbeddedDifferentiationTests.jl")
   include("EmbeddedCollectionsTests.jl")
 end
+@time @testset "UnfittedEvolution" begin include("UnfittedEvolutionTests/runtests.jl") end
 
 end # module

@@ -16,6 +16,7 @@ using Gridap.ReferenceFEs, Gridap.FESpaces,  Gridap.MultiField
 
 using Gridap.Geometry: get_faces, num_nodes
 using Gridap.FESpaces: get_assembly_strategy
+using Gridap.ODEs: ODESolver
 using Gridap: writevtk
 
 using GridapDistributed
@@ -38,6 +39,7 @@ using GridapEmbedded.Interfaces: SubFacetData, SubCellTriangulation, SubFacetTri
 using JLD2: save_object, load_object, jldsave
 
 import Base: +
+import Gridap: solve!
 
 include("GridapExtensions.jl")
 
@@ -65,6 +67,11 @@ export isotropic_elast_tensor
 include("LevelSetEvolution/LevelSetEvolution.jl")
 export HamiltonJacobiEvolution
 export FirstOrderStencil
+export UnfittedFEEvolution
+export CutFEMEvolve
+export StabilisedReinit
+export ArtificialViscosity
+export InteriorPenalty
 export evolve!
 export reinit!
 
