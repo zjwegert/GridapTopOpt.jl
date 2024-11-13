@@ -29,14 +29,20 @@ function main()
   φ0 = φ(0.2)
   Ωs = EmbeddedCollection(model,φ0) do cutgeo
     Ω = Triangulation(cutgeo,PHYSICAL_IN)
-    Γ = EmbeddedBoundary(cutgeo)
     (; 
       :Ω  => Ω,
-      :Γ  => Γ,
       :dΩ => Measure(Ω,2*order),
+    )
+  end
+
+  function r_Γ(cutgeo)
+    Γ = EmbeddedBoundary(cutgeo)
+    (; 
+      :Γ  => Γ,
       :dΓ => Measure(Γ,2*order)
     )
   end
+  add_recipe!(Ωs,r_Γ)
 
   area(Ωs) = sum(∫(1.0)*Ωs[:dΩ])
   contour(Ωs) = sum(∫(1.0)*Ωs[:dΓ])
