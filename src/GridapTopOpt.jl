@@ -52,8 +52,8 @@ export evaluate_derivatives!
 
 include("Embedded/Embedded.jl")
 export DifferentiableTriangulation
-export SubFacetBoundaryTriangulation
-export SubFacetSkeletonTriangulation
+export SubFacetBoundaryTriangulation, SubFacetSkeletonTriangulation
+export EmbeddedCollection, update_collection!
 
 include("Utilities.jl")
 export SmoothErsatzMaterialInterpolation

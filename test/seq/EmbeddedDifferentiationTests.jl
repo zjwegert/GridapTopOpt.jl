@@ -1,4 +1,4 @@
-module EmbeddedTests
+module EmbeddedDifferentiationTests
 using Test
 
 using GridapTopOpt

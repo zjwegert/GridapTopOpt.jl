@@ -10,6 +10,9 @@ using Test
 @time @testset "Inverter - HPM" begin include("InverterHPMTests.jl") end
 @time @testset "PZMultiFieldRepeatingState - ALM" begin include("PZMultiFieldRepeatingStateTests.jl") end
 @time @testset "JLD2SaveLoad" begin include("JLD2SaveLoad.jl") end
-@time @testset "Embedded" begin include("EmbeddedTests.jl") end
+@time @testset "Embedded" begin 
+  include("EmbeddedDifferentiationTests.jl")
+  include("EmbeddedCollectionsTests.jl")
+end
 
 end # module
