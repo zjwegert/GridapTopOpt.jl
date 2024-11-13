@@ -44,8 +44,8 @@ function main()
   end
   add_recipe!(Ωs,r_Γ)
 
-  area(Ωs) = sum(∫(1.0)*Ωs[:dΩ])
-  contour(Ωs) = sum(∫(1.0)*Ωs[:dΓ])
+  area(Ωs) = sum(∫(1.0)*Ωs.dΩ)
+  contour(Ωs) = sum(∫(1.0)*Ωs.dΓ)
 
   for r in 0.2:0.1:0.5
     update_collection!(Ωs,φ(r))
