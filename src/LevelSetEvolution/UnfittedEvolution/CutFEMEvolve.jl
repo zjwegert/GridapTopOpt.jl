@@ -6,62 +6,79 @@ Burman et al. (2017). DOI: `10.1016/j.cma.2017.09.005`.
 
 # Parameters
 - `ode_solver::ODESolver`: ODE solver 
-- `model::A`: FE model
+- `Ωs::B`: `EmbeddedCollection` holding updatable triangulation and measures from GridapEmbedded
+- `dΩ_bg::C`: Measure for integration
 - `space::B`: Level-set FE space
-- `dΩ::C`: Measure for integration
 - `assembler::Assembler`: FE assembler
-- `params::D`: Tuple of stabilisation parameter `Γg`, mesh size `h`, 
-  max steps `max_steps`, and FE space `order`
+- `params::D`: Tuple of stabilisation parameter `Γg`, mesh size `h`, and
+  max steps `max_steps`
 - `cache`: Cache for evolver, initially `nothing`.
 
 # Note
-The stepsize `dt = 0.1` in `RungeKutta` is a place-holder and is updated using
-the `γ` passed to `solve!`.
+- The stepsize `dt = 0.1` in `RungeKutta` is a place-holder and is updated using
+  the `γ` passed to `solve!`.
+- We expect the EmbeddedCollection `Ωs` to contain `:F_act` and `:dF_act`. If 
+  this is not available we add it to the recipe list in `Ωs` and a warning will appear. 
 """
-mutable struct CutFEMEvolve{A,B,C,D} <: Evolver
+mutable struct CutFEMEvolve{A,B,C} <: Evolver
   ode_solver::ODESolver
-  model::A
+  Ωs::EmbeddedCollection
+  dΩ_bg::A
   space::B
-  dΩ::C
   assembler::Assembler
-  params::D
+  params::C
   cache
-  function CutFEMEvolve(model::A,V_φ::B,dΩ::C,h::Real;
+  function CutFEMEvolve(V_φ::B,Ωs::EmbeddedCollection,dΩ_bg::A,h::Real;
       max_steps=10,
       Γg = 0.1,
       ode_ls = LUSolver(),
       ode_nl = NLSolver(ode_ls, show_trace=false, method=:newton, iterations=10),
       ode_solver = MutableRungeKutta(ode_nl, ode_ls, 0.1, :DIRK_CrankNicolson_2_2),
-      assembler=SparseMatrixAssembler(V_φ,V_φ)) where {A,B,C}
-    params = (;Γg,h,max_steps,order=get_order(V_φ))
-    new{A,B,C,typeof(params)}(ode_solver,model,V_φ,dΩ,assembler,params,nothing)
+      assembler=SparseMatrixAssembler(V_φ,V_φ)) where {A,B}
+    if !(:F_act ∈ keys(Ωs.objects))
+      @warn "Expected triangulation ':F_act' not found in the 
+      EmbeddedCollection. This and the corresponding measure ':dF_act' have been
+      added to the recipe list. 
+      
+      Ensure that you are not using ':F_act' under a different
+      name to avoid additional computation for cutting."
+      function F_act_recipe(cutgeo)
+        Ω_act = Triangulation(cutgeo,ACTIVE)
+        F_act = SkeletonTriangulation(Ω_act)
+        (; 
+          :F_act => F_act,
+          :dF_act => Measure(F_act,2get_order(V_φ))
+        )
+      end
+      add_recipe!(Ωs,F_act_recipe)
+    end
+    params = (;Γg,h,max_steps)
+    new{A,B,typeof(params)}(ode_solver,Ωs,dΩ_bg,V_φ,assembler,params,nothing)
   end
 end
 
 get_ode_solver(s::CutFEMEvolve) = s.ode_solver
 get_assembler(s::CutFEMEvolve) = s.assembler
 get_space(s::CutFEMEvolve) = s.space
-get_model(s::CutFEMEvolve) = s.model
-get_measure(s::CutFEMEvolve) = s.dΩ
+get_embedded_collection(s::CutFEMEvolve) = s.Ωs
+get_measure(s::CutFEMEvolve) = s.dΩ_bg
 get_params(s::CutFEMEvolve) = s.params
 get_cache(s::CutFEMEvolve) = s.cache
 
 function get_transient_operator(φh,velh,s::CutFEMEvolve)
-  model, V_φ, dΩ, assembler, params = s.model, s.space, s.dΩ, s.assembler, s.params
-  Γg, h, order = params.Γg, params.h, params.order
-
-  geo = DiscreteGeometry(φh,model)
-  cutgeo = cut(model,geo)
-  Ω_act = Triangulation(cutgeo,ACTIVE)
-  F_act = SkeletonTriangulation(Ω_act)
-  dF_act = Measure(F_act,2*order)
-  n = get_normal_vector(F_act)
+  Ωs, V_φ, dΩ_bg, assembler, params = s.Ωs, s.space, s.dΩ_bg, s.assembler, s.params
+  Γg, h = params.Γg, params.h
   ϵ = 1e-20
 
+  update_collection!(Ωs,φh)
+  F_act = Ωs.F_act
+  dF_act = Ωs.dF_act
+  n = get_normal_vector(F_act)
+
   β = velh*∇(φh)/(ϵ + norm ∘ ∇(φh))
-  stiffness(t,u,v) = ∫((β ⋅ ∇(u)) * v)dΩ + ∫(Γg*h^2*jump(∇(u) ⋅ n)*jump(∇(v) ⋅ n))dF_act
-  mass(t, ∂ₜu, v) = ∫(∂ₜu * v)dΩ
-  forcing(t,v) = ∫(0v)dΩ
+  stiffness(t,u,v) = ∫((β ⋅ ∇(u)) * v)dΩ_bg + ∫(Γg*h^2*jump(∇(u) ⋅ n)*jump(∇(v) ⋅ n))dF_act
+  mass(t, ∂ₜu, v) = ∫(∂ₜu * v)dΩ_bg
+  forcing(t,v) = ∫(0v)dΩ_bg
   Ut_φ = TransientTrialFESpace(V_φ)
   ode_op = TransientLinearFEOperator((stiffness,mass),forcing,Ut_φ,V_φ;
     constant_forms=(false,true),assembler)
