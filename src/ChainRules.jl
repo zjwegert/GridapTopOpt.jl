@@ -1,92 +1,37 @@
-abstract type AbstractIntegrandWithMeasure end
-
 """
-    struct IntegrandWithMeasure{A,B<:Tuple}
+    Gridap.gradient(F,uh::Vector,K::Int)
 
-A wrapper to enable serial or parallel partial differentation of an
-integral `F` using `Gridap.gradient`. This is required to allow automatic
-differentation with `DistributedMeasure`.
-
-# Properties
-- `F  :: A`: A function that returns a `DomainContribution` or `DistributedDomainContribution`.
-- `dΩ :: B`: A tuple of measures.
-"""
-struct IntegrandWithMeasure{A,B<:Tuple} <: AbstractIntegrandWithMeasure
-  F  :: A
-  dΩ :: B
-end
-
-"""
-    (F::IntegrandWithMeasure)(args...)
-
-Evaluate `F.F` given arguments `args`.
-"""
-(F::IntegrandWithMeasure)(args...) = F.F(args...,F.dΩ...)
-
-"""
-    Gridap.gradient(F::IntegrandWithMeasure,uh::Vector,K::Int)
-
-Given an an `IntegrandWithMeasure` `F` and a vector of `FEFunctions` `uh` (excluding measures)
-evaluate the partial derivative of `F.F` with respect to `uh[K]`.
+Given a function `F` that returns a DomainContribution when called, and a vector of 
+`FEFunctions` `uh`, evaluate the partial derivative of `F` with respect to `uh[K]`.
 
 # Example
 
 Suppose `uh` and `φh` are FEFunctions with measures `dΩ` and `dΓ_N`.
 Then the partial derivative of a function `J` wrt to `φh` is computed via
 ````
-J(u,φ,dΩ,dΓ_N) = ∫(f(u,φ))dΩ + ∫(g(u,φ))dΓ_N
-J_iwm = IntegrandWithMeasure(J,(dΩ,dΓ_N))
-∂J∂φh = ∇(J_iwm,[uh,φh],2)
+J(u,φ) = ∫(f(u,φ))dΩ + ∫(g(u,φ))dΓ_N
+∂J∂φh = ∇(J,[uh,φh],2)
 ````
 where `f` and `g` are user defined.
 """
-function Gridap.gradient(F::IntegrandWithMeasure,uh::Vector{<:FEFunction},K::Int)
+function Gridap.gradient(F,uh::Vector{<:CellField},K::Int)
   @check 0 < K <= length(uh)
-  _f(uk) = F.F(uh[1:K-1]...,uk,uh[K+1:end]...,F.dΩ...)
+  _f(uk) = F(uh[1:K-1]...,uk,uh[K+1:end]...)
   return Gridap.gradient(_f,uh[K])
 end
 
-function Gridap.gradient(F::IntegrandWithMeasure,uh::Vector,K::Int)
-  @check 0 < K <= length(uh)
-  local_fields = map(local_views,uh) |> to_parray_of_arrays
-  local_measures = map(local_views,F.dΩ) |> to_parray_of_arrays
-  contribs = map(local_measures,local_fields) do dΩ,lf
-    # TODO: Remove second term below, this is a fix for the problem discussed in
-    #  https://github.com/zjwegert/GridapTopOpt.jl/issues/46
-    _f = u -> F.F(lf[1:K-1]...,u,lf[K+1:end]...,dΩ...) #+ ∑(∫(0)dΩ[i] for i = 1:length(dΩ))
-    return Gridap.Fields.gradient(_f,lf[K])
-  end
-  return DistributedDomainContribution(contribs)
-end
-
-Gridap.gradient(F::IntegrandWithMeasure,uh) = Gridap.gradient(F,[uh],1)
-
 """
-    Gridap.jacobian(F::IntegrandWithMeasure,uh::Vector,K::Int)
+    Gridap.jacobian(F,uh::Vector,K::Int)
 
-Given an an `IntegrandWithMeasure` `F` and a vector of `FEFunctions` or `CellField` `uh`
-(excluding measures) evaluate the Jacobian `F.F` with respect to `uh[K]`.
+Given a function `F` that returns a DomainContribution when called, and a 
+vector of `FEFunctions` or `CellField` `uh`, evaluate the Jacobian
+`F` with respect to `uh[K]`.
 """
-function Gridap.jacobian(F::IntegrandWithMeasure,uh::Vector{<:Union{FEFunction,CellField}},K::Int)
+function Gridap.jacobian(F,uh::Vector{<:CellField},K::Int)
   @check 0 < K <= length(uh)
-  _f(uk) = F.F(uh[1:K-1]...,uk,uh[K+1:end]...,F.dΩ...)
+  _f(uk) = F(uh[1:K-1]...,uk,uh[K+1:end]...)
   return Gridap.jacobian(_f,uh[K])
 end
-
-DistributedFields = Union{DistributedCellField,DistributedMultiFieldCellField}
-
-function Gridap.jacobian(F::IntegrandWithMeasure,uh::Vector{<:DistributedFields},K::Int)
-  @check 0 < K <= length(uh)
-  local_fields = map(local_views,uh) |> to_parray_of_arrays
-  local_measures = map(local_views,F.dΩ) |> to_parray_of_arrays
-  contribs = map(local_measures,local_fields) do dΩ,lf
-    _f = u -> F.F(lf[1:K-1]...,u,lf[K+1:end]...,dΩ...)
-    return Gridap.jacobian(_f,lf[K])
-  end
-  return DistributedDomainContribution(contribs)
-end
-
-Gridap.jacobian(F::IntegrandWithMeasure,uh) = Gridap.jacobian(F,[uh],1)
 
 function GridapDistributed.to_parray_of_arrays(a::NTuple{N,T}) where {N,T<:DebugArray}
   indices = linear_indices(first(a))
@@ -107,21 +52,21 @@ function GridapDistributed.to_parray_of_arrays(a::NTuple{N,T}) where {N,T<:MPIAr
 end
 
 """
-    struct StateParamIntegrandWithMeasure{A<:IntegrandWithMeasure,B,C,D}
+    struct StateParamIntegrandWithMeasure{A,B,C,D}
 
-A wrapper to handle partial differentation of an [`IntegrandWithMeasure`](@ref)
+A wrapper to handle partial differentation of a function F
 of a specific form (see below) in a `ChainRules.jl` compatible way with caching.
 
 # Assumptions
 
-We assume that we have a `IntegrandWithMeasure` of the following form:
+We assume that we have a function F of the following form:
 
-`F(u,φ,dΩ₁,dΩ₂,...) = ∫(f(u,φ))dΩ₁ + ∫(g(u,φ))dΩ₂ + ...,`.
+`F(u,φ) = ∫(f(u,φ))dΩ₁ + ∫(g(u,φ))dΩ₂ + ...,`.
 
 where `u` and `φ` are each expected to inherit from `Union{FEFunction,MultiFieldFEFunction}`
 or the GridapDistributed equivalent.
 """
-struct StateParamIntegrandWithMeasure{A<:AbstractIntegrandWithMeasure,B,C,D}
+struct StateParamIntegrandWithMeasure{A,B,C,D}
   F       :: A
   spaces  :: B
   assems  :: C
@@ -129,17 +74,15 @@ struct StateParamIntegrandWithMeasure{A<:AbstractIntegrandWithMeasure,B,C,D}
 end
 
 """
-    StateParamIntegrandWithMeasure(F::IntegrandWithMeasure,U::FESpace,V_φ::FESpace,
+    StateParamIntegrandWithMeasure(F,U::FESpace,V_φ::FESpace,
     U_reg::FESpace,assem_U::Assembler,assem_deriv::Assembler)
 
 Create an instance of `StateParamIntegrandWithMeasure`.
 """
 function StateParamIntegrandWithMeasure(
-  F::AbstractIntegrandWithMeasure,
-  U::FESpace,V_φ::FESpace,U_reg::FESpace,
+  F,U::FESpace,V_φ::FESpace,U_reg::FESpace,
   assem_U::Assembler,assem_deriv::Assembler
 )
-  # TODO: Find alternative to this later, is a fix for grad of embedded FEs
   φ₀, u₀ = interpolate(x->-sqrt((x[1]-1/2)^2+(x[2]-1/2)^2)+0.2,V_φ), zero(U)
   ∂j∂u_vecdata = collect_cell_vector(U,∇(F,[u₀,φ₀],1))
   ∂j∂φ_vecdata = collect_cell_vector(U_reg,∇(F,[u₀,φ₀],2))
@@ -214,13 +157,6 @@ abstract type AbstractFEStateMap end
 Return the solution/state `u` to the FE problem.
 """
 get_state(::AbstractFEStateMap) = @abstractmethod
-
-"""
-    get_measure(m::AbstractFEStateMap)
-
-Return the measures associated with the FE problem.
-"""
-get_measure(::AbstractFEStateMap) = @abstractmethod
 
 """
     get_spaces(m::AbstractFEStateMap)
@@ -400,19 +336,7 @@ function ChainRulesCore.rrule(φ_to_u::AbstractFEStateMap,φ::AbstractVector)
   return ChainRulesCore.rrule(φ_to_u,φh)
 end
 
-"""
-    StateParamIntegrandWithMeasure(f::Function,φ_to_u::AbstractFEStateMap)
-
-Create an instance of `StateParamIntegrandWithMeasure` given a `f` and
-`φ_to_u`.
-"""
-function StateParamIntegrandWithMeasure(f::Function,φ_to_u::AbstractFEStateMap)
-  dΩ = get_measure(φ_to_u)
-  F  = IntegrandWithMeasure(f,dΩ)
-  StateParamIntegrandWithMeasure(F,φ_to_u)
-end
-
-function StateParamIntegrandWithMeasure(F::AbstractIntegrandWithMeasure,φ_to_u::AbstractFEStateMap)
+function StateParamIntegrandWithMeasure(F::Function,φ_to_u::AbstractFEStateMap)
   U,V,V_φ,U_reg = φ_to_u.spaces
   assem_deriv = get_deriv_assembler(φ_to_u)
   assem_U = get_pde_assembler(φ_to_u)
@@ -427,8 +351,8 @@ element operators `AffineFEOperator`.
 
 # Parameters
 
-- `biform::A`: `IntegrandWithMeasure` defining the bilinear form.
-- `liform::B`: `IntegrandWithMeasure` defining the linear form.
+- `biform::A`: `Function` defining the bilinear form.
+- `liform::B`: `Function` defining the linear form.
 - `spaces::C`: `Tuple` of finite element spaces.
 - `plb_caches::D`: A cache for the pullback operator.
 - `fwd_caches::E`: A cache for the forward problem.
@@ -445,7 +369,7 @@ struct AffineFEStateMap{A,B,C,D,E,F} <: AbstractFEStateMap
   @doc """
       AffineFEStateMap(
         a::Function,l::Function,
-        U,V,V_φ,U_reg,φh,dΩ...;
+        U,V,V_φ,U_reg,φh;
         assem_U = SparseMatrixAssembler(U,V),
         assem_adjoint = SparseMatrixAssembler(V,U),
         assem_deriv = SparseMatrixAssembler(U_reg,U_reg),
@@ -460,8 +384,8 @@ struct AffineFEStateMap{A,B,C,D,E,F} <: AbstractFEStateMap
   Optional arguments enable specification of assemblers and linear solvers.
   """
     function AffineFEStateMap(
-      biform::AbstractIntegrandWithMeasure,liform::AbstractIntegrandWithMeasure,
-      U,V,V_φ,U_reg,φh,dΩ...;
+      biform::Function,liform::Function,
+      U,V,V_φ,U_reg,φh;
       assem_U = SparseMatrixAssembler(U,V),
       assem_adjoint = SparseMatrixAssembler(V,U),
       assem_deriv = SparseMatrixAssembler(U_reg,U_reg),
@@ -497,15 +421,8 @@ struct AffineFEStateMap{A,B,C,D,E,F} <: AbstractFEStateMap
   end
 end
 
-function AffineFEStateMap(a::Function,l::Function,U,V,V_φ,U_reg,φh,dΩ...;kwargs...)
-  biform = IntegrandWithMeasure(a,dΩ)
-  liform = IntegrandWithMeasure(l,dΩ)
-  AffineFEStateMap(biform,liform,U,V,V_φ,U_reg,φh,dΩ;kwargs...)
-end
-
 # Getters
 get_state(m::AffineFEStateMap) = FEFunction(get_trial_space(m),m.fwd_caches[4])
-get_measure(m::AffineFEStateMap) = m.biform.dΩ
 get_spaces(m::AffineFEStateMap) = m.spaces
 get_assemblers(m::AffineFEStateMap) = (m.fwd_caches[6],m.plb_caches[2],m.adj_caches[4])
 
@@ -549,7 +466,7 @@ element operators.
 
 # Parameters
 
-- `res::A`: an `IntegrandWithMeasure` defining the residual of the problem.
+- `res::A`: a `Function` defining the residual of the problem.
 - `jac::B`: a `Function` defining Jacobian of the residual.
 - `spaces::C`: `Tuple` of finite element spaces.
 - `plb_caches::D`: A cache for the pullback operator.
@@ -566,7 +483,7 @@ struct NonlinearFEStateMap{A,B,C,D,E,F} <: AbstractFEStateMap
 
   @doc """
       NonlinearFEStateMap(
-        res::Function,U,V,V_φ,U_reg,φh,dΩ...;
+        res::Function,U,V,V_φ,U_reg,φh;
         assem_U = SparseMatrixAssembler(U,V),
         assem_adjoint = SparseMatrixAssembler(V,U),
         assem_deriv = SparseMatrixAssembler(U_reg,U_reg),
@@ -581,7 +498,7 @@ struct NonlinearFEStateMap{A,B,C,D,E,F} <: AbstractFEStateMap
   Optional arguments enable specification of assemblers, nonlinear solver, and adjoint (linear) solver.
   """
   function NonlinearFEStateMap(
-    res::AbstractIntegrandWithMeasure,jac,U,V,V_φ,U_reg,φh,dΩ...;
+    res::Function,jac::Function,U,V,V_φ,U_reg,φh;
     assem_U = SparseMatrixAssembler(U,V),
     assem_adjoint = SparseMatrixAssembler(V,U),
     assem_deriv = SparseMatrixAssembler(U_reg,U_reg),
@@ -616,23 +533,14 @@ struct NonlinearFEStateMap{A,B,C,D,E,F} <: AbstractFEStateMap
   end
 end
 
-function NonlinearFEStateMap(res::AbstractIntegrandWithMeasure,U,V,V_φ,U_reg,φh,dΩ...;jac::Nothing=nothing,kwargs...)
-  jacf = (u,du,v,φh) -> jacobian(res,[u,v,φh],1)
-  NonlinearFEStateMap(res,jacf,U,V,V_φ,U_reg,φh,dΩ;kwargs...)
-end
-
-function NonlinearFEStateMap(res::Function,U,V,V_φ,U_reg,φh,dΩ...;jac=nothing,kwargs...)
-  _res = IntegrandWithMeasure(res,dΩ)
+function NonlinearFEStateMap(res::Function,U,V,V_φ,U_reg,φh;jac=nothing,kwargs...)
   if isnothing(jac)
-    _jac = (u,du,v,φh) -> jacobian(_res,[u,v,φh],1)
-  else
-    _jac = IntegrandWithMeasure(jac,dΩ)
+    jac = (u,du,v,φh) -> jacobian(res,[u,v,φh],1)
   end
-  NonlinearFEStateMap(_res,_jac,U,V,V_φ,U_reg,φh,dΩ;kwargs...)
+  NonlinearFEStateMap(res,jac,U,V,V_φ,U_reg,φh;kwargs...)
 end
 
 get_state(m::NonlinearFEStateMap) = FEFunction(get_trial_space(m),m.fwd_caches[3])
-get_measure(m::NonlinearFEStateMap) = m.res.dΩ
 get_spaces(m::NonlinearFEStateMap) = m.spaces
 get_assemblers(m::NonlinearFEStateMap) = (m.fwd_caches[4],m.plb_caches[2],m.adj_caches[4])
 
@@ -676,8 +584,8 @@ a single bilinear form.
 
 # Parameters
 
-- `biform`: `IntegrandWithMeasure` defining the bilinear form.
-- `liform`: A vector of `IntegrandWithMeasure` defining the linear forms.
+- `biform`: A `Function` defining the bilinear form.
+- `liform`: A vector of `Function` defining the linear forms.
 - `spaces`: Repeated finite element spaces.
 - `spaces_0`: Original finite element spaces that are being repeated.
 - `plb_caches`: A cache for the pullback operator.
@@ -696,7 +604,7 @@ struct RepeatingAffineFEStateMap{A,B,C,D,E,F,G} <: AbstractFEStateMap
   @doc """
       RepeatingAffineFEStateMap(
         nblocks::Int,a::Function,l::Vector{<:Function},
-        U0,V0,V_φ,U_reg,φh,dΩ...;
+        U0,V0,V_φ,U_reg,φh;
         assem_U = SparseMatrixAssembler(U0,V0),
         assem_adjoint = SparseMatrixAssembler(V0,U0),
         assem_deriv = SparseMatrixAssembler(U_reg,U_reg),
@@ -717,8 +625,8 @@ struct RepeatingAffineFEStateMap{A,B,C,D,E,F,G} <: AbstractFEStateMap
     where each field corresponds to an entry in the vector of linear forms
   """
   function RepeatingAffineFEStateMap(
-    nblocks::Int,biform::AbstractIntegrandWithMeasure,liforms::Vector{<:AbstractIntegrandWithMeasure},
-    U0,V0,V_φ,U_reg,φh,dΩ...;
+    nblocks::Int,biform::Function,liforms::Vector{<:Function},
+    U0,V0,V_φ,U_reg,φh;
     assem_U = SparseMatrixAssembler(U0,V0),
     assem_adjoint = SparseMatrixAssembler(V0,U0),
     assem_deriv = SparseMatrixAssembler(U_reg,U_reg),
@@ -764,14 +672,6 @@ struct RepeatingAffineFEStateMap{A,B,C,D,E,F,G} <: AbstractFEStateMap
     E,F,G = typeof(plb_caches), typeof(fwd_caches), typeof(adj_caches)
     return new{A,B,C,D,E,F,G}(biform,liforms,spaces,spaces_0,plb_caches,fwd_caches,adj_caches)
   end
-end
-
-function RepeatingAffineFEStateMap(
-    nblocks::Int,a::Function,l::Vector{<:Function},
-    U0,V0,V_φ,U_reg,φh,dΩ...;kwargs...)
-  biform = IntegrandWithMeasure(a,dΩ)
-  liforms = map(li -> IntegrandWithMeasure(li,dΩ),l)
-  RepeatingAffineFEStateMap(nblocks::Int,biform,liforms,U0,V0,V_φ,U_reg,φh,dΩ...;kwargs...)
 end
 
 const MultiFieldSpaceTypes = Union{<:MultiField.MultiFieldFESpace,<:GridapDistributed.DistributedMultiFieldFESpace}
@@ -840,7 +740,6 @@ function repeated_allocate_in_domain(nblocks::Integer,M::AbstractBlockMatrix)
 end
 
 get_state(m::RepeatingAffineFEStateMap) = FEFunction(get_trial_space(m),m.fwd_caches[4])
-get_measure(m::RepeatingAffineFEStateMap) = m.biform.dΩ
 get_spaces(m::RepeatingAffineFEStateMap) = m.spaces
 get_assemblers(m::RepeatingAffineFEStateMap) = (m.fwd_caches[8],m.plb_caches[2],m.adj_caches[4])
 
@@ -1046,7 +945,6 @@ function Fields.evaluate!(pcf::PDEConstrainedFunctionals,φh)
 
   U_reg = get_deriv_space(pcf.state_map)
   deriv_assem = get_deriv_assembler(pcf.state_map)
-  dΩ = get_measure(pcf.state_map)
 
   ## Foward problem
   u, u_pullback = rrule(pcf.state_map,φh)
@@ -1062,13 +960,6 @@ function Fields.evaluate!(pcf::PDEConstrainedFunctionals,φh)
     return j_val
   end
   function ∇!(F::StateParamIntegrandWithMeasure,dF,dF_analytic::Function)
-    # Analytic shape derivative
-    j_val = F(uh,φh)
-    _dF(q) = dF_analytic(q,uh,φh,dΩ...)
-    assemble_vector!(_dF,dF,deriv_assem,U_reg)
-    return j_val
-  end
-  function ∇!(F::StateParamIntegrandWithMeasure,dF,dF_analytic::AbstractIntegrandWithMeasure)
     # Analytic shape derivative
     j_val = F(uh,φh)
     _dF(q) = dF_analytic(q,uh,φh)
@@ -1088,10 +979,6 @@ function Fields.evaluate!(pcf::PDEConstrainedFunctionals,φ::AbstractVector)
 end
 
 # IO
-
-function Base.show(io::IO,object::IntegrandWithMeasure)
-  print(io,"$(nameof(typeof(object)))")
-end
 
 function Base.show(io::IO,object::StateParamIntegrandWithMeasure)
   print(io,"$(nameof(typeof(object)))")

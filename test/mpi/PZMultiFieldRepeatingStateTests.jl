@@ -67,21 +67,21 @@ function main(distribute,mesh_partition;AD)
   Eⁱ = (VectorValue(1.0,0.0,),
         VectorValue(0.0,1.0))
 
-  a((u,ϕ),(v,q),φ,dΩ) = ∫((I ∘ φ) * (1/k0*((C ⊙ ε(u)) ⊙ ε(v)) -
+  a((u,ϕ),(v,q),φ) = ∫((I ∘ φ) * (1/k0*((C ⊙ ε(u)) ⊙ ε(v)) -
                                     1/α0*((-∇(ϕ) ⋅ e) ⊙ ε(v)) +
                                     -1/α0*((e ⋅² ε(u)) ⋅ -∇(q)) +
                                     -γ0/β0*((κ ⋅ -∇(ϕ)) ⋅ -∇(q))) )dΩ;
 
-  l_ε = [((v,q),φ,dΩ) -> ∫(((I ∘ φ) * (-C ⊙ εᴹ[i] ⊙ ε(v) + k0/α0*(e ⋅² εᴹ[i]) ⋅ -∇(q))))dΩ for i = 1:3];
-  l_E = [((v,q),φ,dΩ) -> ∫((I ∘ φ) * ((Eⁱ[i] ⋅ e ⊙ ε(v) + k0/α0*(κ ⋅ Eⁱ[i]) ⋅ -∇(q))))dΩ for i = 1:2];
+  l_ε = [((v,q),φ) -> ∫(((I ∘ φ) * (-C ⊙ εᴹ[i] ⊙ ε(v) + k0/α0*(e ⋅² εᴹ[i]) ⋅ -∇(q))))dΩ for i = 1:3];
+  l_E = [((v,q),φ) -> ∫((I ∘ φ) * ((Eⁱ[i] ⋅ e ⊙ ε(v) + k0/α0*(κ ⋅ Eⁱ[i]) ⋅ -∇(q))))dΩ for i = 1:2];
   l = [l_ε; l_E]
 
-  function Cᴴ(r,s,uϕ,φ,dΩ)
+  function Cᴴ(r,s,uϕ,φ)
     u_s = uϕ[2s-1]; ϕ_s = uϕ[2s]
     ∫(1/k0 * (I ∘ φ) * (((C ⊙ (1/k0*ε(u_s) + εᴹ[s])) ⊙ εᴹ[r]) - ((-1/α0*∇(ϕ_s) ⋅ e) ⊙ εᴹ[r])))dΩ;
   end
 
-  function DCᴴ(r,s,q,uϕ,φ,dΩ)
+  function DCᴴ(r,s,q,uϕ,φ)
     u_r = uϕ[2r-1]; ϕ_r = uϕ[2r]
     u_s = uϕ[2s-1]; ϕ_s = uϕ[2s]
     ∫(- 1/k0 * q * (
@@ -93,19 +93,19 @@ function main(distribute,mesh_partition;AD)
     )dΩ;
   end
 
-  Bᴴ(uϕ,φ,dΩ) = 1/4*(Cᴴ(1,1,uϕ,φ,dΩ)+Cᴴ(2,2,uϕ,φ,dΩ)+2*Cᴴ(1,2,uϕ,φ,dΩ))
-  DBᴴ(q,uϕ,φ,dΩ) = 1/4*(DCᴴ(1,1,q,uϕ,φ,dΩ)+DCᴴ(2,2,q,uϕ,φ,dΩ)+2*DCᴴ(1,2,q,uϕ,φ,dΩ))
+  Bᴴ(uϕ,φ) = 1/4*(Cᴴ(1,1,uϕ,φ)+Cᴴ(2,2,uϕ,φ)+2*Cᴴ(1,2,uϕ,φ))
+  DBᴴ(q,uϕ,φ) = 1/4*(DCᴴ(1,1,q,uϕ,φ)+DCᴴ(2,2,q,uϕ,φ)+2*DCᴴ(1,2,q,uϕ,φ))
 
-  J(uϕ,φ,dΩ) = -1*Bᴴ(uϕ,φ,dΩ)
-  DJ(q,uϕ,φ,dΩ) = -1*DBᴴ(q,uϕ,φ,dΩ)
-  C1(uϕ,φ,dΩ) = ∫(((ρ ∘ φ) - vf)/vol_D)dΩ;
-  DC1(q,uϕ,φ,dΩ) = ∫(-1/vol_D*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
+  J(uϕ,φ) = -1*Bᴴ(uϕ,φ)
+  DJ(q,uϕ,φ) = -1*DBᴴ(q,uϕ,φ)
+  C1(uϕ,φ) = ∫(((ρ ∘ φ) - vf)/vol_D)dΩ;
+  DC1(q,uϕ,φ) = ∫(-1/vol_D*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
 
   ## Finite difference solver and level set function
   stencil = HamiltonJacobiEvolution(FirstOrderStencil(2,Float64),model,V_φ,tol,max_steps)
 
   ## Setup solver and FE operators
-  state_map = RepeatingAffineFEStateMap(5,a,l,UP,VQ,V_φ,U_reg,φh,dΩ)
+  state_map = RepeatingAffineFEStateMap(5,a,l,UP,VQ,V_φ,U_reg,φh)
   pcfs = if AD
     PDEConstrainedFunctionals(J,[C1],state_map;analytic_dJ=DJ,analytic_dC=[DC1])
   else
