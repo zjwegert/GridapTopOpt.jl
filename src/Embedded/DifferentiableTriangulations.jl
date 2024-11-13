@@ -37,6 +37,11 @@ function update_trian!(trian::DifferentiableTriangulation,φh)
   return trian
 end
 
+function update_trian!(trian::DifferentiableTriangulation,::Nothing)
+  trian.cell_values = nothing
+  return trian
+end
+
 function FESpaces._change_argument(
   op,f,trian::DifferentiableTriangulation,uh::SingleFieldFEFunction
 )
@@ -45,6 +50,7 @@ function FESpaces._change_argument(
     cf = CellField(U,cell_u)
     update_trian!(trian,cf)
     cell_grad = f(cf)
+    update_trian!(trian,nothing) # TODO: experimental
     get_contribution(cell_grad,trian)
   end
   g
@@ -361,6 +367,7 @@ function FESpaces._change_argument(
     cf = CellField(U,cell_u)
     update_trian!(trian,cf)
     cell_grad = f(cf)
+    update_trian!(trian,nothing) # TODO: experimental
     get_contribution(cell_grad,trian)
   end
   g
