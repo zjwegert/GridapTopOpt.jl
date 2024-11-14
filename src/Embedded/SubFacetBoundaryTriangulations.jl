@@ -433,6 +433,29 @@ for func in (:(Gridap.get_normal_vector),:get_tangent_vector)
   end
 end
 
+# Distributed
+# Until we merge, we need changes in 
+#   - GridapDistributed#master
+#   - GridapEmbedded#distributed
+
+function GridapDistributed.remove_ghost_cells(
+  trian::Union{<:SubFacetBoundaryTriangulation,<:SubFacetSkeletonTriangulation},gids
+)
+  model = get_background_model(trian)
+  Dm    = num_cell_dims(model)
+  glue  = get_glue(trian,Val(Dm))
+  GridapDistributed.remove_ghost_cells(glue,trian,gids)
+end
+
+for func in (:get_subfacet_normal_vector,:get_ghost_normal_vector,:get_conormal_vector,:get_tangent_vector)
+  @eval begin
+    function $func(a::DistributedTriangulation)
+      fields = map($func,local_views(a))
+      DistributedCellField(fields,a)
+    end
+  end
+end
+
 ############################################################################################
 # This will go to Gridap
 
