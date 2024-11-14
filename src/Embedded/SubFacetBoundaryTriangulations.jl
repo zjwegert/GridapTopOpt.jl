@@ -447,6 +447,15 @@ function GridapDistributed.remove_ghost_cells(
   GridapDistributed.remove_ghost_cells(glue,trian,gids)
 end
 
+for func in (:get_subfacet_normal_vector,:get_ghost_normal_vector,:get_conormal_vector,:get_tangent_vector)
+  @eval begin
+    function $func(a::DistributedTriangulation)
+      fields = map($func,local_views(a))
+      DistributedCellField(fields,a)
+    end
+  end
+end
+
 ############################################################################################
 # This will go to Gridap
 
