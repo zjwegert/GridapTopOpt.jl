@@ -121,7 +121,7 @@ function solve!(s::CutFEMEvolve,φh,velh,γ,cache::Nothing)
   _, φhF = data
   copy!(get_free_dof_values(φh),get_free_dof_values(φhF))
   s.cache = state_new
-  
+  update_collection!(s.Ωs,φh) # TODO: remove?
   return φh
 end
 
@@ -160,7 +160,7 @@ function solve!(s::CutFEMEvolve,φh,velh,γ,cache)
   _, φhF = data
   copy!(get_free_dof_values(φh),get_free_dof_values(φhF))
   s.cache = state_updated
-  
+  update_collection!(s.Ωs,φh) # TODO: remove?
   return φh
 end
 

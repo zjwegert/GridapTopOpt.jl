@@ -51,9 +51,15 @@ function evolve!(s::UnfittedFEEvolution,φ::T,vel::M,γ,args...) where
 end
 
 function evolve!(s::UnfittedFEEvolution,φ::T,velh,γ,args...) where T<:AbstractVector
-V_φ = get_space(s.evolver)
-φh = FEFunction(V_φ,φ)
-evolve!(s,φh,velh,γ,args...)
+  V_φ = get_space(s.evolver)
+  φh = FEFunction(V_φ,φ)
+  evolve!(s,φh,velh,γ,args...)
+end
+
+function evolve!(s::UnfittedFEEvolution,φh,vel::T,γ,args...) where T<:AbstractVector
+  V_φ = get_space(s.evolver)
+  velh = FEFunction(V_φ,vel)
+  evolve!(s,φh,velh,γ,args...)
 end
 
 function evolve!(s::UnfittedFEEvolution,φh,velh,γ,args...)

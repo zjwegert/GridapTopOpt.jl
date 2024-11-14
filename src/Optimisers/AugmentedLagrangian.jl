@@ -4,11 +4,11 @@
 An augmented Lagrangian method based on Nocedal and Wright, 2006
 ([link](https://doi.org/10.1007/978-0-387-40065-5)). Note that
 this method will function as a Lagrangian method if no constraints
-are defined in `problem::PDEConstrainedFunctionals`.
+are defined in `problem::AbstractPDEConstrainedFunctionals`.
 
 # Parameters
 
-- `problem::PDEConstrainedFunctionals`: The objective and constraint setup.
+- `problem::AbstractPDEConstrainedFunctionals`: The objective and constraint setup.
 - `ls_evolver::LevelSetEvolution`: Solver for the evolution and reinitisation equations.
 - `vel_ext::VelocityExtension`: The velocity-extension method for extending 
   shape sensitivities onto the computational domain.
@@ -22,7 +22,7 @@ iteration history. By default this uses a mean zero crossing algorithm as implem
 in ChaosTools. Oscillations checking can be disabled by taking `has_oscillations = (args...) -> false`.
 """
 struct AugmentedLagrangian <: Optimiser
-  problem           :: PDEConstrainedFunctionals
+  problem           :: AbstractPDEConstrainedFunctionals
   ls_evolver        :: LevelSetEvolution
   vel_ext           :: VelocityExtension
   history           :: OptimiserHistory{Float64}
@@ -33,7 +33,7 @@ struct AugmentedLagrangian <: Optimiser
   
   @doc """
       AugmentedLagrangian(
-        problem    :: PDEConstrainedFunctionals{N},
+        problem    :: AbstractPDEConstrainedFunctionals{N},
         ls_evolver :: LevelSetEvolution,
         vel_ext    :: VelocityExtension,
         φ0;
@@ -47,7 +47,7 @@ struct AugmentedLagrangian <: Optimiser
 
   # Required
 
-  - `problem::PDEConstrainedFunctionals`: The objective and constraint setup.
+  - `problem::AbstractPDEConstrainedFunctionals`: The objective and constraint setup.
   - `ls_evolver::LevelSetEvolution`: Solver for the evolution and reinitisation equations.
   - `vel_ext::VelocityExtension`: The velocity-extension method for extending 
     shape sensitivities onto the computational domain.
@@ -73,7 +73,7 @@ struct AugmentedLagrangian <: Optimiser
   - `debug = false`: Debug flag.
   """
   function AugmentedLagrangian(
-    problem    :: PDEConstrainedFunctionals{N},
+    problem    :: AbstractPDEConstrainedFunctionals{N},
     ls_evolver :: LevelSetEvolution,
     vel_ext    :: VelocityExtension,
     φ0;
@@ -191,8 +191,8 @@ function Base.iterate(m::AugmentedLagrangian,state)
     print_msg(m.history,"   Oscillations detected, reducing γ to $(γ)\n",color=:yellow)
   end
 
-  U_reg = get_deriv_space(m.problem.state_map)
-  V_φ = get_aux_space(m.problem.state_map)
+  U_reg = get_deriv_space(get_state_map(m.problem))
+  V_φ = get_aux_space(get_state_map(m.problem))
   interpolate!(FEFunction(U_reg,dL),vel,V_φ)
   evolve!(m.ls_evolver,φh,vel,γ)
   iszero(it % reinit_mod) && reinit!(m.ls_evolver,φh,γ_reinit)

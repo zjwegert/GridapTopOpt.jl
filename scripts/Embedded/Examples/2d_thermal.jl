@@ -1,94 +1,115 @@
-using Pkg; Pkg.activate()
-
 using Gridap,GridapTopOpt
-include("../embedded_measures_AD_DISABLED.jl")
+using Gridap.Adaptivity, Gridap.Geometry
+using GridapEmbedded, GridapEmbedded.LevelSetCutters
 
-function main()
-  path="./results/UnfittedFEM_thermal_compliance_ALM/"
-  n = 200
-  order = 1
-  γ = 0.1
-  γ_reinit = 0.5
-  max_steps = floor(Int,order*minimum(n)/10)
-  tol = 1/(5*order^2)/minimum(n)
-  vf = 0.4
-  α_coeff = 4max_steps*γ
-  iter_mod = 1
+using GridapTopOpt: StateParamIntegrandWithMeasure
 
-  model = CartesianDiscreteModel((0,1,0,1),(n,n));
-  el_Δ = get_el_Δ(model)
-  f_Γ_D(x) = (x[1] ≈ 0.0 && (x[2] <= 0.2 + eps() || x[2] >= 0.8 - eps()))
-  f_Γ_N(x) = (x[1] ≈ 1 && 0.4 - eps() <= x[2] <= 0.6 + eps())
-  update_labels!(1,model,f_Γ_D,"Gamma_D")
-  update_labels!(2,model,f_Γ_N,"Gamma_N")
+path="./results/UnfittedFEM_thermal_compliance_ALM/"
+mkpath(path)
+n = 51
+order = 1
+γ = 0.1
+γ_reinit = 0.5
+max_steps = floor(Int,order*minimum(n)/10)
+vf = 0.4
+α_coeff = 2max_steps*γ
+iter_mod = 1
 
-  ## Triangulations and measures
-  Ω = Triangulation(model)
-  Γ_N = BoundaryTriangulation(model,tags="Gamma_N")
-  dΩ = Measure(Ω,2*order)
-  dΓ_N = Measure(Γ_N,2*order)
-  vol_D = sum(∫(1)dΩ)
+_model = CartesianDiscreteModel((0,1,0,1),(n,n))
+base_model = UnstructuredDiscreteModel(_model)
+ref_model = refine(base_model, refinement_method = "barycentric")
+model = ref_model.model
+el_Δ = get_el_Δ(_model)
+h = maximum(el_Δ)
+h_refine = maximum(el_Δ)/2
+f_Γ_D(x) = (x[1] ≈ 0.0 && (x[2] <= 0.2 + eps() || x[2] >= 0.8 - eps()))
+f_Γ_N(x) = (x[1] ≈ 1 && 0.4 - eps() <= x[2] <= 0.6 + eps())
+update_labels!(1,model,f_Γ_D,"Gamma_D")
+update_labels!(2,model,f_Γ_N,"Gamma_N")
 
-  ## Spaces
-  reffe_scalar = ReferenceFE(lagrangian,Float64,order)
-  V = TestFESpace(model,reffe_scalar;dirichlet_tags=["Gamma_D"])
+## Triangulations and measures
+Ω = Triangulation(model)
+Γ_N = BoundaryTriangulation(model,tags="Gamma_N")
+dΩ = Measure(Ω,2*order)
+dΓ_N = Measure(Γ_N,2*order)
+vol_D = sum(∫(1)dΩ)
+
+## Levet-set function space and derivative regularisation space
+reffe_scalar = ReferenceFE(lagrangian,Float64,order)
+V_reg = TestFESpace(model,reffe_scalar;dirichlet_tags=["Gamma_N"])
+U_reg = TrialFESpace(V_reg,0)
+V_φ = TestFESpace(model,reffe_scalar)
+
+## Levet-set function
+φh = interpolate(x->-cos(4π*x[1])*cos(4π*x[2])-0.2,V_φ)
+Ωs = EmbeddedCollection(model,φh) do cutgeo
+  Ωin = DifferentiableTriangulation(Triangulation(cutgeo,PHYSICAL))
+  Γg = DifferentiableTriangulation(GhostSkeleton(cutgeo))
+  n_Γg = get_normal_vector(Γg)
+  Γ = DifferentiableTriangulation(EmbeddedBoundary(cutgeo))
+  (; 
+    :Ωin  => Ωin,
+    :dΩin => Measure(Ωin,2*order),
+    :Γg   => Γg,
+    :dΓg  => Measure(Γg,2*order),
+    :n_Γg => get_normal_vector(Γg),
+    :Γ    => Γ,
+    :dΓ   => Measure(Γ,2*order)
+  )
+end  
+
+## Weak form
+const γg = 0.1
+a(u,v,φ) = ∫(∇(v)⋅∇(u))Ωs.dΩin + ∫((γg*h)*jump(Ωs.n_Γg⋅∇(v))*jump(Ωs.n_Γg⋅∇(u)))Ωs.dΓg
+l(v,φ) = ∫(v)dΓ_N
+
+## Optimisation functionals
+J(u,φ) = ∫(∇(u)⋅∇(u))Ωs.dΩin
+Vol(u,φ) = ∫(1/vol_D)Ωs.dΩin - ∫(vf/vol_D)dΩ
+dVol(q,u,φ) = ∫(-1/vol_D*q/(norm ∘ (∇(φ))))Ωs.dΓ
+
+## Setup solver and FE operators
+state_collection = EmbeddedCollection(model,φh) do cutgeo
+  Ωact = Triangulation(cutgeo,ACTIVE)
+  V = TestFESpace(Ωact,reffe_scalar;dirichlet_tags=["Gamma_D"])
   U = TrialFESpace(V,0.0)
-  V_φ = TestFESpace(model,reffe_scalar)
-  V_reg = TestFESpace(model,reffe_scalar;dirichlet_tags=["Gamma_N"])
-  U_reg = TrialFESpace(V_reg,0)
+  state_map = AffineFEStateMap(a,l,U,V,V_φ,U_reg,φh)
+  (; 
+    :state_map => state_map,
+    :J => StateParamIntegrandWithMeasure(J,state_map),
+    :C => map(Ci -> StateParamIntegrandWithMeasure(Ci,state_map),[Vol,])
+  )
+end  
+pcfs = EmbeddedPDEConstrainedFunctionals(state_collection;analytic_dC=(dVol,))
 
-  φh = interpolate(x->-cos(4π*x[1])*cos(4*pi*x[2])/4-0.2/4,V_φ)
-  embedded_meas = EmbeddedMeasureCache(φh,V_φ)
-  update_meas(φ) = update_embedded_measures!(φ,embedded_meas)
-  get_meas(φ) = get_embedded_measures(φ,embedded_meas)
+## Evolution Method
+evo = CutFEMEvolve(V_φ,Ωs,dΩ,h)
+reinit = StabilisedReinit(V_φ,Ωs,dΩ,h;stabilisation_method=InteriorPenalty(V_φ))
+ls_evo = UnfittedFEEvolution(evo,reinit)
+# reinit!(ls_evo,φh)
 
-  ## Weak form
-  a(u,v,φ,dΩ,dΓ_N,dΩ1,dΩ2,dΓ) = ∫(∇(u)⋅∇(v))dΩ1 + ∫(10^-6*∇(u)⋅∇(v))dΩ2
-  l(v,φ,dΩ,dΓ_N,dΩ1,dΩ2,dΓ) = ∫(v)dΓ_N
+## Hilbertian extension-regularisation problems
+# α = α_coeff*(h_refine/order)^2
+# a_hilb(p,q) =∫(α*∇(p)⋅∇(q) + p*q)dΩ;
+α = α_coeff*h_refine
+a_hilb(p,q) = ∫(α^2*∇(p)⋅∇(q) + p*q)dΩ;
+vel_ext = VelocityExtension(a_hilb,U_reg,V_reg)
 
-  ## Optimisation functionals
-  J(u,φ,dΩ,dΓ_N,dΩ1,dΩ2,dΓ) = ∫(∇(u)⋅∇(u))dΩ1
-  dJ(q,u,φ,dΩ,dΓ_N,dΩ1,dΩ2,dΓ) = ∫(∇(u)⋅∇(u)*q)dΓ;
-  Vol(u,φ,dΩ,dΓ_N,dΩ1,dΩ2,dΓ) = ∫(1/vol_D)dΩ1 - ∫(vf/vol_D)dΩ;
-  dVol(q,u,φ,dΩ,dΓ_N,dΩ1,dΩ2,dΓ) = ∫(-1/vol_D*q)dΓ
 
-  ## IntegrandWithEmbeddedMeasure
-  a_iem = IntegrandWithEmbeddedMeasure(a,(dΩ,dΓ_N),update_meas)
-  l_iem = IntegrandWithEmbeddedMeasure(l,(dΩ,dΓ_N),update_meas)
-  J_iem = IntegrandWithEmbeddedMeasure(J,(dΩ,dΓ_N),update_meas)
-  dJ_iem = IntegrandWithEmbeddedMeasure(dJ,(dΩ,dΓ_N),update_meas)
-  Vol_iem = IntegrandWithEmbeddedMeasure(Vol,(dΩ,dΓ_N),update_meas)
-  dVol_iem = IntegrandWithEmbeddedMeasure(dVol,(dΩ,dΓ_N),update_meas)
+## Forward problem and derivatives
+_j,_c,_dJ,_dC = evaluate!(pcfs,φh)
+writevtk(Ω,path*"check_dJ",cellfields=["dJ"=>FEFunction(dJ,U_reg)])
 
-  ## Evolution Method
-  ls_evo = HamiltonJacobiEvolution(FirstOrderStencil(2,Float64),model,V_φ,tol,max_steps)
-
-  ## Setup solver and FE operators
-  state_map = AffineFEStateMap(a_iem,l_iem,U,V,V_φ,U_reg,φh,(dΩ,dΓ_N))
-  pcfs = PDEConstrainedFunctionals(J_iem,[Vol_iem],state_map,analytic_dJ=dJ_iem,analytic_dC=[dVol_iem])
-
-  ## Hilbertian extension-regularisation problems
-  α = α_coeff*maximum(el_Δ)
-  a_hilb(p,q) =∫(α^2*∇(p)⋅∇(q) + p*q)dΩ;
-  vel_ext = VelocityExtension(a_hilb,U_reg,V_reg)
-
-  ## Optimiser
-  rm(path,force=true,recursive=true)
-  mkpath(path)
-  optimiser = AugmentedLagrangian(pcfs,ls_evo,vel_ext,φh;reinit_mod=5,
-    γ,γ_reinit,verbose=true,constraint_names=[:Vol])
-  for (it,uh,φh) in optimiser
-    _Ω1,_,_Γ = get_embedded_triangulations(embedded_meas)
-    if iszero(it % iter_mod)
-      writevtk(_Ω1,path*"Omega_out$it",cellfields=["φ"=>φh,"|∇(φ)|"=>(norm ∘ ∇(φh)),"uh"=>uh])
-      writevtk(_Γ,path*"Gamma_out$it",cellfields=["normal"=>get_normal_vector(_Γ)])
-    end
-    write_history(path*"/history.txt",optimiser.history)
+## Optimiser
+optimiser = HilbertianProjection(pcfs,ls_evo,vel_ext,φh;debug=true,
+  γ,γ_reinit,verbose=true,constraint_names=[:Vol])
+for (it,uh,φh,state) in optimiser
+  if iszero(it % iter_mod)
+    writevtk(Ω,path*"Omega$it",cellfields=["φ"=>φh,"|∇(φ)|"=>(norm ∘ ∇(φh)),"uh"=>uh,"velh"=>FEFunction(V_φ,state.vel)])
+    writevtk(Ωs.Γ,path*"Gamma_out$it",cellfields=["normal"=>get_normal_vector(Ωs.Γ)])
   end
-  it = get_history(optimiser).niter; uh = get_state(pcfs)
-  _Ω1,_,_Γ = get_embedded_triangulations(embedded_meas)
-  writevtk(_Ω1,path*"Omega_out$it",cellfields=["φ"=>φh,"|∇(φ)|"=>(norm ∘ ∇(φh)),"uh"=>uh])
-  writevtk(_Γ,path*"Gamma_out$it",cellfields=["normal"=>get_normal_vector(_Γ)])
+  write_history(path*"/history.txt",optimiser.history)
 end
-
-main()
+it = get_history(optimiser).niter; uh = get_state(pcfs)
+writevtk(Ω,path*"Omega$it",cellfields=["φ"=>φh,"|∇(φ)|"=>(norm ∘ ∇(φh)),"uh"=>uh])
+writevtk(Ωs.Γ,path*"Gamma_out$it",cellfields=["normal"=>get_normal_vector(Ωs.Γ)])

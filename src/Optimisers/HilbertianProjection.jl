@@ -138,7 +138,7 @@ A Hilbertian projection method as described by Wegert et al., 2023
 
 # Parameters
 
-- `problem::PDEConstrainedFunctionals{N}`: The objective and constraint setup.
+- `problem::AbstractPDEConstrainedFunctionals{N}`: The objective and constraint setup.
 - `ls_evolver::LevelSetEvolution`: Solver for the evolution and reinitisation equations.
 - `vel_ext::VelocityExtension`: The velocity-extension method for extending
   shape sensitivities onto the computational domain.
@@ -149,7 +149,7 @@ A Hilbertian projection method as described by Wegert et al., 2023
 - `params::NamedTuple`: Optimisation parameters.
 """
 struct HilbertianProjection{A} <: Optimiser
-  problem           :: PDEConstrainedFunctionals
+  problem           :: AbstractPDEConstrainedFunctionals
   ls_evolver        :: LevelSetEvolution
   vel_ext           :: VelocityExtension
   projector         :: HilbertianProjectionMap
@@ -161,7 +161,7 @@ struct HilbertianProjection{A} <: Optimiser
 
   @doc """
       HilbertianProjection(
-        problem :: PDEConstrainedFunctionals{N},
+        problem :: AbstractPDEConstrainedFunctionals{N},
         ls_evolver :: LevelSetEvolution,
         vel_ext :: VelocityExtension,
         φ0;
@@ -179,7 +179,7 @@ struct HilbertianProjection{A} <: Optimiser
 
   # Required
 
-  - `problem::PDEConstrainedFunctionals{N}`: The objective and constraint setup.
+  - `problem::AbstractPDEConstrainedFunctionals{N}`: The objective and constraint setup.
   - `ls_evolver::LevelSetEvolution`: Solver for the evolution and reinitisation equations.
   - `vel_ext::VelocityExtension`: The velocity-extension method for extending
     shape sensitivities onto the computational domain.
@@ -229,7 +229,7 @@ struct HilbertianProjection{A} <: Optimiser
       This can be set to always be enfored by taking `ls_ξ = 0.0025` and `ls_ξ_reduce_coef = 0.1`.
   """
     function HilbertianProjection(
-    problem    :: PDEConstrainedFunctionals{N},
+    problem    :: AbstractPDEConstrainedFunctionals{N},
     ls_evolver :: LevelSetEvolution,
     vel_ext    :: VelocityExtension,
     φ0;
@@ -349,8 +349,8 @@ function Base.iterate(m::HilbertianProjection,state)
   end
 
   ## Line search
-  U_reg = get_deriv_space(m.problem.state_map)
-  V_φ   = get_aux_space(m.problem.state_map)
+  U_reg = get_deriv_space(get_state_map(m.problem))
+  V_φ   = get_aux_space(get_state_map(m.problem))
   interpolate!(FEFunction(U_reg,θ),vel,V_φ)
   J, C, dJ, dC = _linesearch!(m,state,γ)
 

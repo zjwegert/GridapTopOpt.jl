@@ -84,6 +84,7 @@ function StateParamIntegrandWithMeasure(
   assem_U::Assembler,assem_deriv::Assembler
 )
   φ₀, u₀ = interpolate(x->-sqrt((x[1]-1/2)^2+(x[2]-1/2)^2)+0.2,V_φ), zero(U)
+  # TODO: Can we make F a dummy functional?
   ∂j∂u_vecdata = collect_cell_vector(U,∇(F,[u₀,φ₀],1))
   ∂j∂φ_vecdata = collect_cell_vector(U_reg,∇(F,[u₀,φ₀],2))
   ∂j∂u_vec = allocate_vector(assem_U,∂j∂u_vecdata)
@@ -383,7 +384,7 @@ struct AffineFEStateMap{A,B,C,D,E,F} <: AbstractFEStateMap
 
   Optional arguments enable specification of assemblers and linear solvers.
   """
-    function AffineFEStateMap(
+  function AffineFEStateMap(
       biform::Function,liform::Function,
       U,V,V_φ,U_reg,φh;
       assem_U = SparseMatrixAssembler(U,V),
@@ -407,13 +408,13 @@ struct AffineFEStateMap{A,B,C,D,E,F} <: AbstractFEStateMap
     K, b = get_matrix(op), get_vector(op)
     x  = allocate_in_domain(K); fill!(x,zero(eltype(x)))
     ns = numerical_setup(symbolic_setup(ls,K),K)
-    fwd_caches = (ns,K,b,x,uhd,assem_U)
+    fwd_caches = (ns,K,b,x,uhd,assem_U,ls)
 
     ## Adjoint cache
     adjoint_K  = assemble_matrix((u,v)->biform(v,u,φh),assem_adjoint,V,U)
     adjoint_x  = allocate_in_domain(adjoint_K); fill!(adjoint_x,zero(eltype(adjoint_x)))
     adjoint_ns = numerical_setup(symbolic_setup(adjoint_ls,adjoint_K),adjoint_K)
-    adj_caches = (adjoint_ns,adjoint_K,adjoint_x,assem_adjoint)
+    adj_caches = (adjoint_ns,adjoint_K,adjoint_x,assem_adjoint,adjoint_ls)
 
     A,B,C = typeof(biform), typeof(liform), typeof(spaces)
     D,E,F = typeof(plb_caches),typeof(fwd_caches), typeof(adj_caches)
@@ -429,7 +430,7 @@ get_assemblers(m::AffineFEStateMap) = (m.fwd_caches[6],m.plb_caches[2],m.adj_cac
 function forward_solve!(φ_to_u::AffineFEStateMap,φh)
   biform, liform = φ_to_u.biform, φ_to_u.liform
   U, V, _, _ = φ_to_u.spaces
-  ns, K, b, x, uhd, assem_U = φ_to_u.fwd_caches
+  ns, K, b, x, uhd, assem_U, _ = φ_to_u.fwd_caches
 
   a_fwd(u,v) = biform(u,v,φh)
   l_fwd(v)   = liform(v,φh)
@@ -445,7 +446,7 @@ function dRdφ(φ_to_u::AffineFEStateMap,uh,vh,φh)
 end
 
 function update_adjoint_caches!(φ_to_u::AffineFEStateMap,uh,φh)
-  adjoint_ns, adjoint_K, _, assem_adjoint = φ_to_u.adj_caches
+  adjoint_ns, adjoint_K, _, assem_adjoint, _ = φ_to_u.adj_caches
   U, V, _, _ = φ_to_u.spaces
   assemble_matrix!((u,v) -> φ_to_u.biform(v,u,φh),adjoint_K,assem_adjoint,V,U)
   numerical_setup!(adjoint_ns,adjoint_K)
@@ -453,7 +454,7 @@ function update_adjoint_caches!(φ_to_u::AffineFEStateMap,uh,φh)
 end
 
 function adjoint_solve!(φ_to_u::AffineFEStateMap,du::AbstractVector)
-  adjoint_ns, _, adjoint_x, _ = φ_to_u.adj_caches
+  adjoint_ns, _, adjoint_x, _, _ = φ_to_u.adj_caches
   solve!(adjoint_x,adjoint_ns,du)
   return adjoint_x
 end
@@ -526,7 +527,8 @@ struct NonlinearFEStateMap{A,B,C,D,E,F} <: AbstractFEStateMap
     adjoint_K  = assemble_adjoint_matrix(_jac_adj,assem_adjoint,U,V)
     adjoint_x  = allocate_in_domain(adjoint_K); fill!(adjoint_x,zero(eltype(adjoint_x)))
     adjoint_ns = numerical_setup(symbolic_setup(adjoint_ls,adjoint_K),adjoint_K)
-    adj_caches = (adjoint_ns,adjoint_K,adjoint_x,assem_adjoint)
+    adj_caches = (adjoint_ns,adjoint_K,adjoint_x,assem_adjoint,adjoint_ls)
+
     A, B, C = typeof(res), typeof(jac), typeof(spaces)
     D, E, F = typeof(plb_caches), typeof(fwd_caches), typeof(adj_caches)
     return new{A,B,C,D,E,F}(res,jac,spaces,plb_caches,fwd_caches,adj_caches)
@@ -561,7 +563,7 @@ function dRdφ(φ_to_u::NonlinearFEStateMap,uh,vh,φh)
 end
 
 function update_adjoint_caches!(φ_to_u::NonlinearFEStateMap,uh,φh)
-  adjoint_ns, adjoint_K, _, assem_adjoint = φ_to_u.adj_caches
+  adjoint_ns, adjoint_K, _, assem_adjoint, _ = φ_to_u.adj_caches
   U, V, _, _ = φ_to_u.spaces
   jac(du,v) =  φ_to_u.jac(uh,du,v,φh)
   assemble_adjoint_matrix!(jac,adjoint_K,assem_adjoint,U,V)
@@ -570,7 +572,7 @@ function update_adjoint_caches!(φ_to_u::NonlinearFEStateMap,uh,φh)
 end
 
 function adjoint_solve!(φ_to_u::NonlinearFEStateMap,du::AbstractVector)
-  adjoint_ns, _, adjoint_x, _ = φ_to_u.adj_caches
+  adjoint_ns, _, adjoint_x, _, _ = φ_to_u.adj_caches
   solve!(adjoint_x,adjoint_ns,du)
   return adjoint_x
 end
@@ -660,13 +662,13 @@ struct RepeatingAffineFEStateMap{A,B,C,D,E,F,G} <: AbstractFEStateMap
     b0 = allocate_in_range(K); fill!(b0,zero(eltype(b0)))
     x  = repeated_allocate_in_domain(nblocks,K); fill!(x,zero(eltype(x)))
     ns = numerical_setup(symbolic_setup(ls,K),K)
-    fwd_caches = (ns,K,b,x,uhd,assem_U0,b0,assem_U)
+    fwd_caches = (ns,K,b,x,uhd,assem_U0,b0,assem_U,ls)
 
     ## Adjoint cache
     adjoint_K  = assemble_matrix((u,v)->biform(v,u,φh),assem_adjoint,V0,U0)
     adjoint_x  = repeated_allocate_in_domain(nblocks,adjoint_K); fill!(adjoint_x,zero(eltype(adjoint_x)))
     adjoint_ns = numerical_setup(symbolic_setup(adjoint_ls,adjoint_K),adjoint_K)
-    adj_caches = (adjoint_ns,adjoint_K,adjoint_x,assem_adjoint)
+    adj_caches = (adjoint_ns,adjoint_K,adjoint_x,assem_adjoint,adjoint_ls)
 
     A,B,C,D = typeof(biform), typeof(liforms), typeof(spaces), typeof(spaces_0)
     E,F,G = typeof(plb_caches), typeof(fwd_caches), typeof(adj_caches)
@@ -746,7 +748,7 @@ get_assemblers(m::RepeatingAffineFEStateMap) = (m.fwd_caches[8],m.plb_caches[2],
 function forward_solve!(φ_to_u::RepeatingAffineFEStateMap,φh)
   biform, liforms = φ_to_u.biform, φ_to_u.liform
   U0, V0 = φ_to_u.spaces_0
-  ns, K, b, x, uhd, assem_U0, b0, _ = φ_to_u.fwd_caches
+  ns, K, b, x, uhd, assem_U0, b0, _, _ = φ_to_u.fwd_caches
 
   a_fwd(u,v) = biform(u,v,φh)
   assemble_matrix!(a_fwd,K,assem_U0,U0,V0)
@@ -780,7 +782,7 @@ function dRdφ(φ_to_u::RepeatingAffineFEStateMap,uh,vh,φh)
 end
 
 function update_adjoint_caches!(φ_to_u::RepeatingAffineFEStateMap,uh,φh)
-  adjoint_ns, adjoint_K, _, assem_adjoint = φ_to_u.adj_caches
+  adjoint_ns, adjoint_K, _, assem_adjoint, _ = φ_to_u.adj_caches
   U0, V0 = φ_to_u.spaces_0
   assemble_matrix!((u,v) -> φ_to_u.biform(v,u,φh),adjoint_K,assem_adjoint,V0,U0)
   numerical_setup!(adjoint_ns,adjoint_K)
@@ -788,7 +790,7 @@ function update_adjoint_caches!(φ_to_u::RepeatingAffineFEStateMap,uh,φh)
 end
 
 function adjoint_solve!(φ_to_u::RepeatingAffineFEStateMap,du::AbstractBlockVector)
-  adjoint_ns, _, adjoint_x, _ = φ_to_u.adj_caches
+  adjoint_ns, _, adjoint_x, _, _ = φ_to_u.adj_caches
   U0, V0 = φ_to_u.spaces_0
   map(repeated_blocks(U0,adjoint_x),repeated_blocks(U0,du)) do xi, dui
     solve!(xi,adjoint_ns,dui)
@@ -796,8 +798,10 @@ function adjoint_solve!(φ_to_u::RepeatingAffineFEStateMap,du::AbstractBlockVect
   return adjoint_x
 end
 
+abstract type AbstractPDEConstrainedFunctionals{N} end
+
 """
-    struct PDEConstrainedFunctionals{N,A}
+    struct PDEConstrainedFunctionals{N,A} <: AbstractPDEConstrainedFunctionals{N}
 
 An object that computes the objective, constraints, and their derivatives.
 
@@ -847,7 +851,7 @@ The gradient is then ``\\frac{\\partial F}{\\partial \\varphi} =
 - If `analytic_dJ = nothing` automatic differentiation will be used.
 - If `analytic_dC[i] = nothing` automatic differentiation will be used for `C[i]`.
 """
-struct PDEConstrainedFunctionals{N,A}
+struct PDEConstrainedFunctionals{N,A} <: AbstractPDEConstrainedFunctionals{N}
   J
   C
   dJ
@@ -895,24 +899,25 @@ Create an instance of `PDEConstrainedFunctionals` when the problem has no constr
 PDEConstrainedFunctionals(J,state_map::AbstractFEStateMap;analytic_dJ=nothing) =
   PDEConstrainedFunctionals(J,typeof(J)[],state_map;analytic_dJ = analytic_dJ,analytic_dC = Nothing[])
 
-get_state(m::PDEConstrainedFunctionals) = get_state(m.state_map)
+get_state_map(m::PDEConstrainedFunctionals) = m.state_map
+get_state(m::PDEConstrainedFunctionals) = get_state(get_state_map(m))
 
 """
     evaluate_functionals!(pcf::PDEConstrainedFunctionals,φh)
 
 Evaluate the objective and constraints at `φh`.
 """
-function evaluate_functionals!(pcf::PDEConstrainedFunctionals,φh)
-  u  = pcf.state_map(φh)
-  U  = get_trial_space(pcf.state_map)
+function evaluate_functionals!(pcf::PDEConstrainedFunctionals,φh;kwargs...)
+  u  = get_state_map(pcf)(φh)
+  U  = get_trial_space(get_state_map(pcf))
   uh = FEFunction(U,u)
   return pcf.J(uh,φh), map(Ci->Ci(uh,φh),pcf.C)
 end
 
-function evaluate_functionals!(pcf::PDEConstrainedFunctionals,φ::AbstractVector)
-  V_φ = get_aux_space(pcf.state_map)
+function evaluate_functionals!(pcf::PDEConstrainedFunctionals,φ::AbstractVector;kwargs...)
+  V_φ = get_aux_space(get_state_map(pcf))
   φh = FEFunction(V_φ,φ)
-  return evaluate_functionals!(pcf,φh)
+  return evaluate_functionals!(pcf,φh;kwargs...)
 end
 
 """
@@ -920,15 +925,15 @@ end
 
 Evaluate the derivatives of the objective and constraints at `φh`.
 """
-function evaluate_derivatives!(pcf::PDEConstrainedFunctionals,φh)
+function evaluate_derivatives!(pcf::PDEConstrainedFunctionals,φh;kwargs...)
   _,_,dJ,dC = evaluate!(pcf,φh)
   return dJ,dC
 end
 
-function evaluate_derivatives!(pcf::PDEConstrainedFunctionals,φ::AbstractVector)
-  V_φ = get_aux_space(pcf.state_map)
+function evaluate_derivatives!(pcf::PDEConstrainedFunctionals,φ::AbstractVector;kwargs...)
+  V_φ = get_aux_space(get_state_map(pcf))
   φh = FEFunction(V_φ,φ)
-  return evaluate_derivatives!(pcf,φh)
+  return evaluate_derivatives!(pcf,φh;kwargs...)
 end
 
 """
@@ -937,17 +942,17 @@ end
 Evaluate the objective and constraints, and their derivatives at
 `φh`.
 """
-function Fields.evaluate!(pcf::PDEConstrainedFunctionals,φh)
+function Fields.evaluate!(pcf::PDEConstrainedFunctionals,φh;kwargs...)
   J, C, dJ, dC = pcf.J,pcf.C,pcf.dJ,pcf.dC
   analytic_dJ  = pcf.analytic_dJ
   analytic_dC  = pcf.analytic_dC
-  U = get_trial_space(pcf.state_map)
+  U = get_trial_space(get_state_map(pcf))
 
-  U_reg = get_deriv_space(pcf.state_map)
-  deriv_assem = get_deriv_assembler(pcf.state_map)
+  U_reg = get_deriv_space(get_state_map(pcf))
+  deriv_assem = get_deriv_assembler(get_state_map(pcf))
 
   ## Foward problem
-  u, u_pullback = rrule(pcf.state_map,φh)
+  u, u_pullback = rrule(get_state_map(pcf),φh)
   uh = FEFunction(U,u)
 
   function ∇!(F::StateParamIntegrandWithMeasure,dF,::Nothing)
@@ -972,10 +977,172 @@ function Fields.evaluate!(pcf::PDEConstrainedFunctionals,φh)
   return j,c,dJ,dC
 end
 
-function Fields.evaluate!(pcf::PDEConstrainedFunctionals,φ::AbstractVector)
-  V_φ = get_aux_space(pcf.state_map)
+function Fields.evaluate!(pcf::PDEConstrainedFunctionals,φ::AbstractVector;kwargs...)
+  V_φ = get_aux_space(get_state_map(pcf))
   φh = FEFunction(V_φ,φ)
-  return evaluate!(pcf,φh)
+  return evaluate!(pcf,φh;kwargs...)
+end
+
+"""
+    mutable struct EmbeddedPDEConstrainedFunctionals{N} <: AbstractPDEConstrainedFunctionals{N}
+
+A mutable version of `PDEConstrainedFunctionals` that allows `state_map` to be
+updated given new FE spaces for the forward problem. This is currently required
+for body-fitted mesh methods and unfitted methods.
+"""
+struct EmbeddedPDEConstrainedFunctionals{N,T} <: AbstractPDEConstrainedFunctionals{N}
+  dJ
+  dC
+  analytic_dJ
+  analytic_dC
+  embedded_collection
+
+  @doc """
+      EmbeddedPDEConstrainedFunctionals(objective::Function,constraints::Vector{<:Function},
+        embedded_collection :: EmbeddedCollection;analytic_dJ;analytic_dC)
+
+  Create an instance of `EmbeddedPDEConstrainedFunctionals`.
+  """
+  function EmbeddedPDEConstrainedFunctionals(
+      embedded_collection :: EmbeddedCollection;
+      analytic_dJ = nothing,
+      analytic_dC = nothing)
+    
+    @assert Set((:state_map,:J,:C)) == keys(embedded_collection.objects) """
+    Expected EmbeddedCollection to have objects ':state_map,:J,:C'. Ensure that you 
+    have updated the collection after adding new recipes.
+
+    You have $(keys(embedded_collection.objects))
+
+    Note:
+    - We require that this EmbeddedCollection is seperate to the one used for the 
+      UnfittedEvolution. This is because updating the FEStateMap is more expensive than
+      cutting and there are instances where evolution and reinitialisation happen
+      at before recomputing the forward solution. As such, we cut an extra time
+      to avoid allocating the state map more often then required.
+    - For problems with no constraints `:C` must at least point to an empty list 
+    """
+    # Preallocate
+    dJ = similar(embedded_collection.J.caches[2])
+    dC = map(Ci->similar(Ci.caches[2]),embedded_collection.C)
+
+    N = length(embedded_collection.C)
+    if analytic_dC isa Nothing
+      analytic_dC = fill(nothing,length(N))
+    end
+    
+    T = typeof(embedded_collection.state_map)
+    return new{N,T}(dJ,dC,analytic_dJ,analytic_dC,embedded_collection)
+  end
+end
+
+get_state_map(m::EmbeddedPDEConstrainedFunctionals) = m.embedded_collection.state_map
+get_state(m::EmbeddedPDEConstrainedFunctionals) = get_state(get_state_map(m))
+
+"""
+    evaluate_functionals!(pcf::EmbeddedPDEConstrainedFunctionals,φh)
+
+Evaluate the objective and constraints at `φh`.
+
+!!! warning
+    Taking `update_space = false` will NOT update the underlying finite element 
+    spaces and assemblers that depend on `φh`. This should only be used
+    when you are certain that `φh` has not been updated.
+"""
+function evaluate_functionals!(pcf::EmbeddedPDEConstrainedFunctionals,φh;update_space::Bool=true)
+  update_space && update_collection!(pcf.embedded_collection,φh)
+  u  = get_state_map(pcf)(φh)
+  U  = get_trial_space(get_state_map(pcf))
+  uh = FEFunction(U,u)
+  J = pcf.embedded_collection.J
+  C = pcf.embedded_collection.C
+  return J(uh,φh), map(Ci->Ci(uh,φh),C)
+end
+
+function evaluate_functionals!(pcf::EmbeddedPDEConstrainedFunctionals,φ::AbstractVector;kwargs...)
+  V_φ = get_aux_space(get_state_map(pcf))
+  φh  = FEFunction(V_φ,φ)
+  return evaluate_functionals!(pcf,φh;kwargs...)
+end
+
+"""
+    evaluate_derivatives!(pcf::EmbeddedPDEConstrainedFunctionals,φh)
+
+Evaluate the derivatives of the objective and constraints at `φh`.
+
+!!! warning
+    Taking `update_space = false` will NOT update the underlying finite element 
+    spaces and assemblers that depend on `φh`. This should only be used
+    when you are certain that `φh` has not been updated.
+"""
+function evaluate_derivatives!(pcf::EmbeddedPDEConstrainedFunctionals,φh;update_space::Bool=true)
+  update_space && update_collection!(pcf.embedded_collection,φh)
+  _,_,dJ,dC = evaluate!(pcf,φh)
+  return dJ,dC
+end
+
+function evaluate_derivatives!(pcf::EmbeddedPDEConstrainedFunctionals,φ::AbstractVector;kwargs...)
+  V_φ = get_aux_space(get_state_map(pcf))
+  φh = FEFunction(V_φ,φ)
+  return evaluate_derivatives!(pcf,φh;kwargs...)
+end
+
+"""
+    Fields.evaluate!(pcf::EmbeddedPDEConstrainedFunctionals,φh)
+
+Evaluate the objective and constraints, and their derivatives at
+`φh`.
+
+!!! warning
+    Taking `update_space = false` will NOT update the underlying finite element 
+    spaces and assemblers that depend on `φh`. This should only be used
+    when you are certain that `φh` has not been updated.
+"""
+function Fields.evaluate!(pcf::EmbeddedPDEConstrainedFunctionals,φh;update_space::Bool=true)
+  update_space && update_collection!(pcf.embedded_collection,φh)
+
+  J           = pcf.embedded_collection.J
+  C           = pcf.embedded_collection.C
+  dJ          = pcf.dJ
+  dC          = pcf.dC
+  analytic_dJ = pcf.analytic_dJ
+  analytic_dC = pcf.analytic_dC
+  state_map   = get_state_map(pcf)
+  U           = get_trial_space(state_map)
+
+  U_reg = get_deriv_space(state_map)
+  deriv_assem = get_deriv_assembler(state_map)
+
+  ## Foward problem
+  u, u_pullback = rrule(state_map,φh)
+  uh = FEFunction(U,u)
+
+  function ∇!(F::StateParamIntegrandWithMeasure,dF,::Nothing)
+    # Automatic differentation
+    j_val, j_pullback = rrule(F,uh,φh)   # Compute functional and pull back
+    _, dFdu, dFdφ     = j_pullback(1)    # Compute dFdu, dFdφ
+    _, dφ_adj         = u_pullback(dFdu) # Compute -dFdu*dudφ via adjoint
+    copy!(dF,dφ_adj)
+    dF .+= dFdφ
+    return j_val
+  end
+  function ∇!(F::StateParamIntegrandWithMeasure,dF,dF_analytic::Function)
+    # Analytic shape derivative
+    j_val = F(uh,φh)
+    _dF(q) = dF_analytic(q,uh,φh)
+    assemble_vector!(_dF,dF,deriv_assem,U_reg)
+    return j_val
+  end
+  j = ∇!(J,dJ,analytic_dJ)
+  c = map(∇!,C,dC,analytic_dC)
+
+  return j,c,dJ,dC
+end
+
+function Fields.evaluate!(pcf::EmbeddedPDEConstrainedFunctionals,φ::AbstractVector;kwargs...)
+  V_φ = get_aux_space(get_state_map(pcf))
+  φh = FEFunction(V_φ,φ)
+  return evaluate!(pcf,φh;kwargs...)
 end
 
 # IO
@@ -988,7 +1155,7 @@ function Base.show(io::IO,object::AbstractFEStateMap)
   print(io,"$(nameof(typeof(object)))")
 end
 
-function Base.show(io::IO,::MIME"text/plain",f::PDEConstrainedFunctionals)
+function Base.show(io::IO,::MIME"text/plain",f::AbstractPDEConstrainedFunctionals{N}) where N
   print(io,"$(nameof(typeof(f))):
-    num_constraints: $(length(f.C))")
+    num_constraints: $N")
 end

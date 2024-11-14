@@ -76,6 +76,7 @@ function solve!(s::StabilisedReinit,φh,nls_cache::Nothing)
   s.cache = nls_cache
   # Solve
   solve!(get_free_dof_values(φh),nls,op,nls_cache)
+  update_collection!(s.Ωs,φh) # TODO: remove?
   return φh
 end
 
@@ -87,6 +88,7 @@ function solve!(s::StabilisedReinit,φh,nls_cache)
   op = get_algebraic_operator(FEOperator(res,jac,V_φ,V_φ,assembler))
   # Solve
   solve!(get_free_dof_values(φh),nls,op,nls_cache)
+  update_collection!(s.Ωs,φh) # TODO: remove?
   return φh
 end
 
@@ -131,7 +133,6 @@ function get_residual_and_jacobian(s::StabilisedReinit{InteriorPenalty},φh)
   dΓ = Ωs.dΓ
 
   W(u,∇u) = sign(u) * ∇u / (ϵ + norm(∇u))
-  V(w) = ca*h*(sqrt ∘ ( w ⋅ w ))
   a(w,u,v) = ∫(v*(W ∘ (w,∇(w))) ⋅ ∇(u))dΩ_bg + ∫(h^2*jump(∇(u)) ⋅ jump(∇(v)))dΛ + ∫((γd/h)*v*u)dΓ
   b(w,v) = ∫((sign ∘ w)*v)dΩ_bg
   res(u,v) = a(u,u,v) - b(u,v)

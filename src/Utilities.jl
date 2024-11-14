@@ -69,13 +69,13 @@ end
 """
     update_labels!(e::Int,model,f_Γ::Function,name::String)
 
-Given a tag number `e`, a `CartesianDiscreteModel` or `DistributedDiscreteModel` model,
-an indicator function `f_Γ`, and a string `name`, label the corresponding vertices, edges, and faces
+Given a tag number `e`, a `DiscreteModel` model, an indicator function `f_Γ`, 
+and a string `name`, label the corresponding vertices, edges, and faces
 as `name`.
 
 Note: `f_Γ` must recieve a Vector and return a Boolean depending on whether it indicates Γ
 """
-function update_labels!(e::Integer,model::CartesianDiscreteModel,f_Γ::Function,name::String)
+function update_labels!(e::Integer,model::DiscreteModel,f_Γ::Function,name::String)
   mask = mark_nodes(f_Γ,model)
   _update_labels_locally!(e,model,mask,name)
   nothing
@@ -92,7 +92,7 @@ function update_labels!(e::Integer,model::DistributedDiscreteModel,f_Γ::Functio
   nothing
 end
 
-function _update_labels_locally!(e,model::CartesianDiscreteModel{2},mask,name)
+function _update_labels_locally!(e,model::DiscreteModel{2},mask,name)
   topo   = get_grid_topology(model)
   labels = get_face_labeling(model)
   cell_to_entity = labels.d_to_dface_to_entity[end]
@@ -110,7 +110,7 @@ function _update_labels_locally!(e,model::CartesianDiscreteModel{2},mask,name)
   return cell_to_entity
 end
 
-function _update_labels_locally!(e,model::CartesianDiscreteModel{3},mask,name)
+function _update_labels_locally!(e,model::DiscreteModel{3},mask,name)
   topo   = get_grid_topology(model)
   labels = get_face_labeling(model)
   cell_to_entity = labels.d_to_dface_to_entity[end]
@@ -164,8 +164,7 @@ initial_lsf(ξ,a;b=0) = x::VectorValue -> -1/4*prod(cos.(get_array(@.(ξ*pi*(x-b
 """
     get_el_Δ(model)
 
-Given a CartesianDiscreteModel or DistributedDiscreteModel that is
-uniform, return the element size as a tuple.
+Given a CartesianDiscreteModel return the element size as a tuple.
 """
 function get_el_Δ(model::CartesianDiscreteModel)
   desc = get_cartesian_descriptor(model)

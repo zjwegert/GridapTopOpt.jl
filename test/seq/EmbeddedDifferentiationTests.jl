@@ -62,7 +62,7 @@ function main(
   geo = DiscreteGeometry(φh,model)
   cutgeo = cut(model,geo)
 
-  # A) Volume integral
+  # A.1) Volume integral
 
   Ω = Triangulation(cutgeo,PHYSICAL_IN)
   Ω_AD = DifferentiableTriangulation(Ω)
@@ -80,7 +80,19 @@ function main(
 
   @test norm(dJ_bulk_AD_vec - dJ_bulk_exact_vec) < 1e-10
 
-  # B) Facet integral
+  # A.2) Volume integral
+
+  g(fh) = ∇(fh)⋅∇(fh)
+  J_bulk2(φ) = ∫(g(fh))dΩ
+  dJ_bulk_AD2 = gradient(J_bulk2,φh)
+  dJ_bulk_AD_vec2 = assemble_vector(dJ_bulk_AD2,V_φ)
+
+  dJ_bulk_exact2(q) = ∫(-g(fh)*q/(norm ∘ (∇(φh))))dΓ
+  dJ_bulk_exact_vec2 = assemble_vector(dJ_bulk_exact2,V_φ)
+
+  @test norm(dJ_bulk_AD_vec2 - dJ_bulk_exact_vec2) < 1e-10
+
+  # B.1) Facet integral
 
   Γ = EmbeddedBoundary(cutgeo)
   Γ_AD = DifferentiableTriangulation(Γ)
@@ -112,6 +124,19 @@ function main(
   dJ_int_exact_vec = assemble_vector(dJ_int_exact,V_φ)
 
   @test norm(dJ_int_AD_vec - dJ_int_exact_vec) < 1e-10
+
+  # B.2) Facet integral
+
+  J_int2(φ) = ∫(g(fh))dΓ_AD
+  dJ_int_AD2 = gradient(J_int2,φh)
+  dJ_int_AD_vec2 = assemble_vector(dJ_int_AD2,V_φ)
+
+  dJ_int_exact2(w) = ∫((-n_Γ⋅∇(g(fh)))*w/(norm ∘ (∇(φh))))dΓ + 
+                    ∫(-n_S_Λ ⋅ (jump(g(fh)*m_k_Λ) * mean(w) / ∇ˢφ_Λ))dΛ +
+                    ∫(-n_S_Σ ⋅ (g(fh)*m_k_Σ * w / ∇ˢφ_Σ))dΣ
+  dJ_int_exact_vec2 = assemble_vector(dJ_int_exact2,V_φ)
+
+  @test norm(dJ_int_AD_vec2 - dJ_int_exact_vec2) < 1e-10
 
   if vtk
     path = "results/$(name)"
@@ -177,6 +202,13 @@ n = 10
 model = generate_model(D,n)
 φ = level_set(:circle)
 f = x -> 1.0
+main(model,φ,f;vtk=true)
+
+D = 2
+n = 10
+model = generate_model(D,n)
+φ = level_set(:circle)
+f = x -> x[1]+x[2]
 main(model,φ,f;vtk=true)
 
 end
