@@ -3,6 +3,7 @@ using Test
 
 using GridapTopOpt
 using Gridap, Gridap.Geometry, Gridap.Adaptivity
+using GridapEmbedded
 
 order = 1
 n = 201
@@ -20,8 +21,16 @@ V_φ = TestFESpace(model,reffe_scalar)
 
 φh = interpolate(x->-sqrt((x[1]-0.5)^2+(x[2]-0.5)^2)+0.25,V_φ)
 
-ls_evo = CutFEMEvolve(model,V_φ,dΩ,h)
-ls_reinit = StabilisedReinit(model,V_φ,dΩ,h)
+Ωs = EmbeddedCollection(model,φh) do cutgeo
+  Γ = EmbeddedBoundary(cutgeo)
+  (; 
+    :Γ  => Γ,
+    :dΓ => Measure(Γ,2*order),
+  )
+end
+
+ls_evo = CutFEMEvolve(V_φ,Ωs,dΩ,h)
+ls_reinit = StabilisedReinit(V_φ,Ωs,dΩ,h)
 evo = UnfittedFEEvolution(ls_evo,ls_reinit)
 
 φ0 = copy(get_free_dof_values(φh))

@@ -23,7 +23,8 @@ using GridapDistributed
 using GridapDistributed: DistributedDiscreteModel, DistributedTriangulation,
   DistributedFESpace, DistributedDomainContribution, to_parray_of_arrays,
   allocate_in_domain, DistributedCellField, DistributedMultiFieldCellField,
-  DistributedMultiFieldFEBasis, BlockPMatrix, BlockPVector, change_ghost
+  DistributedMultiFieldFEBasis, BlockPMatrix, BlockPVector, change_ghost,
+  gradient, jacobian
 
 using PartitionedArrays
 using PartitionedArrays: getany, tuple_of_arrays, matching_ghost_indices

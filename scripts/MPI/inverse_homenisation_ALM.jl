@@ -62,16 +62,16 @@ function main(mesh_partition,distribute,el_size,path)
         TensorValue(0.,0.,0.,1.),     # ϵᵢⱼ⁽²²⁾≡ϵᵢⱼ⁽²⁾
         TensorValue(0.,1/2,1/2,0.))   # ϵᵢⱼ⁽¹²⁾≡ϵᵢⱼ⁽³⁾
 
-  a(u,v,φ,dΩ) = ∫((I ∘ φ) * C ⊙ ε(u) ⊙ ε(v))dΩ
-  l = [(v,φ,dΩ) -> ∫(-(I ∘ φ) * C ⊙ εᴹ[i] ⊙ ε(v))dΩ for i in 1:3]
+  a(u,v,φ) = ∫((I ∘ φ) * C ⊙ ε(u) ⊙ ε(v))dΩ
+  l = [(v,φ) -> ∫(-(I ∘ φ) * C ⊙ εᴹ[i] ⊙ ε(v))dΩ for i in 1:3]
 
   ## Optimisation functionals
-  Cᴴ(r,s,u,φ,dΩ) = ∫((I ∘ φ)*(C ⊙ (ε(u[r])+εᴹ[r]) ⊙ εᴹ[s]))dΩ
-  dCᴴ(r,s,q,u,φ,dΩ) = ∫(-q*(C ⊙ (ε(u[r])+εᴹ[r]) ⊙ (ε(u[s])+εᴹ[s]))*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
-  κ(u,φ,dΩ) = -1/4*(Cᴴ(1,1,u,φ,dΩ)+Cᴴ(2,2,u,φ,dΩ)+2*Cᴴ(1,2,u,φ,dΩ))
-  dκ(q,u,φ,dΩ) = -1/4*(dCᴴ(1,1,q,u,φ,dΩ)+dCᴴ(2,2,q,u,φ,dΩ)+2*dCᴴ(1,2,q,u,φ,dΩ))
-  Vol(u,φ,dΩ) = ∫(((ρ ∘ φ) - vf)/vol_D)dΩ;
-  dVol(q,u,φ,dΩ) = ∫(-1/vol_D*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
+  Cᴴ(r,s,u,φ) = ∫((I ∘ φ)*(C ⊙ (ε(u[r])+εᴹ[r]) ⊙ εᴹ[s]))dΩ
+  dCᴴ(r,s,q,u,φ) = ∫(-q*(C ⊙ (ε(u[r])+εᴹ[r]) ⊙ (ε(u[s])+εᴹ[s]))*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
+  κ(u,φ) = -1/4*(Cᴴ(1,1,u,φ)+Cᴴ(2,2,u,φ)+2*Cᴴ(1,2,u,φ))
+  dκ(q,u,φ) = -1/4*(dCᴴ(1,1,q,u,φ)+dCᴴ(2,2,q,u,φ)+2*dCᴴ(1,2,q,u,φ))
+  Vol(u,φ) = ∫(((ρ ∘ φ) - vf)/vol_D)dΩ;
+  dVol(q,u,φ) = ∫(-1/vol_D*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
 
   ## Finite difference solver and level set function
   ls_evo = HamiltonJacobiEvolution(FirstOrderStencil(2,Float64),model,V_φ,tol,max_steps)
@@ -82,7 +82,7 @@ function main(mesh_partition,distribute,el_size,path)
   solver = ElasticitySolver(V)
 
   state_map = RepeatingAffineFEStateMap(
-    3,a,l,U,V,V_φ,U_reg,φh,dΩ;
+    3,a,l,U,V,V_φ,U_reg,φh;
     assem_U = SparseMatrixAssembler(Tm,Tv,U,V),
     assem_adjoint = SparseMatrixAssembler(Tm,Tv,V,U),
     assem_deriv = SparseMatrixAssembler(Tm,Tv,U_reg,U_reg),

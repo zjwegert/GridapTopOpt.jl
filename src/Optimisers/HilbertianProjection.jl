@@ -352,7 +352,7 @@ function Base.iterate(m::HilbertianProjection,state)
   U_reg = get_deriv_space(m.problem.state_map)
   V_φ   = get_aux_space(m.problem.state_map)
   interpolate!(FEFunction(U_reg,θ),vel,V_φ)
-  J, C, dJ, dC, γ = _linesearch!(m,state)
+  J, C, dJ, dC = _linesearch!(m,state,γ)
 
   ## Hilbertian extension-regularisation
   project!(m.vel_ext,dJ)
@@ -367,8 +367,8 @@ function Base.iterate(m::HilbertianProjection,state)
   return vars, state
 end
 
-function _linesearch!(m::HilbertianProjection{WithAutoDiff},state)
-  it, J, C, θ, dJ, dC, uh, φh, vel, φ_tmp, γ, os_it = state
+function _linesearch!(m::HilbertianProjection{WithAutoDiff},state,γ)
+  it, J, C, θ, dJ, dC, uh, φh, vel, φ_tmp, _, os_it = state
 
   params = m.params; history = m.history
   ls_enabled = params.ls_enabled; reinit_mod = params.reinit_mod
@@ -409,8 +409,8 @@ function _linesearch!(m::HilbertianProjection{WithAutoDiff},state)
   return J, C, dJ, dC, γ
 end
 
-function _linesearch!(m::HilbertianProjection{NoAutoDiff},state)
-  it, J, C, θ, dJ, dC, uh, φh, vel, φ_tmp, γ, os_it = state
+function _linesearch!(m::HilbertianProjection{NoAutoDiff},state,γ)
+  it, J, C, θ, dJ, dC, uh, φh, vel, φ_tmp, _, os_it = state
 
   params = m.params; history = m.history
   ls_enabled = params.ls_enabled; reinit_mod = params.reinit_mod

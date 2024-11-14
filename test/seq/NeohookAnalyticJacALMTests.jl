@@ -83,21 +83,21 @@ function main()
 
   # Cauchy stress tensor and residual
   σ(∇u) = (1.0/J(F(∇u)))*F(∇u)⋅S(∇u)⋅(F(∇u))'
-  res(u,v,φ,dΩ,dΓ_N) = ∫( (I ∘ φ)*((dE∘(∇(v),∇(u))) ⊙ (S∘∇(u))) )*dΩ - ∫(g⋅v)dΓ_N
-  jac_mat(u,du,v,φ,dΩ,dΓ_N) =  ∫( (I ∘ φ)*(dE∘(∇(v),∇(u))) ⊙ (dS∘(∇(du),∇(u))) )*dΩ
-  jac_geo(u,du,v,φ,dΩ,dΓ_N) = ∫( (I ∘ φ)*∇(v) ⊙ ( (S∘∇(u))⋅∇(du) ) )*dΩ
-  jac(u,du,v,φ,dΩ,dΓ_N) = jac_mat(u,du,v,φ,dΩ,dΓ_N) + jac_geo(u,du,v,φ,dΩ,dΓ_N)
+  res(u,v,φ) = ∫( (I ∘ φ)*((dE∘(∇(v),∇(u))) ⊙ (S∘∇(u))) )*dΩ - ∫(g⋅v)dΓ_N
+  jac_mat(u,du,v,φ) =  ∫( (I ∘ φ)*(dE∘(∇(v),∇(u))) ⊙ (dS∘(∇(du),∇(u))) )*dΩ
+  jac_geo(u,du,v,φ) = ∫( (I ∘ φ)*∇(v) ⊙ ( (S∘∇(u))⋅∇(du) ) )*dΩ
+  jac(u,du,v,φ) = jac_mat(u,du,v,φ) + jac_geo(u,du,v,φ)
 
   ## Optimisation functionals
-  J(u,φ,dΩ,dΓ_N) = ∫((I ∘ φ)*((dE∘(∇(u),∇(u))) ⊙ (S∘∇(u))))dΩ
-  Vol(u,φ,dΩ,dΓ_N) = ∫(((ρ ∘ φ) - vf)/vol_D)dΩ;
-  dVol(q,u,φ,dΩ,dΓ_N) = ∫(-1/vol_D*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
+  J(u,φ) = ∫((I ∘ φ)*((dE∘(∇(u),∇(u))) ⊙ (S∘∇(u))))dΩ
+  Vol(u,φ) = ∫(((ρ ∘ φ) - vf)/vol_D)dΩ;
+  dVol(q,u,φ) = ∫(-1/vol_D*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
 
   ## Finite difference solver and level set function
   ls_evo = HamiltonJacobiEvolution(FirstOrderStencil(2,Float64),model,V_φ,tol,max_steps)
 
   ## Setup solver and FE operators
-  state_map = NonlinearFEStateMap(res,U,V,V_φ,U_reg,φh,dΩ,dΓ_N;jac)
+  state_map = NonlinearFEStateMap(res,U,V,V_φ,U_reg,φh;jac)
   pcfs = PDEConstrainedFunctionals(J,[Vol],state_map,analytic_dC=[dVol])
 
   ## Hilbertian extension-regularisation problems
