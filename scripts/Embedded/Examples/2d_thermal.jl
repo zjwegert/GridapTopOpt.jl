@@ -5,11 +5,11 @@ using GridapEmbedded, GridapEmbedded.LevelSetCutters
 using GridapTopOpt: StateParamIntegrandWithMeasure
 
 path="./results/UnfittedFEM_thermal_compliance_ALM/"
+rm(path,force=true,recursive=true)
 mkpath(path)
-n = 101
+n = 51
 order = 1
 γ = 0.1
-γ_reinit = 0.5
 max_steps = floor(Int,order*minimum(n)/10)
 vf = 0.4
 α_coeff = 4max_steps*γ
@@ -99,7 +99,7 @@ vel_ext = VelocityExtension(a_hilb,U_reg,V_reg)
 
 ## Optimiser
 optimiser = AugmentedLagrangian(pcfs,ls_evo,vel_ext,φh;debug=true,
-  γ,γ_reinit,verbose=true,constraint_names=[:Vol])
+  γ,verbose=true,constraint_names=[:Vol])
 for (it,uh,φh,state) in optimiser
   if iszero(it % iter_mod)
     writevtk(Ω,path*"Omega$it",cellfields=["φ"=>φh,"|∇(φ)|"=>(norm ∘ ∇(φh)),"uh"=>uh,"velh"=>FEFunction(V_φ,state.vel)])
