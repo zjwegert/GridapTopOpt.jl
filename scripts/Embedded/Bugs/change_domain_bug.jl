@@ -12,13 +12,18 @@ model = ref_model.model
 Ω = Triangulation(model)
 dΩ = Measure(Ω,2*order)
 V_φ = TestFESpace(model,ReferenceFE(lagrangian,Float64,order))
-
 φh = interpolate(x->-cos(4π*x[1])*cos(4π*x[2])-0.2,V_φ)
+vh = zero(V_φ)
+
 geo = DiscreteGeometry(φh,model)
 cutgeo = cut(model,geo)
+
+Γ = EmbeddedBoundary(cutgeo)
+dΓ = Measure(Γ,2order)
+∫(vh)dΓ
+∫(2vh)dΓ
+
 Γ = DifferentiableTriangulation(EmbeddedBoundary(cutgeo))
 dΓ = Measure(Γ,2order)
-
-vh = zero(V_φ)
 ∫(vh)dΓ
-∫(vh*vh)dΓ
+∫(2vh)dΓ
