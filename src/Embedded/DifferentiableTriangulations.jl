@@ -74,7 +74,8 @@ end
 
 function CellData.get_cell_points(ttrian::DifferentiableTriangulation)
   if isnothing(ttrian.cell_values)
-    return get_cell_points(ttrian.trian)
+    pts = get_cell_points(ttrian.trian)
+    return CellPoint(CellData.get_data(pts),ttrian,DomainStyle(pts))
   end
   c = ttrian.caches
   cell_values = ttrian.cell_values
@@ -125,6 +126,32 @@ function Geometry.get_glue(ttrian::DifferentiableTriangulation,val::Val{D}) wher
     ref_cell_map,
     glue.mface_to_tface,
   )
+end
+
+function Geometry.is_change_possible(
+  strian::A,ttrian::DifferentiableTriangulation{Dc,Dp,A}
+) where {Dc,Dp,A <: Union{SubCellTriangulation,SubFacetTriangulation}}
+  return strian === ttrian.trian
+end
+
+function Geometry.best_target(
+  strian::A,ttrian::DifferentiableTriangulation{Dc,Dp,A}
+) where {Dc,Dp,A <: Union{SubCellTriangulation,SubFacetTriangulation}}
+  return ttrian
+end
+
+for tdomain in (:ReferenceDomain,:PhysicalDomain)
+  for sdomain in (:ReferenceDomain,:PhysicalDomain)
+    @eval begin
+      function CellData.change_domain(
+        a::CellField,strian::A,::$sdomain,ttrian::DifferentiableTriangulation{Dc,Dp,A},::$tdomain
+      ) where {Dc,Dp,A <: Union{SubCellTriangulation,SubFacetTriangulation}}
+        @assert is_change_possible(strian,ttrian)
+        b = change_domain(a,$(tdomain)())
+        return CellData.similar_cell_field(a,CellData.get_data(b),ttrian,$(tdomain)())
+      end
+    end
+  end
 end
 
 function FESpaces.get_cell_fe_data(fun,f,ttrian::DifferentiableTriangulation)

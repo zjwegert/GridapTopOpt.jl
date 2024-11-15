@@ -23,7 +23,12 @@ dΓ = Measure(Γ,2order)
 ∫(vh)dΓ
 ∫(2vh)dΓ
 
-Γ = DifferentiableTriangulation(EmbeddedBoundary(cutgeo))
+
+_Γ = EmbeddedBoundary(cutgeo)
+Γ = DifferentiableTriangulation(_Γ)
 dΓ = Measure(Γ,2order)
 ∫(vh)dΓ
 ∫(2vh)dΓ
+
+cf = CellField(1,_Γ)
+change_domain(cf,Γ,ReferenceDomain())
