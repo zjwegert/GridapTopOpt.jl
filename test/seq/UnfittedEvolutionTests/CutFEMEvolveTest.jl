@@ -23,9 +23,13 @@ V_φ = TestFESpace(model,reffe_scalar)
 
 Ωs = EmbeddedCollection(model,φh) do cutgeo
   Γ = EmbeddedBoundary(cutgeo)
+  Γg = GhostSkeleton(cutgeo)
   (; 
     :Γ  => Γ,
     :dΓ => Measure(Γ,2*order),
+    :Γg => Γg,
+    :dΓg => Measure(Γg,2*order),
+    :n_Γg => get_normal_vector(Γg)
   )
 end
 

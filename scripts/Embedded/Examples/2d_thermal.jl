@@ -6,13 +6,13 @@ using GridapTopOpt: StateParamIntegrandWithMeasure
 
 path="./results/UnfittedFEM_thermal_compliance_ALM/"
 mkpath(path)
-n = 51
+n = 101
 order = 1
 γ = 0.1
 γ_reinit = 0.5
 max_steps = floor(Int,order*minimum(n)/10)
 vf = 0.4
-α_coeff = 2max_steps*γ
+α_coeff = 4max_steps*γ
 iter_mod = 1
 
 _model = CartesianDiscreteModel((0,1,0,1),(n,n))
@@ -44,9 +44,10 @@ V_φ = TestFESpace(model,reffe_scalar)
 φh = interpolate(x->-cos(4π*x[1])*cos(4π*x[2])-0.2,V_φ)
 Ωs = EmbeddedCollection(model,φh) do cutgeo
   Ωin = DifferentiableTriangulation(Triangulation(cutgeo,PHYSICAL))
-  Γg = DifferentiableTriangulation(GhostSkeleton(cutgeo))
-  n_Γg = get_normal_vector(Γg)
   Γ = DifferentiableTriangulation(EmbeddedBoundary(cutgeo))
+  Γg = GhostSkeleton(cutgeo)
+  n_Γg = get_normal_vector(Γg)
+  Ωact = Triangulation(cutgeo,ACTIVE)
   (; 
     :Ωin  => Ωin,
     :dΩin => Measure(Ωin,2*order),
@@ -54,7 +55,8 @@ V_φ = TestFESpace(model,reffe_scalar)
     :dΓg  => Measure(Γg,2*order),
     :n_Γg => get_normal_vector(Γg),
     :Γ    => Γ,
-    :dΓ   => Measure(Γ,2*order)
+    :dΓ   => Measure(Γ,2*order),
+    :Ωact => Ωact
   )
 end  
 
@@ -64,14 +66,14 @@ a(u,v,φ) = ∫(∇(v)⋅∇(u))Ωs.dΩin + ∫((γg*h)*jump(Ωs.n_Γg⋅∇(v))
 l(v,φ) = ∫(v)dΓ_N
 
 ## Optimisation functionals
-J(u,φ) = ∫(∇(u)⋅∇(u))Ωs.dΩin
+J(u,φ) = a(u,u,φ)
 Vol(u,φ) = ∫(1/vol_D)Ωs.dΩin - ∫(vf/vol_D)dΩ
 dVol(q,u,φ) = ∫(-1/vol_D*q/(norm ∘ (∇(φ))))Ωs.dΓ
 
 ## Setup solver and FE operators
-state_collection = EmbeddedCollection(model,φh) do cutgeo
-  Ωact = Triangulation(cutgeo,ACTIVE)
-  V = TestFESpace(Ωact,reffe_scalar;dirichlet_tags=["Gamma_D"])
+state_collection = EmbeddedCollection(model,φh) do _
+  # update_collection!(Ωs,φh)
+  V = TestFESpace(Ωs.Ωact,reffe_scalar;dirichlet_tags=["Gamma_D"])
   U = TrialFESpace(V,0.0)
   state_map = AffineFEStateMap(a,l,U,V,V_φ,U_reg,φh)
   (; 
@@ -84,32 +86,27 @@ pcfs = EmbeddedPDEConstrainedFunctionals(state_collection;analytic_dC=(dVol,))
 
 ## Evolution Method
 evo = CutFEMEvolve(V_φ,Ωs,dΩ,h)
-reinit = StabilisedReinit(V_φ,Ωs,dΩ,h;stabilisation_method=InteriorPenalty(V_φ))
+reinit = StabilisedReinit(V_φ,Ωs,dΩ,h;stabilisation_method=ArtificialViscosity(3.0))#InteriorPenalty(V_φ))
 ls_evo = UnfittedFEEvolution(evo,reinit)
-# reinit!(ls_evo,φh)
+reinit!(ls_evo,φh)
 
 ## Hilbertian extension-regularisation problems
-# α = α_coeff*(h_refine/order)^2
-# a_hilb(p,q) =∫(α*∇(p)⋅∇(q) + p*q)dΩ;
+## α = α_coeff*(h_refine/order)^2
+## a_hilb(p,q) =∫(α*∇(p)⋅∇(q) + p*q)dΩ;
 α = α_coeff*h_refine
 a_hilb(p,q) = ∫(α^2*∇(p)⋅∇(q) + p*q)dΩ;
 vel_ext = VelocityExtension(a_hilb,U_reg,V_reg)
 
-
-## Forward problem and derivatives
-_j,_c,_dJ,_dC = evaluate!(pcfs,φh)
-writevtk(Ω,path*"check_dJ",cellfields=["dJ"=>FEFunction(dJ,U_reg)])
-
 ## Optimiser
-optimiser = HilbertianProjection(pcfs,ls_evo,vel_ext,φh;debug=true,
+optimiser = AugmentedLagrangian(pcfs,ls_evo,vel_ext,φh;debug=true,
   γ,γ_reinit,verbose=true,constraint_names=[:Vol])
 for (it,uh,φh,state) in optimiser
   if iszero(it % iter_mod)
     writevtk(Ω,path*"Omega$it",cellfields=["φ"=>φh,"|∇(φ)|"=>(norm ∘ ∇(φh)),"uh"=>uh,"velh"=>FEFunction(V_φ,state.vel)])
-    writevtk(Ωs.Γ,path*"Gamma_out$it",cellfields=["normal"=>get_normal_vector(Ωs.Γ)])
+    writevtk(Ωs.Γ,path*"Gamma_out$it")
   end
   write_history(path*"/history.txt",optimiser.history)
 end
 it = get_history(optimiser).niter; uh = get_state(pcfs)
 writevtk(Ω,path*"Omega$it",cellfields=["φ"=>φh,"|∇(φ)|"=>(norm ∘ ∇(φh)),"uh"=>uh])
-writevtk(Ωs.Γ,path*"Gamma_out$it",cellfields=["normal"=>get_normal_vector(Ωs.Γ)])
+writevtk(Ωs.Γ,path*"Gamma_out$it")

@@ -45,15 +45,22 @@ end
 function FESpaces._change_argument(
   op,f,trian::DifferentiableTriangulation,uh::SingleFieldFEFunction
 )
+  update = matching_level_set(trian,uh)
   U = get_fe_space(uh)
   function g(cell_u)
     cf = CellField(U,cell_u)
-    update_trian!(trian,cf)
+    update ? update_trian!(trian,cf) : update_trian!(trian,nothing)
     cell_grad = f(cf)
     update_trian!(trian,nothing) # TODO: experimental
     get_contribution(cell_grad,trian)
   end
   g
+end
+
+function matching_level_set(trian::DifferentiableTriangulation,uh)
+  uh_trian = get_triangulation(uh)
+  bgmodel  = get_background_model(uh_trian)
+  return num_cells(uh_trian) == num_cells(bgmodel)
 end
 
 function FESpaces._compute_cell_ids(uh,ttrian::DifferentiableTriangulation)
@@ -389,10 +396,11 @@ end
 function FESpaces._change_argument(
   op,f,trian::AppendedTriangulation,uh::SingleFieldFEFunction
 )
+  update = matching_level_set(trian,uh)
   U = get_fe_space(uh)
   function g(cell_u)
     cf = CellField(U,cell_u)
-    update_trian!(trian,cf)
+    update ? update_trian!(trian,cf) : update_trian!(trian,nothing)
     cell_grad = f(cf)
     update_trian!(trian,nothing) # TODO: experimental
     get_contribution(cell_grad,trian)
@@ -404,4 +412,14 @@ function FESpaces._compute_cell_ids(uh,ttrian::AppendedTriangulation)
   ids_a = FESpaces._compute_cell_ids(uh,ttrian.a)
   ids_b = FESpaces._compute_cell_ids(uh,ttrian.b)
   lazy_append(ids_a,ids_b)
+end
+
+function matching_level_set(trian::AppendedTriangulation,uh)
+  a = matching_level_set(trian.a,uh)
+  b = matching_level_set(trian.b,uh)
+  return a || b
+end
+
+function matching_level_set(trian::Triangulation,uh)
+  false
 end

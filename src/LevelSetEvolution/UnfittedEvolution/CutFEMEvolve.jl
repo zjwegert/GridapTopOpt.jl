@@ -10,7 +10,7 @@ Burman et al. (2017). DOI: `10.1016/j.cma.2017.09.005`.
 - `dΩ_bg::C`: Measure for integration
 - `space::B`: Level-set FE space
 - `assembler::Assembler`: FE assembler
-- `params::D`: Tuple of stabilisation parameter `Γg`, mesh size `h`, and
+- `params::D`: Tuple of stabilisation parameter `γg`, mesh size `h`, and
   max steps `max_steps`
 - `cache`: Cache for evolver, initially `nothing`.
 
@@ -30,29 +30,29 @@ mutable struct CutFEMEvolve{A,B,C} <: Evolver
   cache
   function CutFEMEvolve(V_φ::B,Ωs::EmbeddedCollection,dΩ_bg::A,h::Real;
       max_steps=10,
-      Γg = 0.1,
+      γg = 0.1,
       ode_ls = LUSolver(),
       ode_nl = NLSolver(ode_ls, show_trace=false, method=:newton, iterations=10),
       ode_solver = MutableRungeKutta(ode_nl, ode_ls, 0.1, :DIRK_CrankNicolson_2_2),
       assembler=SparseMatrixAssembler(V_φ,V_φ)) where {A,B}
-    if !(:F_act ∈ keys(Ωs.objects))
-      @warn "Expected triangulation ':F_act' not found in the 
-      EmbeddedCollection. This and the corresponding measure ':dF_act' have been
+    if !((:dΓg,:n_Γg) ⊆ keys(Ωs.objects))
+      @warn "Expected triangulation ':dΓg, :n_Γg' not found in the 
+      EmbeddedCollection. These and the corresponding triangulation ':Γg' have been
       added to the recipe list. 
       
-      Ensure that you are not using ':F_act' under a different
+      Ensure that you are not using ':Γg' under a different
       name to avoid additional computation for cutting."
       function F_act_recipe(cutgeo)
-        Ω_act = Triangulation(cutgeo,ACTIVE)
-        F_act = SkeletonTriangulation(Ω_act)
+        Γg = GhostSkeleton(cutgeo)
         (; 
-          :F_act => F_act,
-          :dF_act => Measure(F_act,2get_order(V_φ))
+          :Γg => Γg,
+          :dΓg => Measure(Γg,2get_order(V_φ)),
+          :n_Γg => get_normal_vector(Γg),
         )
       end
       add_recipe!(Ωs,F_act_recipe)
     end
-    params = (;Γg,h,max_steps)
+    params = (;γg,h,max_steps)
     new{A,B,typeof(params)}(ode_solver,Ωs,dΩ_bg,V_φ,assembler,params,nothing)
   end
 end
@@ -65,18 +65,28 @@ get_measure(s::CutFEMEvolve) = s.dΩ_bg
 get_params(s::CutFEMEvolve) = s.params
 get_cache(s::CutFEMEvolve) = s.cache
 
-function get_transient_operator(φh,velh,s::CutFEMEvolve)
+function get_transient_operator(φh,velh,s::CutFEMEvolve;use_full_skeleton=false)
   Ωs, V_φ, dΩ_bg, assembler, params = s.Ωs, s.space, s.dΩ_bg, s.assembler, s.params
-  Γg, h = params.Γg, params.h
+  γg, h = params.γg, params.h
   ϵ = 1e-20
 
-  update_collection!(Ωs,φh)
-  F_act = Ωs.F_act
-  dF_act = Ωs.dF_act
-  n = get_normal_vector(F_act)
+  # NOTE/TODO: The sparsity pattern of the Jacobian changes with the level-set function
+  #   because of the `∫(γg*h^2*jump(∇(u) ⋅ n_Γg)*jump(∇(v) ⋅ n_Γg))dΓg` term, where
+  #   dΓg is the measure on the ghost skeleton. As such, the first time we compute the
+  #   operator we use the full background mesh skeleton so that the sparsity pattern
+  #   of the Jacobian is the worst possible. Subsequent iterations will re-use the sparsity
+  #   pattern but less integration is done. The trade-off here is memory cost vs. integration.
+  if use_full_skeleton
+    Γg = SkeletonTriangulation(get_triangulation(dΩ_bg.quad))
+    dΓg = Measure(Γg,2get_order(V_φ))
+    n_Γg = get_normal_vector(Γg)
+  else
+    update_collection!(Ωs,φh)
+    dΓg, n_Γg = Ωs.dΓg, Ωs.n_Γg
+  end
 
   β = velh*∇(φh)/(ϵ + norm ∘ ∇(φh))
-  stiffness(t,u,v) = ∫((β ⋅ ∇(u)) * v)dΩ_bg + ∫(Γg*h^2*jump(∇(u) ⋅ n)*jump(∇(v) ⋅ n))dF_act
+  stiffness(t,u,v) = ∫((β ⋅ ∇(u)) * v)dΩ_bg + ∫(γg*h^2*jump(∇(u) ⋅ n_Γg)*jump(∇(v) ⋅ n_Γg))dΓg
   mass(t, ∂ₜu, v) = ∫(∂ₜu * v)dΩ_bg
   forcing(t,v) = ∫(0v)dΩ_bg
   Ut_φ = TransientTrialFESpace(V_φ)
@@ -102,7 +112,7 @@ function solve!(s::CutFEMEvolve,φh,velh,γ,cache::Nothing)
   h, max_steps = params.h, params.max_steps
 
   # Setup FE operator and solver
-  ode_op = get_transient_operator(φh,velh,s)
+  ode_op = get_transient_operator(φh,velh,s;use_full_skeleton=true)
   dt = _compute_Δt(h,γ,get_free_dof_values(velh))
   ode_solver.dt = dt
   ode_sol = solve(ode_solver,ode_op,0.0,dt*max_steps,φh)

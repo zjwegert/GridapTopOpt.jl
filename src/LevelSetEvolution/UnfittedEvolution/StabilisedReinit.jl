@@ -44,7 +44,7 @@ mutable struct StabilisedReinit{A,B,C,D} <: Reinitialiser
       Ensure that you are not using ':dΓ' under a different
       name to avoid additional computation for cutting."
       function dΓ_recipe(cutgeo)
-        Γ = EmbeddedBoundary(cutgeo)
+        Γ = DifferentiableTriangulation(EmbeddedBoundary(cutgeo))
         (; 
           :dΓ => Measure(Γ,2get_order(V_φ))
         )
@@ -111,6 +111,7 @@ function get_residual_and_jacobian(s::StabilisedReinit{ArtificialViscosity},φh)
   b(w,v) = ∫((sign ∘ w)*v)dΩ_bg
   res(u,v) = a(u,u,v) - b(u,v)
   jac(u,du,v) = a(u,du,v)
+  # jac(u,du,v) = jacobian(res,[u,v],1)
   return res,jac
 end
 
@@ -137,6 +138,6 @@ function get_residual_and_jacobian(s::StabilisedReinit{InteriorPenalty},φh)
   b(w,v) = ∫((sign ∘ w)*v)dΩ_bg
   res(u,v) = a(u,u,v) - b(u,v)
   jac(u,du,v) = a(u,du,v)
-
+  # jac(u,du,v) = jacobian(res,[u,v],1)
   return res,jac
 end
