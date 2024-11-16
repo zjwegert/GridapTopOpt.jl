@@ -1,4 +1,4 @@
-using Gridap,GridapTopOpt
+using Gridap,GridapTopOpt, GridapSolvers
 using Gridap.Adaptivity, Gridap.Geometry
 using GridapEmbedded, GridapEmbedded.LevelSetCutters
 
@@ -10,9 +10,9 @@ mkpath(path)
 n = 51
 order = 1
 γ = 0.1
-max_steps = floor(Int,order*minimum(n)/10)
+max_steps = floor(Int,order*n/5)
 vf = 0.4
-α_coeff = 4max_steps*γ
+α_coeff = 3#4max_steps*γ
 iter_mod = 1
 
 _model = CartesianDiscreteModel((0,1,0,1),(n,n))
@@ -41,7 +41,7 @@ U_reg = TrialFESpace(V_reg,0)
 V_φ = TestFESpace(model,reffe_scalar)
 
 ## Levet-set function
-φh = interpolate(x->-cos(4π*x[1])*cos(4π*x[2])-0.2,V_φ)
+φh = interpolate(x->-cos(8π*x[1])*cos(8π*x[2])-0.2,V_φ)
 Ωs = EmbeddedCollection(model,φh) do cutgeo
   Ωin = DifferentiableTriangulation(Triangulation(cutgeo,PHYSICAL))
   Γ = DifferentiableTriangulation(EmbeddedBoundary(cutgeo))
@@ -71,11 +71,14 @@ Vol(u,φ) = ∫(1/vol_D)Ωs.dΩin - ∫(vf/vol_D)dΩ
 dVol(q,u,φ) = ∫(-1/vol_D*q/(norm ∘ (∇(φ))))Ωs.dΓ
 
 ## Setup solver and FE operators
+Pl = JacobiLinearSolver()
+ls = CGSolver(Pl;maxiter=1000,verbose=1,name="CG")
+
 state_collection = EmbeddedCollection(model,φh) do _
   # update_collection!(Ωs,φh)
   V = TestFESpace(Ωs.Ωact,reffe_scalar;dirichlet_tags=["Gamma_D"])
   U = TrialFESpace(V,0.0)
-  state_map = AffineFEStateMap(a,l,U,V,V_φ,U_reg,φh)
+  state_map = AffineFEStateMap(a,l,U,V,V_φ,U_reg,φh;ls,adjoint_ls=ls)
   (; 
     :state_map => state_map,
     :J => StateParamIntegrandWithMeasure(J,state_map),
@@ -85,28 +88,36 @@ end
 pcfs = EmbeddedPDEConstrainedFunctionals(state_collection;analytic_dC=(dVol,))
 
 ## Evolution Method
-evo = CutFEMEvolve(V_φ,Ωs,dΩ,h)
+evo = CutFEMEvolve(V_φ,Ωs,dΩ,h;max_steps)
 reinit = StabilisedReinit(V_φ,Ωs,dΩ,h;stabilisation_method=ArtificialViscosity(3.0))#InteriorPenalty(V_φ))
 ls_evo = UnfittedFEEvolution(evo,reinit)
 reinit!(ls_evo,φh)
 
 ## Hilbertian extension-regularisation problems
-## α = α_coeff*(h_refine/order)^2
-## a_hilb(p,q) =∫(α*∇(p)⋅∇(q) + p*q)dΩ;
-α = α_coeff*h_refine
-a_hilb(p,q) = ∫(α^2*∇(p)⋅∇(q) + p*q)dΩ;
+α = α_coeff*(h_refine/order)^2
+a_hilb(p,q) =∫(α*∇(p)⋅∇(q) + p*q)dΩ;
 vel_ext = VelocityExtension(a_hilb,U_reg,V_reg)
 
 ## Optimiser
+converged(m) = GridapTopOpt.default_al_converged(
+  m;
+  L_tol = 0.01*h_refine,
+  C_tol = 0.01
+)
+has_oscillations(m,os_it) = GridapTopOpt.default_has_oscillations(m,os_it;itlength=50,
+    itstart=100)
 optimiser = AugmentedLagrangian(pcfs,ls_evo,vel_ext,φh;debug=true,
-  γ,verbose=true,constraint_names=[:Vol])
+  γ,verbose=true,constraint_names=[:Vol],converged)#,has_oscillations,reinit_mod=5)
 for (it,uh,φh,state) in optimiser
+  x_φ = get_free_dof_values(φh)
+  idx = findall(isapprox(0.0;atol=10^-10),x_φ)
+  !isempty(idx) && @warn "Boundary intersects nodes!"
   if iszero(it % iter_mod)
     writevtk(Ω,path*"Omega$it",cellfields=["φ"=>φh,"|∇(φ)|"=>(norm ∘ ∇(φh)),"uh"=>uh,"velh"=>FEFunction(V_φ,state.vel)])
-    writevtk(Ωs.Γ,path*"Gamma_out$it")
+    writevtk(Ωs.Ωin,path*"Omega_in$it",cellfields=["uh"=>uh])
   end
   write_history(path*"/history.txt",optimiser.history)
 end
 it = get_history(optimiser).niter; uh = get_state(pcfs)
 writevtk(Ω,path*"Omega$it",cellfields=["φ"=>φh,"|∇(φ)|"=>(norm ∘ ∇(φh)),"uh"=>uh])
-writevtk(Ωs.Γ,path*"Gamma_out$it")
+writevtk(Ωs.Ωin,path*"Omega_in$it",cellfields=["uh"=>uh])
