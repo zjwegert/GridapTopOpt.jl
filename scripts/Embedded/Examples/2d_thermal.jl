@@ -4,15 +4,15 @@ using GridapEmbedded, GridapEmbedded.LevelSetCutters
 
 using GridapTopOpt: StateParamIntegrandWithMeasure
 
-path="./results/UnfittedFEM_thermal_compliance_ALM/"
+path="./results/UnfittedFEM_thermal_compliance_ALM/" # _n100
 rm(path,force=true,recursive=true)
 mkpath(path)
-n = 51
+n = 51 #100
 order = 1
 γ = 0.1
 max_steps = floor(Int,order*n/5)
 vf = 0.4
-α_coeff = 3#4max_steps*γ
+α_coeff = 3 # 4max_steps*γ
 iter_mod = 1
 
 _model = CartesianDiscreteModel((0,1,0,1),(n,n))
@@ -104,10 +104,8 @@ converged(m) = GridapTopOpt.default_al_converged(
   L_tol = 0.01*h_refine,
   C_tol = 0.01
 )
-has_oscillations(m,os_it) = GridapTopOpt.default_has_oscillations(m,os_it;itlength=50,
-    itstart=100)
 optimiser = AugmentedLagrangian(pcfs,ls_evo,vel_ext,φh;debug=true,
-  γ,verbose=true,constraint_names=[:Vol],converged)#,has_oscillations,reinit_mod=5)
+  γ,verbose=true,constraint_names=[:Vol],converged,reinit_mod=5) # reinit_mod = 1 is fine
 for (it,uh,φh,state) in optimiser
   x_φ = get_free_dof_values(φh)
   idx = findall(isapprox(0.0;atol=10^-10),x_φ)
