@@ -100,49 +100,49 @@ function Arrays.evaluate!(
   Polynomials._evaluate!(cache,fg,x,Val(false))
 end
 
-# TODO: Below is dangerous, as it may break other Gridap methods,
-#   it is neccessary for now - see thermal_2d.jl problem
-function FESpaces._compute_cell_ids(uh,ttrian)
-  strian = get_triangulation(uh)
-  if strian === ttrian
-    return collect(IdentityVector(Int32(num_cells(strian))))
-  end
-  @check is_change_possible(strian,ttrian)
-  D = num_cell_dims(strian)
-  sglue = get_glue(strian,Val(D))
-  tglue = get_glue(ttrian,Val(D))
-  @notimplementedif !isa(sglue,FaceToFaceGlue)
-  @notimplementedif !isa(tglue,FaceToFaceGlue)
-  scells = IdentityVector(Int32(num_cells(strian)))
-  mcells = extend(scells,sglue.mface_to_tface)
-  tcells = lazy_map(Reindex(mcells),tglue.tface_to_mface)
-  # <-- Remove collect to keep PosNegReindex
-  # tcells = collect(tcells)
-  return tcells
-end
+# # TODO: Below is dangerous, as it may break other Gridap methods,
+# #   it is neccessary for now - see thermal_2d.jl problem
+# function FESpaces._compute_cell_ids(uh,ttrian)
+#   strian = get_triangulation(uh)
+#   if strian === ttrian
+#     return collect(IdentityVector(Int32(num_cells(strian))))
+#   end
+#   @check is_change_possible(strian,ttrian)
+#   D = num_cell_dims(strian)
+#   sglue = get_glue(strian,Val(D))
+#   tglue = get_glue(ttrian,Val(D))
+#   @notimplementedif !isa(sglue,FaceToFaceGlue)
+#   @notimplementedif !isa(tglue,FaceToFaceGlue)
+#   scells = IdentityVector(Int32(num_cells(strian)))
+#   mcells = extend(scells,sglue.mface_to_tface)
+#   tcells = lazy_map(Reindex(mcells),tglue.tface_to_mface)
+#   # <-- Remove collect to keep PosNegReindex
+#   # tcells = collect(tcells)
+#   return tcells
+# end
 
-# New dispatching
-function Arrays.lazy_map(k::Reindex,ids::Arrays.LazyArray{<:Fill{<:PosNegReindex}})
-  k_posneg = ids.maps.value
-  posneg_partition = ids.args[1]
-  pos_values = lazy_map(Reindex(k.values),k_posneg.values_pos)
-  pos_values, neg_values = Geometry.pos_neg_data(pos_values,posneg_partition)
-  # println("Byee ::: $(eltype(pos_values)) --- $(eltype(neg_values))")
-  lazy_map(PosNegReindex(pos_values,neg_values),posneg_partition)
-end
+# # New dispatching
+# function Arrays.lazy_map(k::Reindex,ids::Arrays.LazyArray{<:Fill{<:PosNegReindex}})
+#   k_posneg = ids.maps.value
+#   posneg_partition = ids.args[1]
+#   pos_values = lazy_map(Reindex(k.values),k_posneg.values_pos)
+#   pos_values, neg_values = Geometry.pos_neg_data(pos_values,posneg_partition)
+#   # println("Byee ::: $(eltype(pos_values)) --- $(eltype(neg_values))")
+#   lazy_map(PosNegReindex(pos_values,neg_values),posneg_partition)
+# end
 
-function Arrays.lazy_map(k::Reindex,ids::Arrays.AppendedArray)
-  a = lazy_map(k,ids.a)
-  b = lazy_map(k,ids.b)
-  # println("Hello ::: $(eltype(a)) --- $(eltype(b))")
-  return lazy_append(a,b)
-end
+# function Arrays.lazy_map(k::Reindex,ids::Arrays.AppendedArray)
+#   a = lazy_map(k,ids.a)
+#   b = lazy_map(k,ids.b)
+#   # println("Hello ::: $(eltype(a)) --- $(eltype(b))")
+#   return lazy_append(a,b)
+# end
 
-using ForwardDiff
+# using ForwardDiff
 
-function Arrays.evaluate!(result,k::AutoDiffMap,ydual,x,cfg::ForwardDiff.GradientConfig{T}) where T
-  @notimplementedif ForwardDiff.chunksize(cfg) != length(x)
-  @notimplementedif length(result) != length(x)
-  !isempty(x) && ForwardDiff.extract_gradient!(T, result, ydual) # <-- Watch for empty cell contributions
-  return result
-end
+# function Arrays.evaluate!(result,k::AutoDiffMap,ydual,x,cfg::ForwardDiff.GradientConfig{T}) where T
+#   @notimplementedif ForwardDiff.chunksize(cfg) != length(x)
+#   @notimplementedif length(result) != length(x)
+#   !isempty(x) && ForwardDiff.extract_gradient!(T, result, ydual) # <-- Watch for empty cell contributions
+#   return result
+# end
