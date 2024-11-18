@@ -4,15 +4,15 @@ using GridapEmbedded, GridapEmbedded.LevelSetCutters
 
 using GridapTopOpt: StateParamIntegrandWithMeasure
 
-path="./results/UnfittedFEM_thermal_compliance_ALM/" # _n100
+path="./results/UnfittedFEM_thermal_compliance_ALM/"
 rm(path,force=true,recursive=true)
 mkpath(path)
-n = 51 #100
+n = 50
 order = 1
 γ = 0.1
 max_steps = floor(Int,order*n/5)
 vf = 0.4
-α_coeff = 3 # 4max_steps*γ
+α_coeff = 4max_steps*γ
 iter_mod = 1
 
 _model = CartesianDiscreteModel((0,1,0,1),(n,n))
@@ -42,7 +42,7 @@ V_φ = TestFESpace(model,reffe_scalar)
 
 ## Levet-set function
 φh = interpolate(x->-cos(8π*x[1])*cos(8π*x[2])-0.2,V_φ)
-Ωs = EmbeddedCollection(model,φh) do cutgeo
+Ωs = EmbeddedCollection(model,φh) do cutgeo,_
   Ωin = DifferentiableTriangulation(Triangulation(cutgeo,PHYSICAL))
   Γ = DifferentiableTriangulation(EmbeddedBoundary(cutgeo))
   Γg = GhostSkeleton(cutgeo)
@@ -68,14 +68,13 @@ l(v,φ) = ∫(v)dΓ_N
 ## Optimisation functionals
 J(u,φ) = a(u,u,φ)
 Vol(u,φ) = ∫(1/vol_D)Ωs.dΩin - ∫(vf/vol_D)dΩ
-dVol(q,u,φ) = ∫(-1/vol_D*q/(norm ∘ (∇(φ))))Ωs.dΓ
+dVol(q,u,φ) = ∫(-1/vol_D*q/(1e-20 + norm ∘ (∇(φ))))Ωs.dΓ
 
 ## Setup solver and FE operators
 Pl = JacobiLinearSolver()
 ls = CGSolver(Pl;maxiter=1000,verbose=1,name="CG")
 
-state_collection = EmbeddedCollection(model,φh) do _
-  # update_collection!(Ωs,φh)
+state_collection = EmbeddedCollection(model,φh) do _,_
   V = TestFESpace(Ωs.Ωact,reffe_scalar;dirichlet_tags=["Gamma_D"])
   U = TrialFESpace(V,0.0)
   state_map = AffineFEStateMap(a,l,U,V,V_φ,U_reg,φh;ls,adjoint_ls=ls)
@@ -105,7 +104,7 @@ converged(m) = GridapTopOpt.default_al_converged(
   C_tol = 0.01
 )
 optimiser = AugmentedLagrangian(pcfs,ls_evo,vel_ext,φh;debug=true,
-  γ,verbose=true,constraint_names=[:Vol],converged,reinit_mod=5) # reinit_mod = 1 is fine
+  γ,verbose=true,constraint_names=[:Vol],converged,reinit_mod=5)
 for (it,uh,φh,state) in optimiser
   x_φ = get_free_dof_values(φh)
   idx = findall(isapprox(0.0;atol=10^-10),x_φ)

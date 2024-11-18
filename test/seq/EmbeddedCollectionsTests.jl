@@ -27,7 +27,7 @@ function main()
   φ(r) = interpolate(x->sqrt((x[1]-0.5)^2+(x[2]-0.5)^2)-r,V_φ) # Circle
 
   φ0 = φ(0.2)
-  Ωs = EmbeddedCollection(model,φ0) do cutgeo
+  Ωs = EmbeddedCollection(model,φ0) do cutgeo,_
     Ω = Triangulation(cutgeo,PHYSICAL_IN)
     (; 
       :Ω  => Ω,
