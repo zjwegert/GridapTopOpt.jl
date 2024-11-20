@@ -11,33 +11,39 @@ methods to compute derivatives wrt deformations of the embedded mesh.
 To do so, it propagates dual numbers into the geometric maps mapping cut subcells/subfacets 
 to the background mesh.
 """
-mutable struct DifferentiableTriangulation{Dc,Dp,A} <: Triangulation{Dc,Dp}
+mutable struct DifferentiableTriangulation{Dc,Dp,A,B} <: Triangulation{Dc,Dp}
   trian :: A
+  fe_space :: B
   cell_values
   caches
   function DifferentiableTriangulation(
-    trian :: Triangulation{Dc,Dp},cell_values,caches
+    trian :: Triangulation{Dc,Dp},
+    fe_space :: FESpace,
+    cell_values,caches
   ) where {Dc,Dp}
     A = typeof(trian)
-    new{Dc,Dp,A}(trian,cell_values,caches)
+    B = typeof(fe_space)
+    new{Dc,Dp,A,B}(trian,fe_space,cell_values,caches)
   end
 end
 
 function DifferentiableTriangulation(
-  trian::Union{<:SubCellTriangulation,<:SubFacetTriangulation}
+  trian::Union{<:SubCellTriangulation,<:SubFacetTriangulation},
+  fe_space
 )
   caches = precompute_autodiff_caches(trian)
-  return DifferentiableTriangulation(trian,nothing,caches)
+  return DifferentiableTriangulation(trian,fe_space,nothing,caches)
 end
 
-(t::DifferentiableTriangulation)(φh) = update_trian!(t,φh)
+(t::DifferentiableTriangulation)(φh) = update_trian!(t,get_fe_space(φh),φh)
 
-function update_trian!(trian::DifferentiableTriangulation,φh)
+function update_trian!(trian::DifferentiableTriangulation,U::FESpace,φh)
+  ~(U === trian.fe_space) && return trian
   trian.cell_values = extract_dualized_cell_values(trian.trian,φh)
   return trian
 end
 
-function update_trian!(trian::DifferentiableTriangulation,::Nothing)
+function update_trian!(trian::DifferentiableTriangulation,::FESpace,::Nothing)
   trian.cell_values = nothing
   return trian
 end
@@ -45,22 +51,15 @@ end
 function FESpaces._change_argument(
   op,f,trian::DifferentiableTriangulation,uh::SingleFieldFEFunction
 )
-  update = matching_level_set(trian,uh)
   U = get_fe_space(uh)
   function g(cell_u)
     cf = CellField(U,cell_u)
-    update ? update_trian!(trian,cf) : update_trian!(trian,nothing)
+    update_trian!(trian,U,cf)
     cell_grad = f(cf)
-    update_trian!(trian,nothing) # TODO: experimental
+    update_trian!(trian,U,nothing) # TODO: experimental
     get_contribution(cell_grad,trian)
   end
   g
-end
-
-function matching_level_set(trian::DifferentiableTriangulation,uh)
-  uh_trian = get_triangulation(uh)
-  bgmodel  = get_background_model(uh_trian)
-  return num_cells(uh_trian) == num_cells(bgmodel)
 end
 
 function FESpaces._compute_cell_ids(uh,ttrian::DifferentiableTriangulation)
@@ -375,34 +374,34 @@ end
 # We only need to propagate the dual numbers to the CUT cells, which is what the 
 # following implementation does:
 
-DifferentiableTriangulation(trian::Triangulation) = trian
+DifferentiableTriangulation(trian::Triangulation,fe_space) = trian
 
 function DifferentiableTriangulation(
-  trian::AppendedTriangulation
+  trian::AppendedTriangulation,
+  fe_space :: FESpace
 )
-  a = DifferentiableTriangulation(trian.a)
-  b = DifferentiableTriangulation(trian.b)
+  a = DifferentiableTriangulation(trian.a,fe_space)
+  b = DifferentiableTriangulation(trian.b,fe_space)
   return AppendedTriangulation(a,b)
 end
 
-update_trian!(trian::Triangulation,φh) = trian
+update_trian!(trian::Triangulation,U,φh) = trian
 
-function update_trian!(trian::AppendedTriangulation,φh)
-  update_trian!(trian.a,φh)
-  update_trian!(trian.b,φh)
+function update_trian!(trian::AppendedTriangulation,U,φh)
+  update_trian!(trian.a,U,φh)
+  update_trian!(trian.b,U,φh)
   return trian
 end
 
 function FESpaces._change_argument(
   op,f,trian::AppendedTriangulation,uh::SingleFieldFEFunction
 )
-  update = matching_level_set(trian,uh)
   U = get_fe_space(uh)
   function g(cell_u)
     cf = CellField(U,cell_u)
-    update ? update_trian!(trian,cf) : update_trian!(trian,nothing)
+    update_trian!(trian,U,cf)
     cell_grad = f(cf)
-    update_trian!(trian,nothing) # TODO: experimental
+    update_trian!(trian,U,nothing) # TODO: experimental
     get_contribution(cell_grad,trian)
   end
   g
@@ -412,14 +411,4 @@ function FESpaces._compute_cell_ids(uh,ttrian::AppendedTriangulation)
   ids_a = FESpaces._compute_cell_ids(uh,ttrian.a)
   ids_b = FESpaces._compute_cell_ids(uh,ttrian.b)
   lazy_append(ids_a,ids_b)
-end
-
-function matching_level_set(trian::AppendedTriangulation,uh)
-  a = matching_level_set(trian.a,uh)
-  b = matching_level_set(trian.b,uh)
-  return a || b
-end
-
-function matching_level_set(trian::Triangulation,uh)
-  false
 end

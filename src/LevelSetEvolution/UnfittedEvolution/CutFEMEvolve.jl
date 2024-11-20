@@ -11,14 +11,12 @@ Burman et al. (2017). DOI: `10.1016/j.cma.2017.09.005`.
 - `space::B`: Level-set FE space
 - `assembler::Assembler`: FE assembler
 - `params::D`: Tuple of stabilisation parameter `γg`, mesh size `h`, and
-  max steps `max_steps`
+  max steps `max_steps`, and background mesh skeleton parameters 
 - `cache`: Cache for evolver, initially `nothing`.
 
 # Note
 - The stepsize `dt = 0.1` in `RungeKutta` is a place-holder and is updated using
   the `γ` passed to `solve!`.
-- We expect the EmbeddedCollection `Ωs` to contain `:F_act` and `:dF_act`. If 
-  this is not available we add it to the recipe list in `Ωs` and a warning will appear. 
 """
 mutable struct CutFEMEvolve{A,B,C} <: Evolver
   ode_solver::ODESolver
@@ -35,24 +33,10 @@ mutable struct CutFEMEvolve{A,B,C} <: Evolver
       ode_nl = NLSolver(ode_ls, show_trace=false, method=:newton, iterations=10),
       ode_solver = MutableRungeKutta(ode_nl, ode_ls, 0.1, :DIRK_CrankNicolson_2_2),
       assembler=SparseMatrixAssembler(V_φ,V_φ)) where {A,B}
-    if !((:dΓg,:n_Γg) ⊆ keys(Ωs.objects))
-      @warn "Expected triangulation ':dΓg, :n_Γg' not found in the 
-      EmbeddedCollection. These and the corresponding triangulation ':Γg' have been
-      added to the recipe list. 
-      
-      Ensure that you are not using ':Γg' under a different
-      name to avoid additional computation for cutting."
-      function F_act_recipe(cutgeo)
-        Γg = GhostSkeleton(cutgeo)
-        (; 
-          :Γg => Γg,
-          :dΓg => Measure(Γg,2get_order(V_φ)),
-          :n_Γg => get_normal_vector(Γg),
-        )
-      end
-      add_recipe!(Ωs,F_act_recipe)
-    end
-    params = (;γg,h,max_steps)
+    Γg = SkeletonTriangulation(get_triangulation(dΩ_bg.quad))
+    dΓg = Measure(Γg,2get_order(V_φ))
+    n_Γg = get_normal_vector(Γg)
+    params = (;γg,h,max_steps,dΓg,n_Γg)
     new{A,B,typeof(params)}(ode_solver,Ωs,dΩ_bg,V_φ,assembler,params,nothing)
   end
 end
@@ -60,30 +44,14 @@ end
 get_ode_solver(s::CutFEMEvolve) = s.ode_solver
 get_assembler(s::CutFEMEvolve) = s.assembler
 get_space(s::CutFEMEvolve) = s.space
-get_embedded_collection(s::CutFEMEvolve) = s.Ωs
 get_measure(s::CutFEMEvolve) = s.dΩ_bg
 get_params(s::CutFEMEvolve) = s.params
 get_cache(s::CutFEMEvolve) = s.cache
 
-function get_transient_operator(φh,velh,s::CutFEMEvolve;use_full_skeleton=false)
-  Ωs, V_φ, dΩ_bg, assembler, params = s.Ωs, s.space, s.dΩ_bg, s.assembler, s.params
-  γg, h = params.γg, params.h
+function get_transient_operator(φh,velh,s::CutFEMEvolve)
+  V_φ, dΩ_bg, assembler, params = s.space, s.dΩ_bg, s.assembler, s.params
+  γg, h, dΓg, n_Γg = params.γg, params.h, params.dΓg, params.n_Γg
   ϵ = 1e-20
-
-  # NOTE/TODO: The sparsity pattern of the Jacobian changes with the level-set function
-  #   because of the `∫(γg*h^2*jump(∇(u) ⋅ n_Γg)*jump(∇(v) ⋅ n_Γg))dΓg` term, where
-  #   dΓg is the measure on the ghost skeleton. As such, the first time we compute the
-  #   operator we use the full background mesh skeleton so that the sparsity pattern
-  #   of the Jacobian is the worst possible. Subsequent iterations will re-use the sparsity
-  #   pattern but less integration is done. The trade-off here is memory cost vs. integration.
-  if use_full_skeleton
-    Γg = SkeletonTriangulation(get_triangulation(dΩ_bg.quad))
-    dΓg = Measure(Γg,2get_order(V_φ))
-    n_Γg = get_normal_vector(Γg)
-  else
-    update_collection!(Ωs,φh)
-    dΓg, n_Γg = Ωs.dΓg, Ωs.n_Γg
-  end
 
   β = velh*∇(φh)/(ϵ + norm ∘ ∇(φh))
   stiffness(t,u,v) = ∫((β ⋅ ∇(u)) * v)dΩ_bg + ∫(γg*h^2*jump(∇(u) ⋅ n_Γg)*jump(∇(v) ⋅ n_Γg))dΓg
@@ -112,7 +80,7 @@ function solve!(s::CutFEMEvolve,φh,velh,γ,cache::Nothing)
   h, max_steps = params.h, params.max_steps
 
   # Setup FE operator and solver
-  ode_op = get_transient_operator(φh,velh,s;use_full_skeleton=true)
+  ode_op = get_transient_operator(φh,velh,s)
   dt = _compute_Δt(h,γ,get_free_dof_values(velh))
   ode_solver.dt = dt
   ode_sol = solve(ode_solver,ode_op,0.0,dt*max_steps,φh)
