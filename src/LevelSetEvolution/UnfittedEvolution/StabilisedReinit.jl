@@ -44,7 +44,7 @@ mutable struct StabilisedReinit{A,B,C,D} <: Reinitialiser
       Ensure that you are not using ':dΓ' under a different
       name to avoid additional computation for cutting."
       function dΓ_recipe(cutgeo)
-        Γ = DifferentiableTriangulation(EmbeddedBoundary(cutgeo))
+        Γ = DifferentiableTriangulation(EmbeddedBoundary(cutgeo),V_φ)
         (; 
           :dΓ => Measure(Γ,2get_order(V_φ))
         )
