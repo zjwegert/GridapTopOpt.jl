@@ -25,10 +25,6 @@ order = 1
 
 reffe = ReferenceFE(lagrangian,Float64,order)
 V_φ = TestFESpace(model,reffe)
-Ω = Triangulation(model)
-dΩ = Measure(Ω,2*order)
-Λ = SkeletonTriangulation(Ω)
-dΛ = Measure(Λ,2*order)
 
 φh = interpolate(φ,V_φ)
 
@@ -41,13 +37,14 @@ x_φ[idx] .+= 10*eps(eltype(x_φ))
 geo = DiscreteGeometry(φh,model)
 cutgeo = cut(model,geo)
 
+# Error 1
 Γ = DifferentiableTriangulation(EmbeddedBoundary(cutgeo),V_φ)
 dΓ = Measure(Γ,2get_order(V_φ))
-
-# fails
 dj(u,du,v) = jacobian(u->∫(u*v)dΓ,u)
 dj(φh, get_trial_fe_basis(V_φ), get_fe_basis(V_φ))
 
-# and this one!
+# Error 2
+Λ = SkeletonTriangulation(Triangulation(model))
+dΛ = Measure(Λ,2*order)
 dj(u,du,v) = jacobian(u->∫(jump(∇(u)) ⋅ jump(∇(v)))dΛ,u)
 dj(φh, get_trial_fe_basis(V_φ), get_fe_basis(V_φ))
