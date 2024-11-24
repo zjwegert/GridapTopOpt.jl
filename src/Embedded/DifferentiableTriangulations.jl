@@ -412,3 +412,31 @@ function FESpaces._compute_cell_ids(uh,ttrian::AppendedTriangulation)
   ids_b = FESpaces._compute_cell_ids(uh,ttrian.b)
   lazy_append(ids_a,ids_b)
 end
+
+# TriangulationView
+function DifferentiableTriangulation(
+  trian::Geometry.TriangulationView,
+  fe_space :: FESpace
+)
+  parent = DifferentiableTriangulation(trian.parent,fe_space)
+  return Geometry.TriangulationView(parent,trian.cell_to_parent_cell)
+end
+
+function update_trian!(trian::Geometry.TriangulationView,U,φh)
+  update_trian!(trian.parent,U,φh)
+  return trian
+end
+
+function FESpaces._change_argument(
+  op,f,trian::Geometry.TriangulationView,uh::SingleFieldFEFunction
+)
+  U = get_fe_space(uh)
+  function g(cell_u)
+    cf = CellField(U,cell_u)
+    update_trian!(trian,U,cf)
+    cell_grad = f(cf)
+    update_trian!(trian,U,nothing) # TODO: experimental
+    get_contribution(cell_grad,trian)
+  end
+  g
+end
