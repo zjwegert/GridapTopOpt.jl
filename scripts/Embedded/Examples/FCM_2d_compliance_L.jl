@@ -13,6 +13,7 @@ order = 1
 max_steps = floor(Int,order*n/5)
 vf = 0.4
 α_coeff = 3max_steps*γ
+iter_mod = 1
 
 _model = CartesianDiscreteModel((0,1,0,1),(n,n))
 base_model = UnstructuredDiscreteModel(_model)
