@@ -3,24 +3,24 @@ abstract type StabilisationMethod end
 """
     mutable struct StabilisedReinit{V,M} <: Reinitialiser
 
-Stabilised FE method for level-set reinitialisation. Artificial viscosity 
-approach (`ArtificialViscosity`) based on Mallon et al. (2023). DOI: `10.48550/arXiv.2303.13672`. 
+Stabilised FE method for level-set reinitialisation. Artificial viscosity
+approach (`ArtificialViscosity`) based on Mallon et al. (2023). DOI: `10.48550/arXiv.2303.13672`.
 Interior jump penalty approach (`InteriorPenalty`) adapted from that work and replaces
-the artifical viscosity term with an interior jump penalty term.  
+the artifical viscosity term with an interior jump penalty term.
 
 # Parameters
 - `nls::NonlinearSolver`: Nonlinear solver for solving the reinitialisation equation
-- `stabilisation_method::A`: A `StabilisationMethod` method for stabilising the problem 
+- `stabilisation_method::A`: A `StabilisationMethod` method for stabilising the problem
 - `Ωs::B`: `EmbeddedCollection` holding updatable triangulation and measures from GridapEmbedded
 - `dΩ_bg::D`: Background mesh measure
 - `space::C`: FE space for level-set function
-- `assembler::Assembler`: Assembler for LS FE space 
+- `assembler::Assembler`: Assembler for LS FE space
 - `params::E`: Tuple of Nitsche parameter `γd` and mesh size `h`
 - `cache`: Cache for evolver, initially `nothing`.
 
 # Note
-- We expect the EmbeddedCollection `Ωs` to contain `:dΓ`. If this is not 
-  available we add it to the recipe list in `Ωs` and a warning will appear. 
+- We expect the EmbeddedCollection `Ωs` to contain `:dΓ`. If this is not
+  available we add it to the recipe list in `Ωs` and a warning will appear.
 """
 mutable struct StabilisedReinit{A,B,C,D} <: Reinitialiser
   nls::NonlinearSolver
@@ -36,16 +36,16 @@ mutable struct StabilisedReinit{A,B,C,D} <: Reinitialiser
       nls = NewtonSolver(LUSolver();maxiter=50,rtol=1.e-14,verbose=true),
       assembler=SparseMatrixAssembler(V_φ,V_φ),
       stabilisation_method::A = InteriorPenalty(V_φ)) where {A,B,C}
-    
+
     if !(:dΓ ∈ keys(Ωs.objects))
-      @warn "Expected measure ':dΓ' not found in the 
-      EmbeddedCollection. This has been added to the recipe list. 
-      
+      @warn "Expected measure ':dΓ' not found in the
+      EmbeddedCollection. This has been added to the recipe list.
+
       Ensure that you are not using ':dΓ' under a different
       name to avoid additional computation for cutting."
       function dΓ_recipe(cutgeo)
         Γ = DifferentiableTriangulation(EmbeddedBoundary(cutgeo),V_φ)
-        (; 
+        (;
           :dΓ => Measure(Γ,2get_order(V_φ))
         )
       end
@@ -92,7 +92,7 @@ function solve!(s::StabilisedReinit,φh,nls_cache)
   return φh
 end
 
-struct ArtificialViscosity <: StabilisationMethod 
+struct ArtificialViscosity <: StabilisationMethod
   stabilisation_coefficent::Number
 end
 
@@ -116,7 +116,7 @@ function get_residual_and_jacobian(s::StabilisedReinit{ArtificialViscosity},φh)
 end
 
 struct InteriorPenalty <: StabilisationMethod
-  dΛ::Measure
+  dΛ
 end
 function InteriorPenalty(V_φ::FESpace)
   Λ = SkeletonTriangulation(get_triangulation(V_φ))
