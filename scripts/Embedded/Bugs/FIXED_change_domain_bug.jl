@@ -25,7 +25,7 @@ dΓ = Measure(Γ,2order)
 
 
 _Γ = EmbeddedBoundary(cutgeo)
-Γ = DifferentiableTriangulation(_Γ)
+Γ = DifferentiableTriangulation(_Γ,V_φ)
 dΓ = Measure(Γ,2order)
 ∫(vh)dΓ
 ∫(2vh)dΓ

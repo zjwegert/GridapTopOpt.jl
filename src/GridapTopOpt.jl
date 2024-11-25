@@ -14,7 +14,7 @@ using Gridap.Helpers, Gridap.Algebra, Gridap.TensorValues
 using Gridap.Geometry, Gridap.CellData, Gridap.Fields, Gridap.Arrays
 using Gridap.ReferenceFEs, Gridap.FESpaces,  Gridap.MultiField, Gridap.Polynomials
 
-using Gridap.Geometry: get_faces, num_nodes
+using Gridap.Geometry: get_faces, num_nodes, TriangulationView
 using Gridap.FESpaces: get_assembly_strategy
 using Gridap.ODEs: ODESolver
 using Gridap: writevtk

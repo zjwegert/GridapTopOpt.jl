@@ -47,9 +47,8 @@ V_φ = TestFESpace(model,reffe_scalar)
   Ωout = DifferentiableTriangulation(Triangulation(cutgeo,PHYSICAL_OUT),V_φ)
   Γ = DifferentiableTriangulation(EmbeddedBoundary(cutgeo),V_φ)
   Γg = GhostSkeleton(cutgeo)
-  n_Γg = get_normal_vector(Γg)
   Ωact = Triangulation(cutgeo,ACTIVE)
-  (; 
+  (;
     :Ωin  => Ωin,
     :dΩin => Measure(Ωin,2*order),
     :Ωout  => Ωout,

@@ -170,17 +170,17 @@ Triangulation containing the interfaces between subfacets. We always have dimens
   - Df = Dc-1 :: Dimension of the cut subfacets
   - Di = Dc-2 :: Dimension of the subfacet interfaces
 
-Description of the different components: 
+Description of the different components:
 
 - `face_trian` :: Original SubFacetTriangulation, built on top of the background mesh.
-- `face_model` :: Subfacet model. Active model for `face_trian`. 
+- `face_model` :: Subfacet model. Active model for `face_trian`.
 - `face_boundary` :: Triangulation of the interfaces between subfacets. It is glued to the `face_model`.
-- `cell_boundary` :: Conceptually the same as `face_boundary`, but it is glued to the 
-                     background mesh cells. Created as a CompositeTriangulation between 
+- `cell_boundary` :: Conceptually the same as `face_boundary`, but it is glued to the
+                     background mesh cells. Created as a CompositeTriangulation between
                       `face_trian` and `face_boundary`.
-- `ghost_boundary` :: Triangulation of the background facets that contain each interface. 
+- `ghost_boundary` :: Triangulation of the background facets that contain each interface.
 
-The "real" triangulation is `cell_boundary`, but we require the other triangulations to 
+The "real" triangulation is `cell_boundary`, but we require the other triangulations to
 perform complex changes of domain.
 """
 struct SubFacetBoundaryTriangulation{Di,Df,Dp} <: Triangulation{Di,Dp}
@@ -279,8 +279,8 @@ function get_interface_sign(trian::SubFacetBoundaryTriangulation)
 end
 
 # TODO: This is only valid when dealing with linear meshes (where normals are constant over facets).
-# If we wanted to use higher-order meshes, we would need to generate the geometric map 
-# going from the facets to the interfaces. 
+# If we wanted to use higher-order meshes, we would need to generate the geometric map
+# going from the facets to the interfaces.
 # However, having a high-order background mesh seems quite silly.
 function get_ghost_facet_normal(
   itrian::CompositeTriangulation{Di,Dc}, # Interface -> BG Cell
@@ -305,8 +305,8 @@ function get_subfacet_facet_normal(
 end
 
 """
-  There is still something sweaty about this... 
-  Why do we apply the sign change but at the same time call `get_edge_tangents` in the 
+  There is still something sweaty about this...
+  Why do we apply the sign change but at the same time call `get_edge_tangents` in the
   creation of conormal vectors in 3D? It's like we are cancelling the sign change...
   There is more to think about here.
 """
@@ -362,6 +362,8 @@ function CellData.get_normal_vector(trian::SubFacetBoundaryTriangulation{Di}) wh
   return n_S * isign
 end
 
+CellData.get_facet_normal(trian::SubFacetBoundaryTriangulation) = get_data(get_normal_vector(trian))
+
 # Tangent vector to the cut interface, t_S = n_S x n_k
 function get_tangent_vector(trian::SubFacetBoundaryTriangulation{Di}) where {Di}
   @notimplementedif Di != 1
@@ -386,9 +388,13 @@ function get_conormal_vector(trian::SubFacetBoundaryTriangulation{Di}) where {Di
   return m_k * isign
 end
 
-# SubFacetSkeletonTriangulation
-
-const SubFacetSkeletonTriangulation{Di,Df,Dp} = SkeletonTriangulation{Di,Dp,SubFacetBoundaryTriangulation{Di,Df,Dp}}
+# SubFacetSkeletonTriangulation & SubFacetBoundaryTriangulationView
+const SubFacetBoundaryTriangulationView{Di,Df,Dp} = TriangulationView{Di,Dp,SubFacetBoundaryTriangulation{Di,Df,Dp}}
+const SubFacetSkeletonTriangulation{Di,Df,Dp} = SkeletonTriangulation{Di,Dp,<:Union{
+  SubFacetBoundaryTriangulation{Di,Df,Dp},
+  SubFacetBoundaryTriangulationView{Di,Df,Dp}
+  }
+}
 
 function Geometry.SkeletonTriangulation(face_trian::SubFacetTriangulation)
   bgmodel = get_background_model(face_trian)
@@ -398,7 +404,7 @@ function Geometry.SkeletonTriangulation(face_trian::SubFacetTriangulation)
   face_skeleton = SkeletonTriangulation(face_model,ghost_mask)
   cell_skeleton = CompositeTriangulation(face_trian,face_skeleton)
   ghost_skeleton = generate_ghost_trian(cell_skeleton,bgmodel)
-  
+
   ctrian_plus = CompositeTriangulation(face_trian,face_skeleton.plus)
   ctrian_minus = CompositeTriangulation(face_trian,face_skeleton.minus)
   isign_plus = get_interface_sign(ctrian_plus,face_trian,ghost_skeleton.plus)
@@ -433,8 +439,18 @@ for func in (:(Gridap.get_normal_vector),:get_tangent_vector)
   end
 end
 
+for func in (:get_tangent_vector,:get_subfacet_normal_vector,:get_ghost_normal_vector,:get_conormal_vector)
+  @eval begin
+    function $func(trian::SubFacetBoundaryTriangulationView)
+      data = CellData.get_data($func(trian.parent))
+      restricted_data = Geometry.restrict(data,trian.cell_to_parent_cell)
+      return GenericCellField(restricted_data,trian,ReferenceDomain())
+    end
+  end
+end
+
 # Distributed
-# Until we merge, we need changes in 
+# Until we merge, we need changes in
 #   - GridapDistributed#master
 #   - GridapEmbedded#distributed
 

@@ -5,6 +5,7 @@ using GridapDistributed, PartitionedArrays
 
 using GridapEmbedded
 using GridapEmbedded.LevelSetCutters
+using GridapEmbedded.Distributed
 using Gridap.Geometry, Gridap.FESpaces, Gridap.CellData, Gridap.Adaptivity
 
 using GridapTopOpt: get_subfacet_normal_vector, get_ghost_normal_vector
@@ -39,6 +40,17 @@ cutgeo = cut(model,geo)
 Γ = EmbeddedBoundary(cutgeo)
 Λ = Skeleton(Γ)
 Σ = Boundary(Γ)
+Γg = GhostSkeleton(cutgeo)
+
+n_Γ = get_normal_vector(Γ);
+
+n_S_Λ = get_normal_vector(Λ);
+m_k_Λ = get_conormal_vector(Λ);
+∇ˢφ_Λ = Operation(abs)(n_S_Λ ⋅ ∇(φh).plus);
+
+n_S_Σ = get_normal_vector(Σ);
+m_k_Σ = get_conormal_vector(Σ);
+∇ˢφ_Σ = Operation(abs)(n_S_Σ ⋅ ∇(φh));
 
 ############################################################################################
 

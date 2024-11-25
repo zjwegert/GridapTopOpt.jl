@@ -4,11 +4,11 @@
 """
   mutable struct DifferentiableTriangulation{Dc,Dp,A<:Triangulation{Dc,Dp}} <: Triangulation{Dc,Dp}
 
-A DifferentiableTriangulation is a wrapper around an embedded triangulation 
-(i.e SubCellTriangulation or SubFacetTriangulation) implementing all the necessary 
+A DifferentiableTriangulation is a wrapper around an embedded triangulation
+(i.e SubCellTriangulation or SubFacetTriangulation) implementing all the necessary
 methods to compute derivatives wrt deformations of the embedded mesh.
 
-To do so, it propagates dual numbers into the geometric maps mapping cut subcells/subfacets 
+To do so, it propagates dual numbers into the geometric maps mapping cut subcells/subfacets
 to the background mesh.
 """
 mutable struct DifferentiableTriangulation{Dc,Dp,A,B} <: Triangulation{Dc,Dp}
@@ -117,7 +117,7 @@ function Geometry.get_glue(ttrian::DifferentiableTriangulation,val::Val{D}) wher
     return glue
   end
 
-  # New reference maps 
+  # New reference maps
   c = ttrian.caches
   cell_values = ttrian.cell_values
   cell_to_rcoords = lazy_map(
@@ -159,6 +159,15 @@ for tdomain in (:ReferenceDomain,:PhysicalDomain)
     end
   end
 end
+
+# function CellData.change_domain(
+#   a::CellField,target_trian::DifferentiableTriangulation{Dc,Dp,A},target_domain::ReferenceDomain
+# ) where {Dc,Dp,A <: Union{SubCellTriangulation,SubFacetTriangulation}}
+#   change_domain(a,get_triangulation(a),DomainStyle(a),target_trian,target_domain)
+#   @assert is_change_possible(strian,ttrian)
+#   b = change_domain(a,$(tdomain)())
+#   return CellData.similar_cell_field(a,CellData.get_data(b),ttrian,$(tdomain)())
+# end
 
 function FESpaces.get_cell_fe_data(fun,f,ttrian::DifferentiableTriangulation)
   FESpaces.get_cell_fe_data(fun,f,ttrian.trian)
@@ -220,9 +229,9 @@ end
 """
     precompute_cut_edge_ids(rcoords,bg_rcoords,edge_list)
 
-Given 
+Given
   - `rcoords`: the node ref coordinates of the cut subcell/subfacet,
-  - `bg_rcoords`: the node ref coordinates of the background cell containing it, 
+  - `bg_rcoords`: the node ref coordinates of the background cell containing it,
   - `edge_list`: the list of nodes defining each edge of the background cell,
 
 this function returns a vector that for each node of the cut subcell/subfacet contains
@@ -368,10 +377,10 @@ end
 # AppendedTriangulation
 #
 # When cutting an embedded domain, we will usually end up with an AppendedTriangulation
-# containing 
+# containing
 #   a) a regular triangulation with the IN/OUT cells
 #   b) a SubCell/SubFacetTriangulation with the CUT cells
-# We only need to propagate the dual numbers to the CUT cells, which is what the 
+# We only need to propagate the dual numbers to the CUT cells, which is what the
 # following implementation does:
 
 DifferentiableTriangulation(trian::Triangulation,fe_space) = trian
@@ -413,6 +422,32 @@ function FESpaces._compute_cell_ids(uh,ttrian::AppendedTriangulation)
   lazy_append(ids_a,ids_b)
 end
 
+#### DistributedTriangulations
+
+function DifferentiableTriangulation(trian::DistributedTriangulation,fe_space)
+  bg_model = get_background_model(trian)
+  trians = map(DifferentiableTriangulation,local_views(trian),local_views(fe_space))
+  return DistributedTriangulation(trians,bg_model)
+end
+
+# TODO: Dispatch more appropriately on trian?
+function FESpaces._change_argument(op,f,trian,uh::DistributedCellField)
+  spaces = map(get_fe_space,local_views(uh))
+  function g(cell_u)
+    cf = DistributedCellField(
+      map(CellField,spaces,cell_u),
+      get_triangulation(uh),
+    )
+    map(update_trian!,local_views(trian),local_views(spaces),local_views(cf))
+    cell_grad = f(cf)
+    map(local_views(trian),local_views(spaces)) do Ω, V
+      update_trian!(Ω,V,nothing)
+    end
+    map(get_contribution,local_views(cell_grad),trian)
+  end
+  g
+end
+
 # TriangulationView
 function DifferentiableTriangulation(
   trian::Geometry.TriangulationView,
@@ -425,18 +460,4 @@ end
 function update_trian!(trian::Geometry.TriangulationView,U,φh)
   update_trian!(trian.parent,U,φh)
   return trian
-end
-
-function FESpaces._change_argument(
-  op,f,trian::Geometry.TriangulationView,uh::SingleFieldFEFunction
-)
-  U = get_fe_space(uh)
-  function g(cell_u)
-    cf = CellField(U,cell_u)
-    update_trian!(trian,U,cf)
-    cell_grad = f(cf)
-    update_trian!(trian,U,nothing) # TODO: experimental
-    get_contribution(cell_grad,trian)
-  end
-  g
 end

@@ -1,17 +1,17 @@
 """
     mutable struct CutFEMEvolve{V,M} <: Evolver
 
-CutFEM method for level-set evolution based on method developed by 
+CutFEM method for level-set evolution based on method developed by
 Burman et al. (2017). DOI: `10.1016/j.cma.2017.09.005`.
 
 # Parameters
-- `ode_solver::ODESolver`: ODE solver 
+- `ode_solver::ODESolver`: ODE solver
 - `Ωs::B`: `EmbeddedCollection` holding updatable triangulation and measures from GridapEmbedded
 - `dΩ_bg::C`: Measure for integration
 - `space::B`: Level-set FE space
 - `assembler::Assembler`: FE assembler
 - `params::D`: Tuple of stabilisation parameter `γg`, mesh size `h`, and
-  max steps `max_steps`, and background mesh skeleton parameters 
+  max steps `max_steps`, and background mesh skeleton parameters
 - `cache`: Cache for evolver, initially `nothing`.
 
 # Note
@@ -33,7 +33,7 @@ mutable struct CutFEMEvolve{A,B,C} <: Evolver
       ode_nl = NLSolver(ode_ls, show_trace=false, method=:newton, iterations=10),
       ode_solver = MutableRungeKutta(ode_nl, ode_ls, 0.1, :DIRK_CrankNicolson_2_2),
       assembler=SparseMatrixAssembler(V_φ,V_φ)) where {A,B}
-    Γg = SkeletonTriangulation(get_triangulation(dΩ_bg.quad))
+    Γg = SkeletonTriangulation(get_triangulation(V_φ))
     dΓg = Measure(Γg,2get_order(V_φ))
     n_Γg = get_normal_vector(Γg)
     params = (;γg,h,max_steps,dΓg,n_Γg)
@@ -84,7 +84,7 @@ function solve!(s::CutFEMEvolve,φh,velh,γ,cache::Nothing)
   dt = _compute_Δt(h,γ,get_free_dof_values(velh))
   ode_solver.dt = dt
   ode_sol = solve(ode_solver,ode_op,0.0,dt*max_steps,φh)
-  
+
   # March
   march = Base.iterate(ode_sol)
   data, state = march
@@ -110,13 +110,13 @@ function solve!(s::CutFEMEvolve,φh,velh,γ,cache)
 
   ## Update state
   # `get_transient_operator` re-creates the entire TransientLinearFEOperator wrapper.
-  #   We do this so that the first iterate of ODESolution always recomputes the 
+  #   We do this so that the first iterate of ODESolution always recomputes the
   #   stiffness matrix and associated the Jacboian, numerical setups, etc via
   #   `constant_forms = (false,true)`.
   ode_op = get_transient_operator(φh,velh,s)
-  # Between the first iterate and subsequent iterates we use the function 
+  # Between the first iterate and subsequent iterates we use the function
   #   `update_reuse!` to update the iterator state so that we re-use
-  #   the stiffness matrix, etc. The Optional argument `zero_tF` indicates 
+  #   the stiffness matrix, etc. The Optional argument `zero_tF` indicates
   #   whether we are solving a new ODE with the same functional form but
   #   updated coefficients in the weak form. If so, we want to re-use the cache.
   state_inter = update_reuse!(cache,false;zero_tF=true)

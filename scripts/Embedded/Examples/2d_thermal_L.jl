@@ -52,11 +52,10 @@ V_φ = TestFESpace(model,reffe_scalar)
 φh = interpolate(x->-cos(8π*x[1])*cos(8π*x[2])-0.2,V_φ)
 Ωs = EmbeddedCollection(model,φh) do cutgeo,_
   Ωin = DifferentiableTriangulation(Triangulation(cutgeo,PHYSICAL))
-  Γ = DifferentiableTriangulation(EmbeddedBoundary(cutgeo))
+  Γ = DifferentiableTriangulation(EmbeddedBoundary(cutgeo),V_φ)
   Γg = GhostSkeleton(cutgeo)
-  n_Γg = get_normal_vector(Γg)
   Ωact = Triangulation(cutgeo,ACTIVE)
-  (; 
+  (;
     :Ωin  => Ωin,
     :dΩin => Measure(Ωin,2*order),
     :Γg   => Γg,
@@ -66,7 +65,7 @@ V_φ = TestFESpace(model,reffe_scalar)
     :dΓ   => Measure(Γ,2*order),
     :Ωact => Ωact
   )
-end  
+end
 
 ## Weak form
 const γg = 0.1
@@ -86,12 +85,12 @@ state_collection = EmbeddedCollection(model,φh) do _,_
   V = TestFESpace(Ωs.Ωact,reffe_scalar;dirichlet_tags=["Gamma_D"])
   U = TrialFESpace(V,0.0)
   state_map = AffineFEStateMap(a,l,U,V,V_φ,U_reg,φh;ls,adjoint_ls=ls)
-  (; 
+  (;
     :state_map => state_map,
     :J => StateParamIntegrandWithMeasure(J,state_map),
     :C => map(Ci -> StateParamIntegrandWithMeasure(Ci,state_map),[Vol,])
   )
-end  
+end
 pcfs = EmbeddedPDEConstrainedFunctionals(state_collection;analytic_dC=(dVol,))
 
 ## Evolution Method

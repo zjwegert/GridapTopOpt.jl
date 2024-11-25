@@ -4,7 +4,10 @@ using GridapEmbedded, GridapEmbedded.LevelSetCutters
 
 using GridapTopOpt: StateParamIntegrandWithMeasure
 
-using GridapDistributed, PartitionedArrays, GridapPETSc
+using GridapDistributed, GridapPETSc, GridapSolvers,
+  PartitionedArrays, GridapTopOpt, SparseMatricesCSR
+
+using GridapSolvers: NewtonSolver
 
 function main(mesh_partition,distribute,el_size,path)
   ranks = distribute(LinearIndices((prod(mesh_partition),)))
@@ -53,9 +56,8 @@ function main(mesh_partition,distribute,el_size,path)
     Ωout = DifferentiableTriangulation(Triangulation(cutgeo,PHYSICAL_OUT),V_φ)
     Γ = DifferentiableTriangulation(EmbeddedBoundary(cutgeo),V_φ)
     Γg = GhostSkeleton(cutgeo)
-    n_Γg = get_normal_vector(Γg)
     Ωact = Triangulation(cutgeo,ACTIVE)
-    (; 
+    (;
       :Ωin  => Ωin,
       :dΩin => Measure(Ωin,2*order),
       :Ωout  => Ωout,
@@ -95,8 +97,13 @@ function main(mesh_partition,distribute,el_size,path)
   pcfs = PDEConstrainedFunctionals(J,[Vol],state_map;analytic_dC=(dVol,))
 
   ## Evolution Method
-  evo = CutFEMEvolve(V_φ,Ωs,dΩ,h;max_steps)
-  reinit = StabilisedReinit(V_φ,Ωs,dΩ,h;stabilisation_method=ArtificialViscosity(3.0))
+  evo = CutFEMEvolve(V_φ,Ωs,dΩ,h;max_steps,
+    ode_ls = solver,
+    assembler=SparseMatrixAssembler(Tm,Tv,V_φ,V_φ))
+  reinit = StabilisedReinit(V_φ,Ωs,dΩ,h;
+    stabilisation_method=ArtificialViscosity(3.0),
+    assembler=SparseMatrixAssembler(Tm,Tv,V_φ,V_φ),
+    nls = NewtonSolver(LUSolver();maxiter=50,rtol=1.e-14,verbose=i_am_main(ranks)))
   ls_evo = UnfittedFEEvolution(evo,reinit)
   reinit!(ls_evo,φh)
 
@@ -118,9 +125,6 @@ function main(mesh_partition,distribute,el_size,path)
   optimiser = AugmentedLagrangian(pcfs,ls_evo,vel_ext,φh;debug=true,
     γ,verbose=i_am_main(ranks),constraint_names=[:Vol],converged)
   for (it,uh,φh,state) in optimiser
-    x_φ = get_free_dof_values(φh)
-    idx = findall(isapprox(0.0;atol=10^-10),x_φ)
-    !isempty(idx) && i_am_main(ranks) && @warn "Boundary intersects nodes!"
     if iszero(it % iter_mod)
       writevtk(Ω,path*"Omega$it",cellfields=["φ"=>φh,"|∇(φ)|"=>(norm ∘ ∇(φh)),"uh"=>uh,"velh"=>FEFunction(V_φ,state.vel)])
       writevtk(Ωs.Ωin,path*"Omega_in$it",cellfields=["uh"=>uh])

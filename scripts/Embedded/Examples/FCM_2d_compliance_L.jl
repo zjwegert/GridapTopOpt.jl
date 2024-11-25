@@ -55,9 +55,8 @@ V_φ = TestFESpace(model,reffe_scalar)
   Ωout = DifferentiableTriangulation(Triangulation(cutgeo,PHYSICAL_OUT),V_φ)
   Γ = DifferentiableTriangulation(EmbeddedBoundary(cutgeo),V_φ)
   Γg = GhostSkeleton(cutgeo)
-  n_Γg = get_normal_vector(Γg)
   Ωact = Triangulation(cutgeo,ACTIVE)
-  (; 
+  (;
     :Ωin  => Ωin,
     :dΩin => Measure(Ωin,2*order),
     :Ωout  => Ωout,
@@ -69,7 +68,7 @@ V_φ = TestFESpace(model,reffe_scalar)
     :dΓ   => Measure(Γ,2*order),
     :Ωact => Ωact
   )
-end  
+end
 
 ## Weak form
 function lame_parameters(E,ν)
@@ -84,7 +83,7 @@ E = 1.0
 g = VectorValue(0,-0.1)
 
 const ϵ = (λ + μ)*1e-3
-a(u,v,φ) = ∫(ε(v) ⊙ (σ ∘ ε(u)))Ωs.dΩin + 
+a(u,v,φ) = ∫(ε(v) ⊙ (σ ∘ ε(u)))Ωs.dΩin +
   # ∫(ϵ*(ε(v) ⊙ (σ ∘ ε(u))))Ωs.dΩout # Ersatz
   ∫(ϵ * ∇(v) ⊙ ∇(u))Ωs.dΩout # Pure diffusion
 l(v,φ) = ∫(v⋅g)dΓ_N

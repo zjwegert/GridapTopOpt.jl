@@ -41,7 +41,7 @@ cutgeo = cut(model,geo)
 # A.1) Volume integral
 
 Ω = Triangulation(cutgeo,PHYSICAL_IN)
-Ω_AD = DifferentiableTriangulation(Ω)
+Ω_AD = DifferentiableTriangulation(Ω,V_φ)
 dΩ = Measure(Ω_AD,2*order)
 
 Γ = EmbeddedBoundary(cutgeo)

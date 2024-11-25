@@ -65,7 +65,7 @@ function main(
   # A.1) Volume integral
 
   Ω = Triangulation(cutgeo,PHYSICAL_IN)
-  Ω_AD = DifferentiableTriangulation(Ω)
+  Ω_AD = DifferentiableTriangulation(Ω,V_φ)
   dΩ = Measure(Ω_AD,2*order)
 
   Γ = EmbeddedBoundary(cutgeo)
@@ -95,7 +95,7 @@ function main(
   # B.1) Facet integral
 
   Γ = EmbeddedBoundary(cutgeo)
-  Γ_AD = DifferentiableTriangulation(Γ)
+  Γ_AD = DifferentiableTriangulation(Γ,V_φ)
   Λ = Skeleton(Γ)
   Σ = Boundary(Γ)
 
@@ -118,7 +118,7 @@ function main(
   dJ_int_AD = gradient(J_int,φh)
   dJ_int_AD_vec = assemble_vector(dJ_int_AD,V_φ)
 
-  dJ_int_exact(w) = ∫((-n_Γ⋅∇(fh))*w/(norm ∘ (∇(φh))))dΓ + 
+  dJ_int_exact(w) = ∫((-n_Γ⋅∇(fh))*w/(norm ∘ (∇(φh))))dΓ +
                     ∫(-n_S_Λ ⋅ (jump(fh*m_k_Λ) * mean(w) / ∇ˢφ_Λ))dΛ +
                     ∫(-n_S_Σ ⋅ (fh*m_k_Σ * w / ∇ˢφ_Σ))dΣ
   dJ_int_exact_vec = assemble_vector(dJ_int_exact,V_φ)
@@ -131,7 +131,7 @@ function main(
   dJ_int_AD2 = gradient(J_int2,φh)
   dJ_int_AD_vec2 = assemble_vector(dJ_int_AD2,V_φ)
 
-  dJ_int_exact2(w) = ∫((-n_Γ⋅∇(g(fh)))*w/(norm ∘ (∇(φh))))dΓ + 
+  dJ_int_exact2(w) = ∫((-n_Γ⋅∇(g(fh)))*w/(norm ∘ (∇(φh))))dΓ +
                     ∫(-n_S_Λ ⋅ (jump(g(fh)*m_k_Λ) * mean(w) / ∇ˢφ_Λ))dΛ +
                     ∫(-n_S_Σ ⋅ (g(fh)*m_k_Σ * w / ∇ˢφ_Σ))dΣ
   dJ_int_exact_vec2 = assemble_vector(dJ_int_exact2,V_φ)
@@ -155,7 +155,7 @@ function main(
       ];
       append = false
     )
-  
+
     writevtk(
       Ω, "$(path)_omega"; append = false
     )
