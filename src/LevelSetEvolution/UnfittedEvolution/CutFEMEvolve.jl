@@ -56,7 +56,18 @@ function get_transient_operator(φh,velh,s::CutFEMEvolve)
   β = velh*∇(φh)/(ϵ + norm ∘ ∇(φh))
   stiffness(t,u,v) = ∫((β ⋅ ∇(u)) * v)dΩ_bg + ∫(γg*h^2*jump(∇(u) ⋅ n_Γg)*jump(∇(v) ⋅ n_Γg))dΓg
   mass(t, ∂ₜu, v) = ∫(∂ₜu * v)dΩ_bg
-  forcing(t,v) = ∫(0v)dΩ_bg
+  forcing(t,v) = ∫(0v)dΩ_bg + ∫(0*jump(∇(v) ⋅ n_Γg))dΓg
+  # Second term is added to address the following issue: 
+  #  - ODEs is allocating separately the residual and jacobian
+  #  - This is fine in serial, but in parallel there are some instances where the the following happens: 
+  #     - The residual is touched by less ghost entries than the columns of the matrix
+  #     - If we assemble both jac and res together, we communicate the extra ghost ids to 
+  #       the residual, so everything is consistent. 
+  #     - However, if we assemble the residual and jacobian separately, 
+  #       the residual is not aware of the extra ghost ids
+  # This happens when there are touched ghost entries that do not belong to the local domain. 
+  # In particular, this happens when we have jumps, where some contributions come from two 
+  # cells away. Boundary cells then get contributions from cells which are not in the local domain.
   Ut_φ = TransientTrialFESpace(V_φ)
   ode_op = TransientLinearFEOperator((stiffness,mass),forcing,Ut_φ,V_φ;
     constant_forms=(false,true),assembler)
