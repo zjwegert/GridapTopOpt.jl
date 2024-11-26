@@ -1,7 +1,7 @@
 name = "GridapTopOpt"
 uuid = "27dd0110-1916-4fd6-8b4b-1bc109db1170"
 authors = ["Zach Wegert <zach.wegert@hdr.qut.edu.au>", "JordiManyer <jordi.manyer@monash.edu>"]
-version = "0.1.1"
+version = "0.1.2"
 
 [deps]
 BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
@@ -25,18 +25,17 @@ SparseMatricesCSR = "a0a7dd2c-ebf4-11e9-1f05-cf50bc540ca1"
 
 [compat]
 BenchmarkTools = "1"
-BlockArrays = "0.16,1"
+BlockArrays = "1"
 ChainRulesCore = "1"
 CircularArrays = "1"
-FillArrays = "0.8.4,1"
+FillArrays = "1"
 Gridap = "0.18"
 GridapDistributed = "0.4"
-GridapEmbedded = "0.9.5"
 GridapPETSc = "0.5"
 GridapSolvers = "0.4"
 JLD2 = "0.4,0.5"
-MPI = "0.19, 0.20"
-PartitionedArrays = "0.3"
+MPI = "0.16, 0.17, 0.18, 0.19, 0.20"
+PartitionedArrays = "0.3.3"
 SparseMatricesCSR = "0.6.6"
 julia = "1.6.7"
 
