@@ -40,6 +40,11 @@ cutgeo = cut(model,geo)
 Γ_AD = DifferentiableTriangulation(Γ,V_φ)
 dΓ_AD = Measure(Γ_AD,2*order)
 
-J_int2(φ) = ∫(g(fh))dΓ_AD
+J_int2(φ) = ∫(fh*fh)dΓ_AD
 dJ_int_AD2 = gradient(J_int2,φh)
 dJ_int_AD_vec2 = assemble_vector(dJ_int_AD2,V_φ)
+
+# Jordi: 
+# The issue was caused by ref cell points not having dimension Dc. 
+# We were returning the facet edges on the ref background cell, which is not what we want. 
+# It is fixed now in get_cell_point

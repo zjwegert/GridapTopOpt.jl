@@ -78,22 +78,25 @@ function Geometry.get_cell_reffe(t::DifferentiableTriangulation)
   get_cell_reffe(t.trian)
 end
 
+# TODO: Do we ever need to dualize the cell points? 
+# I think its not necessary, since all the dual numbers are propagated through the cellmaps...
+# Also: The current version dualizes only the phys points... 
+# If we want to indeed dualize this, we should probably also dualize the ref points 
+# in the case where ttrian.trian is a SubCellTriangulation (but not in the case of a SubFacetTriangulation)
+# Anyway, I don't think this matters for now...
 function CellData.get_cell_points(ttrian::DifferentiableTriangulation)
+  pts = get_cell_points(ttrian.trian)
+  cell_ref_point = pts.cell_ref_point
   if isnothing(ttrian.cell_values)
-    pts = get_cell_points(ttrian.trian)
-    return CellPoint(CellData.get_data(pts),ttrian,DomainStyle(pts))
+    cell_phys_point = pts.cell_phys_point
+  else
+    c = ttrian.caches
+    cell_phys_point = lazy_map(
+      DualizeCoordsMap(),c.face_to_coords,c.face_to_bgcoords,
+      ttrian.cell_values,c.face_to_edges,c.face_to_edge_lists
+    )
   end
-  c = ttrian.caches
-  cell_values = ttrian.cell_values
-  cell_to_rcoords = lazy_map(
-    DualizeCoordsMap(),c.face_to_rcoords,c.face_to_bgrcoords,
-    cell_values,c.face_to_edges,c.face_to_edge_lists
-  )
-  cell_to_coords = lazy_map(
-    DualizeCoordsMap(),c.face_to_coords,c.face_to_bgcoords,
-    cell_values,c.face_to_edges,c.face_to_edge_lists
-  )
-  return CellPoint(cell_to_rcoords, cell_to_coords, ttrian, ReferenceDomain())
+  return CellPoint(cell_ref_point, cell_phys_point, ttrian, DomainStyle(pts))
 end
 
 function Geometry.get_cell_map(ttrian::DifferentiableTriangulation)
