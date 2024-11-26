@@ -1,8 +1,8 @@
 """
     benchmark(f, args, ranks; nreps, reset!)
 
-Benchmark a function `f` that takes arguments `args`. 
-  
+Benchmark a function `f` that takes arguments `args`.
+
 In MPI mode, benchmark will always return the maximum CPU time across all ranks.
 This behaviour can be changed by overwritting `process_timer`.
 
@@ -14,7 +14,7 @@ set `ranks = nothing`.
 # Optional
 
 - `nreps = 10`: Number of benchmark repetitions
-- `reset!= (x...) -> nothing`: Function for resetting inital data (e.g., level-set function ``\\varphi``). 
+- `reset!= (x...) -> nothing`: Function for resetting inital data (e.g., level-set function ``\\varphi``).
 """
 function benchmark(f, args, ranks::Nothing; nreps = 10, reset! = (x...) -> nothing)
   t = zeros(Float64,nreps)
@@ -93,7 +93,7 @@ function benchmark_single_iteration(m::Optimiser,ranks; nreps = 10)
   end
 
   φ0 = copy(get_free_dof_values(m.φ0))
-  λ0 = copy(state.λ); Λ0 = copy(state.Λ) 
+  λ0 = copy(state.λ); Λ0 = copy(state.Λ)
   dL0 = copy(state.dL)
   function opt_reset!(m::Optimiser)
     u = get_free_dof_values(get_state(m.problem));
@@ -112,7 +112,7 @@ end
 """
     benchmark_forward_problem(m::AbstractFEStateMap, φh, ranks; nreps)
 
-Benchmark the forward FE solve given `m::AbstractFEStateMap` and a level-set 
+Benchmark the forward FE solve given `m::AbstractFEStateMap` and a level-set
 function `φh`. See [`forward_solve!`](@ref) for input types.
 """
 function benchmark_forward_problem(m::AbstractFEStateMap, φh, ranks; nreps = 10)
@@ -123,14 +123,14 @@ function benchmark_forward_problem(m::AbstractFEStateMap, φh, ranks; nreps = 10
     u = get_free_dof_values(get_state(m));
     fill!(u,zero(eltype(u)))
   end
-  return benchmark(f, (m,φh), ranks; nreps)
+  return benchmark(f, (m,φh), ranks; nreps, reset!)
 end
 
 """
     benchmark_advection(stencil::LevelSetEvolution, φ0, v0, γ, ranks; nreps)
 
 Benchmark solving the Hamilton-Jacobi evolution equation given a `stencil`,
-level-set function `φ0`, velocity function `v0`, and time step coefficient `γ`. 
+level-set function `φ0`, velocity function `v0`, and time step coefficient `γ`.
 See [`evolve!`](@ref) for input types.
 """
 function benchmark_advection(stencil::LevelSetEvolution, φ0, v0, γ, ranks; nreps = 10)
@@ -183,7 +183,7 @@ end
 """
     benchmark_hilbertian_projection_map(m::HilbertianProjectionMap, dV, C, dC, K, ranks; nreps)
 
-Benchmark `update_descent_direction!` for `HilbertianProjectionMap` given a objective 
+Benchmark `update_descent_direction!` for `HilbertianProjectionMap` given a objective
 sensitivity `dV`, constraint values C, constraint sensitivities `dC`, and stiffness
 matrix `K` for the velocity-extension.
 """
