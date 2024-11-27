@@ -1,8 +1,9 @@
 using Gridap, Gridap.Geometry, Gridap.Adaptivity
 using GridapEmbedded, GridapEmbedded.LevelSetCutters
 using GridapTopOpt
+using GridapSolvers
 
-path = "./results/stokes testing/"
+path = "./results/navier-stokes testing/"
 mkpath(path)
 
 # Formulation taken from
@@ -11,7 +12,7 @@ mkpath(path)
 # J Sci Comput (2014) 61:604–628 DOI 10.1007/s10915-014-9838-9
 
 # Cut the background model
-n = 200
+n = 100
 partition = (n,n)
 D = length(partition)
 _model = CartesianDiscreteModel((0,1,0,1),partition)
@@ -34,12 +35,11 @@ geo = DiscreteGeometry(φh,model)
 cutgeo = cut(model,geo)
 cutgeo_facets = cut_facets(model,geo)
 
-# Generate the "active" model (here we use whole domain as active)
-Ω_act = Triangulation(model)
+# Generate the "active" model
+Ω_act = Triangulation(cutgeo,ACTIVE)
 
 # Setup integration meshes
 Ω = Triangulation(cutgeo,PHYSICAL)
-Ωout = Triangulation(cutgeo,PHYSICAL_OUT)
 Γ = EmbeddedBoundary(cutgeo)
 Γg = GhostSkeleton(cutgeo)
 Γi = SkeletonTriangulation(cutgeo_facets)
@@ -53,14 +53,13 @@ n_Γi = get_normal_vector(Γi)
 order = 1
 degree = 2*order
 dΩ = Measure(Ω,degree)
-dΩout = Measure(Ωout,degree)
 dΓ = Measure(Γ,degree)
 dΓg = Measure(Γg,degree)
 dΓi = Measure(Γi,degree)
 
 # Setup FESpace
 
-uin(x) = VectorValue(x[2]*(1-x[2]),0.0)
+uin(x) = VectorValue(x[2]*(1-x[2]),0.5)
 
 reffe_u = ReferenceFE(lagrangian,VectorValue{D,Float64},order,space=:P)
 reffe_p = ReferenceFE(lagrangian,Float64,order,space=:P)
@@ -75,30 +74,44 @@ X = MultiFieldFESpace([U,P])
 Y = MultiFieldFESpace([V,Q])
 
 # Stabilization parameters
+β0 = 0.25
 β1 = 0.2
-γ = 1000.0
+β2 = 0.1
+β3 = 0.05
+γ = 10.0
 
 # Weak form
 a_Ω(u,v) = ∇(u) ⊙ ∇(v)
 b_Ω(v,p) = - (∇⋅v)*p
+c_Γi(p,q) = (β0*h)*jump(p)*jump(q)
 c_Ω(p,q) = (β1*h^2)*∇(p)⋅∇(q)
+a_Γ(u,v) = - (n_Γ⋅∇(u))⋅v - u⋅(n_Γ⋅∇(v)) + (γ/h)*u⋅v
+b_Γ(v,p) = (n_Γ⋅v)*p
+i_Γg(u,v) = (β2*h)*jump(n_Γg⋅∇(u))⋅jump(n_Γg⋅∇(v))
+j_Γg(p,q) = (β3*h^3)*jump(n_Γg⋅∇(p))*jump(n_Γg⋅∇(q)) + c_Γi(p,q)
 
 a((u,p),(v,q)) =
   ∫( a_Ω(u,v)+b_Ω(u,q)+b_Ω(v,p)-c_Ω(p,q) ) * dΩ +
-  ∫( a_Ω(u,v)+b_Ω(u,q)+b_Ω(v,p)-c_Ω(p,q) + (γ/h)*u⋅v ) * dΩout
+  ∫( a_Γ(u,v)+b_Γ(u,q)+b_Γ(v,p) ) * dΓ +
+  ∫( i_Γg(u,v) - j_Γg(p,q) ) * dΓg
 
 l((v,q)) = 0.0
 
-op = AffineFEOperator(a,l,X,Y)
+const Re = 700.0
+conv(u,∇u) = Re*(∇u')⋅u
+dconv(du,∇du,u,∇u) = conv(u,∇du)+conv(du,∇u)
+c(u,v) = ∫( v⊙(conv∘(u,∇(u))) )dΩ
+dc(u,du,v) = ∫( v⊙(dconv∘(du,∇(du),u,∇(u))) )dΩ
 
-uh, ph = solve(op)
+res((u,p),(v,q)) = a((u,p),(v,q)) + c(u,v)
+jac((u,p),(du,dp),(v,q)) = a((du,dp),(v,q)) + dc(u,du,v)
 
-writevtk(Ω,path*"5-results",
+op = FEOperator(res,jac,X,Y)
+
+solver = GridapSolvers.NewtonSolver(LUSolver();verbose=true)
+uh, ph = solve(solver,op)
+
+writevtk(Ω,path*"2-results",
   cellfields=["uh"=>uh,"ph"=>ph])
 
-writevtk(Ωout,path*"5-results-out",
-  cellfields=["uh"=>uh,"ph"=>ph])
-
-writevtk(Γ,path*"5-results-stress",cellfields=["uh"=>uh,"ph"=>ph,"σn"=>∇(uh)⋅n_Γ - ph*n_Γ])
-
-σ5 = ∇(uh)⋅n_Γ - ph*n_Γ
+writevtk(Γ,path*"2-results-stress",cellfields=["uh"=>uh,"ph"=>ph,"σn"=>∇(uh)⋅n_Γ - ph*n_Γ])

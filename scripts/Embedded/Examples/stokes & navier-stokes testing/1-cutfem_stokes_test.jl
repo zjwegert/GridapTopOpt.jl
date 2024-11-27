@@ -4,7 +4,7 @@ using GridapEmbedded
 using Test
 using LinearAlgebra: tr
 
-path = "./results/stokes & navier-stokes testing/"
+path = "./results/stokes testing/"
 mkpath(path)
 
 # Manufactured solution

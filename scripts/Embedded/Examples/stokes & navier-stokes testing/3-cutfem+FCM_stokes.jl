@@ -2,7 +2,7 @@ using Gridap, Gridap.Geometry, Gridap.Adaptivity
 using GridapEmbedded, GridapEmbedded.LevelSetCutters
 using GridapTopOpt
 
-path = "./results/stokes & navier-stokes testing/"
+path = "./results/stokes testing/"
 mkpath(path)
 
 # Formulation taken from
