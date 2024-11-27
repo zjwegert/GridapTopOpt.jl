@@ -22,9 +22,9 @@ V_φ = TestFESpace(model,reffe_scalar)
 φh = interpolate(x->-(x[1]-0.5)^2-(x[2]-0.5)^2+0.25^2,V_φ)
 φh0 = interpolate(x->-sqrt((x[1]-0.5)^2+(x[2]-0.5)^2)+0.25,V_φ)
 
-Ωs = EmbeddedCollection(model,φh) do cutgeo
+Ωs = EmbeddedCollection(model,φh) do cutgeo,_
   Γ = EmbeddedBoundary(cutgeo)
-  (; 
+  (;
     :Γ => Γ,
     :dΓ => Measure(Γ,2*order)
   )
@@ -54,7 +54,7 @@ cutgeo0 = cut(model,geo0)
 # writevtk(
 #   Ω,"results/test_evolve",
 #   cellfields=[
-#   "φh0"=>φh0,"|∇φh0|"=>norm ∘ ∇(φh0),  
+#   "φh0"=>φh0,"|∇φh0|"=>norm ∘ ∇(φh0),
 #   "φh_reinit"=>φh_reinit,"|∇φh_reinit|"=>norm ∘ ∇(φh_reinit)
 #   ]
 # )

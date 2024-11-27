@@ -1,4 +1,4 @@
-module EmbeddedDifferentiationTests
+module EmbeddedDifferentiationTestsMPI
 using Test
 
 using GridapTopOpt
@@ -8,12 +8,12 @@ using GridapEmbedded, GridapEmbedded.LevelSetCutters
 using Gridap.Arrays: Operation
 using GridapTopOpt: get_conormal_vector,get_subfacet_normal_vector,get_ghost_normal_vector
 
-function generate_model(D,n)
+function generate_model(D,n,ranks,mesh_partition)
   domain = (D==2) ? (0,1,0,1) : (0,1,0,1,0,1)
   cell_partition = (D==2) ? (n,n) : (n,n,n)
-  base_model = UnstructuredDiscreteModel((CartesianDiscreteModel(domain,cell_partition)))
+  base_model = UnstructuredDiscreteModel(CartesianDiscreteModel(ranks,mesh_partition,domain,cell_partition))
   ref_model = refine(base_model, refinement_method = "barycentric")
-  model = ref_model.model
+  model = Adaptivity.get_model(ref_model)
   return model
 end
 
@@ -42,9 +42,7 @@ function level_set(shape::Symbol;N=4)
 end
 
 function main(
-  model,φ::Function,f::Function;
-  vtk=false,
-  name="embedded"
+  model,φ::Function,f::Function
 )
   order = 1
   reffe = ReferenceFE(lagrangian,Float64,order)
@@ -52,12 +50,6 @@ function main(
 
   φh = interpolate(φ,V_φ)
   fh = interpolate(f,V_φ)
-
-  # Correction if level set is on top of a node
-  x_φ = get_free_dof_values(φh)
-  idx = findall(isapprox(0.0;atol=10^-10),x_φ)
-  !isempty(idx) && @info "Correcting level values!"
-  x_φ[idx] .+= 10*eps(eltype(x_φ))
 
   geo = DiscreteGeometry(φh,model)
   cutgeo = cut(model,geo)
@@ -139,77 +131,30 @@ function main(
 
   # @test norm(dJ_int_AD_vec2 - dJ_int_exact_vec2) < 1e-10
 
-  if vtk
-    path = "results/$(name)"
-    Ω_bg = Triangulation(model)
-    writevtk(
-      Ω_bg,"$(path)_results",
-      cellfields = [
-        "φh" => φh,"∇φh" => ∇(φh),
-        "dJ_bulk_AD" => FEFunction(V_φ,dJ_bulk_AD_vec),
-        "dJ_bulk_exact" => FEFunction(V_φ,dJ_bulk_exact_vec),
-        "dJ_int_AD" => FEFunction(V_φ,dJ_int_AD_vec),
-        "dJ_int_exact" => FEFunction(V_φ,dJ_int_exact_vec)
-      ],
-      celldata = [
-        "inoutcut" => GridapEmbedded.Interfaces.compute_bgcell_to_inoutcut(model,geo)
-      ];
-      append = false
-    )
-
-    writevtk(
-      Ω, "$(path)_omega"; append = false
-    )
-    writevtk(
-      Γ, "$(path)_gamma"; append = false
-    )
-
-    n_∂Ω_Λ = get_subfacet_normal_vector(Λ)
-    n_k_Λ  = get_ghost_normal_vector(Λ)
-    writevtk(
-      Λ, "$(path)_lambda",
-      cellfields = [
-        "n_∂Ω.plus" => n_∂Ω_Λ.plus,"n_∂Ω.minus" => n_∂Ω_Λ.minus,
-        "n_k.plus" => n_k_Λ.plus,"n_k.minus" => n_k_Λ.minus,
-        "n_S" => n_S_Λ,
-        "m_k.plus" => m_k_Λ.plus,"m_k.minus" => m_k_Λ.minus,
-        "∇ˢφ" => ∇ˢφ_Λ,
-        "∇φh_Γs_plus" => ∇(φh).plus,"∇φh_Γs_minus" => ∇(φh).minus,
-        "jump(fh*m_k)" => jump(fh*m_k_Λ)
-      ];
-      append = false
-    )
-
-    if num_cells(Σ) > 0
-      n_∂Ω_Σ = get_subfacet_normal_vector(Σ)
-      n_k_Σ  = get_ghost_normal_vector(Σ)
-      writevtk(
-        Σ, "$(path)_sigma",
-        cellfields = [
-          "n_∂Ω" => n_∂Ω_Σ, "n_k" => n_k_Σ,
-          "n_S" => n_S_Σ, "m_k" => m_k_Σ,
-          "∇ˢφ" => ∇ˢφ_Σ, "∇φh_Γs" => ∇(φh),
-        ];
-        append = false
-      )
-    end
-  end
 end
 
 #######################
 
-D = 2
-n = 10
-model = generate_model(D,n)
-φ = level_set(:circle)
-f = x -> 1.0
-main(model,φ,f;vtk=true)
+with_mpi() do distribute
+  mesh_partition = (2,2)
+  ranks = distribute(LinearIndices((prod(mesh_partition),)))
+  D = 2
+  n = 10
+  model = generate_model(D,n,ranks,mesh_partition)
+  φ = level_set(:circle)
+  f = x -> 1.0
+  main(model,φ,f)
+end
 
-D = 2
-n = 10
-model = generate_model(D,n)
-φ = level_set(:circle)
-f = x -> x[1]+x[2]
-main(model,φ,f;vtk=true)
+with_mpi() do distribute
+  mesh_partition = (2,2)
+  ranks = distribute(LinearIndices((prod(mesh_partition),)))
+  D = 2
+  n = 10
+  model = generate_model(D,n,ranks,mesh_partition)
+  φ = level_set(:circle)
+  f = x -> x[1]+x[2]
+  main(model,φ,f)
+end
 
 end

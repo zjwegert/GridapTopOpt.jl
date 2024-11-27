@@ -21,10 +21,10 @@ V_φ = TestFESpace(model,reffe_scalar)
 
 φh = interpolate(x->-sqrt((x[1]-0.5)^2+(x[2]-0.5)^2)+0.25,V_φ)
 
-Ωs = EmbeddedCollection(model,φh) do cutgeo
+Ωs = EmbeddedCollection(model,φh) do cutgeo,_
   Γ = EmbeddedBoundary(cutgeo)
   Γg = GhostSkeleton(cutgeo)
-  (; 
+  (;
     :Γ  => Γ,
     :dΓ => Measure(Γ,2*order),
     :Γg => Γg,
@@ -58,7 +58,7 @@ evolve!(evo,φh,velh,0.1)
 # writevtk(
 #   Ω,"results/test_evolve",
 #   cellfields=[
-#   "φh0"=>φh0,"|∇φh0|"=>norm ∘ ∇(φh0),  
+#   "φh0"=>φh0,"|∇φh0|"=>norm ∘ ∇(φh0),
 #   "φh_advect"=>φh,"|∇φh_advect|"=>norm ∘ ∇(φh),
 #   "φh_expected_lsf"=>φh_expected_lsf
 #   ]

@@ -1,4 +1,4 @@
-module LSTOMPITests
+module UnfittedEvolutionTestsMPI
 
 using Test
 using MPI
@@ -20,7 +20,5 @@ MPI.mpiexec() do cmd
     @test true
   end
 end
-
-include("UnfittedEvolutionTests/runtests.jl")
 
 end
