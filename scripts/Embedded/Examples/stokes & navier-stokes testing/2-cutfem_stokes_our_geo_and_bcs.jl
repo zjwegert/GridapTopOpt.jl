@@ -11,7 +11,7 @@ mkpath(path)
 # J Sci Comput (2014) 61:604–628 DOI 10.1007/s10915-014-9838-9
 
 # Cut the background model
-n = 100
+n = 200
 partition = (n,n)
 D = length(partition)
 _model = CartesianDiscreteModel((0,1,0,1),partition)
@@ -104,3 +104,11 @@ writevtk(Ω,path*"2-results",
   cellfields=["uh"=>uh,"ph"=>ph])
 
 writevtk(Γ,path*"2-results-stress",cellfields=["uh"=>uh,"ph"=>ph,"σn"=>∇(uh)⋅n_Γ - ph*n_Γ])
+
+σ2 = ∇(uh)⋅n_Γ - ph*n_Γ
+
+sum(∫(σ2) * Measure(get_triangulation(σ2),degree))
+sum(∫(σ3) * Measure(get_triangulation(σ3),degree))
+sum(∫(σ4) * Measure(get_triangulation(σ4),degree))
+sum(∫(σ5) * Measure(get_triangulation(σ5),degree))
+sum(∫(σ6) * Measure(get_triangulation(σ6),degree))

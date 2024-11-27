@@ -11,7 +11,7 @@ mkpath(path)
 # J Sci Comput (2014) 61:604–628 DOI 10.1007/s10915-014-9838-9
 
 # Cut the background model
-n = 100
+n = 200
 partition = (n,n)
 D = length(partition)
 _model = CartesianDiscreteModel((0,1,0,1),partition)
@@ -75,21 +75,15 @@ X = MultiFieldFESpace([U,P])
 Y = MultiFieldFESpace([V,Q])
 
 # Stabilization parameters
-# β0 = 0.25
 β1 = 0.2
-# β2 = 0.1
-# β3 = 0.05
 γ = 10.0
 
 # Weak form
 a_Ω(u,v) = ∇(u) ⊙ ∇(v)
 b_Ω(v,p) = - (∇⋅v)*p
-# c_Γi(p,q) = (β0*h)*jump(p)*jump(q)
 c_Ω(p,q) = (β1*h^2)*∇(p)⋅∇(q)
 a_Γ(u,v) = - (n_Γ⋅∇(u))⋅v - u⋅(n_Γ⋅∇(v)) + (γ/h)*u⋅v
 b_Γ(v,p) = (n_Γ⋅v)*p
-# i_Γg(u,v) = (β2*h)*jump(n_Γg⋅∇(u))⋅jump(n_Γg⋅∇(v))
-# j_Γg(p,q) = (β3*h^3)*jump(n_Γg⋅∇(p))*jump(n_Γg⋅∇(q)) + c_Γi(p,q)
 
 a((u,p),(v,q)) =
   ∫( a_Ω(u,v)+b_Ω(u,q)+b_Ω(v,p)-c_Ω(p,q) ) * dΩ +
@@ -109,3 +103,5 @@ writevtk(Ωout,path*"4-results-out",
   cellfields=["uh"=>uh,"ph"=>ph])
 
 writevtk(Γ,path*"4-results-stress",cellfields=["uh"=>uh,"ph"=>ph,"σn"=>∇(uh)⋅n_Γ - ph*n_Γ])
+
+σ4 = ∇(uh)⋅n_Γ - ph*n_Γ
