@@ -102,3 +102,5 @@ uh, ph = solve(op)
 
 writevtk(Ω,path*"2-results",
   cellfields=["uh"=>uh,"ph"=>ph])
+
+writevtk(Γ,path*"2-results-stress",cellfields=["uh"=>uh,"ph"=>ph,"σn"=>∇(uh)⋅n_Γ - ph*n_Γ])
