@@ -53,7 +53,7 @@ function tag_isolated_volumes(
   color_to_inout = Int8[]
   touched  = falses(n_cells)
   q, q_cut = Queue{Int}(), Queue{Int}()
-  
+
   # First pass: Color IN/OUT cells
   #   - We assume that every IN/OUT transition can be bridged by a CUT cell
   first_cell = findfirst(state -> state != CUT, cell_to_inoutcut)
@@ -62,7 +62,7 @@ function tag_isolated_volumes(
     cell  = dequeue!(q)
     nbors = cell_to_nbors[cell]
     state = cell_to_inoutcut[cell]
-    
+
     # Mark with color
     if state != CUT
       i = findfirst(!iszero,view(cell_color,nbors))
@@ -107,14 +107,21 @@ function tag_isolated_volumes(
 end
 
 order = 1
-n = 20
+n = 100
 model = UnstructuredDiscreteModel(CartesianDiscreteModel((0,1,0,1),(n,n)))
 Ω = Triangulation(model)
 
 reffe_scalar = ReferenceFE(lagrangian,Float64,order)
 V_φ = TestFESpace(model,reffe_scalar)
 
-φh = interpolate(x->cos(2π*x[1])*cos(2π*x[2])-0.11,V_φ)
+# φh = interpolate(x->cos(2π*x[1])*cos(2π*x[2])-0.11,V_φ)
+
+# R = 0.195
+R = 0.2 # This fails
+f(x0,r) = x -> sqrt((x[1]-x0[1])^2 + (x[2]-x0[2])^2) - r
+φh = interpolate(x->-f([0.5,0.5],R)(x),V_φ)
+# φh = interpolate(x->min(f([0.25,0.5],R)(x),f([0.75,0.5],R)(x)),V_φ)
+
 
 geo = DiscreteGeometry(φh,model)
 cutgeo = cut(model,geo)
