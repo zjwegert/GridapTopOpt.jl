@@ -82,6 +82,9 @@ Y = MultiFieldFESpace([V,Q])
 γ = 10.0
 
 # Weak form
+# NOTE: This problem is kind of a CutFEM FCM hybird with ersatz.
+# It does not really make sense to use both approaches.
+
 a_Ω(u,v) = ∇(u) ⊙ ∇(v)
 b_Ω(v,p) = - (∇⋅v)*p
 c_Γi(p,q) = (β0*h)*jump(p)*jump(q)
