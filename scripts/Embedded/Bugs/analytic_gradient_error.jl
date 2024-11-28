@@ -66,3 +66,23 @@ dJ_int_exact2(w) = ∫((-n_Γ⋅∇(g(fh)))*w/(norm ∘ (∇(φh))))dΓ +
                   ∫(-n_S_Λ ⋅ (jump(g(fh)*m_k_Λ) * mean(w) / ∇ˢφ_Λ))dΛ +
                   ∫(-n_S_Σ ⋅ (g(fh)*m_k_Σ * w / ∇ˢφ_Σ))dΣ
 dJ_int_exact_vec2 = assemble_vector(dJ_int_exact2,V_φ)
+
+Ω = Triangulation(model)
+x = get_cell_points(Ω)
+
+using Gridap.CellData: get_data
+
+∇g(fh) = ∇∇(fh)⋅∇(fh) + ∇(fh)⋅∇∇(fh)
+∇g2(∇∇f,∇f) = ∇∇f⋅∇f + ∇f⋅∇∇f
+
+h = g(fh)
+∇h = ∇(h)
+∇h_exact = ∇g(fh)
+∇h_exact2 = ∇g2∘(∇∇(fh),∇(fh))
+
+h(x)
+∇h(x)
+∇h_exact(x)
+∇h_exact2(x)
+
+
