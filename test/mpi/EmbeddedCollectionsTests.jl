@@ -1,4 +1,4 @@
-module EmbeddedCollectionsTests
+module EmbeddedCollectionsTestsMPI
 using Test
 
 using GridapTopOpt
@@ -8,18 +8,20 @@ using GridapEmbedded
 using GridapEmbedded.LevelSetCutters
 using Gridap.Geometry, Gridap.FESpaces, Gridap.CellData, Gridap.Adaptivity
 
-function generate_model(D,n)
+function generate_model(D,n,ranks,mesh_partition)
   domain = (D==2) ? (0,1,0,1) : (0,1,0,1,0,1)
   cell_partition = (D==2) ? (n,n) : (n,n,n)
-  base_model = UnstructuredDiscreteModel((CartesianDiscreteModel(domain,cell_partition)))
+  base_model = UnstructuredDiscreteModel(CartesianDiscreteModel(ranks,mesh_partition,domain,cell_partition))
   ref_model = refine(base_model, refinement_method = "barycentric")
-  model = ref_model.model
+  model = Adaptivity.get_model(ref_model)
   return model
 end
 
-function main()
+function main(distribute,mesh_partition)
+  ranks = distribute(LinearIndices((prod(mesh_partition),)))
+
   order = 1
-  model = generate_model(2,40)
+  model = generate_model(2,40,ranks,mesh_partition)
 
   reffe = ReferenceFE(lagrangian,Float64,order)
   V_φ = TestFESpace(model,reffe)
@@ -51,15 +53,17 @@ function main()
     update_collection!(Ωs,φ(r))
     A = area(Ωs)
     C = contour(Ωs)
-    println(" >> Radius: $r")
-    println(" >> Area: $(A) (expected: $(π*r^2))")
-    println(" >> Contour: $(C) (expected: $(2π*r))")
+    i_am_main(ranks) && println(" >> Radius: $r")
+    i_am_main(ranks) && println(" >> Area: $(A) (expected: $(π*r^2))")
+    i_am_main(ranks) && println(" >> Contour: $(C) (expected: $(2π*r))")
     @test abs(A - π*r^2) < 1e-3
     @test abs(C - 2π*r) < 1e-3
     println("---------------------------------")
   end
 end
 
-main()
+with_mpi() do distribute
+  main(distribute,(2,2))
+end
 
 end
