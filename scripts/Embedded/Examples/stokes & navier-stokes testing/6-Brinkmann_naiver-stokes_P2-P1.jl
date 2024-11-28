@@ -29,7 +29,12 @@ update_labels!(2,model,f_Γ_NoSlip,"Gamma_NoSlip")
 # Cut the background model
 reffe_scalar = ReferenceFE(lagrangian,Float64,1)
 V_φ = TestFESpace(model,reffe_scalar)
-φh = interpolate(x->-sqrt((x[1]-0.5)^2+(x[2]-0.5)^2)+0.1,V_φ)
+## Circle
+# φh = interpolate(x->-sqrt((x[1]-0.5)^2+(x[2]-0.5)^2)+0.1,V_φ)
+## Concave obstacle
+_g(x,y) = (x*cos(x))^2 + 5*(y*cos(16*y))^4 - 0.01
+φh = interpolate(x->-_g(x[1]-0.5,x[2]-0.5),V_φ)
+
 geo = DiscreteGeometry(φh,model)
 cutgeo = cut(model,geo)
 cutgeo_facets = cut_facets(model,geo)
@@ -87,7 +92,7 @@ a((u,p),(v,q)) =
 
 l((v,q)) = 0.0
 
-const Re = 700.0
+const Re = 10.0
 conv(u,∇u) = Re*(∇u')⋅u
 dconv(du,∇du,u,∇u) = conv(u,∇du)+conv(du,∇u)
 c(u,v) = ∫( v⊙(conv∘(u,∇(u))) )dΩ

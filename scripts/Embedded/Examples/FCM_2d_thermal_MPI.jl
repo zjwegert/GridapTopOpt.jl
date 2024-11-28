@@ -136,10 +136,10 @@ function main(mesh_partition,distribute,el_size,path)
   writevtk(Ωs.Ωin,path*"Omega_in$it",cellfields=["uh"=>uh])
 end
 
-with_debug() do distribute
-  write_dir="./results/FCM_thermal_compliance_ALM/"
+with_mpi() do distribute
+  write_dir="./results/FCM_thermal_compliance_ALM_MPI/"
   mesh_partition = (2,2)
-  el_size = (100,100)
+  el_size = (50,50)
   solver_options = "-pc_type gamg -ksp_type cg -ksp_error_if_not_converged true
     -ksp_converged_reason -ksp_rtol 1.0e-12"
 

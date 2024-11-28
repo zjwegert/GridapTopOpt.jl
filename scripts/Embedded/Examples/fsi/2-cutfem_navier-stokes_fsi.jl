@@ -1,18 +1,12 @@
 using Gridap, Gridap.Geometry, Gridap.Adaptivity
 using GridapEmbedded, GridapEmbedded.LevelSetCutters
 using GridapTopOpt
-using GridapSolvers
 
-path = "./results/navier-stokes testing/"
+path = "./results/fsi testing/"
 mkpath(path)
 
-# Formulation taken from
-# André Massing · Mats G. Larson · Anders Logg · Marie E. Rognes,
-# A Stabilized Nitsche Fictitious Domain Method for the Stokes Problem
-# J Sci Comput (2014) 61:604–628 DOI 10.1007/s10915-014-9838-9
-
 # Cut the background model
-n = 200
+n = 100
 partition = (n,n)
 D = length(partition)
 _model = CartesianDiscreteModel((0,1,0,1),partition)
@@ -23,28 +17,27 @@ model = ref_model.model
 el_Δ = get_el_Δ(_model)
 h = maximum(el_Δ)
 f_Γ_D(x) = x[1] ≈ 0
-f_Γ_NoSlip(x) = x[2] ≈ 0 || x[2] ≈ 1
+f_Γ_NoSlipTop(x) = x[2] ≈ 1
+f_Γ_NoSlipBottom(x) = x[2] ≈ 0
 update_labels!(1,model,f_Γ_D,"Gamma_D")
-update_labels!(2,model,f_Γ_NoSlip,"Gamma_NoSlip")
+update_labels!(2,model,f_Γ_NoSlipTop,"Gamma_NoSlipTop")
+update_labels!(3,model,f_Γ_NoSlipBottom,"Gamma_NoSlipBottom")
 
 # Cut the background model
 reffe_scalar = ReferenceFE(lagrangian,Float64,1)
 V_φ = TestFESpace(model,reffe_scalar)
-## Circle
-# φh = interpolate(x->-sqrt((x[1]-0.5)^2+(x[2]-0.5)^2)+0.1,V_φ)
-## Concave obstacle
-_g(x,y) = (x*cos(x))^2 + 5*(y*cos(16*y))^4 - 0.01
-φh = interpolate(x->-_g(x[1]-0.5,x[2]-0.5),V_φ)
-
+φh = interpolate(x->-max(20*abs(x[1]-0.5),3*abs(x[2]-0.2))+1,V_φ)
 geo = DiscreteGeometry(φh,model)
 cutgeo = cut(model,geo)
 cutgeo_facets = cut_facets(model,geo)
 
 # Generate the "active" model
 Ω_act = Triangulation(cutgeo,ACTIVE)
+Ω_act_solid = Triangulation(cutgeo,ACTIVE_OUT)
 
 # Setup integration meshes
 Ω = Triangulation(cutgeo,PHYSICAL)
+Ωout = Triangulation(cutgeo,PHYSICAL_OUT)
 Γ = EmbeddedBoundary(cutgeo)
 Γg = GhostSkeleton(cutgeo)
 Γi = SkeletonTriangulation(cutgeo_facets)
@@ -58,35 +51,44 @@ n_Γi = get_normal_vector(Γi)
 order = 1
 degree = 2*order
 dΩ = Measure(Ω,degree)
+dΩout = Measure(Ωout,degree)
 dΓ = Measure(Γ,degree)
 dΓg = Measure(Γg,degree)
 dΓi = Measure(Γi,degree)
 
 # Setup FESpace
 
-uin(x) = VectorValue(x[2]*(1-x[2]),0.5)
+uin(x) = VectorValue(0.01x[2]*(1-x[2]),0.0)
 
 reffe_u = ReferenceFE(lagrangian,VectorValue{D,Float64},order,space=:P)
 reffe_p = ReferenceFE(lagrangian,Float64,order,space=:P)
+reffe_d = ReferenceFE(lagrangian,VectorValue{D,Float64},order)
 
-V = TestFESpace(Ω_act,reffe_u,conformity=:H1,dirichlet_tags=["Gamma_D","Gamma_NoSlip"])
+V = TestFESpace(Ω_act,reffe_u,conformity=:H1,dirichlet_tags=["Gamma_D","Gamma_NoSlipTop","Gamma_NoSlipBottom"])
 Q = TestFESpace(Ω_act,reffe_p,conformity=:H1)
+T = TestFESpace(Ω_act_solid,reffe_d,conformity=:H1,dirichlet_tags=["Gamma_NoSlipBottom"])
 
-U = TrialFESpace(V,[x->uin(x),VectorValue(0.0,0.0)])
+U = TrialFESpace(V,[x->uin(x),VectorValue(0.0,0.0),VectorValue(0.0,0.0)])
 P = TrialFESpace(Q)
+R = TrialFESpace(T)
 
-X = MultiFieldFESpace([U,P])
-Y = MultiFieldFESpace([V,Q])
+X = MultiFieldFESpace([U,P,R])
+Y = MultiFieldFESpace([V,Q,T])
 
+# Weak form
+## Fluid
+# Properties
+μ = 1.0
+ρ = 10.0
 # Stabilization parameters
 β0 = 0.25
 β1 = 0.2
 β2 = 0.1
 β3 = 0.05
 γ = 10.0
-
-# Weak form
-a_Ω(u,v) = ∇(u) ⊙ ∇(v)
+# Terms
+σf(u,p) = ∇(u)⋅n_Γ - p*n_Γ
+a_Ω(u,v) = μ*(∇(u) ⊙ ∇(v))
 b_Ω(v,p) = - (∇⋅v)*p
 c_Γi(p,q) = (β0*h)*jump(p)*jump(q)
 c_Ω(p,q) = (β1*h^2)*∇(p)⋅∇(q)
@@ -95,28 +97,46 @@ b_Γ(v,p) = (n_Γ⋅v)*p
 i_Γg(u,v) = (β2*h)*jump(n_Γg⋅∇(u))⋅jump(n_Γg⋅∇(v))
 j_Γg(p,q) = (β3*h^3)*jump(n_Γg⋅∇(p))*jump(n_Γg⋅∇(q)) + c_Γi(p,q)
 
-a((u,p),(v,q)) =
+a_fluid((u,p),(v,q)) =
   ∫( a_Ω(u,v)+b_Ω(u,q)+b_Ω(v,p)-c_Ω(p,q) ) * dΩ +
   ∫( a_Γ(u,v)+b_Γ(u,q)+b_Γ(v,p) ) * dΓ +
   ∫( i_Γg(u,v) - j_Γg(p,q) ) * dΓg
 
-l((v,q)) = 0.0
-
-const Re = 10.0
-conv(u,∇u) = Re*(∇u')⋅u
+conv(u,∇u) = ρ*(∇u')⋅u
 dconv(du,∇du,u,∇u) = conv(u,∇du)+conv(du,∇u)
 c(u,v) = ∫( v⊙(conv∘(u,∇(u))) )dΩ
 dc(u,du,v) = ∫( v⊙(dconv∘(du,∇(du),u,∇(u))) )dΩ
 
-res((u,p),(v,q)) = a((u,p),(v,q)) + c(u,v)
-jac((u,p),(du,dp),(v,q)) = a((du,dp),(v,q)) + dc(u,du,v)
+res_fluid((u,p),(v,q)) = a_fluid((u,p),(v,q)) + c(u,v)
+jac_fluid((u,p),(du,dp),(v,q)) = a_fluid((du,dp),(v,q)) + dc(u,du,v)
+
+## Structure
+# Stabilization and material parameters
+γg = 0.1
+function lame_parameters(E,ν)
+  λ = (E*ν)/((1+ν)*(1-2*ν))
+  μ = E/(2*(1+ν))
+  (λ, μ)
+end
+λ, μ = lame_parameters(1.0,0.3)
+# Terms
+σ(ε) = λ*tr(ε)*one(ε) + 2*μ*ε
+a_solid(d,s) = ∫(ε(s) ⊙ (σ ∘ ε(d)))dΩout +
+  ∫((γg*h)*jump(n_Γg⋅∇(s)) ⋅ jump(n_Γg⋅∇(d)))dΓg
+
+## Full problem
+res((u,p,d),(v,q,s)) = res_fluid((u,p),(v,q)) + a_solid(d,s) +
+  ∫(((σ ∘ ε(d))⋅n_Γ + σf(u,p))⋅s)dΓ # plus sign because of the normal direction
+jac((u,p,d),(du,dp,dd),(v,q,s)) = jac_fluid((u,p),(du,dp),(v,q)) + a_solid(dd,s) +
+  ∫(((σ ∘ ε(dd))⋅n_Γ + σf(du,dp))⋅s)dΓ
 
 op = FEOperator(res,jac,X,Y)
-
 solver = GridapSolvers.NewtonSolver(LUSolver();verbose=true)
-uh, ph = solve(solver,op)
+uh, ph, dh = solve(solver,op)
 
-writevtk(Ω,path*"2-results",
-  cellfields=["uh"=>uh,"ph"=>ph])
+writevtk(Ω,path*"fsi-navier-stokes-CutFEM_fluid",
+  cellfields=["uh"=>uh,"ph"=>ph,"dh"=>dh])
+writevtk(Ωout,path*"fsi-navier-stokes-CutFEM_solid",
+  cellfields=["uh"=>uh,"ph"=>ph,"dh"=>dh])
 
-writevtk(Γ,path*"2-results-stress",cellfields=["uh"=>uh,"ph"=>ph,"σn"=>∇(uh)⋅n_Γ - ph*n_Γ])
+writevtk(Γ,path*"fsi-navier-stokes-CutFEM_interface",cellfields=["σ⋅n"=>(σ ∘ ε(dh))⋅n_Γ,"σf"=>σf(uh,ph)])
