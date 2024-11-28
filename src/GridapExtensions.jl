@@ -100,6 +100,31 @@ function Arrays.evaluate!(
   Polynomials._evaluate!(cache,fg,x,Val(false))
 end
 
+# Fix for autodiff of CompositeTriangulations of Skeleton trians
+
+function FESpaces._change_argument(
+  op,f,trian::Geometry.CompositeTriangulation{Dc,Dp,A,<:SkeletonTriangulation},uh::SingleFieldFEFunction
+) where {Dc,Dp,A}
+  U = get_fe_space(uh)
+  function g(cell_u)
+    uh_dual = CellField(U,cell_u)
+    scfp_plus = CellData.SkeletonCellFieldPair(uh_dual, uh)
+    scfp_minus = CellData.SkeletonCellFieldPair(uh, uh_dual)
+    cell_grad_plus = f(scfp_plus)
+    cell_grad_minus = f(scfp_minus)
+    CellData.get_contribution(cell_grad_plus,trian), CellData.get_contribution(cell_grad_minus,trian)
+  end
+  g
+end
+
+function FESpaces._compute_cell_ids(
+  uh,ttrian::Geometry.CompositeTriangulation{Dc,Dp,A,<:SkeletonTriangulation}
+) where {Dc,Dp,A}
+  tcells_plus  = FESpaces._compute_cell_ids(uh,ttrian.dtrian.plus)
+  tcells_minus = FESpaces._compute_cell_ids(uh,ttrian.dtrian.minus)
+  CellData.SkeletonPair(tcells_plus,tcells_minus)
+end
+
 # # TODO: Below is dangerous, as it may break other Gridap methods,
 # #   it is neccessary for now - see thermal_2d.jl problem
 # function FESpaces._compute_cell_ids(uh,ttrian)
