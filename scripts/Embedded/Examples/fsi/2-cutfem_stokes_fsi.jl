@@ -58,7 +58,7 @@ dΓi = Measure(Γi,degree)
 
 # Setup FESpace
 
-uin(x) = VectorValue(0.01x[2]*(1-x[2]),0.0)
+uin(x) = VectorValue(x[2],0.0)
 
 reffe_u = ReferenceFE(lagrangian,VectorValue{D,Float64},order,space=:P)
 reffe_p = ReferenceFE(lagrangian,Float64,order,space=:P)
@@ -68,7 +68,7 @@ V = TestFESpace(Ω_act,reffe_u,conformity=:H1,dirichlet_tags=["Gamma_D","Gamma_N
 Q = TestFESpace(Ω_act,reffe_p,conformity=:H1)
 T = TestFESpace(Ω_act_solid,reffe_d,conformity=:H1,dirichlet_tags=["Gamma_NoSlipBottom"])
 
-U = TrialFESpace(V,[x->uin(x),VectorValue(0.0,0.0),VectorValue(0.0,0.0)])
+U = TrialFESpace(V,[uin,VectorValue(0.0,0.0),VectorValue(0.0,0.0)])
 P = TrialFESpace(Q)
 R = TrialFESpace(T)
 
@@ -78,23 +78,27 @@ Y = MultiFieldFESpace([V,Q,T])
 # Weak form
 ## Fluid
 # Properties
-μ = 1.0
+Re = 60 # Reynolds number
+ρ = 1.0 # Density
+L = 1.0 # Characteristic length
+u0_max = maximum(abs,get_dirichlet_dof_values(U))
+μ = ρ*L*u0_max/Re # Viscosity
 # Stabilization parameters
 β0 = 0.25
 β1 = 0.2
-β2 = 0.1
-β3 = 0.05
-γ = 10.0
+β2 = 0.1*h # 0.05*μ*h
+β3 = 0.05*(μ/h + ρ*u0_max/6)^-1*h^2 # 0.05*h^3
+γ = 100.0
 # Terms
-σf(u,p) = ∇(u)⋅n_Γ - p*n_Γ
+σf_n(u,p) = μ*∇(u)⋅n_Γ - p*n_Γ
 a_Ω(u,v) = μ*(∇(u) ⊙ ∇(v))
 b_Ω(v,p) = - (∇⋅v)*p
-c_Γi(p,q) = (β0*h)*jump(p)*jump(q)
+c_Γi(p,q) = (β0*h)*jump(p)*jump(q) # this will vanish for p∈P1
 c_Ω(p,q) = (β1*h^2)*∇(p)⋅∇(q)
 a_Γ(u,v) = - (n_Γ⋅∇(u))⋅v - u⋅(n_Γ⋅∇(v)) + (γ/h)*u⋅v
 b_Γ(v,p) = (n_Γ⋅v)*p
-i_Γg(u,v) = (β2*h)*jump(n_Γg⋅∇(u))⋅jump(n_Γg⋅∇(v))
-j_Γg(p,q) = (β3*h^3)*jump(n_Γg⋅∇(p))*jump(n_Γg⋅∇(q)) + c_Γi(p,q)
+i_Γg(u,v) = β2*jump(n_Γg⋅∇(u))⋅jump(n_Γg⋅∇(v))
+j_Γg(p,q) = β3*jump(n_Γg⋅∇(p))*jump(n_Γg⋅∇(q)) + c_Γi(p,q)
 
 a_fluid((u,p),(v,q)) =
   ∫( a_Ω(u,v)+b_Ω(u,q)+b_Ω(v,p)-c_Ω(p,q) ) * dΩ +
@@ -103,30 +107,33 @@ a_fluid((u,p),(v,q)) =
 
 ## Structure
 # Stabilization and material parameters
-γg = 0.1
 function lame_parameters(E,ν)
   λ = (E*ν)/((1+ν)*(1-2*ν))
   μ = E/(2*(1+ν))
   (λ, μ)
 end
-λ, μ = lame_parameters(1.0,0.3)
+λs, μs = lame_parameters(1.0,0.3)
+γg = (λs + 2μs)*0.1
 # Terms
-σ(ε) = λ*tr(ε)*one(ε) + 2*μ*ε
+σ(ε) = λs*tr(ε)*one(ε) + 2*μs*ε
 a_solid(d,s) = ∫(ε(s) ⊙ (σ ∘ ε(d)))dΩout +
-  ∫((γg*h)*jump(n_Γg⋅∇(s)) ⋅ jump(n_Γg⋅∇(d)))dΓg
+  ∫((γg*h^3)*jump(n_Γg⋅∇(s)) ⋅ jump(n_Γg⋅∇(d)))dΓg
 
 ## Full problem
 a((u,p,d),(v,q,s)) = a_fluid((u,p),(v,q)) + a_solid(d,s) +
-  ∫(((σ ∘ ε(d))⋅n_Γ + σf(u,p))⋅s)dΓ # plus sign because of the normal direction
+  ∫(σf_n(u,p) ⋅ s)dΓ # plus sign because of the normal direction
 l((v,q,s)) = 0.0
 
 op = AffineFEOperator(a,l,X,Y)
 
 uh, ph, dh = solve(op)
 
+# Mass flow rate through surface (this should be close to zero)
+@show m = sum(∫(ρ*uh⋅n_Γ)dΓ)
+
 writevtk(Ω,path*"fsi-stokes-CutFEM_fluid",
   cellfields=["uh"=>uh,"ph"=>ph,"dh"=>dh])
 writevtk(Ωout,path*"fsi-stokes-CutFEM_solid",
   cellfields=["uh"=>uh,"ph"=>ph,"dh"=>dh])
 
-writevtk(Γ,path*"fsi-stokes-CutFEM_interface",cellfields=["σ⋅n"=>(σ ∘ ε(dh))⋅n_Γ,"σf"=>σf(uh,ph)])
+writevtk(Γ,path*"fsi-stokes-CutFEM_interface",cellfields=["σ⋅n"=>(σ ∘ ε(dh))⋅n_Γ,"σf_n"=>σf_n(uh,ph)])

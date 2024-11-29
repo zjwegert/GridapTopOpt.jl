@@ -66,7 +66,7 @@ reffe_u = ReferenceFE(lagrangian,VectorValue{D,Float64},order,space=:P)
 reffe_p = ReferenceFE(lagrangian,Float64,order-1,space=:P)
 
 V = TestFESpace(Ω_act,reffe_u,conformity=:H1,dirichlet_tags=["Gamma_D","Gamma_NoSlip"])
-Q = TestFESpace(Ω_act,reffe_p,conformity=:H1)
+Q = TestFESpace(Ω_act,reffe_p,conformity=:C0)
 
 U = TrialFESpace(V,[x->uin(x),VectorValue(0.0,0.0)])
 P = TrialFESpace(Q)

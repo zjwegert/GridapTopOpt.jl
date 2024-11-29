@@ -126,18 +126,20 @@ function main(
   @test norm(dJ_int_AD_vec - dJ_int_exact_vec) < 1e-10
 
   # B.2) Facet integral
+  g(fh) = ∇(fh)⋅∇(fh)
 
   J_int2(φ) = ∫(g(fh))dΓ_AD
   dJ_int_AD2 = gradient(J_int2,φh)
   dJ_int_AD_vec2 = assemble_vector(dJ_int_AD2,V_φ)
 
-  ## TODO: This currently doesn't work
-  # dJ_int_exact2(w) = ∫((-n_Γ⋅∇(g(fh)))*w/(norm ∘ (∇(φh))))dΓ +
-  #                   ∫(-n_S_Λ ⋅ (jump(g(fh)*m_k_Λ) * mean(w) / ∇ˢφ_Λ))dΛ +
-  #                   ∫(-n_S_Σ ⋅ (g(fh)*m_k_Σ * w / ∇ˢφ_Σ))dΣ
-  # dJ_int_exact_vec2 = assemble_vector(dJ_int_exact2,V_φ)
+  g(fh) = ∇(fh)⋅∇(fh)
+  ∇g(∇∇f,∇f) = ∇∇f⋅∇f + ∇f⋅∇∇f
+  dJ_int_exact2(w) = ∫((-n_Γ⋅ (∇g ∘ (∇∇(fh),∇(fh))))*w/(norm ∘ (∇(φh))))dΓ +
+                    ∫(-n_S_Λ ⋅ (jump(g(fh)*m_k_Λ) * mean(w) / ∇ˢφ_Λ))dΛ +
+                    ∫(-n_S_Σ ⋅ (g(fh)*m_k_Σ * w / ∇ˢφ_Σ))dΣ
+  dJ_int_exact_vec2 = assemble_vector(dJ_int_exact2,V_φ)
 
-  # @test norm(dJ_int_AD_vec2 - dJ_int_exact_vec2) < 1e-10
+  @test norm(dJ_int_AD_vec2 - dJ_int_exact_vec2) < 1e-10
 
   if vtk
     path = "results/$(name)"
