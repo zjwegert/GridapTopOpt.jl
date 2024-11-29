@@ -200,10 +200,12 @@ for (it,uh,φh,state) in optimiser
         "inoutcut"=>bgcell_to_inoutcut,
         "volumes"=>colors,
         "tagged"=>cell_to_tagged,
+        "χ"=>@. (bgcell_to_inoutcut < 0) * (1-cell_to_tagged)
       ]; append=false)
     writevtk(Ωs.Ωin,path*"Omega_in$it",cellfields=["uh"=>uh])
   end
   write_history(path*"/history.txt",optimiser.history)
+  it == 12 && break
 end
 it = get_history(optimiser).niter; uh = get_state(pcfs)
 geo = DiscreteGeometry(φh,model)
@@ -217,5 +219,6 @@ writevtk(Ω,path*"Omega$it",
     "inoutcut"=>bgcell_to_inoutcut,
     "volumes"=>colors,
     "tagged"=>cell_to_tagged,
+    "χ"=>@. (bgcell_to_inoutcut < 0) * (1-cell_to_tagged)
   ]; append=false)
 writevtk(Ωs.Ωin,path*"Omega_in$it",cellfields=["uh"=>uh])
