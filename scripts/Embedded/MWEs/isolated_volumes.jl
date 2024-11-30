@@ -21,7 +21,6 @@ V_φ = TestFESpace(model,reffe_scalar)
 # φh = interpolate(x->-f([0.5,0.5],R)(x),V_φ)
 # φh = interpolate(x->min(f([0.25,0.5],R)(x),f([0.75,0.5],R)(x)),V_φ)
 
-
 geo = DiscreteGeometry(φh,model)
 cutgeo = cut(model,geo)
 

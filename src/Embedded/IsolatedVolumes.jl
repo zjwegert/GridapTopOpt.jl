@@ -11,14 +11,30 @@ function generate_neighbor_graph(model::DiscreteModel{Dc}) where Dc
   return cell_to_nbors
 end
 
+"""
+    function tag_volume!(
+        cell::Int,color::Int16,group::Union{Integer,NTuple{N,Integer}},
+        cell_to_nbors::Vector{Vector{Int32}},
+        cell_to_state::Vector{Int8},
+        cell_to_color::Vector{Int16},
+        touched::BitVector
+    )
+
+Starting from a cell `cell`, crawls the cell graph provided by `cell_to_nbors` and colors all cells
+connected to `cell` that 
+  - belong to the group `group` (i.e., `cell_to_state[cell] ∈ group`), and
+  - have not been seen yet (i.e., `!touched[cell]`).
+
+This is done by using a breadth-first search algorithm.
+"""
 function tag_volume!(
   cell::Int,color::Int16,group::Union{Integer,NTuple{N,Integer}},
   cell_to_nbors::Vector{Vector{Int32}},
-  cell_to_inoutcut::Vector{Int8},
+  cell_to_state::Vector{Int8},
   cell_to_color::Vector{Int16},
   touched::BitVector
 ) where N
-  @assert cell_to_inoutcut[cell] ∈ group
+  @assert cell_to_state[cell] ∈ group
   
   q = Queue{Int}()
   enqueue!(q,cell)
@@ -28,7 +44,7 @@ function tag_volume!(
     cell = dequeue!(q)
     cell_to_color[cell] = color
     
-    state = cell_to_inoutcut[cell]
+    state = cell_to_state[cell]
     nbors = cell_to_nbors[cell]
     for nbor in nbors
       if !touched[nbor] && state ∈ group
@@ -39,10 +55,21 @@ function tag_volume!(
   end
 end
 
+"""
+    function tag_isolated_volumes(
+        model::DiscreteModel{Dc},
+        cell_to_state::Vector{<:Integer};
+        groups = Tuple(unique(cell_to_state))
+    )
+
+Given a DiscreteModel `model` and an initial coloring `cell_to_state`, 
+returns another coloring such that each color corresponds to a connected component of the
+graph of cells that are connected by a face and have their state in the same group.
+"""
 function tag_isolated_volumes(
   model::DiscreteModel{Dc},
-  cell_to_inoutcut::Vector{<:Integer};
-  groups = (CUT,IN,OUT)
+  cell_to_state::Vector{<:Integer};
+  groups = Tuple(unique(cell_to_state))
 ) where Dc
 
   n_cells = num_cells(model)
@@ -56,10 +83,10 @@ function tag_isolated_volumes(
   while cell <= n_cells
     if !touched[cell]
       n_color += one(Int16)
-      state = cell_to_inoutcut[cell]
+      state = cell_to_state[cell]
       group = findfirst(g -> state ∈ g, groups)
       push!(color_to_group, group)
-      tag_volume!(cell, n_color, groups[group], cell_to_nbors, cell_to_inoutcut, cell_to_color, touched)
+      tag_volume!(cell, n_color, groups[group], cell_to_nbors, cell_to_state, cell_to_color, touched)
     end
     cell += 1
   end
@@ -88,6 +115,15 @@ function find_tagged_volumes(
   return is_tagged
 end
 
+"""
+    get_isolated_volumes_mask(cutgeo::EmbeddedDiscretization,dirichlet_tags)
+
+Given an EmbeddedDiscretization `cutgeo` and a list of tags `dirichlet_tags`, 
+this function returns a CellField which is `1` on isolated volumes and `0` otherwise.
+
+We define an isolated volume as a volume that is IN but is not constrained by any 
+of the tags in `dirichlet_tags`.
+"""
 function get_isolated_volumes_mask(
   cutgeo::EmbeddedDiscretization,dirichlet_tags
 )
