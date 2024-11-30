@@ -84,5 +84,3 @@ h(x)
 ∇h(x)
 ∇h_exact(x)
 ∇h_exact2(x)
-
-

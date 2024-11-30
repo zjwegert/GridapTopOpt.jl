@@ -8,6 +8,7 @@ using BlockArrays, CircularArrays, FillArrays
 using LinearAlgebra
 using ChainRulesCore
 using DelimitedFiles, Printf
+using DataStructures
 
 using Gridap
 using Gridap.Helpers, Gridap.Algebra, Gridap.TensorValues
