@@ -47,7 +47,7 @@ n_Γg = get_normal_vector(Γg)
 n_Γi = get_normal_vector(Γi)
 
 # Setup Lebesgue measures
-order = 1
+order = 2
 degree = 2*order
 dΩ = Measure(Ω,degree)
 dΩout = Measure(Ωout,degree)
@@ -60,11 +60,11 @@ dΓi = Measure(Γi,degree)
 uin(x) = VectorValue(x[2]*(1-x[2]),0.0)
 
 reffe_u = ReferenceFE(lagrangian,VectorValue{D,Float64},order,space=:P)
-reffe_p = ReferenceFE(lagrangian,Float64,order,space=:P)
+reffe_p = ReferenceFE(lagrangian,Float64,order-1,space=:P)
 reffe_d = ReferenceFE(lagrangian,VectorValue{D,Float64},order)
 
 V = TestFESpace(Ω_act,reffe_u,conformity=:H1,dirichlet_tags=["Gamma_D","Gamma_NoSlipTop","Gamma_NoSlipBottom"])
-Q = TestFESpace(Ω_act,reffe_p,conformity=:H1)
+Q = TestFESpace(Ω_act,reffe_p,conformity=:C0)
 T = TestFESpace(Ω_act ,reffe_d,conformity=:H1,dirichlet_tags=["Gamma_NoSlipBottom"])
 
 U = TrialFESpace(V,[uin,VectorValue(0.0,0.0),VectorValue(0.0,0.0)])
@@ -83,18 +83,16 @@ L = 1.0 # Characteristic length
 u0_max = maximum(abs,get_dirichlet_dof_values(U))
 μ = ρ*L*u0_max/Re # Viscosity
 # Stabilization parameters
-β1 = 0.2
 γ = 1000.0
 
 # Terms
 σf_n(u,p) = μ*∇(u)⋅n_Γ - p*n_Γ
 a_Ω(u,v) = μ*(∇(u) ⊙ ∇(v))
 b_Ω(v,p) = - (∇⋅v)*p
-c_Ω(p,q) = (β1*h^2)*∇(p)⋅∇(q)
 
 a_fluid((u,p),(v,q)) =
-  ∫( a_Ω(u,v)+b_Ω(u,q)+b_Ω(v,p)-c_Ω(p,q) ) * dΩ +
-  ∫( a_Ω(u,v)+b_Ω(u,q)+b_Ω(v,p)-c_Ω(p,q) + (γ/h)*u⋅v ) * dΩout
+  ∫( a_Ω(u,v)+b_Ω(u,q)+b_Ω(v,p)) * dΩ +
+  ∫( a_Ω(u,v)+b_Ω(u,q)+b_Ω(v,p) + (γ/h)*u⋅v ) * dΩout
 
 ## Structure
 # Stabilization and material parameters
@@ -122,11 +120,11 @@ uh, ph, dh = solve(op)
 # Mass flow rate through surface (this should be close to zero)
 @show m = sum(∫(ρ*uh⋅n_Γ)dΓ)
 
-writevtk(Ω_act,path*"fsi-stokes-brinkmann-P1P1_elast-ersatz_full",
+writevtk(Ω_act,path*"fsi-stokes-brinkmann-P2P1_elast-ersatz_full",
   cellfields=["uh"=>uh,"ph"=>ph,"dh"=>dh])
-writevtk(Ω,path*"fsi-stokes-brinkmann-P1P1_elast-ersatz_fluid",
+writevtk(Ω,path*"fsi-stokes-brinkmann-P2P1_elast-ersatz_fluid",
   cellfields=["uh"=>uh,"ph"=>ph,"dh"=>dh])
-writevtk(Ωout,path*"fsi-stokes-brinkmann-P1P1_elast-ersatz_solid",
+writevtk(Ωout,path*"fsi-stokes-brinkmann-P2P1_elast-ersatz_solid",
   cellfields=["uh"=>uh,"ph"=>ph,"dh"=>dh])
 
-writevtk(Γ,path*"fsi-stokes-brinkmann-P1P1_elast-ersatz_interface",cellfields=["σ⋅n"=>(σ ∘ ε(dh))⋅n_Γ,"σf_n"=>σf_n(uh,ph)])
+writevtk(Γ,path*"fsi-stokes-brinkmann-P2P1_elast-ersatz_interface",cellfields=["σ⋅n"=>(σ ∘ ε(dh))⋅n_Γ,"σf_n"=>σf_n(uh,ph)])
