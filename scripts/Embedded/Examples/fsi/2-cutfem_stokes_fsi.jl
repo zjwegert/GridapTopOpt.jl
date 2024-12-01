@@ -58,7 +58,7 @@ dΓi = Measure(Γi,degree)
 
 # Setup FESpace
 
-uin(x) = VectorValue(x[2],0.0)
+uin(x) = VectorValue(x[2]*(1-x[2]),0.0)
 
 reffe_u = ReferenceFE(lagrangian,VectorValue{D,Float64},order,space=:P)
 reffe_p = ReferenceFE(lagrangian,Float64,order,space=:P)
