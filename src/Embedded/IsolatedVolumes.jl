@@ -44,9 +44,9 @@ function tag_volume!(
     cell = dequeue!(q)
     cell_to_color[cell] = color
     
-    state = cell_to_state[cell]
     nbors = cell_to_nbors[cell]
     for nbor in nbors
+      state = cell_to_state[nbor]
       if !touched[nbor] && state ∈ group
         enqueue!(q,nbor)
         touched[nbor] = true
