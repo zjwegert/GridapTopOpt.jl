@@ -39,7 +39,6 @@ reffe_scalar = ReferenceFE(lagrangian,Float64,order)
 V_reg = TestFESpace(model,reffe_scalar;dirichlet_tags=["Gamma_N"])
 U_reg = TrialFESpace(V_reg,0)
 V_φ = TestFESpace(model,reffe_scalar)
-V_χ = TestFESpace(model,ReferenceFE(lagrangian,Float64,0))
 
 ## Levet-set function
 φh = interpolate(x->-cos(4π*x[1])*cos(4π*x[2])-0.4,V_φ)
