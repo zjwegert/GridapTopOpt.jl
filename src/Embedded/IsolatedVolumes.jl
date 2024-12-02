@@ -154,6 +154,31 @@ function tag_isolated_volumes(
   n_lcolor = map(length,lcolor_to_group)
   color_gids = generate_volume_gids(cell_ids, n_lcolor, cell_to_lcolor)
 
+  return cell_to_lcolor, lcolor_to_group, color_gids
+end
+
+function get_isolated_volumes_mask(
+  cutgeo::GridapEmbedded.Distributed.DistributedEmbeddedDiscretization,dirichlet_tags
+)
+  model = get_background_model(cutgeo)
+  geo = get_geometry(cutgeo)
+
+  bgcell_to_inoutcut = map(compute_bgcell_to_inoutcut,local_views(model),local_views(geo))
+  cell_to_lcolor, lcolor_to_group, color_gids = tag_isolated_volumes(model,bgcell_to_inoutcut,((CUT,IN),OUT))
+
+  lcolor_to_tagged = map(local_views(model),cell_to_lcolor,lcolor_to_group) do model, cell_to_lcolor, lcolor_to_group
+    find_tagged_volumes(model,dirichlet_tags,cell_to_lcolor,lcolor_to_group)
+  end
+  aux = PVector(lcolor_to_tagged,partition(color_gids))
+  assemble!(&,aux) |> wait
+  consistent!(aux) |> wait
+
+  trian = Triangulation(GridapDistributed.WithGhost(),model)
+  fields = map(local_views(trian),cell_to_lcolor,lcolor_to_group,lcolor_to_tagged) do trian, cell_to_lcolor, lcolor_to_group, lcolor_to_tagged
+    data = map(c -> !lcolor_to_tagged[c] && isone(lcolor_to_group[c]), cell_to_lcolor)
+    CellField(collect(Float64,data),trian)  
+  end
+  return GridapDistributed.DistributedCellField(fields,trian)
 end
 
 function generate_volume_gids(
@@ -161,7 +186,7 @@ function generate_volume_gids(
 )
   exchange_caches = PartitionedArrays.p_vector_cache_impl(Vector,cell_to_lcolor,cell_ids)
 
-  # Get color information from neighbors
+  # Send and receive local information from neighbors
   neighbors_snd, neighbors_rcv, buffer_snd, buffer_rcv = map(exchange_caches,cell_to_lcolor) do cache, cell_to_lcolor
     for (k,lid) in enumerate(cache.local_indices_snd)
       cache.buffer_snd[k] = cell_to_lcolor[lid]

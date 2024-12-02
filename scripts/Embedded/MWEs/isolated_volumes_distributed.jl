@@ -36,4 +36,8 @@ color_gids = GridapTopOpt.generate_volume_gids(
   cell_ids,n_lcolor,cell_to_lcolor
 )
 
+cell_to_lcolor, lcolor_to_group, color_gids = GridapTopOpt.tag_isolated_volumes(model,bgcell_to_inoutcut,((GridapTopOpt.CUT,IN),OUT));
+
+μ = GridapTopOpt.get_isolated_volumes_mask(cutgeo,[1,2,5,7])
+
 
