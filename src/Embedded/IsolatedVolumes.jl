@@ -137,3 +137,103 @@ function get_isolated_volumes_mask(
   data = map(c -> !color_to_tagged[c] && isone(color_to_group[c]), cell_to_color)
   return CellField(collect(Float64,data),Triangulation(model))  
 end
+
+# Distributed
+
+function tag_isolated_volumes(
+  model::GridapDistributed.DistributedDiscreteModel{Dc},
+  cell_to_state::AbstractVector{<:Vector{<:Integer}},
+  groups::Tuple
+) where Dc
+
+  cell_to_lcolor, lcolor_to_group = map(local_views(model),cell_to_state) do model, cell_to_state
+    tag_isolated_volumes(model,cell_to_state;groups)
+  end |> tuple_of_arrays
+
+  cell_ids = partition(get_cell_gids(model))
+  n_lcolor = map(length,lcolor_to_group)
+  color_gids = generate_volume_gids(cell_ids, n_lcolor, cell_to_lcolor)
+
+end
+
+function generate_volume_gids(
+  cell_ids, n_lcolor, cell_to_lcolor
+)
+  exchange_caches = PartitionedArrays.p_vector_cache_impl(Vector,cell_to_lcolor,cell_ids)
+
+  # Get color information from neighbors
+  neighbors_snd, neighbors_rcv, buffer_snd, buffer_rcv = map(exchange_caches,cell_to_lcolor) do cache, cell_to_lcolor
+    for (k,lid) in enumerate(cache.local_indices_snd)
+      cache.buffer_snd[k] = cell_to_lcolor[lid]
+    end
+    cache.neighbors_snd,cache.neighbors_rcv,cache.buffer_snd,cache.buffer_rcv
+  end |> tuple_of_arrays; 
+
+  graph = ExchangeGraph(neighbors_snd,neighbors_rcv)
+  t = exchange!(buffer_rcv,buffer_snd,graph)
+  wait(t)
+
+  # Prepare local information
+  lcolor_to_nbor, lcolor_to_nbor_lcolor = map(cell_ids,n_lcolor,exchange_caches,cell_to_lcolor) do ids, n_lcolor, cache, cell_to_lcolor
+    lcolor_to_nbor = fill(part_id(ids),n_lcolor)
+    lcolor_to_nbor_lcolor = zeros(Int16,n_lcolor)
+
+    for (p,nbor) in enumerate(cache.neighbors_rcv)
+      for k in cache.buffer_rcv.ptrs[p]:cache.buffer_rcv.ptrs[p+1]-1
+        lid = cache.local_indices_rcv.data[k]
+        nbor_lcolor = cache.buffer_rcv.data[k]
+        lcolor = cell_to_lcolor[lid]
+        lcolor_to_nbor[lcolor] = min(nbor,lcolor_to_nbor[lcolor])
+        lcolor_to_nbor_lcolor[lcolor] = nbor_lcolor
+      end
+    end
+    return lcolor_to_nbor, lcolor_to_nbor_lcolor
+  end |> tuple_of_arrays;
+
+  # Gather local information in MAIN
+  lcolor_to_nbor = gather(lcolor_to_nbor)
+  lcolor_to_nbor_lcolor = gather(lcolor_to_nbor_lcolor)
+
+  # Create global ordering in MAIN
+  lcolor_to_color, lcolor_to_owner, n_color = map_main(lcolor_to_nbor,lcolor_to_nbor_lcolor; otherwise = (args...) -> (nothing, nothing, zero(Int16))) do lcolor_to_nbor, lcolor_to_nbor_lcolor
+    ptrs = lcolor_to_nbor.ptrs
+    lcolor_to_color = JaggedArray(zeros(Int16,ptrs[end]-1),ptrs)
+    color_to_owner = Int[]
+
+    n_procs = length(lcolor_to_nbor)
+    n_color = zero(Int16)
+    for p in 1:n_procs
+      seen = Dict{Tuple{Int,Int16},Int16}()
+      for k in ptrs[p]:ptrs[p+1]-1
+        nbor = lcolor_to_nbor.data[k]
+        nbor_lcolor = lcolor_to_nbor_lcolor.data[k]
+        if nbor < p
+          color = lcolor_to_color.data[ptrs[nbor]+nbor_lcolor-1]
+        elseif iszero(nbor_lcolor) || !haskey(seen,(nbor,nbor_lcolor))
+          n_color += one(Int16)
+          color = n_color
+          push!(color_to_owner,p)
+          seen[(nbor,nbor_lcolor)] = color
+        else
+          color = seen[(nbor,nbor_lcolor)]
+        end
+        lcolor_to_color.data[k] = color
+      end
+    end
+    lcolor_to_owner = JaggedArray(map(c -> color_to_owner[c], lcolor_to_color.data),ptrs)
+    return lcolor_to_color, lcolor_to_owner, n_color
+  end |> tuple_of_arrays;
+
+  # Scatter global color information
+  lcolor_to_color = scatter(lcolor_to_color)
+  lcolor_to_owner = scatter(lcolor_to_owner)
+  n_color = emit(n_color)
+
+  # Locally build color gids
+  color_ids = map(cell_ids,lcolor_to_color,lcolor_to_owner,n_color) do ids, lcolor_to_color, lcolor_to_owner, n_color
+    me = part_id(ids)
+    LocalIndices(Int(n_color),me,collect(Int,lcolor_to_color),collect(Int32,lcolor_to_owner))
+  end
+
+  return PRange(color_ids)
+end
