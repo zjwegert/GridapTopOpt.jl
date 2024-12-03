@@ -32,7 +32,7 @@ f_NonDesign(x) = ((x0 - w/2 <= x[1] <= x0 + w/2 && 0.0 <= x[2] <= a) &&
 update_labels!(1,model,f_Γ_D,"Gamma_D")
 update_labels!(2,model,f_Γ_NoSlipTop,"Gamma_NoSlipTop")
 update_labels!(3,model,f_Γ_NoSlipBottom,"Gamma_NoSlipBottom")
-
+update_labels!(4,model,f_NonDesign,"NonDesign")
 
 # Cut the background model
 reffe_scalar = ReferenceFE(lagrangian,Float64,1)
