@@ -24,7 +24,7 @@ h = maximum(el_Δ)
 h_refine = maximum(el_Δ)/2
 f_Γ_D(x) = (x[1] ≈ 0.0 && (x[2] <= 0.2 + eps() || x[2] >= 0.8 - eps()))
 f_Γ_N(x) = (x[1] ≈ 1 && 0.4 - eps() <= x[2] <= 0.6 + eps())
-f_NonDesign(x) = (0.4 <= x[2] <= 0.6 || 0.0 <= x[2] <= 0.1)
+f_NonDesign(x) = (0.4 <= x[1] <= 0.6 && 0.0 <= x[2] <= 0.1)
 update_labels!(1,model,f_Γ_D,"Gamma_D")
 update_labels!(2,model,f_Γ_N,"Gamma_N")
 update_labels!(3,model,f_NonDesign,"NonDesignDom")
@@ -38,7 +38,7 @@ vol_D = sum(∫(1)dΩ)
 
 ## Levet-set function space and derivative regularisation space
 reffe_scalar = ReferenceFE(lagrangian,Float64,order)
-V_reg = TestFESpace(model,reffe_scalar;dirichlet_tags=["Gamma_N,NonDesignDom"])
+V_reg = TestFESpace(model,reffe_scalar;dirichlet_tags=["Gamma_N","NonDesignDom"])
 U_reg = TrialFESpace(V_reg,0)
 V_φ = TestFESpace(model,reffe_scalar)
 
@@ -81,7 +81,7 @@ state_map = AffineFEStateMap(a,l,U,V,V_φ,U_reg,φh)
 pcfs = PDEConstrainedFunctionals(J,[Vol],state_map;analytic_dC=(dVol,))
 
 ## Evolution Method
-evo = CutFEMEvolve(V_φ,Ωs,dΩ,h;max_steps)
+evo = CutFEMEvolve(V_φ,Ωs,dΩ,h;max_steps,γg=0.5)
 reinit = StabilisedReinit(V_φ,Ωs,dΩ,h;stabilisation_method=ArtificialViscosity(3.0))
 ls_evo = UnfittedFEEvolution(evo,reinit)
 reinit!(ls_evo,φh)

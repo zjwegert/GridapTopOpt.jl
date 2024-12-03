@@ -98,7 +98,7 @@ function solve!(s::CutFEMEvolve,φh::CellField,velh::CellField,γ,cache::Nothing
   ode_op = get_transient_operator(φh,velh,s)
   dt = _compute_Δt(h,γ,get_free_dof_values(velh))
   ode_solver.dt = dt
-  ode_sol = solve(ode_solver,ode_op,0.0,dt*max_steps,φh)
+  ode_sol = solve(ode_solver,ode_op,0.0,dt*max_steps,interpolate(φh,s.space))
 
   # March
   march = Base.iterate(ode_sol)
@@ -112,7 +112,13 @@ function solve!(s::CutFEMEvolve,φh::CellField,velh::CellField,γ,cache::Nothing
 
   # Update φh and cache
   _, φhF = data
-  copy!(get_free_dof_values(φh),get_free_dof_values(φhF))
+  if get_triangulation(φh) === get_triangulation(φhF)
+    copy!(get_free_dof_values(φh),get_free_dof_values(φhF))
+  else
+    interpolate!(φhF,get_free_dof_values(φh),get_fe_space(φh))
+  end
+  writevtk(get_triangulation(φhF),"./results/FCM_thermal_compliance_ALM/test",cellfields=["φ"=>φhF])
+  writevtk(get_triangulation(φh),"./results/FCM_thermal_compliance_ALM/test2",cellfields=["φ"=>φh])
   s.cache = state_new
   update_collection!(s.Ωs,φh) # TODO: remove?
   return φh
@@ -139,7 +145,7 @@ function solve!(s::CutFEMEvolve,φh::CellField,velh::CellField,γ,cache)
   ode_solver.dt = dt
 
   ## March
-  ode_sol = solve(ode_solver,ode_op,0.0,dt*max_steps,φh)
+  ode_sol = solve(ode_solver,ode_op,0.0,dt*max_steps,interpolate(φh,s.space))
   march = Base.iterate(ode_sol,state_inter) # First step includes stiffness matrix update
   data, state = march
   state_updated = update_reuse!(state,true) # Fix the stiffness matrix for remaining march
@@ -151,7 +157,11 @@ function solve!(s::CutFEMEvolve,φh::CellField,velh::CellField,γ,cache)
 
   ## Update φh and cache
   _, φhF = data
-  copy!(get_free_dof_values(φh),get_free_dof_values(φhF))
+  if get_triangulation(φh) === get_triangulation(φhF)
+    copy!(get_free_dof_values(φh),get_free_dof_values(φhF))
+  else
+    interpolate!(φhF,get_free_dof_values(φh),get_fe_space(φh))
+  end
   s.cache = state_updated
   update_collection!(s.Ωs,φh) # TODO: remove?
   return φh
