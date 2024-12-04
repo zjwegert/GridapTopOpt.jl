@@ -110,3 +110,17 @@ dJ_int_exact2(w) = ∫((-n_Γ⋅∇(g(fh)))*w/(norm ∘ (∇(φh))))dΓ +
 dJ_int_exact_vec2 = assemble_vector(dJ_int_exact2,V_φ)
 
 @test norm(dJ_int_AD_vec2 - dJ_int_exact_vec2) < 1e-10
+
+# Facet integral with facet_normals
+
+Γ = EmbeddedBoundary(cutgeo)
+Γ_AD = DifferentiableTriangulation(Γ,V_φ)
+dΓ_AD = Measure(Γ_AD,2*order)
+
+fh = VectorValue(1.,1.)
+function J_int(φ)
+  n = get_normal_vector(Γ_AD)
+  ∫(fh⋅n)dΓ_AD
+end
+dJ_int_AD = gradient(J_int,φh)
+dJ_int_AD_vec = assemble_vector(dJ_int_AD,V_φ)

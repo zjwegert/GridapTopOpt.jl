@@ -114,6 +114,35 @@ function Geometry.get_cell_map(ttrian::DifferentiableTriangulation)
   return cell_map
 end
 
+function face_normal(face_coords::Vector{<:Point},orientation::Int8)
+  n = face_normal(face_coords)
+  return n*orientation
+end
+function face_normal(face_coords::Vector{<:Point{2}})
+  p1, p2 = face_coords[1:2]
+  LevelSetCutters._normal_vector(p2-p1)
+end
+function face_normal(face_coords::Vector{<:Point{3}})
+  p1, p2, p3 = face_coords[1:3]
+  LevelSetCutters._normal_vector(p2-p1,p3-p1)
+end
+
+function Geometry.get_facet_normal(
+  ttrian::DifferentiableTriangulation{Dc,Dp,<:SubFacetTriangulation}
+) where {Dc,Dp}
+  if isnothing(ttrian.cell_values)
+    return get_facet_normal(ttrian.trian)
+  end
+  c = ttrian.caches
+  cell_values = ttrian.cell_values
+  cell_to_coords = lazy_map(
+    DualizeCoordsMap(),c.face_to_coords,c.face_to_bgcoords,
+    cell_values,c.face_to_edges,c.face_to_edge_lists
+  )
+  facet_normals = lazy_map(face_normal,cell_to_coords,c.orientations)
+  return lazy_map(constant_field,facet_normals)
+end
+
 function Geometry.get_glue(ttrian::DifferentiableTriangulation,val::Val{D}) where {D}
   glue = get_glue(ttrian.trian,val)
   if isnothing(glue) || isnothing(ttrian.cell_values)
@@ -162,15 +191,6 @@ for tdomain in (:ReferenceDomain,:PhysicalDomain)
     end
   end
 end
-
-# function CellData.change_domain(
-#   a::CellField,target_trian::DifferentiableTriangulation{Dc,Dp,A},target_domain::ReferenceDomain
-# ) where {Dc,Dp,A <: Union{SubCellTriangulation,SubFacetTriangulation}}
-#   change_domain(a,get_triangulation(a),DomainStyle(a),target_trian,target_domain)
-#   @assert is_change_possible(strian,ttrian)
-#   b = change_domain(a,$(tdomain)())
-#   return CellData.similar_cell_field(a,CellData.get_data(b),ttrian,$(tdomain)())
-# end
 
 function FESpaces.get_cell_fe_data(fun,f,ttrian::DifferentiableTriangulation)
   FESpaces.get_cell_fe_data(fun,f,ttrian.trian)
@@ -295,13 +315,20 @@ function precompute_autodiff_caches(
   bgmodel = get_background_model(trian)
   subfacets = trian.subfacets
 
-  precompute_autodiff_caches(
+  caches = precompute_autodiff_caches(
     bgmodel,
     subfacets.facet_to_bgcell,
     subfacets.facet_to_points,
     subfacets.point_to_rcoords,
     subfacets.point_to_coords,
   )
+
+  # Precompute orientations
+  facet_normals = lazy_map(face_normal,caches.face_to_coords)
+  orientations = map(x -> round(Int8,x), lazy_map(⋅,facet_normals,subfacets.facet_to_normal))
+
+  cache = (; caches..., orientations)
+  return cache
 end
 
 function precompute_autodiff_caches(
