@@ -78,10 +78,10 @@ function Geometry.get_cell_reffe(t::DifferentiableTriangulation)
   get_cell_reffe(t.trian)
 end
 
-# TODO: Do we ever need to dualize the cell points? 
+# TODO: Do we ever need to dualize the cell points?
 # I think its not necessary, since all the dual numbers are propagated through the cellmaps...
-# Also: The current version dualizes only the phys points... 
-# If we want to indeed dualize this, we should probably also dualize the ref points 
+# Also: The current version dualizes only the phys points...
+# If we want to indeed dualize this, we should probably also dualize the ref points
 # in the case where ttrian.trian is a SubCellTriangulation (but not in the case of a SubFacetTriangulation)
 # Anyway, I don't think this matters for now...
 function CellData.get_cell_points(ttrian::DifferentiableTriangulation)

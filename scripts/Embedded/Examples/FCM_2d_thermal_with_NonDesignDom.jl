@@ -70,7 +70,7 @@ a(u,v,φ) = ∫(∇(v)⋅∇(u))Ωs.dΩin + ∫(ϵ*∇(v)⋅∇(u))Ωs.dΩout
 l(v,φ) = ∫(v)dΓ_N
 
 ## Optimisation functionals
-J(u,φ) = a(u,u,φ)
+J(u,φ) = ∫(∇(u)⋅∇(u))Ωs.dΩin
 Vol(u,φ) = ∫(1/vol_D)Ωs.dΩin - ∫(vf/vol_D)dΩ
 dVol(q,u,φ) = ∫(-1/vol_D*q/(norm ∘ (∇(φ))))Ωs.dΓ
 

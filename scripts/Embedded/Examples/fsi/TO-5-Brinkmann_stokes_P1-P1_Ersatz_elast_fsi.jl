@@ -2,11 +2,11 @@ using Gridap, Gridap.Geometry, Gridap.Adaptivity
 using GridapEmbedded, GridapEmbedded.LevelSetCutters
 using GridapTopOpt
 
-path = "./results/TO-6-Brinkmann_stokes_P2-P1_Ersatz_elast_fsi/"
+path = "./results/TO-6-Brinkmann_stokes_P1-P1_Ersatz_elast_fsi/"
 mkpath(path)
 
 n = 100
-γ_evo = 0.1
+γ_evo = 0.05
 max_steps = floor(Int,n/5)
 vf = 0.03
 α_coeff = 2
@@ -62,7 +62,7 @@ fholes((x,y),q,r) = max(f1((x,y),q,r),f1((x-1/q,y),q,r))
 # writevtk(get_triangulation(φh),path*"initial_lsf",cellfields=["φ"=>φh])
 
 # Setup integration meshes and measures
-order = 2
+order = 1
 degree = 2*order
 
 Ω_act = Triangulation(model)
@@ -98,12 +98,12 @@ end
 uin(x) = VectorValue(16x[2]*(H-x[2]),0.0)
 
 reffe_u = ReferenceFE(lagrangian,VectorValue{D,Float64},order,space=:P)
-reffe_p = ReferenceFE(lagrangian,Float64,order-1,space=:P)
-reffe_d = ReferenceFE(lagrangian,VectorValue{D,Float64},order-1)
+reffe_p = ReferenceFE(lagrangian,Float64,order,space=:P)
+reffe_d = ReferenceFE(lagrangian,VectorValue{D,Float64},order)
 
 V = TestFESpace(Ω_act,reffe_u,conformity=:H1,
   dirichlet_tags=["Gamma_f_D","Gamma_NoSlipTop","Gamma_NoSlipBottom","Gamma_s_D"])
-Q = TestFESpace(Ω_act,reffe_p,conformity=:C0)
+Q = TestFESpace(Ω_act,reffe_p,conformity=:H1)
 T = TestFESpace(Ω_act ,reffe_d,conformity=:H1,dirichlet_tags=["Gamma_s_D"])
 
 U = TrialFESpace(V,[uin,VectorValue(0.0,0.0),VectorValue(0.0,0.0),VectorValue(0.0,0.0)])
@@ -120,18 +120,21 @@ Re = 60 # Reynolds number
 ρ = 1.0 # Density
 cl = H # Characteristic length
 u0_max = maximum(abs,get_dirichlet_dof_values(U))
-μ = ρ*cl*u0_max/Re # Viscosity
+μ = 1.0#ρ*cl*u0_max/Re # Viscosity
 # Stabilization parameters
-γ = 1000.0
+# TODO: Need to look at this much closer
+γ = 10^16#10.0/μ
+β1 = 0.2#1/μ
 
 # Terms
 σf_n(u,p,n) = μ*∇(u) ⋅ n - p*n
 a_Ω(u,v) = μ*(∇(u) ⊙ ∇(v))
 b_Ω(v,p) = - (∇⋅v)*p
+c_Ω(p,q) = (β1*h^2)*∇(p)⋅∇(q)
 
 a_fluid((u,p),(v,q)) =
-  ∫( a_Ω(u,v)+b_Ω(u,q)+b_Ω(v,p)) * Ω.dΩf +
-  ∫( a_Ω(u,v)+b_Ω(u,q)+b_Ω(v,p) + (γ/h)*u⋅v ) * Ω.dΩs
+  ∫( a_Ω(u,v)+b_Ω(u,q)+b_Ω(v,p)-c_Ω(p,q) ) * Ω.dΩf +
+  ∫( a_Ω(u,v)+b_Ω(u,q)+b_Ω(v,p)-c_Ω(p,q)+(γ/h)*u⋅v ) * Ω.dΩs
 
 ## Structure
 # Stabilization and material parameters
@@ -140,7 +143,7 @@ function lame_parameters(E,ν)
   μ = E/(2*(1+ν))
   (λ, μ)
 end
-λs, μs = lame_parameters(0.1,0.05) #1.0,0.3)
+λs, μs = lame_parameters(1.0,0.3) #0.1,0.05)
 ϵ = (λs + 2μs)*1e-3
 # Terms
 σ(ε) = λs*tr(ε)*one(ε) + 2*μs*ε
@@ -164,7 +167,7 @@ Vol((u,p,d),φ) = ∫(100*1/vol_D)Ω.dΩs - ∫(100*vf/vol_D)dΩ_act
 
 ## Setup solver and FE operators
 state_map = AffineFEStateMap(a_coupled,l_coupled,X,Y,V_φ,U_reg,φh)
-pcfs = PDEConstrainedFunctionals(J_comp,[Vol],state_map)
+pcfs = PDEConstrainedFunctionals(J_pres,[Vol],state_map)
 
 ## Evolution Method
 evo = CutFEMEvolve(V_φ,Ω,dΩ_act,h;max_steps)
@@ -187,6 +190,7 @@ for (it,(uh,ph,dh),φh) in optimiser
     writevtk(Ω.Ωs,path*"Omega_s_$it",
       cellfields=["uh"=>uh,"ph"=>ph,"dh"=>dh])
     writevtk(Ω.Γ,path*"Gamma_$it",cellfields=["σ⋅n"=>(σ ∘ ε(dh))⋅Ω.n_Γ,"σf_n"=>σf_n(uh,ph,φh)])
+    error()
   end
   write_history(path*"/history.txt",optimiser.history)
 end

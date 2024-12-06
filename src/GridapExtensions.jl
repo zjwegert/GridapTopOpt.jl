@@ -32,7 +32,7 @@ end
 
 # Transpose contributions before assembly
 
-transpose_contributions(b::DistributedDomainContribution) = 
+transpose_contributions(b::DistributedDomainContribution) =
   DistributedDomainContribution(map(transpose_contributions,local_views(b)))
 
 function transpose_contributions(b::DomainContribution)

@@ -53,20 +53,22 @@ function get_transient_operator(φh,velh,s::CutFEMEvolve)
   γg, h, dΓg, n_Γg = params.γg, params.h, params.dΓg, params.n_Γg
   ϵ = 1e-20
 
-  β = velh*∇(φh)/(ϵ + norm ∘ ∇(φh))
+  v_norm = maximum(abs,get_free_dof_values(velh))
+  β = velh/(ϵ + v_norm) * ∇(φh)/(ϵ + norm ∘ ∇(φh))
+
   stiffness(t,u,v) = ∫((β ⋅ ∇(u)) * v)dΩ_bg + ∫(γg*h^2*jump(∇(u) ⋅ n_Γg)*jump(∇(v) ⋅ n_Γg))dΓg
   mass(t, ∂ₜu, v) = ∫(∂ₜu * v)dΩ_bg
   forcing(t,v) = ∫(0v)dΩ_bg + ∫(0*jump(∇(v) ⋅ n_Γg))dΓg
-  # Second term is added to address the following issue: 
+  # Second term is added to address the following issue:
   #  - ODEs is allocating separately the residual and jacobian
-  #  - This is fine in serial, but in parallel there are some instances where the the following happens: 
+  #  - This is fine in serial, but in parallel there are some instances where the the following happens:
   #     - The residual is touched by less ghost entries than the columns of the matrix
-  #     - If we assemble both jac and res together, we communicate the extra ghost ids to 
-  #       the residual, so everything is consistent. 
-  #     - However, if we assemble the residual and jacobian separately, 
+  #     - If we assemble both jac and res together, we communicate the extra ghost ids to
+  #       the residual, so everything is consistent.
+  #     - However, if we assemble the residual and jacobian separately,
   #       the residual is not aware of the extra ghost ids
-  # This happens when there are touched ghost entries that do not belong to the local domain. 
-  # In particular, this happens when we have jumps, where some contributions come from two 
+  # This happens when there are touched ghost entries that do not belong to the local domain.
+  # In particular, this happens when we have jumps, where some contributions come from two
   # cells away. Boundary cells then get contributions from cells which are not in the local domain.
   Ut_φ = TransientTrialFESpace(V_φ)
   ode_op = TransientLinearFEOperator((stiffness,mass),forcing,Ut_φ,V_φ;
@@ -91,10 +93,9 @@ function solve!(s::CutFEMEvolve,φh,velh,γ,cache::Nothing)
   h, max_steps = params.h, params.max_steps
 
   # Setup FE operator and solver
+  ode_solver.dt = γ*h
   ode_op = get_transient_operator(φh,velh,s)
-  dt = _compute_Δt(h,γ,get_free_dof_values(velh))
-  ode_solver.dt = dt
-  ode_sol = solve(ode_solver,ode_op,0.0,dt*max_steps,φh)
+  ode_sol = solve(ode_solver,ode_op,0.0,ode_solver.dt*max_steps,φh)
 
   # March
   march = Base.iterate(ode_sol)
@@ -124,6 +125,7 @@ function solve!(s::CutFEMEvolve,φh,velh,γ,cache)
   #   We do this so that the first iterate of ODESolution always recomputes the
   #   stiffness matrix and associated the Jacboian, numerical setups, etc via
   #   `constant_forms = (false,true)`.
+  ode_solver.dt = γ*h
   ode_op = get_transient_operator(φh,velh,s)
   # Between the first iterate and subsequent iterates we use the function
   #   `update_reuse!` to update the iterator state so that we re-use
@@ -131,11 +133,9 @@ function solve!(s::CutFEMEvolve,φh,velh,γ,cache)
   #   whether we are solving a new ODE with the same functional form but
   #   updated coefficients in the weak form. If so, we want to re-use the cache.
   state_inter = update_reuse!(cache,false;zero_tF=true)
-  dt = _compute_Δt(h,γ,get_free_dof_values(velh))
-  ode_solver.dt = dt
 
   ## March
-  ode_sol = solve(ode_solver,ode_op,0.0,dt*max_steps,φh)
+  ode_sol = solve(ode_solver,ode_op,0.0,ode_solver.dt*max_steps,φh)
   march = Base.iterate(ode_sol,state_inter) # First step includes stiffness matrix update
   data, state = march
   state_updated = update_reuse!(state,true) # Fix the stiffness matrix for remaining march
@@ -151,10 +151,4 @@ function solve!(s::CutFEMEvolve,φh,velh,γ,cache)
   s.cache = state_updated
   update_collection!(s.Ωs,φh) # TODO: remove?
   return φh
-end
-
-function _compute_Δt(h,γ,vel)
-  T = eltype(γ)
-  v_norm = maximum(abs,vel)
-  return γ * h / (eps(T)^2 + v_norm)
 end

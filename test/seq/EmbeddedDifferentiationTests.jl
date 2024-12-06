@@ -26,6 +26,8 @@ function level_set(shape::Symbol;N=4)
     x -> abs(x[1]-0.5)+abs(x[2]-0.5)-0.25-0/n/10 # Diamond
   elseif shape == :circle
     x -> sqrt((x[1]-0.5)^2+(x[2]-0.5)^2)-0.5223 # Circle
+  elseif shape == :circle_2
+    x -> sqrt((x[1]-0.5)^2+(x[2]-0.5)^2)-0.23 # Circle
   elseif shape == :square_prism
     x -> max(abs(x[1]-0.5),abs(x[2]-0.5),abs(x[3]-0.5))-0.25 # Square prism
   elseif shape == :corner_3d
@@ -198,20 +200,97 @@ function main(
   end
 end
 
+## Concering integrals of the form `φ->∫(f ⋅ n(φ))dΓ(φ)`
+function main_normal(
+  model,φ::Function,f::Function;
+  vtk=false,
+  name="embedded",
+  run_test=true
+)
+  order = 1
+  reffe = ReferenceFE(lagrangian,Float64,order)
+  V_φ = TestFESpace(model,reffe)
+
+  φh = interpolate(φ,V_φ)
+
+  geo = DiscreteGeometry(φh,model)
+  cutgeo = cut(model,geo)
+
+  Γ = EmbeddedBoundary(cutgeo)
+  Γ_AD = DifferentiableTriangulation(Γ,V_φ)
+  dΓ_AD = Measure(Γ_AD,2*order)
+  dΓ = Measure(Γ,2*order)
+
+  fh_Γ = CellField(f,Γ)
+  fh_Γ_AD = CellField(f,Γ_AD)
+
+  function J_int(φ)
+    n = get_normal_vector(Γ_AD)
+    ∫(fh_Γ_AD⋅n)dΓ_AD
+  end
+  dJ_int_AD = gradient(J_int,φh)
+  dJ_int_AD_vec = assemble_vector(dJ_int_AD,V_φ)
+
+  _n(∇φ) = ∇φ/(10^-20+norm(∇φ))
+  dJ_int_phi = ∇(φ->∫(fh_Γ_AD ⋅ (_n ∘ (∇(φ))))dΓ_AD,φh)
+  dJh_int_phi = assemble_vector(dJ_int_phi,V_φ)
+
+  run_test && @test norm(dJ_int_AD_vec - dJh_int_phi) < 1e-10
+
+  # Analytic
+  # Note: currently, the analytic result is only valid on closed domains thanks
+  #   to the divergence theorem. I think it would take significant work to compute
+  #   the analytic derivative generally as we can't rely on divergence theorem to
+  #   rewrite it in a convenient way. As a result, we don't have an analytic result
+  #   for general cases such as ∫( f(n(φ)) )dΓ(φ), nor the case when Γ intersects
+  #   ∂D. Thankfully, we have AD instead ;)
+  # Note 2: For the case that Γ does intersect the surface, the result is correct
+  #   everywhere except on the intersection.
+
+  fh2(x) = VectorValue((1-x[1])^2,(1-x[2])^2)
+  fh_Γ = CellField(fh2,Γ)
+  fh_Γ_AD = CellField(fh2,Γ_AD)
+
+  # Note: this comes from rewriting via the divergence theorem:
+  #         ∫(f ⋅ n(φ))dΓ(φ) = ∫(∇⋅f)dΩ(φ)
+  dJ_int_exact3(w) = ∫(-(∇⋅(fh_Γ))*w/(norm ∘ (∇(φh))))dΓ
+  dJh_int_exact3 = assemble_vector(dJ_int_exact3,V_φ)
+
+  run_test && @test norm(dJh_int_exact3 - dJ_int_AD_vec) < 1e-10
+
+  if vtk
+    path = "results/$(name)"
+    Ω_bg = Triangulation(model)
+    writevtk(Ω_bg,path,cellfields=[
+      "dJ_AD"=>FEFunction(V_φ,dJ_int_AD_vec),
+      "dJ_AD_with_phi"=>FEFunction(V_φ,dJh_int_phi),
+      "dJ_exact"=>FEFunction(V_φ,dJh_int_exact3)
+      ])
+  end
+end
+
 #######################
 
 D = 2
 n = 10
 model = generate_model(D,n)
 φ = level_set(:circle)
-f = x -> 1.0
+f(x) = 1.0
 main(model,φ,f;vtk=true)
 
 D = 2
 n = 10
 model = generate_model(D,n)
 φ = level_set(:circle)
-f = x -> x[1]+x[2]
+f(x) = x[1]+x[2]
 main(model,φ,f;vtk=true)
+
+D = 2
+n = 10
+model = generate_model(D,n)
+φ = level_set(:circle_2)
+fvec((x,y)) = VectorValue((1-x)^2,(1-y)^2)
+main_normal(model,φ,fvec;vtk=true)
+# main_normal(model,level_set(:circle),fvec;vtk=true) # This will fail as expected
 
 end
