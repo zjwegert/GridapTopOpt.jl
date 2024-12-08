@@ -10,14 +10,14 @@ are defined in `problem::AbstractPDEConstrainedFunctionals`.
 
 - `problem::AbstractPDEConstrainedFunctionals`: The objective and constraint setup.
 - `ls_evolver::LevelSetEvolution`: Solver for the evolution and reinitisation equations.
-- `vel_ext::VelocityExtension`: The velocity-extension method for extending 
+- `vel_ext::VelocityExtension`: The velocity-extension method for extending
   shape sensitivities onto the computational domain.
 - `history::OptimiserHistory{Float64}`: Historical information for optimisation problem.
-- `converged::Function`: A function to check optimiser convergence. 
+- `converged::Function`: A function to check optimiser convergence.
 - `has_oscillations::Function`: A function to check for oscillations.
 - `params::NamedTuple`: Optimisation parameters.
 
-The `has_oscillations` function has been added to avoid oscillations in the 
+The `has_oscillations` function has been added to avoid oscillations in the
 iteration history. By default this uses a mean zero crossing algorithm as implemented
 in ChaosTools. Oscillations checking can be disabled by taking `has_oscillations = (args...) -> false`.
 """
@@ -30,7 +30,7 @@ struct AugmentedLagrangian <: Optimiser
   has_oscillations  :: Function
   params            :: NamedTuple
   φ0 # TODO: Please remove me
-  
+
   @doc """
       AugmentedLagrangian(
         problem    :: AbstractPDEConstrainedFunctionals{N},
@@ -49,7 +49,7 @@ struct AugmentedLagrangian <: Optimiser
 
   - `problem::AbstractPDEConstrainedFunctionals`: The objective and constraint setup.
   - `ls_evolver::LevelSetEvolution`: Solver for the evolution and reinitisation equations.
-  - `vel_ext::VelocityExtension`: The velocity-extension method for extending 
+  - `vel_ext::VelocityExtension`: The velocity-extension method for extending
     shape sensitivities onto the computational domain.
   - `φ0`: An initial level-set function defined as a FEFunction or GridapDistributed equivilent.
 
@@ -64,7 +64,7 @@ struct AugmentedLagrangian <: Optimiser
   - `maxiter = 1000`: Maximum number of algorithm iterations.
   - `verbose=false`: Verbosity flag.
   - `constraint_names = map(i -> Symbol("C_\$i"),1:N)`: Constraint names for history output.
-  - `has_oscillations::Function = default_has_oscillations`: Function to check for oscillations 
+  - `has_oscillations::Function = default_has_oscillations`: Function to check for oscillations
     in the history.
   - `initial_parameters::Function = default_al_init_params`: Function to generate initial λ, Λ.
     This can be replaced to inject different λ and Λ, for example.
@@ -77,7 +77,7 @@ struct AugmentedLagrangian <: Optimiser
     ls_evolver :: LevelSetEvolution,
     vel_ext    :: VelocityExtension,
     φ0;
-    Λ_max = 10^10, ζ = 1.1, update_mod = 5, reinit_mod = 1, γ = 0.1, γ_reinit = 0.5, 
+    Λ_max = 10^10, ζ = 1.1, update_mod = 5, reinit_mod = 1, γ = 0.1, γ_reinit = 0.5,
     os_γ_mult = 0.75, maxiter = 1000, verbose=false, constraint_names = map(i -> Symbol("C_$i"),1:N),
     converged::Function = default_al_converged, debug = false,
     has_oscillations::Function = default_has_oscillations,
@@ -114,7 +114,7 @@ function default_al_init_params(J,C)
   λ = zeros(eltype(J),length(C))
   Λ = @. 0.1*abs(J)/abs(C)^1.5
 
-  return λ,Λ 
+  return λ,Λ
 end
 
 function converged(m::AugmentedLagrangian)
@@ -209,9 +209,9 @@ function Base.iterate(m::AugmentedLagrangian,state)
   λ .= λ .- Λ .* C
   if iszero(it % update_mod)
     for i = 1:length(C)
-      if abs(C[i])>0.01
+      # if abs(C[i])>0.01 # TODO: This is an algorithmic change that requires us to re-run all jobs
         Λ[i] = min(Λ[i]*ζ,Λ_max)
-      end
+      # end
     end
   end
 

@@ -23,6 +23,11 @@ end
 
 #############
 
+# TODO:
+# 1. Update UnfittedEvolution to allow CellField h
+# 2. Check Line 212 of AugmentedLagrangian.jl
+# 3. Check Dirichlet values of shape derivative β in CutFEMEvolve.jl
+
 path = "./results/GMSH-TO-6-Brinkmann_stokes_P2-P1_Ersatz_elast_fsi/results/"
 mkpath(path)
 
@@ -60,7 +65,7 @@ f1((x,y),q,r) = - cos(q*π*x)*cos(q*π*y)/q - r/q
 fin(x) = f0(x,l,a)
 fsolid(x) = min(f0(x,l,b),f0(x,w,a))
 fholes((x,y),q,r) = max(f1((x,y),q,r),f1((x-1/q,y),q,r))
-φf(x) = min(max(fin(x),fholes(x,12,0.6)),fsolid(x)) # 22,0.6
+φf(x) = min(max(fin(x),fholes(x,22,0.6)),fsolid(x))
 φh = interpolate(φf,V_φ)
 writevtk(get_triangulation(φh),path*"initial_lsf",cellfields=["φ"=>φh,"h"=>hₕ])
 
@@ -143,7 +148,7 @@ function lame_parameters(E,ν)
   μ = E/(2*(1+ν))
   (λ, μ)
 end
-λs, μs = lame_parameters(0.1,0.05) #1.0,0.3)
+λs, μs = lame_parameters(0.1,0.05)
 ϵ = (λs + 2μs)*1e-3
 # Terms
 σ(ε) = λs*tr(ε)*one(ε) + 2*μs*ε
