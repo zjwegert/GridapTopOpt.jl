@@ -31,7 +31,7 @@ mutable struct StabilisedReinit{A,B,C,D} <: Reinitialiser
   assembler::Assembler
   params::D
   cache
-  function StabilisedReinit(V_φ::C,Ωs::EmbeddedCollection,dΩ_bg::B,h::Real;
+  function StabilisedReinit(V_φ::C,Ωs::EmbeddedCollection,dΩ_bg::B,h;
       γd = 20.0,
       nls = NewtonSolver(LUSolver();maxiter=50,rtol=1.e-14,verbose=true),
       assembler=SparseMatrixAssembler(V_φ,V_φ),

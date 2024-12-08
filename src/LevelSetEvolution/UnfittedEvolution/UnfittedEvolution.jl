@@ -1,7 +1,7 @@
 """
     abstract type Evolver
 
-Your own unfitted level-set evolution method can be created by implementing 
+Your own unfitted level-set evolution method can be created by implementing
 concrete functionality for `solve!`.
 """
 abstract type Evolver end
@@ -18,7 +18,7 @@ end
 """
     abstract type Reinitialiser
 
-Your own unfitted level-set reinitialisation method can be created by implementing 
+Your own unfitted level-set reinitialisation method can be created by implementing
 concrete functionality for `solve!`.
 """
 abstract type Reinitialiser end
@@ -42,7 +42,7 @@ struct UnfittedFEEvolution{A<:Evolver,B<:Reinitialiser} <: LevelSetEvolution
   reinitialiser::B
 end
 
-function evolve!(s::UnfittedFEEvolution,φ::T,vel::M,γ,args...) where 
+function evolve!(s::UnfittedFEEvolution,φ::T,vel::M,γ,args...) where
     {T<:AbstractVector,M<:AbstractVector}
   V_φ = get_space(s.evolver)
   φh = FEFunction(V_φ,φ)
@@ -80,6 +80,7 @@ function reinit!(s::UnfittedFEEvolution,φh,args...)
   return get_free_dof_values(φh)
 end
 
+# TODO: Allow for CellField hₕ, we would then rename get_dof_Δ to get_minimum_dof_Δ, and leave get_dof_Δ as deprecated
 function get_dof_Δ(s::UnfittedFEEvolution)
   V_φ = get_space(s.evolver)
   _,h,_ = get_params(s.evolver)

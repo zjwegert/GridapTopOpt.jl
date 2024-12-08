@@ -26,7 +26,7 @@ mutable struct CutFEMEvolve{A,B,C} <: Evolver
   assembler::Assembler
   params::C
   cache
-  function CutFEMEvolve(V_φ::B,Ωs::EmbeddedCollection,dΩ_bg::A,h::Real;
+  function CutFEMEvolve(V_φ::B,Ωs::EmbeddedCollection,dΩ_bg::A,h;
       max_steps=10,
       γg = 0.1,
       ode_ls = LUSolver(),

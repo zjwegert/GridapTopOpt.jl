@@ -352,7 +352,7 @@ function Base.iterate(m::HilbertianProjection,state)
   U_reg = get_deriv_space(get_state_map(m.problem))
   V_φ   = get_aux_space(get_state_map(m.problem))
   interpolate!(FEFunction(U_reg,θ),vel,V_φ)
-  J, C, dJ, dC = _linesearch!(m,state,γ)
+  J, C, dJ, dC, γ = _linesearch!(m,state,γ)
 
   ## Hilbertian extension-regularisation
   project!(m.vel_ext,dJ)

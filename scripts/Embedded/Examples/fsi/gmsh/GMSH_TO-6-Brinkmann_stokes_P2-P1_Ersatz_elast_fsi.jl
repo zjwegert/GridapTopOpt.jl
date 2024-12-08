@@ -3,12 +3,32 @@ using GridapEmbedded, GridapEmbedded.LevelSetCutters
 using GridapGmsh
 using GridapTopOpt
 
-path = "./results/GMSH-TO-6-Brinkmann_stokes_P2-P1_Ersatz_elast_fsi/"
+function get_element_sizes(model,f=min)
+  coords = get_cell_coordinates(model)
+  polys = get_polytopes(model)
+  @assert length(polys) == 1 "Only one cell type is currently supported"
+  return _get_element_sizes(f,coords,first(polys))
+end
+
+function _get_element_sizes(f,coords,::Polytope{2})
+  function _get_tri_side_lengths(cell_coords)
+    p1 = cell_coords[1]
+    p2 = cell_coords[2]
+    p3 = cell_coords[3]
+    return norm(p1-p2), norm(p1-p3), norm(p2-p3)
+  end
+  side_lengths = lazy_map(_get_tri_side_lengths,coords)
+  return lazy_map(t->f(t...),side_lengths)
+end
+
+#############
+
+path = "./results/GMSH-TO-6-Brinkmann_stokes_P2-P1_Ersatz_elast_fsi/results/"
 mkpath(path)
 
-γ_evo = 0.1
+γ_evo = 0.2
 max_steps = 20
-vf = 0.03
+vf = 0.025
 α_coeff = 2
 iter_mod = 1
 D = 2
@@ -18,16 +38,16 @@ L = 2.0;
 H = 0.5;
 x0 = 0.5;
 l = 0.4;
-w = 0.05;
+w = 0.025;
 a = 0.3;
-b = 0.03;
+b = 0.01;
 
 model = GmshDiscreteModel((@__DIR__)*"/mesh.msh")
-# writevtk(model,path*"model")
+writevtk(model,path*"model")
 
-# el_Δ = get_el_Δ(_model)
-# h = maximum(el_Δ)
-# h_refine = maximum(el_Δ)/2
+h = minimum(get_element_sizes(model))
+Ω_act = Triangulation(model)
+hₕ = CellField(get_element_sizes(model),Ω_act) # TODO: Line 83 - UnfittedEvolution.jl
 
 # Cut the background model
 reffe_scalar = ReferenceFE(lagrangian,Float64,1)
@@ -40,15 +60,15 @@ f1((x,y),q,r) = - cos(q*π*x)*cos(q*π*y)/q - r/q
 fin(x) = f0(x,l,a)
 fsolid(x) = min(f0(x,l,b),f0(x,w,a))
 fholes((x,y),q,r) = max(f1((x,y),q,r),f1((x-1/q,y),q,r))
-φf(x) = min(max(fin(x),fholes(x,15,0.5)),fsolid(x))
+φf(x) = min(max(fin(x),fholes(x,12,0.6)),fsolid(x)) # 22,0.6
 φh = interpolate(φf,V_φ)
-# writevtk(get_triangulation(φh),path*"initial_lsf",cellfields=["φ"=>φh])
+writevtk(get_triangulation(φh),path*"initial_lsf",cellfields=["φ"=>φh,"h"=>hₕ])
 
 # Setup integration meshes and measures
 order = 2
 degree = 2*order
 
-Ω_act = Triangulation(model)
+# Ω_act = Triangulation(model)
 dΩ_act = Measure(Ω_act,degree)
 vol_D = L*H
 
@@ -76,12 +96,6 @@ dΓf_N = Measure(Γf_N,degree)
     :Ωact => Ωact
   )
 end
-
-writevtk(Ω_act,path*"Omega_act",
-  cellfields=["φ"=>φh,"|∇(φ)|"=>(norm ∘ ∇(φh))])
-writevtk(Ω.Ωf,path*"Omega_f")
-writevtk(Ω.Ωs,path*"Omega_s")
-writevtk(Ω.Γ,path*"Gamma")
 
 # Setup FESpace
 uin(x) = VectorValue(16x[2]*(H-x[2]),0.0)
@@ -149,7 +163,7 @@ l_coupled((v,q,s),φ) = ∫(0.0q)dΩ_act
 ## Optimisation functionals
 J_pres((u,p,d),φ) = ∫(p)dΓf_D - ∫(p)dΓf_N
 J_comp((u,p,d),φ) = ∫(ε(d) ⊙ (σ ∘ ε(d)))Ω.dΩs
-Vol((u,p,d),φ) = ∫(100*1/vol_D)Ω.dΩs - ∫(100*vf/vol_D)dΩ_act
+Vol((u,p,d),φ) = ∫(vol_D)Ω.dΩs - ∫(vf/vol_D)dΩ_act
 
 ## Setup solver and FE operators
 state_map = AffineFEStateMap(a_coupled,l_coupled,X,Y,V_φ,U_reg,φh)
@@ -161,13 +175,25 @@ reinit = StabilisedReinit(V_φ,Ω,dΩ_act,h;stabilisation_method=ArtificialVisco
 ls_evo = UnfittedFEEvolution(evo,reinit)
 
 ## Hilbertian extension-regularisation problems
-α = α_coeff*h_refine
-a_hilb(p,q) =∫(α^2*∇(p)⋅∇(q) + p*q)dΩ_act;
+_α(hₕ) = (α_coeff*hₕ)^2
+a_hilb(p,q) =∫((_α ∘ hₕ)*∇(p)⋅∇(q) + p*q)dΩ_act;
 vel_ext = VelocityExtension(a_hilb,U_reg,V_reg)
 
+## Optimiser
+converged(m) = GridapTopOpt.default_al_converged(
+  m;
+  L_tol = 0.5h,
+  C_tol = 0.01vf
+)
+function has_oscillations(m,os_it)
+  history = GridapTopOpt.get_history(m)
+  it = GridapTopOpt.get_last_iteration(history)
+  all(@.(abs(history[:C,it]) < 0.05vf)) && GridapTopOpt.default_has_oscillations(m,os_it)
+end
 optimiser = AugmentedLagrangian(pcfs,ls_evo,vel_ext,φh;
-  γ=γ_evo,verbose=true,constraint_names=[:Vol])
+  γ=γ_evo,verbose=true,constraint_names=[:Vol],converged,has_oscillations)
 for (it,(uh,ph,dh),φh) in optimiser
+  GC.gc()
   if iszero(it % iter_mod)
     writevtk(Ω_act,path*"Omega_act_$it",
       cellfields=["φ"=>φh,"|∇(φ)|"=>(norm ∘ ∇(φh)),"uh"=>uh,"ph"=>ph,"dh"=>dh])
