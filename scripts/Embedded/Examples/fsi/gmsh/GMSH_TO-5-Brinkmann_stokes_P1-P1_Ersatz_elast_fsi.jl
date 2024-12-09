@@ -29,6 +29,7 @@ writevtk(model,path*"model")
 
 Ω_act = Triangulation(model)
 hₕ = CellField(get_element_sizes(model),Ω_act)
+hmin = GridapTopOpt._get_minimum_element_diameter(hₕ)
 
 # Cut the background model
 reffe_scalar = ReferenceFE(lagrangian,Float64,1)
@@ -107,7 +108,7 @@ cl = H # Characteristic length
 u0_max = maximum(abs,get_dirichlet_dof_values(U))
 μ = ρ*cl*u0_max/Re # Viscosity
 # Stabilization parameters
-γ(h) = 100.0*μ/h
+γ(h) = 1e5*μ/h
 β1(h) = 1/3*(h^2/4μ)
 
 # Terms
@@ -118,7 +119,7 @@ c_Ω(p,q) = (β1 ∘ hₕ)*∇(p)⋅∇(q)
 
 a_fluid((u,p),(v,q)) =
   ∫( a_Ω(u,v)+b_Ω(u,q)+b_Ω(v,p)-c_Ω(p,q)) * Ω.dΩf +
-  ∫( a_Ω(u,v)+b_Ω(u,q)+b_Ω(v,p)-c_Ω(p,q)+γ*u⋅v ) * Ω.dΩs
+  ∫( a_Ω(u,v)+b_Ω(u,q)+b_Ω(v,p)-c_Ω(p,q)+(γ ∘ hₕ)*(u⋅v)) * Ω.dΩs
 
 ## Structure
 # Stabilization and material parameters
@@ -166,7 +167,7 @@ vel_ext = VelocityExtension(a_hilb,U_reg,V_reg)
 ## Optimiser
 converged(m) = GridapTopOpt.default_al_converged(
   m;
-  L_tol = 0.5h,
+  L_tol = 0.5*hmin,
   C_tol = 0.01vf
 )
 function has_oscillations(m,os_it)

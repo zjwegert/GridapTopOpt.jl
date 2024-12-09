@@ -58,7 +58,7 @@ function get_transient_operator(φh,velh,s::CutFEMEvolve)
   v_norm = maximum(abs,get_free_dof_values(velh))
   β(vh,∇φ) = vh/(ϵ + v_norm) * ∇φ/(ϵ + norm(∇φ))
 
-  stiffness(t,u,v) = ∫(((β ∘ (velh,∇(φh))) ⋅ ∇(u)) * v)dΩ_bg + ∫(γg*h^2*jump(∇(u) ⋅ n_Γg)*jump(∇(v) ⋅ n_Γg))dΓg
+  stiffness(t,u,v) = ∫(((β ∘ (velh,∇(φh))) ⋅ ∇(u)) * v)dΩ_bg + ∫((γg*h*h)*jump(∇(u) ⋅ n_Γg)*jump(∇(v) ⋅ n_Γg))dΓg
   mass(t, ∂ₜu, v) = ∫(∂ₜu * v)dΩ_bg
   forcing(t,v) = ∫(0v)dΩ_bg + ∫(0*jump(∇(v) ⋅ n_Γg))dΓg
   # Second term is added to address the following issue:

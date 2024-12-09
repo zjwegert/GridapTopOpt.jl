@@ -135,7 +135,7 @@ function get_residual_and_jacobian(s::StabilisedReinit{InteriorPenalty},φh)
   dΓ = Ωs.dΓ
 
   W(u,∇u) = sign(u) * ∇u / (ϵ + norm(∇u))
-  a(w,u,v) = ∫(v*(W ∘ (w,∇(w))) ⋅ ∇(u))dΩ_bg + ∫(h^2*jump(∇(u)) ⋅ jump(∇(v)))dΛ + ∫((γd/h)*v*u)dΓ
+  a(w,u,v) = ∫(v*(W ∘ (w,∇(w))) ⋅ ∇(u))dΩ_bg + ∫(h*h*jump(∇(u)) ⋅ jump(∇(v)))dΛ + ∫((γd/h)*v*u)dΓ
   b(w,v) = ∫((sign ∘ w)*v)dΩ_bg
   res(u,v) = a(u,u,v) - b(u,v)
   jac(u,du,v) = a(u,du,v)
