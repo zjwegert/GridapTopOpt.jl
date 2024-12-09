@@ -10,7 +10,7 @@ Burman et al. (2017). DOI: `10.1016/j.cma.2017.09.005`.
 - `dΩ_bg::C`: Measure for integration
 - `space::B`: Level-set FE space
 - `assembler::Assembler`: FE assembler
-- `params::D`: Tuple of stabilisation parameter `γg`, mesh size `h`, and
+- `params::D`: Tuple of stabilisation parameter `γg`, mesh sizes `h`, and
   max steps `max_steps`, and background mesh skeleton parameters
 - `cache`: Cache for evolver, initially `nothing`.
 
@@ -36,7 +36,8 @@ mutable struct CutFEMEvolve{A,B,C} <: Evolver
     Γg = SkeletonTriangulation(get_triangulation(V_φ))
     dΓg = Measure(Γg,2get_order(V_φ))
     n_Γg = get_normal_vector(Γg)
-    params = (;γg,h,max_steps,dΓg,n_Γg)
+    hmin = _get_minimum_element_diameter(h)
+    params = (;γg,h,hmin,max_steps,dΓg,n_Γg)
     new{A,B,typeof(params)}(ode_solver,Ωs,dΩ_bg,V_φ,assembler,params,nothing)
   end
 end
@@ -46,6 +47,7 @@ get_assembler(s::CutFEMEvolve) = s.assembler
 get_space(s::CutFEMEvolve) = s.space
 get_measure(s::CutFEMEvolve) = s.dΩ_bg
 get_params(s::CutFEMEvolve) = s.params
+get_element_sizes(s::CutFEMEvolve) = s.params.h
 get_cache(s::CutFEMEvolve) = s.cache
 
 function get_transient_operator(φh,velh,s::CutFEMEvolve)
@@ -54,9 +56,9 @@ function get_transient_operator(φh,velh,s::CutFEMEvolve)
   ϵ = 1e-20
 
   v_norm = maximum(abs,get_free_dof_values(velh))
-  β = velh/(ϵ + v_norm) * ∇(φh)/(ϵ + norm ∘ ∇(φh))
+  β(vh,∇φ) = vh/(ϵ + v_norm) * ∇φ/(ϵ + norm(∇φ))
 
-  stiffness(t,u,v) = ∫((β ⋅ ∇(u)) * v)dΩ_bg + ∫(γg*h^2*jump(∇(u) ⋅ n_Γg)*jump(∇(v) ⋅ n_Γg))dΓg
+  stiffness(t,u,v) = ∫(((β ∘ (velh,∇(φh))) ⋅ ∇(u)) * v)dΩ_bg + ∫(γg*h^2*jump(∇(u) ⋅ n_Γg)*jump(∇(v) ⋅ n_Γg))dΓg
   mass(t, ∂ₜu, v) = ∫(∂ₜu * v)dΩ_bg
   forcing(t,v) = ∫(0v)dΩ_bg + ∫(0*jump(∇(v) ⋅ n_Γg))dΓg
   # Second term is added to address the following issue:
@@ -90,10 +92,10 @@ end
 function solve!(s::CutFEMEvolve,φh,velh,γ,cache::Nothing)
   ode_solver = get_ode_solver(s)
   params = get_params(s)
-  h, max_steps = params.h, params.max_steps
+  hmin, max_steps = params.hmin, params.max_steps
 
   # Setup FE operator and solver
-  ode_solver.dt = γ*h
+  ode_solver.dt = γ*hmin
   ode_op = get_transient_operator(φh,velh,s)
   ode_sol = solve(ode_solver,ode_op,0.0,ode_solver.dt*max_steps,φh)
 
@@ -118,14 +120,14 @@ end
 function solve!(s::CutFEMEvolve,φh,velh,γ,cache)
   ode_solver = get_ode_solver(s)
   params = get_params(s)
-  h, max_steps = params.h, params.max_steps
+  hmin, max_steps = params.hmin, params.max_steps
 
   ## Update state
   # `get_transient_operator` re-creates the entire TransientLinearFEOperator wrapper.
   #   We do this so that the first iterate of ODESolution always recomputes the
   #   stiffness matrix and associated the Jacboian, numerical setups, etc via
   #   `constant_forms = (false,true)`.
-  ode_solver.dt = γ*h
+  ode_solver.dt = γ*hmin
   ode_op = get_transient_operator(φh,velh,s)
   # Between the first iterate and subsequent iterates we use the function
   #   `update_reuse!` to update the iterator state so that we re-use

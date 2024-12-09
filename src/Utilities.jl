@@ -69,7 +69,7 @@ end
 """
     update_labels!(e::Int,model,f_Γ::Function,name::String)
 
-Given a tag number `e`, a `DiscreteModel` model, an indicator function `f_Γ`, 
+Given a tag number `e`, a `DiscreteModel` model, an indicator function `f_Γ`,
 and a string `name`, label the corresponding vertices, edges, and faces
 as `name`.
 
@@ -162,21 +162,23 @@ where x is a vector with components xᵢ.
 initial_lsf(ξ,a;b=0) = x::VectorValue -> -1/4*prod(cos.(get_array(@.(ξ*pi*(x-b))))) - a/4
 
 """
-    get_el_Δ(model)
+    get_cartesian_element_sizes(model)
 
 Given a CartesianDiscreteModel return the element size as a tuple.
 """
-function get_el_Δ(model::CartesianDiscreteModel)
+function get_cartesian_element_sizes(model::CartesianDiscreteModel)
   desc = get_cartesian_descriptor(model)
   return desc.sizes
 end
 
-function get_el_Δ(model::DistributedDiscreteModel)
+function get_cartesian_element_sizes(model::DistributedDiscreteModel)
   local_Δ = map(local_views(model)) do model
-    get_el_Δ(model)
+    get_cartesian_element_sizes(model)
   end
   return getany(local_Δ)
 end
+
+const get_el_Δ = get_cartesian_element_sizes
 
 """
     isotropic_elast_tensor(D::Int,E::M,v::M)
@@ -240,4 +242,46 @@ end
 function get_order(space::DistributedFESpace)
   order = map(get_order,local_views(space))
   return getany(order)
+end
+
+# Element size for general model
+
+"""
+    get_element_sizes(model)
+
+Given a general model return the element size as a lazy map of minimum (by default)
+side length sizes.
+"""
+function get_element_sizes(model,f=min)
+  coords = get_cell_coordinates(model)
+  polys = get_polytopes(model)
+  @assert length(polys) == 1 "Only one cell type is currently supported"
+  return _get_element_sizes(f,coords,first(polys))
+end
+
+function _get_tri_side_lengths(cell_coords)
+  p1 = cell_coords[1]
+  p2 = cell_coords[2]
+  p3 = cell_coords[3]
+  return norm(p1-p2), norm(p1-p3), norm(p2-p3)
+end
+
+function _get_tet_side_lengths(cell_coords)
+  p1 = cell_coords[1]
+  p2 = cell_coords[2]
+  p3 = cell_coords[3]
+  p4 = cell_coords[4]
+  return norm(p1-p2), norm(p1-p3), norm(p2-p3),
+    norm(p1-p4), norm(p2-p4), norm(p3-p4)
+end
+
+function _get_element_sizes(f,coords,poly::Polytope)
+  if poly == TRI
+    side_lengths = lazy_map(_get_tri_side_lengths,coords)
+  elseif poly == TET
+    side_lengths = lazy_map(_get_tet_side_lengths,coords)
+  else
+    @notimplemented "Only triangles and tetrahedra are currently supported"
+  end
+  return lazy_map(t->f(t...),side_lengths)
 end

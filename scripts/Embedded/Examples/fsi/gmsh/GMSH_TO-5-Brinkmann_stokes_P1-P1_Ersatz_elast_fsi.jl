@@ -5,7 +5,7 @@ using GridapTopOpt
 
 #############
 
-path = "./results/GMSH-TO-6-Brinkmann_stokes_P2-P1_Ersatz_elast_fsi/results/"
+path = "./results/GMSH-TO-5-Brinkmann_stokes_P1-P1_Ersatz_elast_fsi/results/"
 mkpath(path)
 
 γ_evo = 0.2
@@ -47,7 +47,7 @@ fholes((x,y),q,r) = max(f1((x,y),q,r),f1((x-1/q,y),q,r))
 writevtk(get_triangulation(φh),path*"initial_lsf",cellfields=["φ"=>φh,"h"=>hₕ])
 
 # Setup integration meshes and measures
-order = 2
+order = 1
 degree = 2*order
 
 # Ω_act = Triangulation(model)
@@ -83,8 +83,8 @@ end
 uin(x) = VectorValue(16x[2]*(H-x[2]),0.0)
 
 reffe_u = ReferenceFE(lagrangian,VectorValue{D,Float64},order,space=:P)
-reffe_p = ReferenceFE(lagrangian,Float64,order-1,space=:P)
-reffe_d = ReferenceFE(lagrangian,VectorValue{D,Float64},order-1)
+reffe_p = ReferenceFE(lagrangian,Float64,order,space=:P)
+reffe_d = ReferenceFE(lagrangian,VectorValue{D,Float64},order)
 
 V = TestFESpace(Ω_act,reffe_u,conformity=:H1,
   dirichlet_tags=["Gamma_f_D","Gamma_NoSlipTop","Gamma_NoSlipBottom","Gamma_s_D"])
@@ -107,16 +107,18 @@ cl = H # Characteristic length
 u0_max = maximum(abs,get_dirichlet_dof_values(U))
 μ = ρ*cl*u0_max/Re # Viscosity
 # Stabilization parameters
-γ = 1000.0
+γ(h) = 100.0*μ/h
+β1(h) = 1/3*(h^2/4μ)
 
 # Terms
 σf_n(u,p,n) = μ*∇(u) ⋅ n - p*n
 a_Ω(u,v) = μ*(∇(u) ⊙ ∇(v))
 b_Ω(v,p) = - (∇⋅v)*p
+c_Ω(p,q) = (β1 ∘ hₕ)*∇(p)⋅∇(q)
 
 a_fluid((u,p),(v,q)) =
-  ∫( a_Ω(u,v)+b_Ω(u,q)+b_Ω(v,p)) * Ω.dΩf +
-  ∫( a_Ω(u,v)+b_Ω(u,q)+b_Ω(v,p) + (γ/hₕ)*u⋅v ) * Ω.dΩs
+  ∫( a_Ω(u,v)+b_Ω(u,q)+b_Ω(v,p)-c_Ω(p,q)) * Ω.dΩf +
+  ∫( a_Ω(u,v)+b_Ω(u,q)+b_Ω(v,p)-c_Ω(p,q)+γ*u⋅v ) * Ω.dΩs
 
 ## Structure
 # Stabilization and material parameters

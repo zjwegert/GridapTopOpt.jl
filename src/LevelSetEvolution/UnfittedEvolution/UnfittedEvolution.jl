@@ -37,9 +37,17 @@ end
 
 Wrapper for unfitted evolution and reinitialisation methods.
 """
-struct UnfittedFEEvolution{A<:Evolver,B<:Reinitialiser} <: LevelSetEvolution
+struct UnfittedFEEvolution{A<:Evolver,B<:Reinitialiser,C<:Real} <: LevelSetEvolution
   evolver::A
   reinitialiser::B
+  min_element_diameter::C
+  function UnfittedFEEvolution(evolver::A,reinitialiser::B) where {A,B}
+    h_evo = get_element_sizes(evolver)
+    h_reinit = get_element_sizes(reinitialiser)
+    @assert h_evo === h_reinit "Element sizes for evolution and reinitialisation should be the same."
+    min_element_diameter = _get_minimum_element_diameter(h_evo)
+    new{A,B,typeof(min_element_diameter)}(evolver,reinitialiser,min_element_diameter)
+  end
 end
 
 function evolve!(s::UnfittedFEEvolution,φ::T,vel::M,γ,args...) where
@@ -80,13 +88,33 @@ function reinit!(s::UnfittedFEEvolution,φh,args...)
   return get_free_dof_values(φh)
 end
 
-# TODO: Allow for CellField hₕ, we would then rename get_dof_Δ to get_minimum_dof_Δ, and leave get_dof_Δ as deprecated
 function get_dof_Δ(s::UnfittedFEEvolution)
   V_φ = get_space(s.evolver)
-  _,h,_ = get_params(s.evolver)
-  return h/get_order(V_φ)
+  hmin = s.min_element_diameter
+  return hmin/get_order(V_φ)
 end
 
+## Helpers
+function _get_minimum_element_diameter(h::CellField)
+  h_data = lazy_map(_get_value,get_data(h))
+  return minimum(h_data)
+end
+
+_get_minimum_element_diameter(h::Real) = h
+
+function _get_minimum_element_diameter(h)
+  @notimplemented
+end
+
+function _get_value(t::Gridap.CellData.ConstantField)
+  return t.value
+end
+
+function _get_value(::Gridap.Fields.Field)
+  Gridap.Helpers.@notimplemented "Only ConstantField is currently supported"
+end
+
+##
 include("CutFEMEvolve.jl")
 include("StabilisedReinit.jl")
 include("MutableRungeKutta.jl")

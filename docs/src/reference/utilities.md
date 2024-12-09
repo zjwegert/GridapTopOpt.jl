@@ -15,5 +15,6 @@ GridapTopOpt.update_labels!
 ```@docs
 GridapTopOpt.initial_lsf
 GridapTopOpt.isotropic_elast_tensor
-GridapTopOpt.get_el_Δ
+GridapTopOpt.get_cartesian_element_sizes
+GridapTopOpt.get_element_sizes
 ```

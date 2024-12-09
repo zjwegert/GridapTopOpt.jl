@@ -38,7 +38,7 @@ struct AugmentedLagrangian <: Optimiser
         vel_ext    :: VelocityExtension,
         φ0;
         Λ_max = 10^10, ζ = 1.1, update_mod = 5, γ = 0.1, γ_reinit = 0.5, os_γ_mult = 0.75,
-        maxiter = 1000, verbose=false, constraint_names = map(i -> Symbol("C_\$i"),1:N),
+        Λ_update_tol = 0.01,maxiter = 1000, verbose=false, constraint_names = map(i -> Symbol("C_\$i"),1:N),
         converged::Function = default_al_converged, debug = false,
         has_oscillations::Function = default_has_oscillations
       ) where {N,O}
@@ -58,7 +58,7 @@ struct AugmentedLagrangian <: Optimiser
   - `γ = 0.1`: Initial coeffient on the time step size for solving the Hamilton-Jacobi evolution equation.
   - `γ_reinit = 0.5`: Coeffient on the time step size for solving the reinitisation equation.
   - `ζ = 1.1`: Increase multiplier on Λ every `update_mod` iterations.
-  - `Λ_max = 5.0`: Maximum value on any entry in Λ.
+  - `Λ_max = 10^10`: Maximum value on any entry in Λ.
   - `update_mod = 5`: Number of iterations before increasing `Λ`.
   - `reinit_mod = 1`: How often we solve reinitialisation equation.
   - `maxiter = 1000`: Maximum number of algorithm iterations.
@@ -69,6 +69,9 @@ struct AugmentedLagrangian <: Optimiser
   - `initial_parameters::Function = default_al_init_params`: Function to generate initial λ, Λ.
     This can be replaced to inject different λ and Λ, for example.
   - `os_γ_mult = 0.75`: Decrease multiplier for `γ` when `has_oscillations` returns true
+  - `Λ_update_tol = 0.01`: Tolerance of constraint satisfaction for updating Λ. In our testing, this
+    is usually set to 0.01. Some problems, may perform better with a stricter tolerance (e.g.,
+    0.001 or 0.0 to always update).
   - `converged::Function = default_hp_converged`: Convergence criteria.
   - `debug = false`: Debug flag.
   """
@@ -78,7 +81,7 @@ struct AugmentedLagrangian <: Optimiser
     vel_ext    :: VelocityExtension,
     φ0;
     Λ_max = 10^10, ζ = 1.1, update_mod = 5, reinit_mod = 1, γ = 0.1, γ_reinit = 0.5,
-    os_γ_mult = 0.75, maxiter = 1000, verbose=false, constraint_names = map(i -> Symbol("C_$i"),1:N),
+    os_γ_mult = 0.75, Λ_update_tol = 0.01, maxiter = 1000, verbose=false, constraint_names = map(i -> Symbol("C_$i"),1:N),
     converged::Function = default_al_converged, debug = false,
     has_oscillations::Function = default_has_oscillations,
     initial_parameters::Function = default_al_init_params
@@ -91,7 +94,7 @@ struct AugmentedLagrangian <: Optimiser
     al_bundles = Dict(:C => constraint_names, :λ => λ_names, :Λ => Λ_names)
     history = OptimiserHistory(Float64,al_keys,al_bundles,maxiter,verbose)
 
-    params = (;Λ_max,ζ,update_mod,reinit_mod,γ,γ_reinit,os_γ_mult,debug,initial_parameters)
+    params = (;Λ_max,ζ,update_mod,reinit_mod,γ,γ_reinit,os_γ_mult,Λ_update_tol,debug,initial_parameters)
     new(problem,ls_evolver,vel_ext,history,converged,has_oscillations,params,φ0)
   end
 end
@@ -174,7 +177,7 @@ end
 function Base.iterate(m::AugmentedLagrangian,state)
   it, L, J, C, dL, dJ, dC, uh, φh, vel, λ, Λ, γ, os_it = state
   params, history = m.params, m.history
-  Λ_max,ζ,update_mod,reinit_mod,_,γ_reinit,os_γ_mult,_,_ = params
+  Λ_max,ζ,update_mod,reinit_mod,_,γ_reinit,os_γ_mult,Λ_update_tol,_,_ = params
 
   ## Periodicially call GC
   iszero(it % 50) && GC.gc();
@@ -209,9 +212,9 @@ function Base.iterate(m::AugmentedLagrangian,state)
   λ .= λ .- Λ .* C
   if iszero(it % update_mod)
     for i = 1:length(C)
-      # if abs(C[i])>0.01 # TODO: This is an algorithmic change that requires us to re-run all jobs
+      if abs(C[i])>Λ_update_tol
         Λ[i] = min(Λ[i]*ζ,Λ_max)
-      # end
+      end
     end
   end
 

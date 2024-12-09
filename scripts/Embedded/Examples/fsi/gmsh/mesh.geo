@@ -109,3 +109,4 @@ Physical Point("Gamma_s_D", 30) = {2, 3};
 //+
 Physical Surface("Omega_NonDesign", 31) = {6};
 Physical Curve("Omega_NonDesign", 32) = {17, 18, 19, 20, 16, 15, 21};
+Physical Point("Omega_NonDesign", 33) = {11, 12, 13, 14, 15, 16};

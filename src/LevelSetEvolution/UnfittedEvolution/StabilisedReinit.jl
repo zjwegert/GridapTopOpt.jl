@@ -64,6 +64,7 @@ get_space(s::StabilisedReinit) = s.space
 get_embedded_collection(s::StabilisedReinit) = s.Ωs
 get_measure(s::StabilisedReinit) = s.dΩ_bg
 get_params(s::StabilisedReinit) = s.params
+get_element_sizes(s::StabilisedReinit) = s.params.h
 get_cache(s::StabilisedReinit) = s.cache
 
 function solve!(s::StabilisedReinit,φh,nls_cache::Nothing)
