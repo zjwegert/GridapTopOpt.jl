@@ -107,6 +107,7 @@ Re = 60 # Reynolds number
 cl = H # Characteristic length
 u0_max = maximum(abs,get_dirichlet_dof_values(U))
 μ = ρ*cl*u0_max/Re # Viscosity
+ν = μ/ρ # Kinematic viscosity
 # Stabilization parameters
 γ(h) = 1e5*μ/h
 

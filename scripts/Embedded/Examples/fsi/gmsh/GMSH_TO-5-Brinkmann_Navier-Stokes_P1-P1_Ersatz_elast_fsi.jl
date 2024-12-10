@@ -5,7 +5,7 @@ using GridapTopOpt
 
 #############
 
-path = "./results/GMSH-TO-5-Brinkmann_stokes_P1-P1_Ersatz_elast_fsi/results/"
+path = "./results/GMSH-TO-5-Brinkmann_ Navier-Stokes_P1-P1_Ersatz_elast_fsi/results/"
 mkpath(path)
 
 γ_evo = 0.2
@@ -111,6 +111,7 @@ u0_max = maximum(abs,get_dirichlet_dof_values(U))
 # Stabilization parameters
 γ(h) = 1e5*μ/h
 β1(h) = 1/3*(h^2/4ν)
+# τ_SUPG(u,h) = ...
 
 # Terms
 σf_n(u,p,n) = μ*∇(u) ⋅ n - p*n
@@ -156,7 +157,7 @@ state_map = AffineFEStateMap(a_coupled,l_coupled,X,Y,V_φ,U_reg,φh)
 pcfs = PDEConstrainedFunctionals(J_comp,[Vol],state_map)
 
 ## Evolution Method
-evo = CutFEMEvolve(V_φ,Ω,dΩ_act,hₕ;max_steps,γg=0.5)
+evo = CutFEMEvolve(V_φ,Ω,dΩ_act,hₕ;max_steps,γg=0.1)
 reinit = StabilisedReinit(V_φ,Ω,dΩ_act,hₕ;stabilisation_method=ArtificialViscosity(3.0))
 ls_evo = UnfittedFEEvolution(evo,reinit)
 
