@@ -42,8 +42,8 @@ struct UnfittedFEEvolution{A<:Evolver,B<:Reinitialiser,C<:Real} <: LevelSetEvolu
   reinitialiser::B
   min_element_diameter::C
   function UnfittedFEEvolution(evolver::A,reinitialiser::B) where {A,B}
-    h_evo = get_element_sizes(evolver)
-    h_reinit = get_element_sizes(reinitialiser)
+    h_evo = get_element_diameters(evolver)
+    h_reinit = get_element_diameters(reinitialiser)
     @assert h_evo === h_reinit "Element sizes for evolution and reinitialisation should be the same."
     min_element_diameter = _get_minimum_element_diameter(h_evo)
     new{A,B,typeof(min_element_diameter)}(evolver,reinitialiser,min_element_diameter)

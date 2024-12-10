@@ -47,7 +47,7 @@ get_assembler(s::CutFEMEvolve) = s.assembler
 get_space(s::CutFEMEvolve) = s.space
 get_measure(s::CutFEMEvolve) = s.dΩ_bg
 get_params(s::CutFEMEvolve) = s.params
-get_element_sizes(s::CutFEMEvolve) = s.params.h
+get_element_diameters(s::CutFEMEvolve) = s.params.h
 get_cache(s::CutFEMEvolve) = s.cache
 
 function get_transient_operator(φh,velh,s::CutFEMEvolve)
@@ -58,7 +58,12 @@ function get_transient_operator(φh,velh,s::CutFEMEvolve)
   v_norm = maximum(abs,get_free_dof_values(velh))
   β(vh,∇φ) = vh/(ϵ + v_norm) * ∇φ/(ϵ + norm(∇φ))
 
-  stiffness(t,u,v) = ∫(((β ∘ (velh,∇(φh))) ⋅ ∇(u)) * v)dΩ_bg + ∫((γg*h*h)*jump(∇(u) ⋅ n_Γg)*jump(∇(v) ⋅ n_Γg))dΓg
+  γ(h) = γg*h^2
+
+  aₛ(u,v,h::CellField) = ∫(mean(γ ∘ h)*jump(∇(u) ⋅ n_Γg)*jump(∇(v) ⋅ n_Γg))dΓg
+  aₛ(u,v,h::Real) = ∫(γ(h)*jump(∇(u) ⋅ n_Γg)*jump(∇(v) ⋅ n_Γg))dΓg
+
+  stiffness(t,u,v) = ∫(((β ∘ (velh,∇(φh))) ⋅ ∇(u)) * v)dΩ_bg + aₛ(u,v,h)
   mass(t, ∂ₜu, v) = ∫(∂ₜu * v)dΩ_bg
   forcing(t,v) = ∫(0v)dΩ_bg + ∫(0*jump(∇(v) ⋅ n_Γg))dΓg
   # Second term is added to address the following issue:

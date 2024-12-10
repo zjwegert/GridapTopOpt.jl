@@ -28,8 +28,8 @@ model = GmshDiscreteModel((@__DIR__)*"/mesh.msh")
 writevtk(model,path*"model")
 
 Ω_act = Triangulation(model)
-hₕ = CellField(get_element_sizes(model),Ω_act)
-hmin = GridapTopOpt._get_minimum_element_diameter(hₕ)
+hₕ = CellField(get_element_diameters(model),Ω_act)
+hmin = minimum(get_element_diameters(model))
 
 # Cut the background model
 reffe_scalar = ReferenceFE(lagrangian,Float64,1)
@@ -155,7 +155,7 @@ state_map = AffineFEStateMap(a_coupled,l_coupled,X,Y,V_φ,U_reg,φh)
 pcfs = PDEConstrainedFunctionals(J_comp,[Vol],state_map)
 
 ## Evolution Method
-evo = CutFEMEvolve(V_φ,Ω,dΩ_act,hₕ;max_steps)
+evo = CutFEMEvolve(V_φ,Ω,dΩ_act,hₕ;max_steps,γg=0.1)
 reinit = StabilisedReinit(V_φ,Ω,dΩ_act,hₕ;stabilisation_method=ArtificialViscosity(3.0))
 ls_evo = UnfittedFEEvolution(evo,reinit)
 
@@ -167,7 +167,7 @@ vel_ext = VelocityExtension(a_hilb,U_reg,V_reg)
 ## Optimiser
 converged(m) = GridapTopOpt.default_al_converged(
   m;
-  L_tol = 0.5*hmin,
+  L_tol = 0.5hmin,
   C_tol = 0.01vf
 )
 function has_oscillations(m,os_it)

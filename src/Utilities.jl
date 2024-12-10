@@ -244,44 +244,71 @@ function get_order(space::DistributedFESpace)
   return getany(order)
 end
 
-# Element size for general model
+# Element diameter for general model
 
+# According to Massing et al. (doi:10.1007/s10915-014-9838-9) the stabilisation terms
+#   should use h_K denotes the diameter of element K, and h_F denotes the average
+#   of the diameters of the elements sharing a facet K. The latter can be computed
+#   as the mean on the facet triangulation.
+#
+# In this implementation, diameter is interpreted as the circumdiameter of the polytope.
 """
-    get_element_sizes(model)
+    get_element_diameters(model)
 
-Given a general model return the element size as a lazy map of minimum (by default)
-side length sizes.
+Given a general unstructured model return the element circumdiameters.
 """
-function get_element_sizes(model,f=min)
+function get_element_diameters(model)
   coords = get_cell_coordinates(model)
   polys = get_polytopes(model)
   @assert length(polys) == 1 "Only one cell type is currently supported"
-  return _get_element_sizes(f,coords,first(polys))
-end
-
-function _get_tri_side_lengths(cell_coords)
-  p1 = cell_coords[1]
-  p2 = cell_coords[2]
-  p3 = cell_coords[3]
-  return norm(p1-p2), norm(p1-p3), norm(p2-p3)
-end
-
-function _get_tet_side_lengths(cell_coords)
-  p1 = cell_coords[1]
-  p2 = cell_coords[2]
-  p3 = cell_coords[3]
-  p4 = cell_coords[4]
-  return norm(p1-p2), norm(p1-p3), norm(p2-p3),
-    norm(p1-p4), norm(p2-p4), norm(p3-p4)
-end
-
-function _get_element_sizes(f,coords,poly::Polytope)
+  poly = first(polys)
   if poly == TRI
-    side_lengths = lazy_map(_get_tri_side_lengths,coords)
+    return lazy_map(_get_tri_circumdiameter,coords)
   elseif poly == TET
-    side_lengths = lazy_map(_get_tet_side_lengths,coords)
+    return lazy_map(_get_tet_circumdiameter,coords)
   else
     @notimplemented "Only triangles and tetrahedra are currently supported"
   end
-  return lazy_map(t->f(t...),side_lengths)
+end
+
+# Based on doi:10.1017/CBO9780511973611. C is the Cayley-Menger matrix.
+function _get_tri_circumdiameter(coords)
+  d12 = norm(coords[1]-coords[2])^2
+  d13 = norm(coords[1]-coords[3])^2
+  d23 = norm(coords[2]-coords[3])^2
+  # C = [
+  #   0  1   1   1
+  #   1  0  d12 d13
+  #   1 d12  0  d23
+  #   1 d13 d23  0
+  # ];
+  # M = -2inv(C);
+  # circumcentre = (M[1,2]*coords[1] + M[1,3]*coords[2] + M[1,4]*coords[3])/sum(M[1,2:end])
+  # circumdiameter = sqrt(M[1,1])
+  M11 = -((4*d12*d13*d23)/(d12^2+(d13-d23)^2-2*d12*(d13+d23)))
+  return sqrt(M11)
+end
+
+function _get_tet_circumdiameter(coords)
+  d12 = norm(coords[1]-coords[2])^2
+  d13 = norm(coords[1]-coords[3])^2
+  d14 = norm(coords[1]-coords[4])^2
+  d23 = norm(coords[2]-coords[3])^2
+  d24 = norm(coords[2]-coords[4])^2
+  d34 = norm(coords[3]-coords[4])^2
+  # C = [
+  #   0  1   1   1   1
+  #   1  0  d12 d13 d14
+  #   1 d12  0  d23 d24
+  #   1 d13 d23  0  d34
+  #   1 d14 d24 d34  0
+  # ];
+  # M = -2inv(C);
+  # circumcentre = (M[1,2]*coords[1] + M[1,3]*coords[2] + M[1,4]*coords[3] + M[1,5]*coords[4])/sum(M[1,2:end])
+  # circumdiameter = sqrt(M[1,1])
+  M11 = (d14^2*d23^2+(d13*d24-d12*d34)^2-2*d14*d23*(d13*d24+d12*d34))/(
+    d13^2*d24+d12^2*d34+d23*(d14^2+d14*(d23-d24-d34)+d24*d34)-
+    d13*(d14*(d23+d24-d34)+d24*(d23-d24+d34))-d12*((d23+d24-d34)*d34+
+    d14*(d23-d24+d34)+d13*(-d23+d24+d34)))
+  return sqrt(M11)
 end

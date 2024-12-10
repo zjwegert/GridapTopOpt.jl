@@ -66,7 +66,7 @@ export update_labels!
 export initial_lsf
 export get_el_Δ
 export get_cartesian_element_sizes
-export get_element_sizes
+export get_element_diameters
 export isotropic_elast_tensor
 
 include("LevelSetEvolution/LevelSetEvolution.jl")

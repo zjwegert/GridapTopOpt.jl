@@ -28,7 +28,8 @@ model = GmshDiscreteModel((@__DIR__)*"/mesh.msh")
 writevtk(model,path*"model")
 
 Ω_act = Triangulation(model)
-hₕ = CellField(get_element_sizes(model),Ω_act)
+hₕ = CellField(get_element_diameters(model),Ω_act)
+hmin = minimum(get_element_diameters(model))
 
 # Cut the background model
 reffe_scalar = ReferenceFE(lagrangian,Float64,1)
@@ -107,7 +108,7 @@ cl = H # Characteristic length
 u0_max = maximum(abs,get_dirichlet_dof_values(U))
 μ = ρ*cl*u0_max/Re # Viscosity
 # Stabilization parameters
-γ = 1000.0
+γ(h) = 1e5*μ/h
 
 # Terms
 σf_n(u,p,n) = μ*∇(u) ⋅ n - p*n
@@ -116,7 +117,7 @@ b_Ω(v,p) = - (∇⋅v)*p
 
 a_fluid((u,p),(v,q)) =
   ∫( a_Ω(u,v)+b_Ω(u,q)+b_Ω(v,p)) * Ω.dΩf +
-  ∫( a_Ω(u,v)+b_Ω(u,q)+b_Ω(v,p) + (γ/hₕ)*u⋅v ) * Ω.dΩs
+  ∫( a_Ω(u,v)+b_Ω(u,q)+b_Ω(v,p) + (γ∘hₕ)*u⋅v ) * Ω.dΩs
 
 ## Structure
 # Stabilization and material parameters
@@ -164,7 +165,7 @@ vel_ext = VelocityExtension(a_hilb,U_reg,V_reg)
 ## Optimiser
 converged(m) = GridapTopOpt.default_al_converged(
   m;
-  L_tol = 0.5h,
+  L_tol = 0.5hmin,
   C_tol = 0.01vf
 )
 function has_oscillations(m,os_it)
