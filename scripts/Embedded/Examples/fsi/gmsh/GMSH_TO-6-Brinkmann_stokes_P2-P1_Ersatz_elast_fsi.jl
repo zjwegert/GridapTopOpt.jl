@@ -5,11 +5,11 @@ using GridapTopOpt
 
 #############
 
-path = "./results/GMSH-TO-6-Brinkmann_stokes_P2-P1_Ersatz_elast_fsi/results/"
+path = "./results/GMSH-TO-6-Brinkmann_stokes_P2-P1_Ersatz_elast_fsi_multistage_reinit/results/"
 mkpath(path)
 
-γ_evo = 0.2
-max_steps = 20
+γ_evo = 3.0
+max_steps = 1
 vf = 0.025
 α_coeff = 2
 iter_mod = 1
@@ -109,7 +109,7 @@ u0_max = maximum(abs,get_dirichlet_dof_values(U))
 μ = ρ*cl*u0_max/Re # Viscosity
 ν = μ/ρ # Kinematic viscosity
 # Stabilization parameters
-γ(h) = 1e5*μ/h
+γ(h) = 1000/h #1e5*μ/h
 
 # Terms
 σf_n(u,p,n) = μ*∇(u) ⋅ n - p*n
@@ -118,7 +118,7 @@ b_Ω(v,p) = - (∇⋅v)*p
 
 a_fluid((u,p),(v,q)) =
   ∫( a_Ω(u,v)+b_Ω(u,q)+b_Ω(v,p)) * Ω.dΩf +
-  ∫( a_Ω(u,v)+b_Ω(u,q)+b_Ω(v,p) + (γ∘hₕ)*u⋅v ) * Ω.dΩs
+  ∫( a_Ω(u,v)+b_Ω(u,q)+b_Ω(v,p) + (γ(hmin))*u⋅v ) * Ω.dΩs
 
 ## Structure
 # Stabilization and material parameters
@@ -154,13 +154,18 @@ state_map = AffineFEStateMap(a_coupled,l_coupled,X,Y,V_φ,U_reg,φh)
 pcfs = PDEConstrainedFunctionals(J_comp,[Vol],state_map)
 
 ## Evolution Method
-evo = CutFEMEvolve(V_φ,Ω,dΩ_act,hₕ;max_steps)
-reinit = StabilisedReinit(V_φ,Ω,dΩ_act,hₕ;stabilisation_method=ArtificialViscosity(3.0))
+# evo = CutFEMEvolve(V_φ,Ω,dΩ_act,hmin;max_steps,γg=0.075)
+# reinit = StabilisedReinit(V_φ,Ω,dΩ_act,hmin;stabilisation_method=ArtificialViscosity(3.0))
+# ls_evo = UnfittedFEEvolution(evo,reinit)
+evo = CutFEMEvolve(V_φ,Ω,dΩ_act,hₕ;max_steps,γg=0.1)
+reinit1 = StabilisedReinit(V_φ,Ω,dΩ_act,hₕ;stabilisation_method=ArtificialViscosity(2.0))
+reinit2 = StabilisedReinit(V_φ,Ω,dΩ_act,hₕ;stabilisation_method=GridapTopOpt.InteriorPenalty2(V_φ,γg=1.0))
+reinit = GridapTopOpt.MultiStageStabilisedReinit2([reinit1,reinit2])
 ls_evo = UnfittedFEEvolution(evo,reinit)
 
 ## Hilbertian extension-regularisation problems
 _α(hₕ) = (α_coeff*hₕ)^2
-a_hilb(p,q) =∫((_α ∘ hₕ)*∇(p)⋅∇(q) + p*q)dΩ_act;
+a_hilb(p,q) =∫((_α(hmin))*∇(p)⋅∇(q) + p*q)dΩ_act;
 vel_ext = VelocityExtension(a_hilb,U_reg,V_reg)
 
 ## Optimiser

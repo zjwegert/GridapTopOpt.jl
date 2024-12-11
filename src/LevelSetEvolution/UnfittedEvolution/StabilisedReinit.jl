@@ -16,7 +16,7 @@ the artifical viscosity term with an interior jump penalty term.
 - `space::C`: FE space for level-set function
 - `assembler::Assembler`: Assembler for LS FE space
 - `params::E`: Tuple of Nitsche parameter `γd` and mesh size `h`
-- `cache`: Cache for evolver, initially `nothing`.
+- `cache`: Cache for reinitialiser, initially `nothing`.
 
 # Note
 - We expect the EmbeddedCollection `Ωs` to contain `:dΓ`. If this is not
@@ -33,7 +33,7 @@ mutable struct StabilisedReinit{A,B,C,D} <: Reinitialiser
   cache
   function StabilisedReinit(V_φ::C,Ωs::EmbeddedCollection,dΩ_bg::B,h;
       γd = 20.0,
-      nls = NewtonSolver(LUSolver();maxiter=50,rtol=1.e-14,verbose=true),
+      nls = NewtonSolver(LUSolver();maxiter=10,rtol=1.e-14,verbose=true),
       assembler=SparseMatrixAssembler(V_φ,V_φ),
       stabilisation_method::A = InteriorPenalty(V_φ)) where {A,B,C}
 
@@ -67,29 +67,41 @@ get_params(s::StabilisedReinit) = s.params
 get_element_diameters(s::StabilisedReinit) = s.params.h
 get_cache(s::StabilisedReinit) = s.cache
 
-function solve!(s::StabilisedReinit,φh,nls_cache::Nothing)
+function solve!(s::StabilisedReinit,φh,cache::Nothing)
   nls, V_φ, assembler, = s.nls, s.space, s.assembler
+  # Temp solution for later reinitialisation
+  φ = get_free_dof_values(φh);
+  φ_tmp = copy(φ)
   # Weak form
   res, jac = get_residual_and_jacobian(s,φh)
   # Operator and cache
   op = get_algebraic_operator(FEOperator(res,jac,V_φ,V_φ,assembler))
   nls_cache = instantiate_caches(get_free_dof_values(φh),nls,op)
-  s.cache = nls_cache
+  s.cache = (;nls_cache,φh_tmp)
   # Solve
   solve!(get_free_dof_values(φh),nls,op,nls_cache)
+  copy!(φ_tmp,get_free_dof_values(φ))
   update_collection!(s.Ωs,φh) # TODO: remove?
   return φh
 end
 
-function solve!(s::StabilisedReinit,φh,nls_cache)
+using GridapSolvers.SolverInterfaces: SOLVER_CONVERGED_ATOL,SOLVER_CONVERGED_RTOL,ConvergenceLog,finished_flag
+
+function solve!(s::StabilisedReinit,φh,cache)
   nls, V_φ, assembler, = s.nls, s.space, s.assembler
+  nls_cache, φ_tmp = cache
+  # Update φ_tmp
+  copy!(φ_tmp,get_free_dof_values(φh))
   # Weak form
   res, jac = get_residual_and_jacobian(s,φh)
   # Operator and cache
   op = get_algebraic_operator(FEOperator(res,jac,V_φ,V_φ,assembler))
   # Solve
-  solve!(get_free_dof_values(φh),nls,op,nls_cache)
-  update_collection!(s.Ωs,φh) # TODO: remove?
+  solve!(φ_tmp,nls,op,nls_cache)
+  if _get_solver_flag(nls.log) ∈ (SOLVER_CONVERGED_ATOL,SOLVER_CONVERGED_RTOL)
+    copy!(get_free_dof_values(φh),φ_tmp)
+    update_collection!(s.Ωs,φh)
+  end
   return φh
 end
 
@@ -118,11 +130,12 @@ end
 
 struct InteriorPenalty <: StabilisationMethod
   dΛ
+  γg
 end
-function InteriorPenalty(V_φ::FESpace)
+function InteriorPenalty(V_φ::FESpace;γg=1.0)
   Λ = SkeletonTriangulation(get_triangulation(V_φ))
   dΛ = Measure(Λ,2get_order(V_φ))
-  return InteriorPenalty(dΛ)
+  return InteriorPenalty(dΛ,γg)
 end
 
 function get_residual_and_jacobian(s::StabilisedReinit{InteriorPenalty},φh)
@@ -130,15 +143,49 @@ function get_residual_and_jacobian(s::StabilisedReinit{InteriorPenalty},φh)
   γd, h = s.params
   ϵ = 1e-20
   dΛ = s.stabilisation_method.dΛ
+  γg = s.stabilisation_method.γg
 
   update_collection!(Ωs,φh)
   dΓ = Ωs.dΓ
+  γ(h) = γg*h^2
+
+  aₛ(u,v,h::CellField) = ∫(mean(γ ∘ h)*jump(∇(u)) ⋅ jump(∇(v)))dΛ
+  aₛ(u,v,h::Real) = ∫(γ(h)*jump(∇(u)) ⋅ jump(∇(v)))dΛ
 
   W(u,∇u) = sign(u) * ∇u / (ϵ + norm(∇u))
-  a(w,u,v) = ∫(v*(W ∘ (w,∇(w))) ⋅ ∇(u))dΩ_bg + ∫(h*h*jump(∇(u)) ⋅ jump(∇(v)))dΛ + ∫((γd/h)*v*u)dΓ
+  a(w,u,v) = ∫(v*(W ∘ (w,∇(w))) ⋅ ∇(u))dΩ_bg + aₛ(u,v,h) + ∫((γd/h)*v*u)dΓ
   b(w,v) = ∫((sign ∘ w)*v)dΩ_bg
   res(u,v) = a(u,u,v) - b(u,v)
   jac(u,du,v) = a(u,du,v)
   # jac(u,du,v) = jacobian(res,[u,v],1)
   return res,jac
+end
+
+struct MultiStageStabilisedReinit <: Reinitialiser
+  stages::Vector{StabilisedReinit}
+  function MultiStageStabilisedReinit(stages::Vector{<:StabilisedReinit})
+    h = get_element_diameters(first(stages))
+    for stage in stages
+      @check h === get_element_diameters(stage)
+    end
+    new(stages)
+  end
+end
+
+get_cache(s::MultiStageStabilisedReinit) = get_cache.(s.stages)
+get_element_diameters(s::MultiStageStabilisedReinit) = get_element_diameters(first(s.stages))
+
+function solve!(s::MultiStageStabilisedReinit,φh,caches)
+  for (stage,cache) in zip(s.stages,caches)
+    solve!(stage,φh,cache)
+  end
+  return φh
+end
+
+## Helper
+function _get_solver_flag(log::ConvergenceLog)
+  r_abs = log.residuals[log.num_iters+1]
+  r_rel = r_abs / log.residuals[1]
+  flag  = finished_flag(log.tols,log.num_iters,r_abs,r_rel)
+  return flag
 end

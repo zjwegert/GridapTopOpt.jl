@@ -55,7 +55,25 @@ function get_transient_operator(φh,velh,s::CutFEMEvolve)
   γg, h, dΓg, n_Γg = params.γg, params.h, params.dΓg, params.n_Γg
   ϵ = 1e-20
 
+  # V_reg2 = TestFESpace(get_triangulation(V_φ).model,
+  #   ReferenceFE(lagrangian,VectorValue{2,Float64},1);dirichlet_tags=["Omega_NonDesign","Gamma_s_D"])
+  # U_reg2 = TrialFESpace(V_reg2)
+
+  # _α(hₕ) = 3(hₕ)^2
+  # a_hilb2(p,q) =∫((_α(h))*∇(p) ⊙ ∇(q) + p ⋅ q)dΩ_bg;
+  # vel_ext2 = VelocityExtension(a_hilb2,U_reg2,V_reg2)
+  # _n(∇φh) = ∇φh/(1e-20 + norm(∇φh))
+  # # l_n(v) = ∫((velh*(_n ∘ ∇(φh)) ⋅ v))dΩ_bg
+  # l_n(v) = ∫((velh*(s.Ωs.n_Γ ⋅ v)))s.Ωs.dΓ
+  # _b = assemble_vector(l_n,V_reg2)
+  # project!(vel_ext2,_b)
+  # n_regh = FEFunction(V_reg2,_b)
+  # β = n_regh/sqrt(dot(_b,vel_ext2.K*_b))
+
+  # writevtk(get_triangulation(φh),"results/beta",cellfields=["beta"=>β])
   v_norm = maximum(abs,get_free_dof_values(velh))
+  # β(vh,n) = vh/(ϵ + v_norm) * n/(ϵ + norm(n))
+  # β(vh,n) = n/(ϵ + norm(n))
   β(vh,∇φ) = vh/(ϵ + v_norm) * ∇φ/(ϵ + norm(∇φ))
 
   γ(h) = γg*h^2
@@ -63,7 +81,17 @@ function get_transient_operator(φh,velh,s::CutFEMEvolve)
   aₛ(u,v,h::CellField) = ∫(mean(γ ∘ h)*jump(∇(u) ⋅ n_Γg)*jump(∇(v) ⋅ n_Γg))dΓg
   aₛ(u,v,h::Real) = ∫(γ(h)*jump(∇(u) ⋅ n_Γg)*jump(∇(v) ⋅ n_Γg))dΓg
 
-  stiffness(t,u,v) = ∫(((β ∘ (velh,∇(φh))) ⋅ ∇(u)) * v)dΩ_bg + aₛ(u,v,h)
+  βh = β ∘ (velh,∇(φh))
+  # dt = get_ode_solver(s).dt
+  # τ(β) = 1/(2sqrt((dt)^-2 + norm(β)^2/h^2))
+  # # τ(β) = 0.5*(4/dt^2 + 4*norm(β)^2/h^2)^-0.5 # Based on MOOSE paper
+  # # τ(β) = h/(2norm(β))
+  # τh = τ ∘ βh
+  # stiffness(t,u,v) = ∫((βh ⋅ ∇(u)) * v + (βh ⋅ ∇(u))*(τh*βh ⋅ ∇(v)))dΩ_bg #+ aₛ(u,v,h)
+  # mass(t, ∂ₜu, v) = ∫(∂ₜu * v + ∂ₜu * (τh*βh ⋅ ∇(v)))dΩ_bg
+  # forcing(t,v) = ∫(0v)dΩ_bg
+
+  stiffness(t,u,v) = ∫((βh ⋅ ∇(u)) * v)dΩ_bg + aₛ(u,v,h)
   mass(t, ∂ₜu, v) = ∫(∂ₜu * v)dΩ_bg
   forcing(t,v) = ∫(0v)dΩ_bg + ∫(0*jump(∇(v) ⋅ n_Γg))dΓg
   # Second term is added to address the following issue:
