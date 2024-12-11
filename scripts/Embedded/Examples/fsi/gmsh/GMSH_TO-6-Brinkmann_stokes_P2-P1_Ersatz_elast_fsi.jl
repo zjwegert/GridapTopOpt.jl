@@ -118,7 +118,7 @@ b_Ω(v,p) = - (∇⋅v)*p
 
 a_fluid((u,p),(v,q)) =
   ∫( a_Ω(u,v)+b_Ω(u,q)+b_Ω(v,p)) * Ω.dΩf +
-  ∫( a_Ω(u,v)+b_Ω(u,q)+b_Ω(v,p) + (γ(hmin))*u⋅v ) * Ω.dΩs
+  ∫( a_Ω(u,v)+b_Ω(u,q)+b_Ω(v,p) + (γ ∘ hₕ)*u⋅v ) * Ω.dΩs
 
 ## Structure
 # Stabilization and material parameters
@@ -165,7 +165,7 @@ ls_evo = UnfittedFEEvolution(evo,reinit)
 
 ## Hilbertian extension-regularisation problems
 _α(hₕ) = (α_coeff*hₕ)^2
-a_hilb(p,q) =∫((_α(hmin))*∇(p)⋅∇(q) + p*q)dΩ_act;
+a_hilb(p,q) =∫((_α ∘ hₕ)*∇(p)⋅∇(q) + p*q)dΩ_act;
 vel_ext = VelocityExtension(a_hilb,U_reg,V_reg)
 
 ## Optimiser

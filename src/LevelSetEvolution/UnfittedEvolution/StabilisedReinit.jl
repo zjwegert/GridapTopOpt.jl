@@ -77,15 +77,13 @@ function solve!(s::StabilisedReinit,φh,cache::Nothing)
   # Operator and cache
   op = get_algebraic_operator(FEOperator(res,jac,V_φ,V_φ,assembler))
   nls_cache = instantiate_caches(get_free_dof_values(φh),nls,op)
-  s.cache = (;nls_cache,φh_tmp)
+  s.cache = (;nls_cache,φ_tmp)
   # Solve
   solve!(get_free_dof_values(φh),nls,op,nls_cache)
   copy!(φ_tmp,get_free_dof_values(φ))
   update_collection!(s.Ωs,φh) # TODO: remove?
   return φh
 end
-
-using GridapSolvers.SolverInterfaces: SOLVER_CONVERGED_ATOL,SOLVER_CONVERGED_RTOL,ConvergenceLog,finished_flag
 
 function solve!(s::StabilisedReinit,φh,cache)
   nls, V_φ, assembler, = s.nls, s.space, s.assembler
