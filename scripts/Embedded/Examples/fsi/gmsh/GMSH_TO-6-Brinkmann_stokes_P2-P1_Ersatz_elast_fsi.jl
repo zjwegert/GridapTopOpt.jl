@@ -8,8 +8,8 @@ using GridapTopOpt
 path = "./results/GMSH-TO-6-Brinkmann_stokes_P2-P1_Ersatz_elast_fsi_multistage_reinit/results/"
 mkpath(path)
 
-γ_evo = 3.0
-max_steps = 1
+γ_evo = 0.1
+max_steps = 20
 vf = 0.025
 α_coeff = 2
 iter_mod = 1
@@ -159,8 +159,8 @@ pcfs = PDEConstrainedFunctionals(J_comp,[Vol],state_map)
 # ls_evo = UnfittedFEEvolution(evo,reinit)
 evo = CutFEMEvolve(V_φ,Ω,dΩ_act,hₕ;max_steps,γg=0.1)
 reinit1 = StabilisedReinit(V_φ,Ω,dΩ_act,hₕ;stabilisation_method=ArtificialViscosity(2.0))
-reinit2 = StabilisedReinit(V_φ,Ω,dΩ_act,hₕ;stabilisation_method=GridapTopOpt.InteriorPenalty2(V_φ,γg=1.0))
-reinit = GridapTopOpt.MultiStageStabilisedReinit2([reinit1,reinit2])
+reinit2 = StabilisedReinit(V_φ,Ω,dΩ_act,hₕ;stabilisation_method=GridapTopOpt.InteriorPenalty(V_φ,γg=1.0))
+reinit = GridapTopOpt.MultiStageStabilisedReinit([reinit1,reinit2])
 ls_evo = UnfittedFEEvolution(evo,reinit)
 
 ## Hilbertian extension-regularisation problems
