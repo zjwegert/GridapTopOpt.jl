@@ -80,7 +80,7 @@ function solve!(s::StabilisedReinit,φh,cache::Nothing)
   s.cache = (;nls_cache,φ_tmp)
   # Solve
   solve!(get_free_dof_values(φh),nls,op,nls_cache)
-  copy!(φ_tmp,get_free_dof_values(φ))
+  copy!(φ_tmp,φ)
   update_collection!(s.Ωs,φh) # TODO: remove?
   return φh
 end
