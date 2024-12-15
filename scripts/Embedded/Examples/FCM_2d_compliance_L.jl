@@ -4,15 +4,15 @@ using GridapEmbedded, GridapEmbedded.LevelSetCutters
 
 using GridapTopOpt: StateParamIntegrandWithMeasure
 
-path="./results/FCM_elastic_compliance_LShape_ALM_diffusion/"
+path="./results/FCM_elastic_compliance_LShape_ALM_n100/"
 rm(path,force=true,recursive=true)
 mkpath(path)
 n = 100
 order = 1
-γ = 0.1
-max_steps = floor(Int,order*n/5)
+γ = 0.2
+max_steps = floor(Int,order*n/10)
 vf = 0.4
-α_coeff = 3max_steps*γ
+α_coeff = max_steps*γ
 iter_mod = 1
 
 _model = CartesianDiscreteModel((0,1,0,1),(n,n))
@@ -49,7 +49,7 @@ U_reg = TrialFESpace(V_reg,0)
 V_φ = TestFESpace(model,reffe_scalar)
 
 ## Levet-set function
-φh = interpolate(x->-cos(8π*x[1])*cos(8π*x[2])-0.2,V_φ)
+φh = interpolate(x->-cos(6π*x[1])*cos(8π*x[2])-0.2,V_φ)
 Ωs = EmbeddedCollection(model,φh) do cutgeo,_
   Ωin = DifferentiableTriangulation(Triangulation(cutgeo,PHYSICAL_IN),V_φ)
   Ωout = DifferentiableTriangulation(Triangulation(cutgeo,PHYSICAL_OUT),V_φ)
@@ -84,8 +84,7 @@ g = VectorValue(0,-0.1)
 
 const ϵ = (λ + μ)*1e-3
 a(u,v,φ) = ∫(ε(v) ⊙ (σ ∘ ε(u)))Ωs.dΩin +
-  # ∫(ϵ*(ε(v) ⊙ (σ ∘ ε(u))))Ωs.dΩout # Ersatz
-  ∫(ϵ * ∇(v) ⊙ ∇(u))Ωs.dΩout # Pure diffusion
+  ∫(ϵ*(ε(v) ⊙ (σ ∘ ε(u))))Ωs.dΩout
 l(v,φ) = ∫(v⋅g)dΓ_N
 
 ## Optimisation functionals
@@ -101,13 +100,14 @@ state_map = AffineFEStateMap(a,l,U,V,V_φ,U_reg,φh)
 pcfs = PDEConstrainedFunctionals(J,[Vol],state_map;analytic_dC=(dVol,))
 
 ## Evolution Method
-evo = CutFEMEvolve(V_φ,Ωs,dΩ,h;max_steps,γg=0.5)
-reinit = StabilisedReinit(V_φ,Ωs,dΩ,h;stabilisation_method=ArtificialViscosity(3.0))
+evo = CutFEMEvolve(V_φ,Ωs,dΩ,h;max_steps,γg=0.1)
+reinit1 = StabilisedReinit(V_φ,Ωs,dΩ,h;stabilisation_method=ArtificialViscosity(3.0))
+reinit2 = StabilisedReinit(V_φ,Ωs,dΩ,h;stabilisation_method=GridapTopOpt.InteriorPenalty(V_φ,γg=2.0))
+reinit = GridapTopOpt.MultiStageStabilisedReinit([reinit1,reinit2])
 ls_evo = UnfittedFEEvolution(evo,reinit)
-reinit!(ls_evo,φh)
 
 ## Hilbertian extension-regularisation problems
-α = α_coeff*(h_refine/order)^2
+α = (α_coeff*h_refine/order)^2
 a_hilb(p,q) =∫(α*∇(p)⋅∇(q) + p*q)dΩ;
 vel_ext = VelocityExtension(a_hilb,U_reg,V_reg)
 

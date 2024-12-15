@@ -106,8 +106,12 @@ function get_transient_operator(φh,velh,s::CutFEMEvolve)
   # In particular, this happens when we have jumps, where some contributions come from two
   # cells away. Boundary cells then get contributions from cells which are not in the local domain.
   Ut_φ = TransientTrialFESpace(V_φ)
+
+  # TODO: This has been disabled due to bug. See below discussion.
+  # ode_op = TransientLinearFEOperator((stiffness,mass),forcing,Ut_φ,V_φ;
+  #   constant_forms=(false,true),assembler)
   ode_op = TransientLinearFEOperator((stiffness,mass),forcing,Ut_φ,V_φ;
-    constant_forms=(false,true),assembler)
+    constant_forms=(true,true),assembler)
   return ode_op
 end
 
@@ -135,7 +139,9 @@ function solve!(s::CutFEMEvolve,φh,velh,γ,cache::Nothing)
   # March
   march = Base.iterate(ode_sol)
   data, state = march
-  state_new = update_reuse!(state,true)
+  # state_new = update_reuse!(state,true) # TODO: This has been disabled due to bug. See below discussion.
+  state_new = state
+
   march_new = data, state_new
   while march_new !== nothing
     data, state_new = march_new
@@ -145,8 +151,12 @@ function solve!(s::CutFEMEvolve,φh,velh,γ,cache::Nothing)
   # Update φh and cache
   _, φhF = data
   copy!(get_free_dof_values(φh),get_free_dof_values(φhF))
-  s.cache = state_new
-  update_collection!(s.Ωs,φh) # TODO: remove?
+  # TODO: This has been disabled for the time being. Originally when this code
+  #   was written, we expected that changing reuse to false and iterating once
+  #   would update the stiffness matrix. However, this does not appear to be the case.
+  #   See `scripts/Embedded/Bugs/odes_reassemble_stiffness.jl` for a minimal example.
+  # s.cache = state_new
+  update_collection!(s.Ωs,φh)
   return φh
 end
 

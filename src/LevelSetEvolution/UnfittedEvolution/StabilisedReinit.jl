@@ -163,8 +163,10 @@ struct MultiStageStabilisedReinit <: Reinitialiser
   stages::Vector{StabilisedReinit}
   function MultiStageStabilisedReinit(stages::Vector{<:StabilisedReinit})
     h = get_element_diameters(first(stages))
+    V_φ = get_space(first(stages))
     for stage in stages
       @check h === get_element_diameters(stage)
+      @check V_φ === get_space(stage)
     end
     new(stages)
   end
@@ -172,6 +174,7 @@ end
 
 get_cache(s::MultiStageStabilisedReinit) = get_cache.(s.stages)
 get_element_diameters(s::MultiStageStabilisedReinit) = get_element_diameters(first(s.stages))
+get_space(s::MultiStageStabilisedReinit) = get_space(first(s.stages))
 
 function solve!(s::MultiStageStabilisedReinit,φh,caches)
   for (stage,cache) in zip(s.stages,caches)

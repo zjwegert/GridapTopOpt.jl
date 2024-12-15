@@ -1,11 +1,13 @@
-using Gridap, Gridap.Geometry, Gridap.Adaptivity
+using Gridap, Gridap.Geometry, Gridap.Adaptivity, Gridap.MultiField
 using GridapEmbedded, GridapEmbedded.LevelSetCutters
 using GridapGmsh
 using GridapTopOpt
 
+using GridapSolvers
+
 #############
 
-path = "./results/GMSH-TO-6-Brinkmann_stokes_P2-P1_Ersatz_elast_fsi/results/"
+path = "./results/GMSH_STAGGERED_TESTING-6-Brinkmann_stokes_P2-P1_Ersatz_elast_fsi/results/"
 mkpath(path)
 
 γ_evo = 0.1
@@ -96,8 +98,12 @@ U = TrialFESpace(V,[uin,VectorValue(0.0,0.0),VectorValue(0.0,0.0),VectorValue(0.
 P = TrialFESpace(Q)
 R = TrialFESpace(T)
 
-X = MultiFieldFESpace([U,P,R])
-Y = MultiFieldFESpace([V,Q,T])
+# mfs_VQ = BlockMultiFieldStyle(2,(1,1)) #<- allows to specify block structure for first problem
+VQ = MultiFieldFESpace([V,Q])#;style=mfs_VQ)
+UP = MultiFieldFESpace([U,P])#;style=mfs_VQ)
+
+mfs = BlockMultiFieldStyle(2,(2,1))
+X = MultiFieldFESpace([U,P,R];style=mfs)
 
 # Weak form
 ## Fluid
@@ -116,9 +122,10 @@ u0_max = maximum(abs,get_dirichlet_dof_values(U))
 a_Ω(u,v) = μ*(∇(u) ⊙ ∇(v))
 b_Ω(v,p) = - (∇⋅v)*p
 
-a_fluid((u,p),(v,q)) =
+a_fluid((),(u,p),(v,q)) =
   ∫( a_Ω(u,v)+b_Ω(u,q)+b_Ω(v,p)) * Ω.dΩf +
-  ∫( a_Ω(u,v)+b_Ω(u,q)+b_Ω(v,p) + (γ ∘ hₕ)*u⋅v ) * Ω.dΩs
+  ∫( a_Ω(u,v)+b_Ω(u,q)+b_Ω(v,p) + (γ ∘ hₕ)*u⋅v) * Ω.dΩs
+l_fluid((),(v,q)) = 0.0
 
 ## Structure
 # Stabilization and material parameters
@@ -131,72 +138,84 @@ end
 ϵ = (λs + 2μs)*1e-3
 # Terms
 σ(ε) = λs*tr(ε)*one(ε) + 2*μs*ε
-a_solid(d,s) = ∫(ε(s) ⊙ (σ ∘ ε(d)))Ω.dΩs +
+a_solid(((u,p),),d,s) = ∫(ε(s) ⊙ (σ ∘ ε(d)))Ω.dΩs +
   ∫(ϵ*(ε(s) ⊙ (σ ∘ ε(d))))Ω.dΩf # Ersatz
 
-## Full problem
-vec0 = VectorValue(0.0,0.0)
-# minus sign because of the normal direction
-function a_coupled((u,p,d),(v,q,s),φ)
+function l_solid(((u,p),),s)
   n_AD = get_normal_vector(Ω.Γ)
-  return a_fluid((u,p),(v,q)) + a_solid(d,s) +
-    ∫(-σf_n(u,p,n_AD) ⋅ s)Ω.dΓ + ∫((-σf_n(u,p,vec0) ⋅ s))dΩ_act
+  return ∫(σf_n(u,p,n_AD) ⋅ s)Ω.dΓ
 end
-l_coupled((v,q,s),φ) = ∫(0.0q)dΩ_act
 
-## Optimisation functionals
-J_pres((u,p,d),φ) = ∫(p)dΓf_D - ∫(p)dΓf_N
-J_comp((u,p,d),φ) = ∫(ε(d) ⊙ (σ ∘ ε(d)))Ω.dΩs
-Vol((u,p,d),φ) = ∫(vol_D)Ω.dΩs - ∫(vf/vol_D)dΩ_act
-dVol(q,(u,p,d),φ) = ∫(-1/vol_D*q/(norm ∘ (∇(φ))))Ω.dΓ
+## FEOperator way
+fluid_op = AffineFEOperator((x,y)->a_fluid((),x,y),y->l_fluid((),y),UP,VQ)
+uh_1,ph_1 = solve(fluid_op)
+solid_op = AffineFEOperator((x,y)->a_solid(((uh_1,ph_1),),x,y),y->l_solid(((uh_1,ph_1),),y),R,T)
+dh_1 = solve(solid_op)
 
-## Setup solver and FE operators
-state_map = AffineFEStateMap(a_coupled,l_coupled,X,Y,V_φ,U_reg,φh)
-pcfs = PDEConstrainedFunctionals(J_comp,[Vol],state_map;analytic_dC=(dVol,))
+## Staggered
+op = GridapSolvers.StaggeredAffineFEOperator([a_fluid,a_solid],[l_fluid,l_solid],[UP,R],[VQ,T])
 
-## Evolution Method
-evo = CutFEMEvolve(V_φ,Ω,dΩ_act,hₕ;max_steps,γg=0.01)
-reinit1 = StabilisedReinit(V_φ,Ω,dΩ_act,hₕ;stabilisation_method=ArtificialViscosity(2.0))
-reinit2 = StabilisedReinit(V_φ,Ω,dΩ_act,hₕ;stabilisation_method=GridapTopOpt.InteriorPenalty(V_φ,γg=1.0))
-reinit = GridapTopOpt.MultiStageStabilisedReinit([reinit1,reinit2])
-ls_evo = UnfittedFEEvolution(evo,reinit)
 
-## Hilbertian extension-regularisation problems
-_α(hₕ) = (α_coeff*hₕ)^2
-a_hilb(p,q) =∫((_α ∘ hₕ)*∇(p)⋅∇(q) + p*q)dΩ_act;
-vel_ext = VelocityExtension(a_hilb,U_reg,V_reg)
+xh = zero(X)
+# lsolver = CGSolver(JacobiLinearSolver();rtol=1.e-12,verbose=true)
+solver = GridapSolvers.StaggeredFESolver(fill(LUSolver(),2))
+xh,cache = solve!(xh,solver,op)
+uh_2,ph_2,dh_2 = xh
 
-## Optimiser
-converged(m) = GridapTopOpt.default_al_converged(
-  m;
-  L_tol = 0.5hmin,
-  C_tol = 0.01vf
-)
-function has_oscillations(m,os_it)
-  history = GridapTopOpt.get_history(m)
-  it = GridapTopOpt.get_last_iteration(history)
-  all(@.(abs(history[:C,it]) < 0.05vf)) && GridapTopOpt.default_has_oscillations(m,os_it)
-end
-optimiser = AugmentedLagrangian(pcfs,ls_evo,vel_ext,φh;
-  γ=γ_evo,verbose=true,constraint_names=[:Vol],converged,has_oscillations)
-for (it,(uh,ph,dh),φh) in optimiser
-  GC.gc()
-  if iszero(it % iter_mod)
-    writevtk(Ω_act,path*"Omega_act_$it",
-      cellfields=["φ"=>φh,"|∇(φ)|"=>(norm ∘ ∇(φh)),"uh"=>uh,"ph"=>ph,"dh"=>dh])
-    writevtk(Ω.Ωf,path*"Omega_f_$it",
-      cellfields=["uh"=>uh,"ph"=>ph,"dh"=>dh])
-    writevtk(Ω.Ωs,path*"Omega_s_$it",
-      cellfields=["uh"=>uh,"ph"=>ph,"dh"=>dh])
-    writevtk(Ω.Γ,path*"Gamma_$it",cellfields=["σ⋅n"=>(σ ∘ ε(dh))⋅Ω.n_Γ,"σf_n"=>σf_n(uh,ph,φh)])
+writevtk(Ω.Ωf,path*"Omega_f",
+  cellfields=["uh"=>uh,"ph"=>ph,"dh"=>dh])
+writevtk(Ω.Ωs,path*"Omega_s",
+  cellfields=["uh"=>uh,"ph"=>ph,"dh"=>dh])
+
+norm(get_free_dof_values(uh_1)-get_free_dof_values(uh_2),Inf)
+norm(get_free_dof_values(ph_1)-get_free_dof_values(ph_2),Inf)
+norm(get_free_dof_values(dh_1)-get_free_dof_values(dh_2),Inf)
+
+## Old way
+function old_main()
+  _X = MultiFieldFESpace([U,P,R])
+  _Y = MultiFieldFESpace([V,Q,T])
+
+  # Terms
+  _a_fluid((u,p),(v,q)) =
+    ∫( a_Ω(u,v)+b_Ω(u,q)+b_Ω(v,p)) * Ω.dΩf +
+    ∫( a_Ω(u,v)+b_Ω(u,q)+b_Ω(v,p) + (γ ∘ hₕ)*u⋅v ) * Ω.dΩs
+
+  ## Structure
+  _a_solid(d,s) = ∫(ε(s) ⊙ (σ ∘ ε(d)))Ω.dΩs +
+    ∫(ϵ*(ε(s) ⊙ (σ ∘ ε(d))))Ω.dΩf # Ersatz
+
+  ## Full problem
+  function a_coupled((u,p,d),(v,q,s))
+    n_AD = get_normal_vector(Ω.Γ)
+    return _a_fluid((u,p),(v,q)) + _a_solid(d,s) +
+      ∫(-σf_n(u,p,n_AD) ⋅ s)Ω.dΓ
   end
-  write_history(path*"/history.txt",optimiser.history)
+  l_coupled((v,q,s)) = 0.0
+
+  return AffineFEOperator(a_coupled,l_coupled,_X,_Y)
 end
-it = get_history(optimiser).niter; uh,ph,dh = get_state(pcfs)
-writevtk(Ω_act,path*"Omega_act_$it",
-  cellfields=["φ"=>φh,"|∇(φ)|"=>(norm ∘ ∇(φh)),"uh"=>uh,"ph"=>ph,"dh"=>dh])
-writevtk(Ω.Ωf,path*"Omega_f_$it",
-  cellfields=["uh"=>uh,"ph"=>ph,"dh"=>dh])
-writevtk(Ω.Ωs,path*"Omega_s_$it",
-  cellfields=["uh"=>uh,"ph"=>ph,"dh"=>dh])
-writevtk(Ω.Γ,path*"Gamma_$it",cellfields=["σ⋅n"=>(σ ∘ ε(dh))⋅Ω.n_Γ,"σf_n"=>σf_n(uh,ph,φh)])
+
+op_old = old_main()
+
+_xh = solve(op_old)
+_uh,_ph,_dh = _xh
+
+norm(get_free_dof_values(uh)-get_free_dof_values(_uh),Inf)
+norm(get_free_dof_values(ph)-get_free_dof_values(_ph),Inf)
+norm(get_free_dof_values(dh)-get_free_dof_values(_dh),Inf)
+
+
+
+########
+_f1((),x,ϕ) = ϕ
+_f2((x,),y,ϕ) = ϕ
+_f3((x,y,),z,ϕ) = ϕ
+
+_fvec0 = [_f1,_f2,_f3]
+
+_fvec = map(x->((xs,u)->x(xs,u,0)),_fvec0)
+
+_fvec[1]((),1)
+_fvec[2]((1,),2)
+_fvec[3]((1,1),2)
