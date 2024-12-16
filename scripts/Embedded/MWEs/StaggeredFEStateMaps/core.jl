@@ -77,8 +77,8 @@ function dRdφ(φ_to_u::StaggeredAffineFEStateMap{NB},uhs,λhs,φh) where NB
   dummy_op = StaggeredAffineFEOperator(biforms,liforms,spaces.trials,spaces.tests,assmes.assmes)
   xhs, ∂Rs∂φ = (), ()
   for k in 1:NB
-    xh_k = get_solution(op,uhs,k)
-    λh_k = get_solution(op,λhs,k)
+    xh_k = get_solution(dummy_op,uhs,k)
+    λh_k = get_solution(dummy_op,λhs,k)
     _a(uk,vk,φh) = dummy_op.biforms[k](xhs,uk,vk,φh)
     _l(vk,φh) = dummy_op.liforms[k](xhs,vk,φh)
     ∂Rk∂φ = ∇((uk,vk,φh) -> _a(uk,vk,φh) - _l(vk,φh),[xh_k,λh_k,φh],3)

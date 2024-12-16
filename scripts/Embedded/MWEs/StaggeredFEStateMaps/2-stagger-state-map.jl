@@ -114,3 +114,12 @@ norm(λ2 - get_free_dof_values(get_solution(op,λh,1)),Inf)/norm(λ1,Inf)
 
 λ1 = ∂R1∂u1_mat\(∂F∂u1_vec - ∂R2∂u1_vec)
 norm(λ1 - get_free_dof_values(get_solution(op_adjoint,λh,2)),Inf)/norm(λ1,Inf)
+
+# Compute total derivative
+λᵀᵢ_dRᵢdφ = dRdφ(φ_to_u,xh,λh,φh)
+λᵀ₁_dR₁dφ = assemble_vector(λᵀᵢ_dRᵢdφ[1],U_reg)
+λᵀ₂_dR₂dφ = assemble_vector(λᵀᵢ_dRᵢdφ[2],U_reg)
+∂F∂φ = assemble_vector(∇((φ->F(xh_comb,φ)))(φh),U_reg)
+dFdφ = ∂F∂φ - λᵀ₁_dR₁dφ - λᵀ₂_dR₂dφ
+
+# Compute semi-analytically
