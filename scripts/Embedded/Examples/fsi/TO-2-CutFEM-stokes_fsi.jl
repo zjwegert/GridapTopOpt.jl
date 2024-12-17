@@ -2,7 +2,7 @@ using Gridap, Gridap.Geometry, Gridap.Adaptivity
 using GridapEmbedded, GridapEmbedded.LevelSetCutters
 using GridapTopOpt
 
-using GridapTopOpt: StateParamIntegrandWithMeasure
+using GridapTopOpt: StateParamMap
 
 path = "./results/TO-2-CutFEM-stokes_fsi/"
 mkpath(path)
@@ -190,8 +190,8 @@ state_collection = EmbeddedCollection(model,φh) do _,_
   state_map = AffineFEStateMap(a_coupled,l_coupled,X,Y,V_φ,U_reg,φh)
   (;
     :state_map => state_map,
-    :J => StateParamIntegrandWithMeasure(J_comp,state_map),
-    :C => map(Ci -> StateParamIntegrandWithMeasure(Ci,state_map),[Vol,])
+    :J => StateParamMap(J_comp,state_map),
+    :C => map(Ci -> StateParamMap(Ci,state_map),[Vol,])
   )
 end
 pcfs = EmbeddedPDEConstrainedFunctionals(state_collection)

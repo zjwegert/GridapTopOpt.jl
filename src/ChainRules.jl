@@ -1,7 +1,7 @@
 """
     Gridap.gradient(F,uh::Vector,K::Int)
 
-Given a function `F` that returns a DomainContribution when called, and a vector of 
+Given a function `F` that returns a DomainContribution when called, and a vector of
 `FEFunctions` `uh`, evaluate the partial derivative of `F` with respect to `uh[K]`.
 
 # Example
@@ -23,7 +23,7 @@ end
 """
     Gridap.jacobian(F,uh::Vector,K::Int)
 
-Given a function `F` that returns a DomainContribution when called, and a 
+Given a function `F` that returns a DomainContribution when called, and a
 vector of `FEFunctions` or `CellField` `uh`, evaluate the Jacobian
 `F` with respect to `uh[K]`.
 """
@@ -52,7 +52,7 @@ function GridapDistributed.to_parray_of_arrays(a::NTuple{N,T}) where {N,T<:MPIAr
 end
 
 """
-    struct StateParamIntegrandWithMeasure{A,B,C,D}
+    struct StateParamMap{A,B,C,D}
 
 A wrapper to handle partial differentation of a function F
 of a specific form (see below) in a `ChainRules.jl` compatible way with caching.
@@ -66,7 +66,7 @@ We assume that we have a function F of the following form:
 where `u` and `φ` are each expected to inherit from `Union{FEFunction,MultiFieldFEFunction}`
 or the GridapDistributed equivalent.
 """
-struct StateParamIntegrandWithMeasure{A,B,C,D}
+struct StateParamMap{A,B,C,D}
   F       :: A
   spaces  :: B
   assems  :: C
@@ -74,12 +74,12 @@ struct StateParamIntegrandWithMeasure{A,B,C,D}
 end
 
 """
-    StateParamIntegrandWithMeasure(F,U::FESpace,V_φ::FESpace,
+    StateParamMap(F,U::FESpace,V_φ::FESpace,
     U_reg::FESpace,assem_U::Assembler,assem_deriv::Assembler)
 
-Create an instance of `StateParamIntegrandWithMeasure`.
+Create an instance of `StateParamMap`.
 """
-function StateParamIntegrandWithMeasure(
+function StateParamMap(
   F,U::FESpace,V_φ::FESpace,U_reg::FESpace,
   assem_U::Assembler,assem_deriv::Assembler
 )
@@ -92,17 +92,17 @@ function StateParamIntegrandWithMeasure(
   assems = (assem_U,assem_deriv)
   spaces = (U,V_φ,U_reg)
   caches = (∂j∂u_vec,∂j∂φ_vec)
-  return StateParamIntegrandWithMeasure(F,spaces,assems,caches)
+  return StateParamMap(F,spaces,assems,caches)
 end
 
 """
-    (u_to_j::StateParamIntegrandWithMeasure)(uh,φh)
+    (u_to_j::StateParamMap)(uh,φh)
 
-Evaluate the `StateParamIntegrandWithMeasure` at parameters `uh` and `φh`.
+Evaluate the `StateParamMap` at parameters `uh` and `φh`.
 """
-(u_to_j::StateParamIntegrandWithMeasure)(uh,φh) = sum(u_to_j.F(uh,φh))
+(u_to_j::StateParamMap)(uh,φh) = sum(u_to_j.F(uh,φh))
 
-function (u_to_j::StateParamIntegrandWithMeasure)(u::AbstractVector,φ::AbstractVector)
+function (u_to_j::StateParamMap)(u::AbstractVector,φ::AbstractVector)
   U,V_φ,_ = u_to_j.spaces
   uh = FEFunction(U,u)
   φh = FEFunction(V_φ,φ)
@@ -110,13 +110,13 @@ function (u_to_j::StateParamIntegrandWithMeasure)(u::AbstractVector,φ::Abstract
 end
 
 """
-    ChainRulesCore.rrule(u_to_j::StateParamIntegrandWithMeasure,uh,φh)
+    ChainRulesCore.rrule(u_to_j::StateParamMap,uh,φh)
 
-Return the evaluation of a `StateParamIntegrandWithMeasure` and a
+Return the evaluation of a `StateParamMap` and a
 a function for evaluating the pullback of `u_to_j`. This enables
 compatiblity with `ChainRules.jl`
 """
-function ChainRulesCore.rrule(u_to_j::StateParamIntegrandWithMeasure,uh,φh)
+function ChainRulesCore.rrule(u_to_j::StateParamMap,uh,φh)
   F = u_to_j.F
   U,V_φ,U_reg = u_to_j.spaces
   assem_U,assem_deriv = u_to_j.assems
@@ -137,12 +137,15 @@ function ChainRulesCore.rrule(u_to_j::StateParamIntegrandWithMeasure,uh,φh)
   return u_to_j(uh,φh), u_to_j_pullback
 end
 
-function ChainRulesCore.rrule(u_to_j::StateParamIntegrandWithMeasure,u::AbstractVector,φ::AbstractVector)
+function ChainRulesCore.rrule(u_to_j::StateParamMap,u::AbstractVector,φ::AbstractVector)
   U,V_φ,U_reg = u_to_j.spaces
   uh = FEFunction(U,u)
   φh = FEFunction(V_φ,φ)
   return ChainRulesCore.rrule(u_to_j,uh,φh)
 end
+
+# Backwards compat
+const StateParamIntegrandWithMeasure = StateParamMap
 
 """
     abstract type AbstractFEStateMap
@@ -337,11 +340,11 @@ function ChainRulesCore.rrule(φ_to_u::AbstractFEStateMap,φ::AbstractVector)
   return ChainRulesCore.rrule(φ_to_u,φh)
 end
 
-function StateParamIntegrandWithMeasure(F::Function,φ_to_u::AbstractFEStateMap)
+function StateParamMap(F::Function,φ_to_u::AbstractFEStateMap)
   U,V,V_φ,U_reg = φ_to_u.spaces
   assem_deriv = get_deriv_assembler(φ_to_u)
   assem_U = get_pde_assembler(φ_to_u)
-  StateParamIntegrandWithMeasure(F,U,V_φ,U_reg,assem_U,assem_deriv)
+  StateParamMap(F,U,V_φ,U_reg,assem_U,assem_deriv)
 end
 
 """
@@ -817,7 +820,7 @@ is the solution to a PDE and implicitly depends on ``\\varphi``.
 This requires two pieces of information:
 
  1) Computation of ``\\frac{\\partial F}{\\partial u}`` and
-    ``\\frac{\\partial F}{\\partial \\varphi}`` (handled by [`StateParamIntegrandWithMeasure `](@ref)).
+    ``\\frac{\\partial F}{\\partial \\varphi}`` (handled by [`StateParamMap `](@ref)).
  2) Computation of ``\\frac{\\partial F}{\\partial u}
     \\frac{\\partial u}{\\partial \\varphi}`` at ``\\varphi`` and ``u``
     using the adjoint method (handled by [`AbstractFEStateMap`](@ref)). I.e., let
@@ -838,8 +841,8 @@ The gradient is then ``\\frac{\\partial F}{\\partial \\varphi} =
 
 # Parameters
 
-- `J`: A `StateParamIntegrandWithMeasure` corresponding to the objective.
-- `C`: A vector of `StateParamIntegrandWithMeasure` corresponding to the constraints.
+- `J`: A `StateParamMap` corresponding to the objective.
+- `C`: A vector of `StateParamMap` corresponding to the constraints.
 - `dJ`: The DoFs for the objective sensitivity.
 - `dC`: The DoFs for each constraint sensitivity.
 - `analytic_dJ`: a `Function` for computing the analytic objective sensitivity.
@@ -865,7 +868,7 @@ struct PDEConstrainedFunctionals{N,A} <: AbstractPDEConstrainedFunctionals{N}
         state_map::AbstractFEStateMap;analytic_dJ;analytic_dC)
 
   Create an instance of `PDEConstrainedFunctionals`. The arguments for the objective
-  and constraints must follow the specification in [`StateParamIntegrandWithMeasure`](@ref).
+  and constraints must follow the specification in [`StateParamMap`](@ref).
   By default we use automatic differentation for the objective and all constraints. This
   can be disabled by passing the shape derivative as a type `Function` to `analytic_dJ`
   and/or entires in `analytic_dC`.
@@ -877,9 +880,9 @@ struct PDEConstrainedFunctionals{N,A} <: AbstractPDEConstrainedFunctionals{N}
       analytic_dJ = nothing,
       analytic_dC = fill(nothing,length(constraints)))
 
-    # Create StateParamIntegrandWithMeasures
-    J = StateParamIntegrandWithMeasure(objective,state_map)
-    C = map(Ci -> StateParamIntegrandWithMeasure(Ci,state_map),constraints)
+    # Create StateParamMaps
+    J = StateParamMap(objective,state_map)
+    C = map(Ci -> StateParamMap(Ci,state_map),constraints)
 
     # Preallocate
     dJ = similar(J.caches[2])
@@ -955,7 +958,7 @@ function Fields.evaluate!(pcf::PDEConstrainedFunctionals,φh;kwargs...)
   u, u_pullback = rrule(get_state_map(pcf),φh)
   uh = FEFunction(U,u)
 
-  function ∇!(F::StateParamIntegrandWithMeasure,dF,::Nothing)
+  function ∇!(F::StateParamMap,dF,::Nothing)
     # Automatic differentation
     j_val, j_pullback = rrule(F,uh,φh)   # Compute functional and pull back
     _, dFdu, dFdφ     = j_pullback(1)    # Compute dFdu, dFdφ
@@ -964,7 +967,7 @@ function Fields.evaluate!(pcf::PDEConstrainedFunctionals,φh;kwargs...)
     dF .+= dFdφ
     return j_val
   end
-  function ∇!(F::StateParamIntegrandWithMeasure,dF,dF_analytic::Function)
+  function ∇!(F::StateParamMap,dF,dF_analytic::Function)
     # Analytic shape derivative
     j_val = F(uh,φh)
     _dF(q) = dF_analytic(q,uh,φh)
@@ -1007,20 +1010,20 @@ struct EmbeddedPDEConstrainedFunctionals{N,T} <: AbstractPDEConstrainedFunctiona
       embedded_collection :: EmbeddedCollection;
       analytic_dJ = nothing,
       analytic_dC = nothing)
-    
+
     @assert Set((:state_map,:J,:C)) == keys(embedded_collection.objects) """
-    Expected EmbeddedCollection to have objects ':state_map,:J,:C'. Ensure that you 
+    Expected EmbeddedCollection to have objects ':state_map,:J,:C'. Ensure that you
     have updated the collection after adding new recipes.
 
     You have $(keys(embedded_collection.objects))
 
     Note:
-    - We require that this EmbeddedCollection is seperate to the one used for the 
+    - We require that this EmbeddedCollection is seperate to the one used for the
       UnfittedEvolution. This is because updating the FEStateMap is more expensive than
       cutting and there are instances where evolution and reinitialisation happen
       at before recomputing the forward solution. As such, we cut an extra time
       to avoid allocating the state map more often then required.
-    - For problems with no constraints `:C` must at least point to an empty list 
+    - For problems with no constraints `:C` must at least point to an empty list
     """
     # Preallocate
     dJ = similar(embedded_collection.J.caches[2])
@@ -1030,7 +1033,7 @@ struct EmbeddedPDEConstrainedFunctionals{N,T} <: AbstractPDEConstrainedFunctiona
     if analytic_dC isa Nothing
       analytic_dC = fill(nothing,length(N))
     end
-    
+
     T = typeof(embedded_collection.state_map)
     return new{N,T}(dJ,dC,analytic_dJ,analytic_dC,embedded_collection)
   end
@@ -1045,7 +1048,7 @@ get_state(m::EmbeddedPDEConstrainedFunctionals) = get_state(get_state_map(m))
 Evaluate the objective and constraints at `φh`.
 
 !!! warning
-    Taking `update_space = false` will NOT update the underlying finite element 
+    Taking `update_space = false` will NOT update the underlying finite element
     spaces and assemblers that depend on `φh`. This should only be used
     when you are certain that `φh` has not been updated.
 """
@@ -1071,7 +1074,7 @@ end
 Evaluate the derivatives of the objective and constraints at `φh`.
 
 !!! warning
-    Taking `update_space = false` will NOT update the underlying finite element 
+    Taking `update_space = false` will NOT update the underlying finite element
     spaces and assemblers that depend on `φh`. This should only be used
     when you are certain that `φh` has not been updated.
 """
@@ -1094,7 +1097,7 @@ Evaluate the objective and constraints, and their derivatives at
 `φh`.
 
 !!! warning
-    Taking `update_space = false` will NOT update the underlying finite element 
+    Taking `update_space = false` will NOT update the underlying finite element
     spaces and assemblers that depend on `φh`. This should only be used
     when you are certain that `φh` has not been updated.
 """
@@ -1117,7 +1120,7 @@ function Fields.evaluate!(pcf::EmbeddedPDEConstrainedFunctionals,φh;update_spac
   u, u_pullback = rrule(state_map,φh)
   uh = FEFunction(U,u)
 
-  function ∇!(F::StateParamIntegrandWithMeasure,dF,::Nothing)
+  function ∇!(F::StateParamMap,dF,::Nothing)
     # Automatic differentation
     j_val, j_pullback = rrule(F,uh,φh)   # Compute functional and pull back
     _, dFdu, dFdφ     = j_pullback(1)    # Compute dFdu, dFdφ
@@ -1126,7 +1129,7 @@ function Fields.evaluate!(pcf::EmbeddedPDEConstrainedFunctionals,φh;update_spac
     dF .+= dFdφ
     return j_val
   end
-  function ∇!(F::StateParamIntegrandWithMeasure,dF,dF_analytic::Function)
+  function ∇!(F::StateParamMap,dF,dF_analytic::Function)
     # Analytic shape derivative
     j_val = F(uh,φh)
     _dF(q) = dF_analytic(q,uh,φh)
@@ -1147,7 +1150,7 @@ end
 
 # IO
 
-function Base.show(io::IO,object::StateParamIntegrandWithMeasure)
+function Base.show(io::IO,object::StateParamMap)
   print(io,"$(nameof(typeof(object)))")
 end
 

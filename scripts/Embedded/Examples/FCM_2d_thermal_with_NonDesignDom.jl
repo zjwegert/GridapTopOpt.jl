@@ -2,7 +2,7 @@ using Gridap,GridapTopOpt, GridapSolvers
 using Gridap.Adaptivity, Gridap.Geometry
 using GridapEmbedded, GridapEmbedded.LevelSetCutters
 
-using GridapTopOpt: StateParamIntegrandWithMeasure
+using GridapTopOpt: StateParamMap
 
 path="./results/FCM_thermal_compliance_ALM/"
 rm(path,force=true,recursive=true)

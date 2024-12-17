@@ -2,7 +2,7 @@ using Gridap,GridapTopOpt, GridapSolvers
 using Gridap.Adaptivity, Gridap.Geometry
 using GridapEmbedded, GridapEmbedded.LevelSetCutters
 
-using GridapTopOpt: StateParamIntegrandWithMeasure
+using GridapTopOpt: StateParamMap
 
 path="./results/FCM_elastic_compliance_LShape_ALM_n100/"
 rm(path,force=true,recursive=true)

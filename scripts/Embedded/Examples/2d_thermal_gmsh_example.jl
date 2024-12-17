@@ -2,7 +2,7 @@ using Gridap,GridapTopOpt, GridapSolvers
 using Gridap.Adaptivity, Gridap.Geometry
 using GridapEmbedded, GridapEmbedded.LevelSetCutters
 
-using GridapTopOpt: StateParamIntegrandWithMeasure
+using GridapTopOpt: StateParamMap
 
 path="./results/UnfittedFEM_thermal_compliance_gmsh_ALM/"
 rm(path,force=true,recursive=true)
@@ -87,8 +87,8 @@ state_collection = EmbeddedCollection(model,φh) do _,_
   state_map = AffineFEStateMap(a,l,U,V,V_φ,U_reg,φh;ls,adjoint_ls=ls)
   (;
     :state_map => state_map,
-    :J => StateParamIntegrandWithMeasure(J,state_map),
-    :C => map(Ci -> StateParamIntegrandWithMeasure(Ci,state_map),[Vol,])
+    :J => StateParamMap(J,state_map),
+    :C => map(Ci -> StateParamMap(Ci,state_map),[Vol,])
   )
 end
 pcfs = EmbeddedPDEConstrainedFunctionals(state_collection;analytic_dC=(dVol,))

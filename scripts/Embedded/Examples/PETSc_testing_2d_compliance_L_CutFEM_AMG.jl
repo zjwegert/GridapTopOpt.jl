@@ -2,7 +2,7 @@ using Gridap,GridapTopOpt, GridapSolvers
 using Gridap.Adaptivity, Gridap.Geometry
 using GridapEmbedded, GridapEmbedded.LevelSetCutters
 
-using GridapTopOpt: StateParamIntegrandWithMeasure
+using GridapTopOpt: StateParamMap
 
 using GridapPETSc, SparseMatricesCSR
 
@@ -66,7 +66,7 @@ function main(n;order=1,γg=0.1)
   σ(ε) = λ*tr(ε)*one(ε) + 2*μ*ε
 
   g = VectorValue(0,-1)
-  a(u,v,φ) = ∫(ε(v) ⊙ (σ ∘ ε(u)))dΩin + 
+  a(u,v,φ) = ∫(ε(v) ⊙ (σ ∘ ε(u)))dΩin +
     ∫((γg*h)*jump(nΛ_D⋅∇(v)) ⋅ jump(nΛ_D⋅∇(u)))dΛ_D +
     ∫((γg*h^3)*jump(n_Γg⋅∇(v)) ⋅ jump(n_Γg⋅∇(u)))dΓg
   l(v,φ) = ∫(v⋅g)dΓ_N

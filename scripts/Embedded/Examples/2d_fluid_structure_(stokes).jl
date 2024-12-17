@@ -2,7 +2,7 @@ using Gridap,GridapTopOpt, GridapSolvers
 using Gridap.Adaptivity, Gridap.Geometry
 using GridapEmbedded, GridapEmbedded.LevelSetCutters
 
-using GridapTopOpt: StateParamIntegrandWithMeasure
+using GridapTopOpt: StateParamMap
 
 path = "./results/UnfittedFEM_fluid_structure_(stokes)_ALM/"
 rm(path,force=true,recursive=true)

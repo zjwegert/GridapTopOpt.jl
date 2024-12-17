@@ -67,8 +67,8 @@ dVol(q,u,φ) = ∫(-1/vol_D*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
 
 state_map = AffineFEStateMap(a,l,U,V,V_φ,V_φ,φh)
 
-# Create StateParamIntegrandWithMeasures
-_J = GridapTopOpt.StateParamIntegrandWithMeasure(J,state_map)
+# Create StateParamMaps
+_J = GridapTopOpt.StateParamMap(J,state_map)
 
 function φ_to_j(φ)
   u = state_map(φ)

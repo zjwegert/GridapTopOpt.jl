@@ -10,11 +10,11 @@ GridapTopOpt.evaluate_derivatives!
 GridapTopOpt.get_state
 ```
 
-## `StateParamIntegrandWithMeasure`
+## `StateParamMap`
 
 ```@docs
-GridapTopOpt.StateParamIntegrandWithMeasure
-GridapTopOpt.rrule(u_to_j::GridapTopOpt.StateParamIntegrandWithMeasure,uh,φh)
+GridapTopOpt.StateParamMap
+GridapTopOpt.rrule(u_to_j::GridapTopOpt.StateParamMap,uh,φh)
 ```
 
 ## Implemented types of `AbstractFEStateMap`
