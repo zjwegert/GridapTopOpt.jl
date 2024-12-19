@@ -28,7 +28,7 @@ r(u1,v1,φ) = ∫((φ*L(u1) - L(_sol)) * v1)dΩ
 
 # Create operator from components
 lsolver = LUSolver()
-solver = NewtonSolver(lsolver;rtol=1.e-10,verbose=false)
+solver = NewtonSolver(lsolver;rtol=1.e-10,verbose)
 φ_to_u = NonlinearFEStateMap(r,U,V,V_φ,U_reg,φh;nls=solver)
 
 ## Test solution

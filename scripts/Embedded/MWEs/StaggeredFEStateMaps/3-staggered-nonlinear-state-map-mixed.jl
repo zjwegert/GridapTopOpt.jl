@@ -31,8 +31,9 @@ F(u::Function) = x -> (u(x) + 1) * u(x)
 F(u) = (u + 1) * u
 dF(u,du) = 2.0 * u * du + du
 
-j1((),u1,du1,dv1,φ) = ∫(dF(u1,du1) * dv1)dΩ
-r1((),u1,v1,φ) = ∫((F(u1) - φ * F(sol[1])) * v1)dΩ
+# Mixed linear/nonlinear problems
+j1((),u1,du1,dv1,φ) = ∫(du1 * dv1)dΩ
+r1((),u1,v1,φ) = ∫(u1 * v1)dΩ - ∫(φ * sol[1] * v1)dΩ
 
 j2((u1,),(u2,u3),(du2,du3),(dv2,dv3),φ) = ∫(u1 * φ *  dF(u2,du2) * dv2)dΩ + ∫(dF(u3,du3) * dv3)dΩ
 r2((u1,),(u2,u3),(v2,v3),φ) = ∫(φ * u1 * (F(u2) - F(sol[2])) * v2)dΩ + ∫((F(u3) - F(sol[3])) * v3)dΩ
