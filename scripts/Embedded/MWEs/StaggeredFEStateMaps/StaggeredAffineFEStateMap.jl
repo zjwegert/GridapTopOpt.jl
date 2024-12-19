@@ -50,14 +50,14 @@ struct StaggeredAffineFEStateMap{NB,SB,A,B,C,D,E,F} <: AbstractFEStateMap
     plb_caches = (Σ_λᵀs_∂Rs∂φ,assem_deriv)
 
     ## Forward cache
-    op_at_φ = get_operator_at_φ(op.biforms,op.liforms,op.trials,op.tests,op.assems,φh)
+    op_at_φ = get_staggered_operator_at_φ(op,φh)
     xh_one = one(op.trial)
     op_cache = _instantiate_caches(xh_one,solver,op_at_φ)
     fwd_caches = (zero_free_values(op.trial),op.trial,op_cache,op_at_φ)
 
     ## Adjoint cache
     xh_one_comb = _get_solutions(op_at_φ,xh_one)
-    op_adjoint = dummy_generate_affine_operator(op_at_φ,xh_one_comb)
+    op_adjoint = dummy_generate_adjoint_operator(op_at_φ,xh_one_comb)
     op_cache = _instantiate_caches(xh_one,adjoint_solver,op_adjoint)
     adj_caches = (zero_free_values(op_adjoint.trial),op_adjoint.trial,op_cache,op_adjoint)
 
@@ -83,7 +83,7 @@ function forward_solve!(φ_to_u::StaggeredAffineFEStateMap,φh)
   solvers = φ_to_u.solvers
   x, X, cache, _ = φ_to_u.fwd_caches
 
-  op = get_operator_at_φ(φ_to_u,φh)
+  op = get_staggered_operator_at_φ(φ_to_u,φh)
   solve!(FEFunction(X,x),solvers.solver,op,cache);
   return x
 end
@@ -107,56 +107,36 @@ end
 function adjoint_solve!(φ_to_u::StaggeredAffineFEStateMap,xh,dFdxj_at_φ::Function)
   solvers = φ_to_u.solvers
   x_adjoint,X_adjoint,cache,_ = φ_to_u.adj_caches
-  op_at_φ = get_operator_at_φ(φ_to_u,φh)
+  op_at_φ = get_staggered_operator_at_φ(φ_to_u,φh)
   xh_comb = _get_solutions(op_at_φ,xh)
-  op_adjoint = generate_affine_operator(op_at_φ,xh_comb,j->dFdxj_at_φ(j,xh_comb))
+  op_adjoint = generate_adjoint_operator(op_at_φ,xh_comb,j->dFdxj_at_φ(j,xh_comb))
 
   solve!(FEFunction(X_adjoint,x_adjoint),solvers.adjoint_solver,op_adjoint,cache);
   return x_adjoint
 end
 
-function pullback(φ_to_u::StaggeredAffineFEStateMap{NB},xh,φh,dFdxj::Function;kwargs...) where NB
-  Σ_λᵀs_∂Rs∂φ, assem_deriv = φ_to_u.plb_caches
-  U_reg = GridapTopOpt.get_deriv_space(φ_to_u)
-
-  ## Adjoint Solve
-  λ  = adjoint_solve!(φ_to_u,xh,(j,xh_comb)->dFdxj(j,φh,xh_comb))
-  λh = FEFunction(get_test_space(φ_to_u),λ)
-
-  ## Compute grad
-  λᵀ∂Rs∂φ = dRdφ(φ_to_u,uh,λh,φh)
-  fill!(Σ_λᵀs_∂Rs∂φ,zero(eltype(Σ_λᵀs_∂Rs∂φ)))
-  for k in 1:NB
-    vecdata = collect_cell_vector(U_reg,λᵀ∂Rs∂φ[k])
-    assemble_vector_add!(Σ_λᵀs_∂Rs∂φ,assem_deriv,vecdata)
-  end
-  rmul!(Σ_λᵀs_∂Rs∂φ, -1)
-
-  return (NoTangent(),Σ_λᵀs_∂Rs∂φ)
-end
-
-function ChainRulesCore.rrule(φ_to_u::StaggeredAffineFEStateMap,φh)
-  u  = forward_solve!(φ_to_u,φh)
-  uh = FEFunction(get_trial_space(φ_to_u),u)
-  return u, du -> pullback(φ_to_u,uh,φh,du)
-end
-
 ### Helpers
 # Staggered Ops
-function get_operator_at_φ(biforms,liforms,trials,tests,assems,φh)
+function _get_staggered_affine_operator_at_φ(biforms,liforms,trials,tests,assems,φh)
   a_at_φ = map(a->((xhs,uk,vk) -> a(xhs,uk,vk,φh)),biforms)
   l_at_φ = map(l->((xhs,vk) -> l(xhs,vk,φh)),liforms)
   return StaggeredAffineFEOperator(a_at_φ,l_at_φ,trials,tests,assems)
 end
 
-function get_operator_at_φ(φ_to_u::StaggeredAffineFEStateMap,φh)
+function get_staggered_operator_at_φ(φ_to_u::StaggeredAffineFEStateMap,φh)
   biforms, liforms, trials, tests, assems = φ_to_u.biforms,φ_to_u.liforms,
     φ_to_u.spaces.trials,φ_to_u.spaces.tests,φ_to_u.assems.assems
-  get_operator_at_φ(biforms, liforms, trials, tests, assems, φh)
+  _get_staggered_affine_operator_at_φ(biforms, liforms, trials, tests, assems, φh)
+end
+
+function get_staggered_operator_at_φ(op::StaggeredAffineFEOperator,φh)
+  biforms, liforms, trials, tests, assems = op.biforms,op.liforms,
+    op.trials,op.tests,op.assems
+  _get_staggered_affine_operator_at_φ(biforms, liforms, trials, tests, assems, φh)
 end
 
 # Adjoint Ops
-function dummy_generate_affine_operator(op_at_φ::StaggeredAffineFEOperator{NB},xh_comb) where NB
+function dummy_generate_adjoint_operator(op_at_φ::StaggeredAffineFEOperator{NB},xh_comb) where NB
   xhs,cs = (),()
   for k = 1:NB
     xh_k = xh_comb[k]
@@ -165,21 +145,7 @@ function dummy_generate_affine_operator(op_at_φ::StaggeredAffineFEOperator{NB},
     cs = (cs...,l(dxk))
     xhs = (xhs...,xh_k)
   end
-  generate_affine_operator(op_at_φ,xh_comb,i->cs[i])
-end
-
-function generate_affine_operator(op_at_φ::StaggeredAffineFEOperator{NB},xh_comb,dFdxj::Function) where NB
-  a_adj,l_adj=(),()
-  for k = 1:NB-1
-    a_adj_k(xhs,λk,Λk) = op_at_φ.biforms[k](xh_comb[1:end-k],Λk,λk)
-    l_adj_k(xhs,Λk) = dFdxj(k) - sum(∂Rk∂xhi(op_at_φ,xh_comb,k,i)(xhs[NB-i+1]) for i = k+1:NB)
-    a_adj = (a_adj...,a_adj_k)
-    l_adj = (l_adj...,l_adj_k)
-  end
-  a_adj = (a_adj...,(xhs,λk,Λk) -> op_at_φ.biforms[NB](xh_comb[1:end-1],Λk,λk))
-  l_adj = (l_adj...,(xhs,Λk) -> dFdxj(NB))
-  StaggeredAffineFEOperator(collect(reverse(a_adj)),collect(reverse(l_adj)),
-    reverse(op_at_φ.tests),reverse(op_at_φ.trials),reverse(op_at_φ.assems))
+  generate_adjoint_operator(op_at_φ,xh_comb,i->cs[i])
 end
 
 function ∂Rk∂xhi(op::StaggeredAffineFEOperator{NB}, xh_comb, i::Int, k::Int) where NB

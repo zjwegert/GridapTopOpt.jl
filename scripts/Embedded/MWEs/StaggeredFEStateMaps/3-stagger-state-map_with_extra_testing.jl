@@ -1,4 +1,5 @@
-include("core_old_caching.jl")
+include("StaggeredAffineFEStateMap.jl")
+include("StaggeredNonlinearFEStateMap.jl")
 include("extensions.jl")
 
 model = CartesianDiscreteModel((0,1,0,1),(8,8))
@@ -94,7 +95,7 @@ _op = StaggeredAffineFEOperator(a_at_φ,l_at_φ,_spaces.trials,_spaces.tests,_as
 # op_adjoint = StaggeredAffineFEOperator(a_adjs,l_adjs,reverse(_spaces.tests),reverse(_spaces.trials))
 # op_adjoint = StaggeredAffineFEOperator(a_adjs,l_adjs,reverse(_spaces.trials),reverse(_spaces.tests))
 
-# op_adjoint = generate_affine_operator(_op,xh,_dFdxj)
+# op_adjoint = generate_adjoint_operator(_op,xh,_dFdxj)
 # λh = zero(op_adjoint.test)
 # λh, cache = solve!(λh,φ_to_u.solvers.adjoint_solver,op_adjoint,nothing);
 
@@ -103,7 +104,7 @@ _op = StaggeredAffineFEOperator(a_at_φ,l_at_φ,_spaces.trials,_spaces.tests,_as
 
 cache = φ_to_u.adj_caches[3]
 xh_comb = _get_solutions(_op,xh)
-dummy_adjoint_op = dummy_generate_affine_operator(_op,xh_comb)
+dummy_adjoint_op = dummy_generate_adjoint_operator(_op,xh_comb)
 
 # Analytic adjoint
 _dFdxj(j) = _F.caches[1](j,φh,xh_comb)

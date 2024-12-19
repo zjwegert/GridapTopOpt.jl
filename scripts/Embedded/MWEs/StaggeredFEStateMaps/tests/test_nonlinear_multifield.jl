@@ -1,4 +1,4 @@
-using Gridap, GridapTopOpt
+using Gridap, GridapTopOpt, GridapSolvers, GridapSolvers.NonlinearSolvers
 using FiniteDifferences
 using Test
 
@@ -9,44 +9,47 @@ reffe = ReferenceFE(lagrangian,Float64,order)
 Ω = Triangulation(model)
 
 V_φ = TestFESpace(Ω,reffe)
-φh = interpolate(1,V_φ)
+φf(x) = x[1]*x[2]+1
+φh = interpolate(φf,V_φ)
 V_reg = TestFESpace(Ω,reffe)
 U_reg = TrialFESpace(V_reg)
 
 V = FESpace(Ω,reffe;dirichlet_tags="boundary")
 
-rhs = x -> x[1]
-sol = x -> rhs(x)
-U = TrialFESpace(V,sol)
+rhs = [x -> x[2], x -> x[1] + x[2]]
+sol = [x -> rhs[1](x), x -> rhs[2](x) + rhs[1](x)*φf(x)]
+U1 = TrialFESpace(V,sol[1])
+U2 = TrialFESpace(V,sol[2])
+UB = MultiFieldFESpace([U1,U2])
+VB = MultiFieldFESpace([V,V])
 
 # Define weakforms
 dΩ = Measure(Ω,3*order)
 
-a1(u1,v1,φ) = ∫(φ * u1 * v1)dΩ
-l1(v1,φ) = ∫(φ * rhs * v1)dΩ
-l2(v1,φ) = ∫(φ * φ * rhs * v1)dΩ
+L(u::Function) = x -> (u(x) + 1) * u(x)
+L(u) = (u + 1) * u
+
+r((u1,u2),(v1,v2),φ) = ∫(φ * (L(u1) - L(sol[1])) * v1)dΩ + ∫(u2 * v2 - u1*v2*φ - v2*rhs[2])dΩ
 
 # Create operator from components
-φ_to_u = RepeatingAffineFEStateMap(2,a1,[l1,l2],U,V,V_φ,U_reg,φh)
+lsolver = LUSolver()
+solver = NewtonSolver(lsolver;rtol=1.e-10,verbose)
+φ_to_u = NonlinearFEStateMap(r,UB,VB,V_φ,U_reg,φh;nls=solver)
 
-# Test solution
-forward_solve!(φ_to_u,φh)
+## Test solution
+GridapTopOpt.forward_solve!(φ_to_u,φh)
 xh = get_state(φ_to_u)
-
-xh_exact = interpolate(sol,U)
-for k in 1:2
-  eh_k = xh[k] - xh_exact
+xh_exact = interpolate(sol,UB)
+for k in 1:length(sol)
+  eh_k = xh[k] - xh_exact[k]
   e_k = sqrt(sum(∫(eh_k * eh_k)dΩ))
   verbose && println("Error in field $k: $e_k")
   @test e_k < 1e-10
 end
 
-φh = interpolate(x->x[1]*x[2]+1,V_φ)
-
-# Compute gradient
-F(x,φ) = ∫(x[1]*x[2]*φ)dΩ
+## Update LSF for testing gradient
+F((u1,u2),φ) = ∫(u2*u1*φ)dΩ
 _F = GridapTopOpt.StateParamMap(F,φ_to_u)
-
 pcf = PDEConstrainedFunctionals(_F,φ_to_u)
 _,_,_dF,_ = evaluate!(pcf,φh)
 
@@ -55,9 +58,8 @@ function φ_to_j(φ)
   _F(u,φ)
 end
 
-using FiniteDifferences
 fdm_grad = FiniteDifferences.grad(central_fdm(5, 1), φ_to_j, get_free_dof_values(φh))[1]
 rel_error = norm(_dF - fdm_grad, Inf)/norm(fdm_grad,Inf)
 
 verbose && println("Relative error in gradient: $rel_error")
-@test rel_error < 1e-10
+@test rel_error < 1e-8

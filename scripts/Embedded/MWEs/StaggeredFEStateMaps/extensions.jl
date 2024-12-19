@@ -64,13 +64,14 @@ function _instantiate_caches(xh,solver::StaggeredFESolver{NB},op::StaggeredFEOpe
     xh_k = GridapSolvers.BlockSolvers.get_solution(op,xh,k)
     x_k = get_free_dof_values(xh_k)
     op_k = GridapSolvers.BlockSolvers.get_operator(op,xhs,k)
-    cache_k = GridapTopOpt.instantiate_caches(x_k,solvers[k],op_k)
+    algebraic_op_k = get_algebraic_operator(op_k)
+    cache_k = GridapTopOpt.instantiate_caches(x_k,solvers[k],algebraic_op_k)
     xhs, caches, operators = (xhs...,xh_k), (caches...,cache_k), (operators...,op_k)
   end
   return (caches,operators)
 end
 
-function GridapTopOpt.instantiate_caches(x,ls::LinearSolver,op::AffineFEOperator)
+function GridapTopOpt.instantiate_caches(x,ls::LinearSolver,op::Gridap.Algebra.AffineOperator)
   numerical_setup(symbolic_setup(ls,get_matrix(op)),get_matrix(op))
 end
 
@@ -83,7 +84,7 @@ struct StaggeredStateParamMap{A,B,C,D} <: GridapTopOpt.AbstractStateParamMap
   caches  :: D
 end
 
-function StaggeredStateParamMap(F::Function,φ_to_u::StaggeredAffineFEStateMap)
+function StaggeredStateParamMap(F::Function,φ_to_u::StaggeredFEStateMapTypes)
   Us = φ_to_u.spaces.trials
   V_φ = GridapTopOpt.get_aux_space(φ_to_u)
   U_reg = GridapTopOpt.get_deriv_space(φ_to_u)
