@@ -10,8 +10,6 @@ function project!(::AbstractVelocityExtension,::AbstractVector)
   @abstractmethod
 end
 
-project!(vel_ext::AbstractVelocityExtension,dF_vec::Vector{<:AbstractVector}) = broadcast(dF -> project!(vel_ext,dF),dF_vec)
-
 function Base.show(io::IO,object::AbstractVelocityExtension)
   print(io,"$(nameof(typeof(object)))")
 end
@@ -24,6 +22,7 @@ A velocity-extension method that does nothing.
 struct IdentityVelocityExtension <: AbstractVelocityExtension end
 
 project!(::IdentityVelocityExtension,dF) = dF
+project!(::IdentityVelocityExtension,dF_vec::Vector{<:AbstractVector}) = dF_vec
 
 """
     struct VelocityExtension{A,B} <: AbstractVelocityExtension
@@ -93,3 +92,5 @@ function project!(vel_ext::VelocityExtension,dF::AbstractVector)
   copy!(dF,x)
   return dF
 end
+
+project!(vel_ext::VelocityExtension,dF_vec::Vector{<:AbstractVector}) = broadcast(dF -> project!(vel_ext,dF),dF_vec)
