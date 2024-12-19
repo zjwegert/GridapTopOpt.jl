@@ -33,7 +33,6 @@ function instantiate_caches(x,nls::PETScNonlinearSolver,op::NonlinearOperator)
 end
 
 function GridapTopOpt.instantiate_caches(x,ls::LinearSolver,op::Gridap.Algebra.AffineOperator)
-  @show typeof(x)
   numerical_setup(symbolic_setup(ls,get_matrix(op)),get_matrix(op))
 end
 

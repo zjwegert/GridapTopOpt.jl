@@ -17,6 +17,8 @@ These can be assembled into a set of linear systems:
     A_k u_k = b_k
 
 where `A_k` and `b_k` only depend on the previous variables `u_1,...,u_{k-1}`.
+
+- TODO: Document adjoint problem
 """
 struct StaggeredAffineFEStateMap{NB,SB,A,B,C,D,E,F} <: AbstractFEStateMap
   biforms    :: Vector{<:Function}

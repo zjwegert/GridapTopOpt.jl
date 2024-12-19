@@ -1,4 +1,4 @@
-module LSTOMPITests
+module GridapTopOptMPITests
 
 using Test
 using MPI
