@@ -9,10 +9,10 @@ rm(path,force=true,recursive=true)
 mkpath(path)
 n = 50
 order = 1
-γ = 0.1
-max_steps = floor(Int,order*n/5)
+γ = 0.2
+max_steps = floor(Int,order*n/10)
 vf = 0.4
-α_coeff = 4max_steps*γ
+α_coeff = max_steps*γ
 iter_mod = 1
 
 _model = CartesianDiscreteModel((0,1,0,1),(n,n))
@@ -81,10 +81,11 @@ state_map = AffineFEStateMap(a,l,U,V,V_φ,U_reg,φh)
 pcfs = PDEConstrainedFunctionals(J,[Vol],state_map;analytic_dC=(dVol,))
 
 ## Evolution Method
-evo = CutFEMEvolve(V_φ,Ωs,dΩ,h;max_steps,γg=0.5)
-reinit = StabilisedReinit(V_φ,Ωs,dΩ,h;stabilisation_method=ArtificialViscosity(3.0))
+evo = CutFEMEvolve(V_φ,Ωs,dΩ,h;max_steps,γg=0.1)
+reinit1 = StabilisedReinit(V_φ,Ωs,dΩ,h;stabilisation_method=ArtificialViscosity(3.0))
+reinit2 = StabilisedReinit(V_φ,Ωs,dΩ,h;stabilisation_method=GridapTopOpt.InteriorPenalty(V_φ,γg=2.0))
+reinit = GridapTopOpt.MultiStageStabilisedReinit([reinit1,reinit2])
 ls_evo = UnfittedFEEvolution(evo,reinit)
-reinit!(ls_evo,φh)
 
 ## Hilbertian extension-regularisation problems
 α = α_coeff*(h_refine/order)^2
