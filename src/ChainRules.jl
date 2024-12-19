@@ -51,8 +51,10 @@ function GridapDistributed.to_parray_of_arrays(a::NTuple{N,T}) where {N,T<:MPIAr
   end
 end
 
+abstract type AbstractStateParamMap end # <- this is only needed for compat with staggered state maps
+
 """
-    struct StateParamMap{A,B,C,D}
+    struct StateParamMap{A,B,C,D} <: AbstractStateParamMap
 
 A wrapper to handle partial differentation of a function F
 of a specific form (see below) in a `ChainRules.jl` compatible way with caching.
@@ -66,7 +68,7 @@ We assume that we have a function F of the following form:
 where `u` and `φ` are each expected to inherit from `Union{FEFunction,MultiFieldFEFunction}`
 or the GridapDistributed equivalent.
 """
-struct StateParamMap{A,B,C,D}
+struct StateParamMap{A,B,C,D} <: AbstractStateParamMap
   F       :: A
   spaces  :: B
   assems  :: C
@@ -100,7 +102,7 @@ end
 
 Evaluate the `StateParamMap` at parameters `uh` and `φh`.
 """
-(u_to_j::StateParamMap)(uh,φh) = sum(u_to_j.F(uh,φh))
+(u_to_j::AbstractStateParamMap)(uh,φh) = sum(u_to_j.F(uh,φh))
 
 function (u_to_j::StateParamMap)(u::AbstractVector,φ::AbstractVector)
   U,V_φ,_ = u_to_j.spaces
@@ -240,11 +242,6 @@ function forward_solve!(φ_to_u::AbstractFEStateMap,φh)
   @abstractmethod
 end
 
-function forward_solve!(φ_to_u::AbstractFEStateMap,φ::AbstractVector)
-  φh = FEFunction(get_aux_space(φ_to_u),φ)
-  return forward_solve!(φ_to_u,φh)
-end
-
 """
     update_adjoint_caches!(φ_to_u::AbstractFEStateMap,uh,φh)
 
@@ -341,7 +338,10 @@ function ChainRulesCore.rrule(φ_to_u::AbstractFEStateMap,φ::AbstractVector)
 end
 
 function StateParamMap(F::Function,φ_to_u::AbstractFEStateMap)
-  U,V,V_φ,U_reg = φ_to_u.spaces
+  U = get_trial_space(φ_to_u)
+  V = get_test_space(φ_to_u)
+  V_φ = get_aux_space(φ_to_u)
+  U_reg = get_deriv_space(φ_to_u)
   assem_deriv = get_deriv_assembler(φ_to_u)
   assem_U = get_pde_assembler(φ_to_u)
   StateParamMap(F,U,V_φ,U_reg,assem_U,assem_deriv)
@@ -441,6 +441,11 @@ function forward_solve!(φ_to_u::AffineFEStateMap,φh)
   numerical_setup!(ns,K)
   solve!(x,ns,b)
   return x
+end
+
+function forward_solve!(φ_to_u::AffineFEStateMap,φ::AbstractVector)
+  φh = FEFunction(get_aux_space(φ_to_u),φ)
+  return forward_solve!(φ_to_u,φh)
 end
 
 function dRdφ(φ_to_u::AffineFEStateMap,uh,vh,φh)
@@ -558,6 +563,11 @@ function forward_solve!(φ_to_u::NonlinearFEStateMap,φh)
   op = get_algebraic_operator(FEOperator(res,jac,U,V,assem_U))
   solve!(x,nls,op,nls_cache)
   return x
+end
+
+function forward_solve!(φ_to_u::NonlinearFEStateMap,φ::AbstractVector)
+  φh = FEFunction(get_aux_space(φ_to_u),φ)
+  return forward_solve!(φ_to_u,φh)
 end
 
 function dRdφ(φ_to_u::NonlinearFEStateMap,uh,vh,φh)
@@ -771,6 +781,11 @@ function forward_solve!(φ_to_u::RepeatingAffineFEStateMap,φh)
   return x
 end
 
+function forward_solve!(φ_to_u::RepeatingAffineFEStateMap,φ::AbstractVector)
+  φh = FEFunction(get_aux_space(φ_to_u),φ)
+  return forward_solve!(φ_to_u,φh)
+end
+
 function dRdφ(φ_to_u::RepeatingAffineFEStateMap,uh,vh,φh)
   biform, liforms = φ_to_u.biform, φ_to_u.liform
   U0, V0 = φ_to_u.spaces_0
@@ -874,8 +889,8 @@ struct PDEConstrainedFunctionals{N,A} <: AbstractPDEConstrainedFunctionals{N}
   and/or entires in `analytic_dC`.
   """
   function PDEConstrainedFunctionals(
-      objective,   #:: Function,
-      constraints :: Vector,#{<:Function},
+      objective   :: Function,
+      constraints :: Vector{<:Function},
       state_map   :: AbstractFEStateMap;
       analytic_dJ = nothing,
       analytic_dC = fill(nothing,length(constraints)))
@@ -891,6 +906,22 @@ struct PDEConstrainedFunctionals{N,A} <: AbstractPDEConstrainedFunctionals{N}
     N = length(constraints)
     T = typeof(state_map)
     return new{N,T}(J,C,dJ,dC,analytic_dJ,analytic_dC,state_map)
+  end
+
+  function PDEConstrainedFunctionals(
+      objective   :: AbstractStateParamMap,
+      constraints :: Vector{<:AbstractStateParamMap},
+      state_map   :: AbstractFEStateMap;
+      analytic_dJ = nothing,
+      analytic_dC = fill(nothing,length(constraints)))
+
+    # Preallocate
+    dJ = similar(objective.caches[2])
+    dC = map(Ci->similar(Ci.caches[2]),constraints)
+
+    N = length(constraints)
+    T = typeof(state_map)
+    return new{N,T}(objective,constraints,dJ,dC,analytic_dJ,analytic_dC,state_map)
   end
 end
 
@@ -958,7 +989,7 @@ function Fields.evaluate!(pcf::PDEConstrainedFunctionals,φh;kwargs...)
   u, u_pullback = rrule(get_state_map(pcf),φh)
   uh = FEFunction(U,u)
 
-  function ∇!(F::StateParamMap,dF,::Nothing)
+  function ∇!(F::AbstractStateParamMap,dF,::Nothing)
     # Automatic differentation
     j_val, j_pullback = rrule(F,uh,φh)   # Compute functional and pull back
     _, dFdu, dFdφ     = j_pullback(1)    # Compute dFdu, dFdφ
@@ -967,7 +998,7 @@ function Fields.evaluate!(pcf::PDEConstrainedFunctionals,φh;kwargs...)
     dF .+= dFdφ
     return j_val
   end
-  function ∇!(F::StateParamMap,dF,dF_analytic::Function)
+  function ∇!(F::AbstractStateParamMap,dF,dF_analytic::Function)
     # Analytic shape derivative
     j_val = F(uh,φh)
     _dF(q) = dF_analytic(q,uh,φh)

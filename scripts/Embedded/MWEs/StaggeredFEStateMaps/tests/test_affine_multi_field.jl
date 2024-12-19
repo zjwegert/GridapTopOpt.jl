@@ -1,5 +1,4 @@
-include("core_old_caching.jl")
-include("extensions.jl")
+using Gridap, GridapTopOpt, FiniteDifferences
 
 model = CartesianDiscreteModel((0,1,0,1),(8,8))
 order = 1
@@ -7,40 +6,33 @@ reffe = ReferenceFE(lagrangian,Float64,order)
 Ω = Triangulation(model)
 
 V_φ = TestFESpace(Ω,reffe)
-φf(x) = x[1]+1
+φf(x) = x[1]*x[2]+1
 φh = interpolate(φf,V_φ)
 V_reg = TestFESpace(Ω,reffe)
 U_reg = TrialFESpace(V_reg)
 
 V = FESpace(Ω,reffe;dirichlet_tags="boundary")
 
-rhs = [x -> x[1], x -> (x[1] - x[2])]
-sol = [x -> rhs[1](x)*φf(x), x -> rhs[2](x)*φf(x)]
-U1 = TrialFESpace(V,sol[1])
-U2 = TrialFESpace(V,sol[2])
+sol = [x->x[1],x->x[1]-x[2]]
+U1, U2 = TrialFESpace(V,sol[1]), TrialFESpace(V,sol[2])
+UB = MultiFieldFESpace([U1,U2])
+VB = MultiFieldFESpace([V,V])
 
 # Define weakforms
-dΩ = Measure(Ω,2*order)
+dΩ = Measure(Ω,3*order)
 
-a1((),u1,v1,φ) = ∫(u1 * v1)dΩ
-l1((),v1,φ) = ∫(φ * rhs[1] * v1)dΩ
-
-a2((u1,),u2,v2,φ) = ∫(u1 * u2 * v2)dΩ
-l2((u1,),v2,φ) = ∫(φ * rhs[2] * u1 * v2)dΩ
+a1((u1,u2),(v1,v2),φ) = ∫(φ * u1 * v1 + u2 * v2)dΩ
+l1((v1,v2),φ) = ∫(φ* φ * _rhs * v1 + v2)dΩ
 
 # Create operator from components
-op = StaggeredAffineFEOperator([a1,a2],[l1,l2],[U1,U2],[V,V])
+φ_to_u = AffineFEStateMap(a1,l1,UB,VB,V_φ,U_reg,φh)
 
-φ_to_u = StaggeredAffineFEStateMap(op,V_φ,U_reg,φh)
+F((u1,u2),φ) = ∫(u1*u2*φ)dΩ
+_F = GridapTopOpt.StateParamMap(F,φ_to_u)
 
-forward_solve!(φ_to_u,φh)
-xh = get_state(φ_to_u)
-
-F((u1,u2),φ) = ∫(u1 + u2 + φ)dΩ
-_F = StaggeredStateParamMap(F,φ_to_u)
-
-u, u_pullback = GridapTopOpt.rrule(φ_to_u,φh);
-uh = FEFunction(get_trial_space(φ_to_u),u)
+# With statemaps
+u, u_pullback = GridapTopOpt.rrule(φ_to_u,φh)
+uh = FEFunction(UB,u)
 j_val, j_pullback = GridapTopOpt.rrule(_F,uh,φh)   # Compute functional and pull back
 _, dFdu, dFdφ     = j_pullback(1)    # Compute dFdu, dFdφ
 _, dφ_adj         = u_pullback(dFdu) # Compute -dFdu*dudφ via adjoint
