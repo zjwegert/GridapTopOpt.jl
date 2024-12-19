@@ -144,8 +144,25 @@ function ChainRulesCore.rrule(φ_to_u::StaggeredFEStateMapTypes,φh)
   return u, du -> pullback(φ_to_u,uh,φh,du)
 end
 
-### Helpers
-# Staggered Ops
+## Fixing staggered operators at φ
+function _get_staggered_affine_operator_at_φ(biforms,liforms,trials,tests,assems,φh)
+  a_at_φ = map(a->((xhs,uk,vk) -> a(xhs,uk,vk,φh)),biforms)
+  l_at_φ = map(l->((xhs,vk) -> l(xhs,vk,φh)),liforms)
+  return StaggeredAffineFEOperator(a_at_φ,l_at_φ,trials,tests,assems)
+end
+
+function get_staggered_operator_at_φ(φ_to_u::StaggeredAffineFEStateMap,φh)
+  biforms, liforms, trials, tests, assems = φ_to_u.biforms,φ_to_u.liforms,
+    φ_to_u.spaces.trials,φ_to_u.spaces.tests,φ_to_u.assems.assems
+  _get_staggered_affine_operator_at_φ(biforms, liforms, trials, tests, assems, φh)
+end
+
+function get_staggered_operator_at_φ(op::StaggeredAffineFEOperator,φh)
+  biforms, liforms, trials, tests, assems = op.biforms,op.liforms,
+    op.trials,op.tests,op.assems
+  _get_staggered_affine_operator_at_φ(biforms, liforms, trials, tests, assems, φh)
+end
+
 function _get_staggered_nonlinear_operator_at_φ(residuals,jacobians,trials,tests,assems,φh)
   residuals_at_φ = map(r->((xhs,uk,vk) -> r(xhs,uk,vk,φh)),residuals)
   jacs_at_φ = map(j->((xhs,uk,duk,dvk) -> j(xhs,uk,duk,dvk,φh)),jacobians)
@@ -164,27 +181,7 @@ function get_staggered_operator_at_φ(op::StaggeredNonlinearFEOperator,φh)
   _get_staggered_nonlinear_operator_at_φ(residuals, jacobians, trials, tests, assems, φh)
 end
 
-# Adjoint Ops
-function dummy_generate_adjoint_operator(op_at_φ::StaggeredNonlinearFEOperator{NB},xh_comb) where NB
-  xhs,cs = (),()
-  for k = 1:NB
-    xh_k = xh_comb[k]
-    dxk = get_fe_basis(op_at_φ.trials[k])
-    l_dummy(vk) = op_at_φ.residuals[k](xhs,xh_k,vk) # TODO: unify this function for both operators
-    cs = (cs...,l_dummy(dxk))
-    xhs = (xhs...,xh_k)
-  end
-  generate_adjoint_operator(op_at_φ,xh_comb,i->cs[i])
-end
-
-function _get_kth_jacobian(op::StaggeredNonlinearFEOperator{NB},xh_comb,k::Int) where NB
-  jac(xhs,λk,Λk) = op.jacobians[k](xh_comb[1:end-NB+k-1],xh_comb[k],Λk,λk)
-end
-
-function _get_kth_jacobian(op::StaggeredAffineFEOperator{NB},xh_comb,k::Int) where NB
-  jac(xhs,λk,Λk) = op.biforms[k](xh_comb[1:end-NB+k-1],Λk,λk)
-end
-
+# Building adjoint operators
 function generate_adjoint_operator(op_at_φ::StaggeredFEOperator{NB},xh_comb,dFdxj::Function) where NB
   a_adj,l_adj=(),()
   for k = 1:NB-1
@@ -199,8 +196,47 @@ function generate_adjoint_operator(op_at_φ::StaggeredFEOperator{NB},xh_comb,dFd
     reverse(op_at_φ.tests),reverse(op_at_φ.trials),reverse(op_at_φ.assems))
 end
 
+# Jacobian of kth residual
+function _get_kth_jacobian(op::StaggeredNonlinearFEOperator{NB},xh_comb,k::Int) where NB
+  jac(xhs,λk,Λk) = op.jacobians[k](xh_comb[1:end-NB+k-1],xh_comb[k],Λk,λk)
+end
+
+function _get_kth_jacobian(op::StaggeredAffineFEOperator{NB},xh_comb,k::Int) where NB
+  jac(xhs,λk,Λk) = op.biforms[k](xh_comb[1:end-NB+k-1],Λk,λk)
+end
+
+# Partial derivatives of kth residual with respect to ith variable xhi
+function ∂Rk∂xhi(op::StaggeredAffineFEOperator{NB}, xh_comb, i::Int, k::Int) where NB
+  @assert NB >= k && 1 <= i < k
+  ak_at_xhi(xhi,vk) = op.biforms[k]((xh_comb[1:i-1]...,xhi,xh_comb[i+1:end-1]...),xh_comb[k],vk)
+  lk_at_xhi(xhi,vk) = op.liforms[k]((xh_comb[1:i-1]...,xhi,xh_comb[i+1:end-1]...),vk)
+  res_k_at_xhi(xhi,vk) = ak_at_xhi(xhi,vk) - lk_at_xhi(xhi,vk)
+  ∂res_k_at_xhi(vk) = ∇(res_k_at_xhi,[xh_comb[i],vk],1)
+end
+
 function ∂Rk∂xhi(op::StaggeredNonlinearFEOperator{NB}, xh_comb, i::Int, k::Int) where NB
   @assert NB >= k && 1 <= i < k
   res_k_at_xhi(xhi,vk) = op.residuals[k]((xh_comb[1:i-1]...,xhi,xh_comb[i+1:end-1]...),xh_comb[k],vk)
   ∂res_k_at_xhi(vk) = ∇(res_k_at_xhi,[xh_comb[i],vk],1)
+end
+
+# Dummy adjoint operator for setting up the cache
+function dummy_generate_adjoint_operator(op_at_φ::StaggeredFEOperator{NB},xh_comb) where NB
+  xhs,cs = (),()
+  for k = 1:NB
+    xh_k = xh_comb[k]
+    dxk = get_fe_basis(op_at_φ.trials[k])
+    l = dummy_linear_form(op_at_φ,xhs,xh_k,k)
+    cs = (cs...,l(dxk))
+    xhs = (xhs...,xh_k)
+  end
+  generate_adjoint_operator(op_at_φ,xh_comb,i->cs[i])
+end
+
+function dummy_linear_form(op_at_φ::StaggeredAffineFEOperator,xhs,xh_k,k)
+  l(vk) = op_at_φ.liforms[k](xhs,vk)
+end
+
+function dummy_linear_form(op_at_φ::StaggeredNonlinearFEOperator,xhs,xh_k,k)
+  l(vk) = op_at_φ.residuals[k](xhs,xh_k,vk)
 end

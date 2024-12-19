@@ -1,8 +1,10 @@
-include("StaggeredAffineFEStateMap.jl")
-include("StaggeredNonlinearFEStateMap.jl")
-include("extensions.jl")
+# include("StaggeredAffineFEStateMap.jl")
+# include("StaggeredNonlinearFEStateMap.jl")
+# include("extensions.jl")
 
-using Gridap, GridapTopOpt
+using GridapTopOpt
+using Gridap, Gridap.MultiField
+using GridapSolvers, GridapSolvers.BlockSolvers, GridapSolvers.NonlinearSolvers
 using FiniteDifferences
 using Test
 
@@ -48,7 +50,7 @@ op = StaggeredAffineFEOperator([a1,a2,a3],[l1,l2,l3],[UB1,UB2,UB3],[VB1,VB2,VB3]
 φ_to_u = StaggeredAffineFEStateMap(op,V_φ,U_reg,φh)
 
 # Test solution
-forward_solve!(φ_to_u,φh)
+GridapTopOpt.forward_solve!(φ_to_u,φh)
 xh = get_state(φ_to_u)
 
 xh_exact = interpolate(sol,op.trial)
@@ -61,14 +63,12 @@ end
 
 # Test gradient
 F((u1,(u2,u3),u4),φ) = ∫(u1*u2*u3*u4*φ)dΩ
-_F = StaggeredStateParamMap(F,φ_to_u)
-
-pcf = PDEConstrainedFunctionals(_F,φ_to_u)
+pcf = PDEConstrainedFunctionals(F,φ_to_u)
 _,_,_dF,_ = evaluate!(pcf,φh)
 
 function φ_to_j(φ)
   u = φ_to_u(φ)
-  _F(u,φ)
+  pcf.J(u,φ)
 end
 
 fdm_grad = FiniteDifferences.grad(central_fdm(5, 1), φ_to_j, get_free_dof_values(φh))[1]

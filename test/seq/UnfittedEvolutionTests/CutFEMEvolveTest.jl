@@ -43,7 +43,7 @@ evo = UnfittedFEEvolution(ls_evo,ls_reinit)
 velh = interpolate(x->-1,V_φ)
 evolve!(evo,φh,velh,0.1)
 
-Δt = GridapTopOpt._compute_Δt(h,0.1,get_free_dof_values(velh))
+Δt = 0.1*h
 φh_expected_lsf = interpolate(x->-sqrt((x[1]-0.5)^2+(x[2]-0.5)^2)+0.25+evo.evolver.params.max_steps*Δt,V_φ)
 
 # Test advected LSF mataches expected LSF

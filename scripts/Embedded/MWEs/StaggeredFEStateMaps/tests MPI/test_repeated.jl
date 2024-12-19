@@ -1,4 +1,6 @@
-using Gridap, GridapTopOpt
+using GridapTopOpt
+using Gridap, Gridap.MultiField
+using GridapSolvers, GridapSolvers.BlockSolvers, GridapSolvers.NonlinearSolvers
 using FiniteDifferences
 using Test
 
@@ -30,7 +32,7 @@ l2(v1,φ) = ∫(φ * φ * rhs * v1)dΩ
 φ_to_u = RepeatingAffineFEStateMap(2,a1,[l1,l2],U,V,V_φ,U_reg,φh)
 
 # Test solution
-forward_solve!(φ_to_u,φh)
+GridapTopOpt.forward_solve!(φ_to_u,φh)
 xh = get_state(φ_to_u)
 
 xh_exact = interpolate(sol,U)
@@ -45,14 +47,12 @@ end
 
 # Compute gradient
 F(x,φ) = ∫(x[1]*x[2]*φ)dΩ
-_F = GridapTopOpt.StateParamMap(F,φ_to_u)
-
-pcf = PDEConstrainedFunctionals(_F,φ_to_u)
+pcf = PDEConstrainedFunctionals(F,φ_to_u)
 _,_,_dF,_ = evaluate!(pcf,φh)
 
 function φ_to_j(φ)
   u = φ_to_u(φ)
-  _F(u,φ)
+  pcf.J(u,φ)
 end
 
 using FiniteDifferences

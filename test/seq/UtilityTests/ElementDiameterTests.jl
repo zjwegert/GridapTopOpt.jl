@@ -2,6 +2,7 @@ module ElementDiameterTests
 using Test
 using GridapTopOpt
 using GridapTopOpt: _get_tri_circumdiameter, _get_tet_circumdiameter
+using Gridap, Gridap.Geometry, Gridap.Adaptivity
 
 function generate_model(D,n)
   domain = (D==2) ? (0,1,0,1) : (0,1,0,1,0,1)

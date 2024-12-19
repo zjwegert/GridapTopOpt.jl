@@ -1,7 +1,3 @@
-# include("StaggeredAffineFEStateMap.jl")
-# include("StaggeredNonlinearFEStateMap.jl")
-# include("extensions.jl")
-
 using GridapTopOpt
 using Gridap, Gridap.MultiField
 using GridapSolvers, GridapSolvers.BlockSolvers, GridapSolvers.NonlinearSolvers
@@ -55,7 +51,7 @@ end
 # Test derivative
 F((u1,u2),φ) = ∫(u1 + u2 + φ)dΩ
 pcf = PDEConstrainedFunctionals(F,φ_to_u)
-_,_,_dF,_ = evaluate!(pcf,φh)
+_,_,_dF,_ = evaluate!(pcf,φh);
 
 function φ_to_j(φ)
   u = φ_to_u(φ)

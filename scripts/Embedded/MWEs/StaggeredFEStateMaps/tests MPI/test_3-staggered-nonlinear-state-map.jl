@@ -1,7 +1,3 @@
-# include("StaggeredAffineFEStateMap.jl")
-# include("StaggeredNonlinearFEStateMap.jl")
-# include("extensions.jl")
-
 using GridapTopOpt
 using Gridap, Gridap.MultiField
 using GridapSolvers, GridapSolvers.BlockSolvers, GridapSolvers.NonlinearSolvers

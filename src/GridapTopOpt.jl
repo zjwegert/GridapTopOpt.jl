@@ -25,7 +25,7 @@ using GridapDistributed: DistributedDiscreteModel, DistributedTriangulation,
   DistributedFESpace, DistributedDomainContribution, to_parray_of_arrays,
   allocate_in_domain, DistributedCellField, DistributedMultiFieldCellField,
   DistributedMultiFieldFEBasis, BlockPMatrix, BlockPVector, change_ghost,
-  gradient, jacobian
+  gradient, jacobian, DistributedMultiFieldFEFunction, DistributedSingleFieldFEFunction
 
 using PartitionedArrays
 using PartitionedArrays: getany, tuple_of_arrays, matching_ghost_indices
@@ -34,6 +34,7 @@ using GridapSolvers
 using GridapSolvers.LinearSolvers, GridapSolvers.NonlinearSolvers, GridapSolvers.BlockSolvers
 using GridapSolvers.SolverInterfaces: SolverVerboseLevel, SOLVER_VERBOSE_NONE, SOLVER_VERBOSE_LOW, SOLVER_VERBOSE_HIGH,
   SOLVER_CONVERGED_ATOL, SOLVER_CONVERGED_RTOL, ConvergenceLog, finished_flag
+using GridapSolvers.BlockSolvers: combine_fespaces, get_solution
 
 using GridapEmbedded
 using GridapEmbedded.LevelSetCutters, GridapEmbedded.Interfaces
@@ -51,12 +52,14 @@ export DifferentiableTriangulation
 export SubFacetBoundaryTriangulation, SubFacetSkeletonTriangulation
 export EmbeddedCollection, update_collection!, add_recipe!
 
-include("ChainRules.jl")
+include("StateMaps/StateMaps.jl")
 export PDEConstrainedFunctionals
 export EmbeddedPDEConstrainedFunctionals
 export AffineFEStateMap
 export NonlinearFEStateMap
 export RepeatingAffineFEStateMap
+export StaggeredAffineFEStateMap
+export StaggeredNonlinearFEStateMap
 export get_state
 export evaluate_functionals!
 export evaluate_derivatives!
@@ -86,6 +89,7 @@ export ElasticitySolver
 
 include("VelocityExtension.jl")
 export VelocityExtension
+export IdentityVelocityExtension
 export project!
 
 include("Optimisers/Optimisers.jl")

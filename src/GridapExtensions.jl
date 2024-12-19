@@ -2,8 +2,10 @@
 ###  These are things that should eventually be moved to official Gridap packages        ###
 ############################################################################################
 
-# Instantiate nonlinear solver caches (without actually doing the first iteration)
 
+################# Instantiate solvers #################
+
+# Instantiate nonlinear solver caches (without actually doing the first iteration)
 function instantiate_caches(x,nls::NLSolver,op::NonlinearOperator)
   Gridap.Algebra._new_nlsolve_cache(x,nls,op)
 end
@@ -30,8 +32,17 @@ function instantiate_caches(x,nls::PETScNonlinearSolver,op::NonlinearOperator)
   return GridapPETSc._setup_cache(x,nls,op)
 end
 
-# Transpose contributions before assembly
+function GridapTopOpt.instantiate_caches(x,ls::LinearSolver,op::Gridap.Algebra.AffineOperator)
+  @show typeof(x)
+  numerical_setup(symbolic_setup(ls,get_matrix(op)),get_matrix(op))
+end
 
+function GridapTopOpt.instantiate_caches(x::PVector,ls::LinearSolver,op::Gridap.Algebra.AffineOperator)
+  numerical_setup(symbolic_setup(ls,get_matrix(op)),get_matrix(op)), allocate_in_domain(get_matrix(op))
+end
+
+################# Assembly #################
+# Transpose contributions before assembly
 transpose_contributions(b::DistributedDomainContribution) =
   DistributedDomainContribution(map(transpose_contributions,local_views(b)))
 
@@ -84,6 +95,74 @@ function get_local_assembly_strategy(a::MultiField.BlockSparseMatrixAssembler)
   return get_local_assembly_strategy(first(a.block_assemblers))
 end
 
+################# Gridap convience #################
+# Allow to swap test and trial in AffineFEOperator
+function Gridap.FESpaces.AffineFEOperator(
+  weakform::Function,trial::FESpace,test::FESpace,assem::Assembler)
+  if ! isa(test,TrialFESpace)
+    @warn """\n
+    You are building an AffineFEOperator with a test space of type TrialFESpace.
+
+    This may result in unexpected behaviour.
+    """ maxlog=1
+  end
+
+  u = get_trial_fe_basis(trial)
+  v = get_fe_basis(test)
+
+  uhd = zero(trial)
+  matcontribs, veccontribs = weakform(u,v)
+  data = collect_cell_matrix_and_vector(trial,test,matcontribs,veccontribs,uhd)
+  A,b = assemble_matrix_and_vector(assem,data)
+  #GC.gc()
+
+  AffineFEOperator(trial,test,A,b)
+end
+
+# Base.one for FESpace
+function Base.one(f::FESpace)
+  uh = zero(f)
+  u = get_free_dof_values(uh)
+  V = get_vector_type(f)
+  fill!(u,one(eltype(V)))
+  return uh
+end
+
+################# GridapSolvers #################
+## Get solutions from vector of spaces
+function GridapSolvers.BlockSolvers.get_solution(spaces::Vector{<:FESpace}, xh::MultiFieldFEFunction, k)
+  r = MultiField.get_block_ranges(spaces)[k]
+  if isone(length(r)) # SingleField
+    xh_k = xh[r[1]]
+  else # MultiField
+    fv_k = blocks(get_free_dof_values(xh))[k]
+    xh_k = MultiFieldFEFunction(fv_k, spaces[k], xh.single_fe_functions[r])
+  end
+  return xh_k
+end
+
+function GridapSolvers.BlockSolvers.get_solution(spaces::Vector{<:FESpace}, xh::DistributedMultiFieldFEFunction, k)
+  r = MultiField.get_block_ranges(spaces)[k]
+  if isone(length(r)) # SingleField
+    xh_k = xh[r[1]]
+  else # MultiField
+    sf_k = xh.field_fe_fun[r]
+    fv_k = blocks(get_free_dof_values(xh))[k]
+    mf_k = map(local_views(spaces[k]),partition(fv_k),map(local_views,sf_k)...) do Vk, fv_k, sf_k...
+      MultiFieldFEFunction(fv_k, Vk, [sf_k...])
+    end
+    xh_k = DistributedMultiFieldFEFunction(sf_k, mf_k, fv_k)
+  end
+  return xh_k
+end
+
+function MultiField.get_block_ranges(spaces::Vector{<:FESpace})
+  NB = length(spaces)
+  SB = Tuple(map(num_fields,spaces))
+  MultiField.get_block_ranges(NB,SB,Tuple(1:sum(SB)))
+end
+
+################# Embedded #################
 # Fix for isbitstype bug in Gridap.Polynomials
 function Arrays.return_cache(
   fg::Fields.FieldGradientArray{1,Polynomials.MonomialBasis{D,V}},
