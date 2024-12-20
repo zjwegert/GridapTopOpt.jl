@@ -343,7 +343,22 @@ function dummy_generate_adjoint_operator(op_at_φ::StaggeredFEOperator{NB},xh_co
     xhs = (xhs...,xh_k)
   end
   generate_adjoint_operator(op_at_φ,xh_comb,i->cs[i])
+  # _generate_adjoint_operator(op_at_φ,xh_comb,i->cs[i])
 end
+
+# function _generate_adjoint_operator(op_at_φ::StaggeredFEOperator{NB},xh_comb,dFdxj::Function) where NB
+#   a_adj,l_adj=(),()
+#   for k = 1:NB-1
+#     a_adj_k(xhs,λk,Λk) = _get_kth_jacobian(op_at_φ,xh_comb,k)(xhs,λk,Λk)
+#     l_adj_k(xhs,Λk) = dFdxj(k) #- sum(∂Rk∂xhi(op_at_φ,xh_comb,k,i)(xhs[NB-i+1]) for i = k+1:NB)
+#     a_adj = (a_adj...,a_adj_k)
+#     l_adj = (l_adj...,l_adj_k)
+#   end
+#   a_adj = (a_adj...,_get_kth_jacobian(op_at_φ,xh_comb,NB))
+#   l_adj = (l_adj...,(xhs,Λk) -> dFdxj(NB))
+#   StaggeredAffineFEOperator(collect(reverse(a_adj)),collect(reverse(l_adj)),
+#     reverse(op_at_φ.tests),reverse(op_at_φ.trials),reverse(op_at_φ.assems))
+# end
 
 function dummy_linear_form(op_at_φ::StaggeredAffineFEOperator,xhs,xh_k,k)
   l(vk) = op_at_φ.liforms[k](xhs,vk)

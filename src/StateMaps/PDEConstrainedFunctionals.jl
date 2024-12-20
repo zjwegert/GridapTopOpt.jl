@@ -281,7 +281,7 @@ Evaluate the objective and constraints at `φh`.
     when you are certain that `φh` has not been updated.
 """
 function evaluate_functionals!(pcf::EmbeddedPDEConstrainedFunctionals,φh;update_space::Bool=true)
-  update_space && update_collection!(pcf.embedded_collection,φh)
+  update_space && update_collection_with_φh!(pcf.embedded_collection,φh)
   u  = get_state_map(pcf)(φh)
   U  = get_trial_space(get_state_map(pcf))
   uh = FEFunction(U,u)
@@ -307,7 +307,7 @@ Evaluate the derivatives of the objective and constraints at `φh`.
     when you are certain that `φh` has not been updated.
 """
 function evaluate_derivatives!(pcf::EmbeddedPDEConstrainedFunctionals,φh;update_space::Bool=true)
-  update_space && update_collection!(pcf.embedded_collection,φh)
+  update_space && update_collection_with_φh!(pcf.embedded_collection,φh)
   _,_,dJ,dC = evaluate!(pcf,φh)
   return dJ,dC
 end
@@ -330,7 +330,7 @@ Evaluate the objective and constraints, and their derivatives at
     when you are certain that `φh` has not been updated.
 """
 function Fields.evaluate!(pcf::EmbeddedPDEConstrainedFunctionals,φh;update_space::Bool=true)
-  update_space && update_collection!(pcf.embedded_collection,φh)
+  update_space && update_collection_with_φh!(pcf.embedded_collection,φh)
 
   J           = pcf.embedded_collection.J
   C           = pcf.embedded_collection.C
@@ -348,7 +348,7 @@ function Fields.evaluate!(pcf::EmbeddedPDEConstrainedFunctionals,φh;update_spac
   u, u_pullback = rrule(state_map,φh)
   uh = FEFunction(U,u)
 
-  function ∇!(F::StateParamMap,dF,::Nothing)
+  function ∇!(F::AbstractStateParamMap,dF,::Nothing)
     # Automatic differentation
     j_val, j_pullback = rrule(F,uh,φh)   # Compute functional and pull back
     _, dFdu, dFdφ     = j_pullback(1)    # Compute dFdu, dFdφ
@@ -357,7 +357,7 @@ function Fields.evaluate!(pcf::EmbeddedPDEConstrainedFunctionals,φh;update_spac
     dF .+= dFdφ
     return j_val
   end
-  function ∇!(F::StateParamMap,dF,dF_analytic::Function)
+  function ∇!(F::AbstractStateParamMap,dF,dF_analytic::Function)
     # Analytic shape derivative
     j_val = F(uh,φh)
     _dF(q) = dF_analytic(q,uh,φh)
@@ -374,6 +374,18 @@ function Fields.evaluate!(pcf::EmbeddedPDEConstrainedFunctionals,φ::AbstractVec
   V_φ = get_aux_space(get_state_map(pcf))
   φh = FEFunction(V_φ,φ)
   return evaluate!(pcf,φh;kwargs...)
+end
+
+function EmbeddedCollection_in_φh(recipes::Union{<:Function,Vector{<:Function}},bgmodel,φ0)
+  c = EmbeddedCollection(recipes,bgmodel)
+  update_collection_with_φh!(c,φ0)
+end
+
+function update_collection__φh!(c::EmbeddedCollection,φh)
+    for r in c.recipeswith
+    merge!(c.objects,pairs(r(φh)))
+  end
+  return c
 end
 
 # IO

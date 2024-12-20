@@ -6,17 +6,17 @@
       bgmodel :: DiscreteModel
     end
 
-A collection of embedded objects on the same background model. This structure 
+A collection of embedded objects on the same background model. This structure
 provides a way to update all the stored objects at once.
 
 ## Constructor
 
 - `EmbeddedCollection(recipes::Union{<:Function,Vector{<:Function}},bgmodel::DiscreteModel[,φh])`
 
-If provided, `φh` will be used to compute the initial collection of objects. If not provided, 
+If provided, `φh` will be used to compute the initial collection of objects. If not provided,
 the collection will remain empty until `update_collection!` is called.
 
-## API: 
+## API:
 
 - `update_collection!(c::EmbeddedCollection,φh)`: Update the collection of objects using the level set function `φh`.
 - `add_recipe!(c::EmbeddedCollection,r::Function[,φh])`: Add a recipe to the collection. Update the collection if `φh` is provided.
