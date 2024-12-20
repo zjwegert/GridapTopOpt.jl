@@ -105,6 +105,7 @@ function build_spaces(Ω_act_s,Ω_act_f)
   Y = MultiFieldFESpace([V,Q,T];style=mfs)
   return X,Y
 end
+init_X,_ = build_spaces(Ω.Ω_act_s,Ω.Ω_act_f)
 
 ### Weak form
 
@@ -145,7 +146,7 @@ function a_fluid((),(u,p),(v,q),φ)
   return ∫( a_Ω(u,v)+b_Ω(u,q)+b_Ω(v,p)-c_Ω(p,q) )Ω.dΩf + # Volume terms
     ∫( a_Γ(u,v,n_Γ)+b_Γ(u,q,n_Γ)+b_Γ(v,p,n_Γ) )Ω.dΓ +    # Interface terms
     ∫( i_Γg(u,v) - j_Γg(p,q) )Ω.dΓg +                    # Ghost penalty terms
-    ∫( v_χ(p,q) )Ω.dΩf                                        # Isolated volume term
+    ∫( v_χ(p,q) )Ω.dΩf                                   # Isolated volume term
 end
 
 l_fluid((),(v,q),φ) = ∫(0q)Ω.dΩf

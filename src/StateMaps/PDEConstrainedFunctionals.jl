@@ -381,8 +381,8 @@ function EmbeddedCollection_in_φh(recipes::Union{<:Function,Vector{<:Function}}
   update_collection_with_φh!(c,φ0)
 end
 
-function update_collection__φh!(c::EmbeddedCollection,φh)
-    for r in c.recipeswith
+function update_collection_with_φh!(c::EmbeddedCollection,φh)
+    for r in c.recipes
     merge!(c.objects,pairs(r(φh)))
   end
   return c
