@@ -11,6 +11,8 @@ using Test
   include("TwoStaggeredAffineFEStateMapTest.jl")
   include("ThreeStaggeredAffineFEStateMapTests.jl")
   include("ThreeStaggeredNonlinearFEStateMapTest.jl")
+
+  include("TwoStaggeredAffineFEStateMapTest_ADTypeUnstableBug.jl")
 end
 
 end # module

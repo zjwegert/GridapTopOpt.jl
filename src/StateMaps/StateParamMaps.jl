@@ -46,6 +46,10 @@ function StateParamMap(
   return StateParamMap(F,spaces,assems,caches)
 end
 
+function get_∂F∂φ_vec(u_to_j::StateParamMap)
+  u_to_j.caches[2]
+end
+
 function StateParamMap(F::Function,φ_to_u::AbstractFEStateMap)
   U = get_trial_space(φ_to_u)
   V_φ = get_aux_space(φ_to_u)

@@ -6,7 +6,7 @@ using GridapSolvers, GridapSolvers.BlockSolvers, GridapSolvers.NonlinearSolvers
 using FiniteDifferences
 using Test
 
-function main(verbose)
+function main(;verbose,analytic_partials)
   model = CartesianDiscreteModel((0,1,0,1),(8,8))
   order = 1
   reffe = ReferenceFE(lagrangian,Float64,order)
@@ -51,7 +51,15 @@ function main(verbose)
   Y = MultiFieldFESpace([V,V,V,V];style=mfs)
   op = StaggeredNonlinearFEOperator([r1,r2,r3],[j1,j2,j3],X,Y)
 
-  φ_to_u = StaggeredNonlinearFEStateMap(op,V_φ,U_reg,φh;solver)
+  if analytic_partials
+    ∂R2∂xh1(du1,(u1,),(u2,u3),(v2,v3),φ) = ∫(φ * du1 * (F(u2) - F(sol[2])) * v2)dΩ
+    ∂R3∂xh1(du1,(u1,(u2,u3)),u4,v4,φ) = ∫(0du1)dΩ
+    ∂R3∂xh2((du2,du3),(u1,(u2,u3)),u4,v4,φ) = ∫(du3 * (φ * F(u4) - F(sol[4])) * v4)dΩ
+    ∂Rk∂xhi = ((∂R2∂xh1,),(∂R3∂xh1,∂R3∂xh2))
+    φ_to_u = StaggeredNonlinearFEStateMap(op,∂Rk∂xhi,V_φ,U_reg,φh;solver)
+  else
+    φ_to_u = StaggeredNonlinearFEStateMap(op,V_φ,U_reg,φh;solver)
+  end
 
   ## Test solution
   GridapTopOpt.forward_solve!(φ_to_u,φh)
@@ -71,7 +79,15 @@ function main(verbose)
 
   ## Test gradient
   F((u1,(u2,u3),u4),φ) = ∫(u1*u2*u3*u4*φ)dΩ
-  pcf = PDEConstrainedFunctionals(F,φ_to_u)
+
+  if analytic_partials
+    ∂F∂u1(du1,(u1,(u2,u3),u4),φ) = ∫(du1*u2*u3*u4*φ)dΩ
+    ∂F∂u23((du2,du3),(u1,(u2,u3),u4),φ) = ∫(u1*du2*u3*u4*φ)dΩ + ∫(u1*u2*du3*u4*φ)dΩ
+    ∂F∂u4(du4,(u1,(u2,u3),u4),φ) = ∫(u1*u2*u3*du4*φ)dΩ
+    pcf = PDEConstrainedFunctionals(F,(∂F∂u1,∂F∂u23,∂F∂u4),φ_to_u)
+  else
+    pcf = PDEConstrainedFunctionals(F,φ_to_u)
+  end
   _,_,_dF,_ = evaluate!(pcf,φh)
 
   function φ_to_j(φ)
@@ -86,5 +102,7 @@ function main(verbose)
   @test rel_error < 1e-9
 end
 
-main(false)
+main(verbose = false, analytic_partials = true)
+main(verbose = false, analytic_partials = false)
+
 end

@@ -68,8 +68,8 @@ struct PDEConstrainedFunctionals{N,A} <: AbstractPDEConstrainedFunctionals{N}
       analytic_dC = fill(nothing,length(constraints)))
 
     # Preallocate
-    dJ = similar(objective.caches[2])
-    dC = map(Ci->similar(Ci.caches[2]),constraints)
+    dJ = similar(get_∂F∂φ_vec(objective))
+    dC = map(Ci->similar(get_∂F∂φ_vec(Ci)),constraints)
 
     N = length(constraints)
     T = typeof(state_map)
@@ -104,17 +104,27 @@ function PDEConstrainedFunctionals(
   return PDEConstrainedFunctionals(J,C,state_map;analytic_dJ,analytic_dC)
 end
 
+"""
+    PDEConstrainedFunctionals(objective,state_map;analytic_dJ)
+
+Create an instance of `PDEConstrainedFunctionals` when the problem has no constraints.
+"""
+PDEConstrainedFunctionals(J,state_map::AbstractFEStateMap;analytic_dJ=nothing) =
+  PDEConstrainedFunctionals(J,typeof(J)[],state_map;analytic_dJ = analytic_dJ,analytic_dC = Nothing[])
+
 ## PDEConstrainedFunctionals for StaggeredStateParamMap
 function PDEConstrainedFunctionals(
     objective   :: Function,
+    ∂J∂xhi,
     constraints :: Vector{<:Function},
+    ∂Cj∂xhi,
     state_map   :: StaggeredFEStateMapTypes;
     analytic_dJ = nothing,
     analytic_dC = fill(nothing,length(constraints)))
 
   # Create StateParamMaps
-  J = StaggeredStateParamMap(objective,state_map)
-  C = map(Ci -> StaggeredStateParamMap(Ci,state_map),constraints)
+  J = StaggeredStateParamMap(objective,∂J∂xhi,state_map)
+  C = map((Cj,∂Cj∂xhi) -> StaggeredStateParamMap(Cj,∂Cj∂xhi,state_map),constraints,∂Cj∂xhi)
   if isempty(C)
     C = StaggeredStateParamMap[]
   end
@@ -122,12 +132,27 @@ function PDEConstrainedFunctionals(
   return PDEConstrainedFunctionals(J,C,state_map;analytic_dJ,analytic_dC)
 end
 
-"""
-    PDEConstrainedFunctionals(objective,state_map;analytic_dJ)
+function PDEConstrainedFunctionals(
+  objective   :: Function,
+  constraints :: Vector{<:Function},
+  state_map   :: StaggeredFEStateMapTypes;
+  analytic_dJ = nothing,
+  analytic_dC = fill(nothing,length(constraints))
+)
+  # Create StateParamMaps
+  J = StaggeredStateParamMap(objective,state_map)
+  C = map(Cj -> StaggeredStateParamMap(Cj,state_map),constraints)
+  if isempty(C)
+    C = StaggeredStateParamMap[]
+  end
 
-Create an instance of `PDEConstrainedFunctionals` when the problem has no constraints.
-"""
-PDEConstrainedFunctionals(J,state_map::AbstractFEStateMap;analytic_dJ=nothing) =
+  return PDEConstrainedFunctionals(J,C,state_map;analytic_dJ,analytic_dC)
+end
+
+PDEConstrainedFunctionals(J,∂J∂xhi::Tuple{Vararg{Function}},state_map::StaggeredFEStateMapTypes;analytic_dJ=nothing) =
+  PDEConstrainedFunctionals(J,∂J∂xhi,typeof(J)[],typeof(J)[],state_map;analytic_dJ = analytic_dJ,analytic_dC = Nothing[])
+
+PDEConstrainedFunctionals(J,state_map::StaggeredFEStateMapTypes;analytic_dJ=nothing) =
   PDEConstrainedFunctionals(J,typeof(J)[],state_map;analytic_dJ = analytic_dJ,analytic_dC = Nothing[])
 
 get_state_map(m::PDEConstrainedFunctionals) = m.state_map
@@ -254,8 +279,8 @@ struct EmbeddedPDEConstrainedFunctionals{N,T} <: AbstractPDEConstrainedFunctiona
     - For problems with no constraints `:C` must at least point to an empty list
     """
     # Preallocate
-    dJ = similar(embedded_collection.J.caches[2])
-    dC = map(Ci->similar(Ci.caches[2]),embedded_collection.C)
+    dJ = similar(get_∂F∂φ_vec(embedded_collection.J))
+    dC = map(Ci->similar(get_∂F∂φ_vec(Ci)),embedded_collection.C)
 
     N = length(embedded_collection.C)
     if analytic_dC isa Nothing

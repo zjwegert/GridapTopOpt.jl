@@ -98,7 +98,7 @@ end
 # Allow to swap test and trial in AffineFEOperator
 function Gridap.FESpaces.AffineFEOperator(
   weakform::Function,trial::FESpace,test::FESpace,assem::Assembler)
-  if ! isa(test,TrialFESpace)
+  if isa(test,TrialFESpace)
     @warn """\n
     You are building an AffineFEOperator with a test space of type TrialFESpace.
 

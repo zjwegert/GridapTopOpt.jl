@@ -23,6 +23,7 @@ where `A_k` and `b_k` only depend on the previous variables `u_1,...,u_{k-1}`.
 struct StaggeredAffineFEStateMap{NB,SB,A,B,C,D,E,F} <: AbstractFEStateMap
   biforms    :: Vector{<:Function}
   liforms    :: Vector{<:Function}
+  ∂Rk∂xhi    :: Tuple{Vararg{Tuple{Vararg{Function}}}}
   spaces     :: A
   assems     :: B
   solvers    :: C
@@ -32,13 +33,24 @@ struct StaggeredAffineFEStateMap{NB,SB,A,B,C,D,E,F} <: AbstractFEStateMap
 
   function StaggeredAffineFEStateMap(
       op              :: StaggeredAffineFEOperator{NB,SB},
+      ∂Rk∂xhi         :: Tuple{Vararg{Tuple{Vararg{Function}}}},
       V_φ             :: FESpace,
       U_reg           :: FESpace,
       φh;
       assem_deriv     :: Assembler = SparseMatrixAssembler(U_reg,U_reg),
-      solver         :: StaggeredFESolver{NB} = StaggeredFESolver(fill(LUSolver(),length(op.biforms))),
-      adjoint_solver :: StaggeredFESolver{NB} = StaggeredFESolver(fill(LUSolver(),length(op.biforms)))
+      solver          :: StaggeredFESolver{NB} = StaggeredFESolver(fill(LUSolver(),length(op.biforms))),
+      adjoint_solver  :: StaggeredFESolver{NB} = StaggeredFESolver(fill(LUSolver(),length(op.biforms)))
     ) where {NB,SB}
+
+    @assert length(∂Rk∂xhi) == NB-1 && all(map(length,∂Rk∂xhi) .== 1:NB-1) """\n
+    We expect k ∈ 2:NB and i ∈ 1:k-1.
+
+    E.g.,
+      ∂Rk∂xhi[1] = ∂R2∂xhi = (∂R2∂xh1,)
+      ∂Rk∂xhi[2] = ∂R3∂xhi = (∂R3∂xh1,∂R3∂xh2,)
+      ...
+      ∂Rk∂xhi[k] = ∂R{k}∂xhi = (∂R{k}∂xh1,∂R{k}∂xh2,...,∂R{k}∂xh{k-1},)
+    """
 
     ## Pullback cache (this is a temporary solution before we refactor ChainRules)
     uhd = zero(op.trial)
@@ -61,8 +73,7 @@ struct StaggeredAffineFEStateMap{NB,SB,A,B,C,D,E,F} <: AbstractFEStateMap
     fwd_caches = (zero_free_values(op.trial),op.trial,op_cache,op_at_φ)
 
     ## Adjoint cache
-    xh_one_comb = _get_solutions(op_at_φ,xh_one)
-    op_adjoint = dummy_generate_adjoint_operator(op_at_φ,xh_one_comb)
+    op_adjoint = dummy_generate_adjoint_operator(op_at_φ,φh,xh_one,∂Rk∂xhi)
     op_cache = _instantiate_caches(xh_one,adjoint_solver,op_adjoint)
     adj_caches = (zero_free_values(op_adjoint.trial),op_adjoint.trial,op_cache,op_adjoint)
 
@@ -71,8 +82,36 @@ struct StaggeredAffineFEStateMap{NB,SB,A,B,C,D,E,F} <: AbstractFEStateMap
     _solvers = (;solver,adjoint_solver)
     A,B,C,D,E,F = typeof(spaces), typeof(assems), typeof(_solvers),
       typeof(plb_caches), typeof(fwd_caches), typeof(adj_caches)
-    new{NB,SB,A,B,C,D,E,F}(op.biforms,op.liforms,spaces,assems,_solvers,plb_caches,fwd_caches,adj_caches)
+    new{NB,SB,A,B,C,D,E,F}(op.biforms,op.liforms,∂Rk∂xhi,spaces,assems,_solvers,plb_caches,fwd_caches,adj_caches)
   end
+end
+
+function StaggeredAffineFEStateMap(
+  op              :: StaggeredAffineFEOperator{NB,SB},
+  V_φ             :: FESpace,
+  U_reg           :: FESpace,
+  φh;
+  assem_deriv     :: Assembler = SparseMatrixAssembler(U_reg,U_reg),
+  solver          :: StaggeredFESolver{NB} = StaggeredFESolver(fill(LUSolver(),length(op.biforms))),
+  adjoint_solver  :: StaggeredFESolver{NB} = StaggeredFESolver(fill(LUSolver(),length(op.biforms)))
+) where {NB,SB}
+
+  _type_unstable_warning("StaggeredAffineFEStateMap","∂Rk∂xhi")
+
+  ∂Rk∂xhi = ()
+  for k = 2:NB
+    _∂Rk∂xhi = ()
+    for i = 1:k-1
+      __∂Rk∂xhi(dxj,xhs,xhk,vhk,φ) = ∇(
+        xi->op.biforms[k]((xhs[1:i-1]...,xi,xhs[i+1:end]...),xhk,vhk,φ) -
+            op.liforms[k]((xhs[1:i-1]...,xi,xhs[i+1:end]...),vhk,φ)
+      )(xhs[i])
+      _∂Rk∂xhi = (_∂Rk∂xhi...,__∂Rk∂xhi)
+    end
+    ∂Rk∂xhi = (∂Rk∂xhi...,_∂Rk∂xhi)
+  end
+
+  return StaggeredAffineFEStateMap(op,∂Rk∂xhi,V_φ,U_reg,φh;assem_deriv,solver,adjoint_solver)
 end
 
 get_state(m::StaggeredAffineFEStateMap) = FEFunction(m.fwd_caches[2],m.fwd_caches[1])
@@ -147,6 +186,7 @@ Note: This is mutable for now, in future we will refactor ChainRules to remove s
 mutable struct StaggeredNonlinearFEStateMap{NB,SB,A,B,C,D,E,F} <: AbstractFEStateMap
   const residuals  :: Vector{<:Function}
   const jacobians  :: Vector{<:Function}
+  const ∂Rk∂xhi    :: Tuple{Vararg{Tuple{Vararg{Function}}}}
   const spaces     :: A
   const assems     :: B
   const solvers    :: C
@@ -156,6 +196,7 @@ mutable struct StaggeredNonlinearFEStateMap{NB,SB,A,B,C,D,E,F} <: AbstractFEStat
 
   function StaggeredNonlinearFEStateMap(
       op             :: StaggeredNonlinearFEOperator{NB,SB},
+      ∂Rk∂xhi        :: Tuple{Vararg{Tuple{Vararg{Function}}}},
       V_φ            :: FESpace,
       U_reg          :: FESpace,
       φh;
@@ -164,6 +205,16 @@ mutable struct StaggeredNonlinearFEStateMap{NB,SB,A,B,C,D,E,F} <: AbstractFEStat
         fill(NewtonSolver(LUSolver();maxiter=50,rtol=1.e-8,verbose=true),length(op.residuals))),
       adjoint_solver :: StaggeredFESolver{NB} = StaggeredFESolver(fill(LUSolver(),length(op.residuals)))
     ) where {NB,SB}
+
+    @assert length(∂Rk∂xhi) == NB-1 && all(map(length,∂Rk∂xhi) .== 1:NB-1) """\n
+    We expect k ∈ 2:NB and i ∈ 1:k-1.
+
+    E.g.,
+      ∂Rk∂xhi[1] = ∂R2∂xhi = (∂R2∂xh1,)
+      ∂Rk∂xhi[2] = ∂R3∂xhi = (∂R3∂xh1,∂R3∂xh2,)
+      ...
+      ∂Rk∂xhi[k] = ∂R{k}∂xhi = (∂R{k}∂xh1,∂R{k}∂xh2,...,∂R{k}∂xh{k-1},)
+    """
 
     ## Pullback cache (this is a temporary solution before we refactor ChainRules)
     uhd = zero(op.trial)
@@ -185,8 +236,7 @@ mutable struct StaggeredNonlinearFEStateMap{NB,SB,A,B,C,D,E,F} <: AbstractFEStat
     fwd_caches = (zero_free_values(op.trial),op.trial,op_cache,op_at_φ)
 
     ## Adjoint cache
-    xh_one_comb = _get_solutions(op_at_φ,xh_one)
-    op_adjoint = dummy_generate_adjoint_operator(op_at_φ,xh_one_comb)
+    op_adjoint = dummy_generate_adjoint_operator(op_at_φ,φh,xh_one,∂Rk∂xhi)
     op_cache = _instantiate_caches(xh_one,adjoint_solver,op_adjoint)
     adj_caches = (zero_free_values(op_adjoint.trial),op_adjoint.trial,op_cache,op_adjoint)
 
@@ -195,8 +245,36 @@ mutable struct StaggeredNonlinearFEStateMap{NB,SB,A,B,C,D,E,F} <: AbstractFEStat
     _solvers = (;solver,adjoint_solver)
     A,B,C,D,E,F = typeof(spaces), typeof(assems), typeof(_solvers),
       typeof(plb_caches), typeof(fwd_caches), typeof(adj_caches)
-    new{NB,SB,A,B,C,D,E,F}(op.residuals,op.jacobians,spaces,assems,_solvers,plb_caches,fwd_caches,adj_caches)
+    new{NB,SB,A,B,C,D,E,F}(op.residuals,op.jacobians,∂Rk∂xhi,spaces,assems,_solvers,plb_caches,fwd_caches,adj_caches)
   end
+end
+
+function StaggeredNonlinearFEStateMap(
+  op             :: StaggeredNonlinearFEOperator{NB,SB},
+  V_φ            :: FESpace,
+  U_reg          :: FESpace,
+  φh;
+  assem_deriv    :: Assembler = SparseMatrixAssembler(U_reg,U_reg),
+  solver         :: StaggeredFESolver{NB} = StaggeredFESolver(
+    fill(NewtonSolver(LUSolver();maxiter=50,rtol=1.e-8,verbose=true),length(op.residuals))),
+  adjoint_solver :: StaggeredFESolver{NB} = StaggeredFESolver(fill(LUSolver(),length(op.residuals)))
+) where {NB,SB}
+
+  _type_unstable_warning("StaggeredNonlinearFEStateMap","∂Rk∂xhi")
+
+  ∂Rk∂xhi = ()
+  for k = 2:NB
+    _∂Rk∂xhi = ()
+    for i = 1:k-1
+      __∂Rk∂xhi(dxj,xhs,xhk,vhk,φ) = ∇(
+        xi->op.residuals[k]((xhs[1:i-1]...,xi,xhs[i+1:end]...),xhk,vhk,φ)
+      )(xhs[i])
+      _∂Rk∂xhi = (_∂Rk∂xhi...,__∂Rk∂xhi)
+    end
+    ∂Rk∂xhi = (∂Rk∂xhi...,_∂Rk∂xhi)
+  end
+
+  return StaggeredNonlinearFEStateMap(op,∂Rk∂xhi,V_φ,U_reg,φh;assem_deriv,solver,adjoint_solver)
 end
 
 get_state(m::StaggeredNonlinearFEStateMap) = FEFunction(get_trial_space(m),m.fwd_caches[1])
@@ -256,24 +334,25 @@ end
 StaggeredFEStateMapTypes{NB} = Union{StaggeredNonlinearFEStateMap{NB},StaggeredAffineFEStateMap{NB}}
 
 # Adjoint solve and pullback
-function adjoint_solve!(φ_to_u::StaggeredFEStateMapTypes,xh,φh,dFdxj_at_φ::Function)
+function adjoint_solve!(φ_to_u::StaggeredFEStateMapTypes,xh,φh,dFdxj)
   solvers = φ_to_u.solvers
+  ∂Rk∂xhi = φ_to_u.∂Rk∂xhi
   x_adjoint,X_adjoint,cache,_ = φ_to_u.adj_caches
   op_at_φ = get_staggered_operator_at_φ(φ_to_u,φh)
-  xh_comb = _get_solutions(op_at_φ,xh)
-  op_adjoint = generate_adjoint_operator(op_at_φ,xh_comb,j->dFdxj_at_φ(j,xh_comb))
+  op_adjoint = generate_adjoint_operator(op_at_φ,φh,xh,dFdxj,∂Rk∂xhi)
 
   solve!(FEFunction(X_adjoint,x_adjoint),solvers.adjoint_solver,op_adjoint,cache);
   return x_adjoint
 end
 
-function pullback(φ_to_u::StaggeredFEStateMapTypes{NB},xh,φh,dFdxj::Function;kwargs...) where NB
+function pullback(φ_to_u::StaggeredFEStateMapTypes{NB},xh,φh,dFdxj;kwargs...) where NB
   Σ_λᵀs_∂Rs∂φ, assem_deriv = φ_to_u.plb_caches
+  Λ = last(φ_to_u.adj_caches).trial
   U_reg = GridapTopOpt.get_deriv_space(φ_to_u)
 
   # Adjoint Solve
-  λ  = adjoint_solve!(φ_to_u,xh,φh,(j,xh_comb)->dFdxj(j,φh,xh_comb))
-  λh = FEFunction(get_test_space(φ_to_u),λ)
+  λ  = adjoint_solve!(φ_to_u,xh,φh,dFdxj)
+  λh = FEFunction(Λ,λ)
 
   # Compute Σ_λᵀs_∂Rs∂φ
   λᵀ∂Rs∂φ = dRdφ(φ_to_u,xh,λh,φh)
@@ -294,16 +373,21 @@ function ChainRulesCore.rrule(φ_to_u::StaggeredFEStateMapTypes,φh)
 end
 
 # Building adjoint operators
-function generate_adjoint_operator(op_at_φ::StaggeredFEOperator{NB},xh_comb,dFdxj::Function) where NB
+function generate_adjoint_operator(op_at_φ::StaggeredFEOperator{NB},φh,xh,dFdxj,∂Rk∂xhi) where NB
+  xh_comb = _get_solutions(op_at_φ,xh)
   a_adj,l_adj=(),()
   for k = 1:NB-1
+    dFdxk(Λk) = dFdxj[k](Λk,xh_comb,φh)
+    ∑ᵢ∂Ri∂xhk(xhs,Λk) = sum(∂Rk∂xhi[i-1][k](Λk,xh_comb[1:i-1],xh_comb[i],xhs[NB-i+1],φh) for i = k+1:NB)
+
     a_adj_k(xhs,λk,Λk) = _get_kth_jacobian(op_at_φ,xh_comb,k)(xhs,λk,Λk)
-    l_adj_k(xhs,Λk) = dFdxj(k) - sum(∂Rk∂xhi(op_at_φ,xh_comb,k,i)(xhs[NB-i+1]) for i = k+1:NB)
+    l_adj_k(xhs,Λk) = dFdxk(Λk) - ∑ᵢ∂Ri∂xhk(xhs,Λk)
+
     a_adj = (a_adj...,a_adj_k)
     l_adj = (l_adj...,l_adj_k)
   end
   a_adj = (a_adj...,_get_kth_jacobian(op_at_φ,xh_comb,NB))
-  l_adj = (l_adj...,(xhs,Λk) -> dFdxj(NB))
+  l_adj = (l_adj...,(xhs,Λk) -> dFdxj[NB](Λk,xh_comb,φh))
   StaggeredAffineFEOperator(collect(reverse(a_adj)),collect(reverse(l_adj)),
     reverse(op_at_φ.tests),reverse(op_at_φ.trials),reverse(op_at_φ.assems))
 end
@@ -317,55 +401,26 @@ function _get_kth_jacobian(op::StaggeredAffineFEOperator{NB},xh_comb,k::Int) whe
   jac(xhs,λk,Λk) = op.biforms[k](xh_comb[1:end-NB+k-1],Λk,λk)
 end
 
-# Partial derivatives of kth residual with respect to ith variable xhi
-function ∂Rk∂xhi(op::StaggeredAffineFEOperator{NB}, xh_comb, i::Int, k::Int) where NB
-  @assert NB >= k && 1 <= i < k
-  ak_at_xhi(xhi,vk) = op.biforms[k]((xh_comb[1:i-1]...,xhi,xh_comb[i+1:end-1]...),xh_comb[k],vk)
-  lk_at_xhi(xhi,vk) = op.liforms[k]((xh_comb[1:i-1]...,xhi,xh_comb[i+1:end-1]...),vk)
-  res_k_at_xhi(xhi,vk) = ak_at_xhi(xhi,vk) - lk_at_xhi(xhi,vk)
-  ∂res_k_at_xhi(vk) = ∇(res_k_at_xhi,[xh_comb[i],vk],1)
-end
-
-function ∂Rk∂xhi(op::StaggeredNonlinearFEOperator{NB}, xh_comb, i::Int, k::Int) where NB
-  @assert NB >= k && 1 <= i < k
-  res_k_at_xhi(xhi,vk) = op.residuals[k]((xh_comb[1:i-1]...,xhi,xh_comb[i+1:end-1]...),xh_comb[k],vk)
-  ∂res_k_at_xhi(vk) = ∇(res_k_at_xhi,[xh_comb[i],vk],1)
-end
-
 # Dummy adjoint operator for setting up the cache
-function dummy_generate_adjoint_operator(op_at_φ::StaggeredFEOperator{NB},xh_comb) where NB
+function dummy_generate_adjoint_operator(op_at_φ::StaggeredFEOperator{NB},φh,xh,∂Rk∂xhi) where NB
   xhs,cs = (),()
   for k = 1:NB
-    xh_k = xh_comb[k]
+    xh_k = get_solution(op_at_φ,xh,k)
     dxk = get_fe_basis(op_at_φ.trials[k])
-    l = dummy_linear_form(op_at_φ,xhs,xh_k,k)
-    cs = (cs...,l(dxk))
+    l(Λk,xh_comb,φh) = dummy_linear_form(op_at_φ,xhs,xh_k,dxk,k)
+    cs = (cs...,l)
     xhs = (xhs...,xh_k)
+
   end
-  generate_adjoint_operator(op_at_φ,xh_comb,i->cs[i])
-  # _generate_adjoint_operator(op_at_φ,xh_comb,i->cs[i])
+  generate_adjoint_operator(op_at_φ,φh,xh,cs,∂Rk∂xhi)
 end
 
-# function _generate_adjoint_operator(op_at_φ::StaggeredFEOperator{NB},xh_comb,dFdxj::Function) where NB
-#   a_adj,l_adj=(),()
-#   for k = 1:NB-1
-#     a_adj_k(xhs,λk,Λk) = _get_kth_jacobian(op_at_φ,xh_comb,k)(xhs,λk,Λk)
-#     l_adj_k(xhs,Λk) = dFdxj(k) #- sum(∂Rk∂xhi(op_at_φ,xh_comb,k,i)(xhs[NB-i+1]) for i = k+1:NB)
-#     a_adj = (a_adj...,a_adj_k)
-#     l_adj = (l_adj...,l_adj_k)
-#   end
-#   a_adj = (a_adj...,_get_kth_jacobian(op_at_φ,xh_comb,NB))
-#   l_adj = (l_adj...,(xhs,Λk) -> dFdxj(NB))
-#   StaggeredAffineFEOperator(collect(reverse(a_adj)),collect(reverse(l_adj)),
-#     reverse(op_at_φ.tests),reverse(op_at_φ.trials),reverse(op_at_φ.assems))
-# end
-
-function dummy_linear_form(op_at_φ::StaggeredAffineFEOperator,xhs,xh_k,k)
-  l(vk) = op_at_φ.liforms[k](xhs,vk)
+function dummy_linear_form(op_at_φ::StaggeredAffineFEOperator,xhs,xh_k,dxk,k)
+  op_at_φ.liforms[k](xhs,dxk)
 end
 
-function dummy_linear_form(op_at_φ::StaggeredNonlinearFEOperator,xhs,xh_k,k)
-  l(vk) = op_at_φ.residuals[k](xhs,xh_k,vk)
+function dummy_linear_form(op_at_φ::StaggeredNonlinearFEOperator,xhs,xh_k,dxk,k)
+  op_at_φ.residuals[k](xhs,xh_k,dxk)
 end
 
 ## Helpers
@@ -399,11 +454,21 @@ end
 #  type.
 #
 # This will be refactored/removed in the future.
-struct StaggeredStateParamMap{A,B,C,D} <: GridapTopOpt.AbstractStateParamMap
+struct StaggeredStateParamMap{NB,A,B,C,D} <: GridapTopOpt.AbstractStateParamMap
   F       :: A
   spaces  :: B
   assems  :: C
   caches  :: D
+  ∂F∂xhi  :: Tuple{Vararg{Function}}
+end
+
+function StaggeredStateParamMap(F::Function,∂F∂xhi::Tuple{Vararg{Function}},φ_to_u::StaggeredFEStateMapTypes)
+  Us = φ_to_u.spaces.trials
+  V_φ = GridapTopOpt.get_aux_space(φ_to_u)
+  U_reg = GridapTopOpt.get_deriv_space(φ_to_u)
+  assem_deriv = GridapTopOpt.get_deriv_assembler(φ_to_u)
+  assem_U = GridapTopOpt.get_pde_assembler(φ_to_u)
+  StaggeredStateParamMap(F,∂F∂xhi,Us,V_φ,U_reg,assem_U,assem_deriv)
 end
 
 function StaggeredStateParamMap(F::Function,φ_to_u::StaggeredFEStateMapTypes)
@@ -412,22 +477,38 @@ function StaggeredStateParamMap(F::Function,φ_to_u::StaggeredFEStateMapTypes)
   U_reg = GridapTopOpt.get_deriv_space(φ_to_u)
   assem_deriv = GridapTopOpt.get_deriv_assembler(φ_to_u)
   assem_U = GridapTopOpt.get_pde_assembler(φ_to_u)
-  StaggeredStateParamMap(F,Us,V_φ,U_reg,assem_U,assem_deriv)
+
+  @assert length(Us) == length(assem_U)
+  _type_unstable_warning("StaggeredStateParamMap","∂F∂xhi")
+  NB = length(Us)
+
+  ∂F∂xhi = ()
+  for j = 1:NB
+    _∂F∂xhj(dxj,xhs,φ) = ∇(xj->F((xhs[1:j-1]...,xj,xhs[j+1:end]...),φ))(xhs[j])
+    ∂F∂xhi = (∂F∂xhi...,_∂F∂xhj)
+  end
+
+  StaggeredStateParamMap(F,∂F∂xhi,Us,V_φ,U_reg,assem_U,assem_deriv)
 end
 
 function StaggeredStateParamMap(
-  F,trials::Vector{<:FESpace},V_φ::FESpace,U_reg::FESpace,
+  F,∂F∂xhi::Tuple{Vararg{Function}},trials::Vector{<:FESpace},V_φ::FESpace,U_reg::FESpace,
   assem_U::Vector{<:Assembler},assem_deriv::Assembler
 )
+  @assert length(trials) == length(assem_U)
   φ₀, u₀s = interpolate(x->-sqrt((x[1]-1/2)^2+(x[2]-1/2)^2)+0.2,V_φ), zero.(trials)
-  dFdxj(j,φh,xh_comb) = ∇((xj->F((xh_comb[1:j-1]...,xj,xh_comb[j+1:end]...),φh)))(xh_comb[j])
 
   ∂F∂φ_vecdata = collect_cell_vector(U_reg,∇((φ->F((u₀s...,),φ)))(φ₀))
   ∂F∂φ_vec = allocate_vector(assem_deriv,∂F∂φ_vecdata)
   assems = (assem_U,assem_deriv)
   spaces = (trials,combine_fespaces(trials),V_φ,U_reg)
-  caches = (dFdxj,∂F∂φ_vec)
-  return StaggeredStateParamMap(F,spaces,assems,caches)
+  caches = ∂F∂φ_vec
+  A,B,C,D = typeof(F),typeof(spaces),typeof(assems),typeof(caches)
+  return StaggeredStateParamMap{length(trials),A,B,C,D}(F,spaces,assems,caches,∂F∂xhi)
+end
+
+function get_∂F∂φ_vec(u_to_j::StaggeredStateParamMap)
+  u_to_j.caches
 end
 
 function (u_to_j::StaggeredStateParamMap)(u::AbstractVector,φ::AbstractVector)
@@ -449,7 +530,8 @@ function ChainRulesCore.rrule(u_to_j::StaggeredStateParamMap,uh,φh)
   F = u_to_j.F
   trials,_,_,U_reg = u_to_j.spaces
   _,assem_deriv = u_to_j.assems
-  dFdxj,∂F∂φ_vec = u_to_j.caches
+  ∂F∂φ_vec = u_to_j.caches
+  ∂F∂xhi = u_to_j.∂F∂xhi
 
   uh_comb = _get_solutions(trials,uh)
 
@@ -458,10 +540,11 @@ function ChainRulesCore.rrule(u_to_j::StaggeredStateParamMap,uh,φh)
     ∂F∂φ = ∇((φ->F((uh_comb...,),φ)))(φh)
     ∂F∂φ_vecdata = collect_cell_vector(U_reg,∂F∂φ)
     assemble_vector!(∂F∂φ_vec,assem_deriv,∂F∂φ_vecdata)
-    dj_dFdxj(x...) = dj*dFdxj(x...)
+    dj_∂F∂xhi = map(∂F∂xh->(x...)->dj*∂F∂xh(x...),∂F∂xhi)
     ∂F∂φ_vec .*= dj
-    (  NoTangent(), dFdxj, ∂F∂φ_vec)
-    # As above, this is really bad as dFdxj is a function and ∂F∂φ_vec is a vector. This is temporary
+
+    (  NoTangent(), dj_∂F∂xhi, ∂F∂φ_vec)
+    # As above, this is really bad as dFdxj is a tuple of functions and ∂F∂φ_vec is a vector. This is temporary
   end
   return u_to_j(uh,φh), u_to_j_pullback
 end
@@ -471,4 +554,18 @@ function ChainRulesCore.rrule(u_to_j::StaggeredStateParamMap,u::AbstractVector,�
   uh = FEFunction(trial,u)
   φh = FEFunction(V_φ,φ)
   return ChainRulesCore.rrule(u_to_j,uh,φh)
+end
+
+function _type_unstable_warning(V,deriv_names)
+  @warn """\n
+  You are creating a $V without specifying $deriv_names. This will
+  now be generated using AutoDiff.
+
+  When a variable being differentiated is not defined on the whole integration
+  domain (e.g., the case of CutFEM), AutoDiff will cause a type-instability
+  error due to Gridap#1052.
+
+  We are aware of this bug and are working on a fix. In the meantime, please
+  pass the analytic expressions for $deriv_names to avoid this bug.
+  """ maxlog=1
 end
