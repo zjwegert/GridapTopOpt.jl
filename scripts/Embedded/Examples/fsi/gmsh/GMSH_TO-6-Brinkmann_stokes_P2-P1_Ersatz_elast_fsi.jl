@@ -64,7 +64,6 @@ dΓf_N = Measure(Γf_N,degree)
   Ωf = DifferentiableTriangulation(Triangulation(cutgeo,PHYSICAL_OUT),V_φ)
   Γ = DifferentiableTriangulation(EmbeddedBoundary(cutgeo),V_φ)
   Γg = GhostSkeleton(cutgeo)
-  Ωact = Triangulation(cutgeo,ACTIVE)
   (;
     :Ωs  => Ωs,
     :dΩs => Measure(Ωs,degree),
@@ -76,7 +75,6 @@ dΓf_N = Measure(Γf_N,degree)
     :Γ    => Γ,
     :dΓ   => Measure(Γ,degree),
     :n_Γ  => get_normal_vector(Γ.trian),
-    :Ωact => Ωact
   )
 end
 
@@ -166,6 +164,20 @@ _α(hₕ) = (α_coeff*hₕ)^2
 a_hilb(p,q) =∫((_α ∘ hₕ)*∇(p)⋅∇(q) + p*q)dΩ_act;
 vel_ext = VelocityExtension(a_hilb,U_reg,V_reg)
 
+reinit!(ls_evo,φh)
+_J, _C, _dJ, _dC = evaluate!(pcfs,φh)
+@show _J, _C
+uh,ph,dh = get_state(pcfs)
+@show sum(J_comp((uh,ph,dh),φh))
+
+writevtk(Ω_act,path*"Omega_act",
+      cellfields=["φ"=>φh,"dJ"=>FEFunction(U_reg,_dJ),"dC"=>FEFunction(U_reg,_dC[1]),
+      "λ1" => FEFunction(GridapTopOpt.get_test_space(state_map),state_map.adj_caches[3])[1],
+      "λ2" => FEFunction(GridapTopOpt.get_test_space(state_map),state_map.adj_caches[3])[2],
+      "λ3" => FEFunction(GridapTopOpt.get_test_space(state_map),state_map.adj_caches[3])[3],
+      "uh"=>uh,"ph"=>ph,"dh"=>dh,])
+error()
+
 ## Optimiser
 converged(m) = GridapTopOpt.default_al_converged(
   m;
@@ -178,12 +190,14 @@ function has_oscillations(m,os_it)
   all(@.(abs(history[:C,it]) < 0.05vf)) && GridapTopOpt.default_has_oscillations(m,os_it)
 end
 optimiser = AugmentedLagrangian(pcfs,ls_evo,vel_ext,φh;
-  γ=γ_evo,verbose=true,constraint_names=[:Vol],converged,has_oscillations)
-for (it,(uh,ph,dh),φh) in optimiser
+  γ=γ_evo,verbose=true,debug=true,constraint_names=[:Vol],converged,has_oscillations)
+for (it,(uh,ph,dh),φh,state) in optimiser
   GC.gc()
   if iszero(it % iter_mod)
     writevtk(Ω_act,path*"Omega_act_$it",
-      cellfields=["φ"=>φh,"|∇(φ)|"=>(norm ∘ ∇(φh)),"uh"=>uh,"ph"=>ph,"dh"=>dh])
+      cellfields=["φ"=>φh,"|∇(φ)|"=>(norm ∘ ∇(φh)),"uh"=>uh,"ph"=>ph,"dh"=>dh,
+      "dJ"=>FEFunction(U_reg,state.dJ),"dC"=>FEFunction(U_reg,state.dC[1]),
+      "dL"=>FEFunction(U_reg,state.dL)])
     writevtk(Ω.Ωf,path*"Omega_f_$it",
       cellfields=["uh"=>uh,"ph"=>ph,"dh"=>dh])
     writevtk(Ω.Ωs,path*"Omega_s_$it",
