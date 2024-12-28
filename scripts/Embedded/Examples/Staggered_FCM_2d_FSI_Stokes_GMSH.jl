@@ -153,14 +153,13 @@ function l_solid(((u,p),),s,φ)
 end
 
 ## Optimisation functionals
-J_pres(((u,p),d),φ) = ∫(p)dΓf_D - ∫(p)dΓf_N
 J_comp(((u,p),d),φ) = ∫(ε(d) ⊙ (σ ∘ ε(d)))Ω.dΩs
 Vol(((u,p),d),φ) = ∫(vol_D)Ω.dΩs - ∫(vf/vol_D)dΩ_act
 
 ## Staggered operators
 op = StaggeredAffineFEOperator([a_fluid,a_solid],[l_fluid,l_solid],X,Y)
 state_map = StaggeredAffineFEStateMap(op,V_φ,U_reg,φh)
-pcfs = PDEConstrainedFunctionals(J_pres,[Vol],state_map)
+pcfs = PDEConstrainedFunctionals(J_comp,[Vol],state_map)
 
 ## Evolution Method
 evo = CutFEMEvolve(V_φ,Ω,dΩ_act,hₕ;max_steps,γg=0.01)
