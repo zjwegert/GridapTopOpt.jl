@@ -149,7 +149,7 @@ end
 
 function tag_isolated_volumes(
   model::GridapDistributed.DistributedDiscreteModel{Dc},
-  cell_to_state::AbstractVector{<:Vector{<:Integer}},
+  cell_to_state::AbstractVector{<:Vector{<:Integer}};
   groups::Tuple
 ) where Dc
 
@@ -172,7 +172,7 @@ function get_isolated_volumes_mask(
   geo = get_geometry(cutgeo)
 
   bgcell_to_inoutcut = map(compute_bgcell_to_inoutcut,local_views(model),local_views(geo))
-  cell_to_lcolor, lcolor_to_group, color_gids = tag_isolated_volumes(model,bgcell_to_inoutcut,((CUT,IN_is),IN*IN_is))
+  cell_to_lcolor, lcolor_to_group, color_gids = tag_isolated_volumes(model,bgcell_to_inoutcut;groups=((CUT,IN_is),IN*IN_is))
 
   lcolor_to_tagged = map(local_views(model),cell_to_lcolor,lcolor_to_group) do model, cell_to_lcolor, lcolor_to_group
     find_tagged_volumes(model,dirichlet_tags,cell_to_lcolor,lcolor_to_group)
