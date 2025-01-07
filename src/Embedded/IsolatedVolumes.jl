@@ -178,7 +178,7 @@ function get_isolated_volumes_mask(
     find_tagged_volumes(model,dirichlet_tags,cell_to_lcolor,lcolor_to_group)
   end
   aux = PVector(lcolor_to_tagged,partition(color_gids))
-  assemble!(&,aux) |> wait
+  assemble!(|,aux) |> wait
   consistent!(aux) |> wait
 
   trian = Triangulation(GridapDistributed.WithGhost(),model)
@@ -217,7 +217,9 @@ function generate_volume_gids(
         nbor_lcolor = cache.buffer_rcv.data[k]
         lcolor = cell_to_lcolor[lid]
         lcolor_to_nbor[lcolor] = min(nbor,lcolor_to_nbor[lcolor])
-        lcolor_to_nbor_lcolor[lcolor] = nbor_lcolor
+        if nbor == lcolor_to_nbor[lcolor]
+          lcolor_to_nbor_lcolor[lcolor] = nbor_lcolor
+        end
       end
     end
     return lcolor_to_nbor, lcolor_to_nbor_lcolor
