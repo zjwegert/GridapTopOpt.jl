@@ -127,6 +127,26 @@ function Base.one(f::FESpace)
   return uh
 end
 
+################# GridapDistributed #################
+
+function GridapDistributed.to_parray_of_arrays(a::NTuple{N,T}) where {N,T<:DebugArray}
+  indices = linear_indices(first(a))
+  map(indices) do i
+    map(a) do aj
+      aj.items[i]
+    end
+  end
+end
+
+function GridapDistributed.to_parray_of_arrays(a::NTuple{N,T}) where {N,T<:MPIArray}
+  indices = linear_indices(first(a))
+  map(indices) do i
+    map(a) do aj
+      PartitionedArrays.getany(aj)
+    end
+  end
+end
+
 ################# GridapSolvers #################
 ## Get solutions from vector of spaces
 function GridapSolvers.BlockSolvers.get_solution(spaces::Vector{<:FESpace}, xh::MultiFieldFEFunction, k)

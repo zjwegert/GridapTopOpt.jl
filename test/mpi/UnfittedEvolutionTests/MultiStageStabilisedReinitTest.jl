@@ -1,4 +1,4 @@
-module ArtificialViscosityStabilisedReinitTestMPI
+module MultiStageStabilisedReinitTestMPI
 using Test
 
 using GridapTopOpt
@@ -37,9 +37,13 @@ function main(distribute,mesh_partition)
   end
 
   ls_evo = CutFEMEvolve(V_φ,Ωs,dΩ,h)
-  ls_reinit = StabilisedReinit(V_φ,Ωs,dΩ,h;
-    stabilisation_method=ArtificialViscosity(1.5h),
+  reinit1 = StabilisedReinit(V_φ,Ωs,dΩ,h;
+    stabilisation_method=ArtificialViscosity(2.0),
     nls = GridapSolvers.NewtonSolver(LUSolver();maxiter=50,rtol=1.e-14,verbose=i_am_main(ranks)))
+  reinit2 = StabilisedReinit(V_φ,Ωs,dΩ,h;
+    stabilisation_method=InteriorPenalty(V_φ),
+    nls = GridapSolvers.NewtonSolver(LUSolver();maxiter=50,rtol=1.e-14,verbose=i_am_main(ranks)))
+  ls_reinit = GridapTopOpt.MultiStageStabilisedReinit([reinit1,reinit2])
   evo = UnfittedFEEvolution(ls_evo,ls_reinit)
   reinit!(evo,φh);
 

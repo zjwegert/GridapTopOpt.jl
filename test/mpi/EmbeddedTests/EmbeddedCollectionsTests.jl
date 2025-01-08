@@ -8,6 +8,8 @@ using GridapEmbedded
 using GridapEmbedded.LevelSetCutters
 using Gridap.Geometry, Gridap.FESpaces, Gridap.CellData, Gridap.Adaptivity
 
+using GridapDistributed, PartitionedArrays
+
 function generate_model(D,n,ranks,mesh_partition)
   domain = (D==2) ? (0,1,0,1) : (0,1,0,1,0,1)
   cell_partition = (D==2) ? (n,n) : (n,n,n)

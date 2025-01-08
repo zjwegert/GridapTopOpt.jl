@@ -271,6 +271,31 @@ function get_element_diameters(model)
   end
 end
 
+"""
+    get_element_diameter_field(model)
+
+Given a general unstructured model return the element circumdiameters as a
+CellField over the triangulation.
+"""
+function get_element_diameter_field(model)
+  return CellField(get_element_diameters(model),Triangulation(model))
+end
+
+function get_element_diameters(model::DistributedDiscreteModel{Dc}) where Dc
+  h = map(get_element_diameters,local_views(model))
+  gids = get_face_gids(model,Dc)
+  return PVector(h,partition(gids))
+end
+
+function get_element_diameter_field(model::DistributedDiscreteModel)
+  Ω = Triangulation(model)
+  fields = map(local_views(model)) do model
+    h = get_element_diameters(model)
+    CellField(h,Triangulation(model))
+  end
+  return DistributedCellField(fields,Ω)
+end
+
 # Based on doi:10.1017/CBO9780511973611. C is the Cayley-Menger matrix.
 function _get_tri_circumdiameter(coords)
   d12 = norm(coords[1]-coords[2])^2
@@ -311,4 +336,43 @@ function _get_tet_circumdiameter(coords)
     d13*(d14*(d23+d24-d34)+d24*(d23-d24+d34))-d12*((d23+d24-d34)*d34+
     d14*(d23-d24+d34)+d13*(-d23+d24+d34)))
   return sqrt(M11)
+end
+
+# Test that a distributed and serial field are the same.
+#
+# Note:
+#   - This is only designed for small tests
+#   - We require that the distributed model is generated with a global ordering
+#     that matches the serial model. See function below.
+function test_serial_and_distributed_fields(fhd::CellField,Vd,fhs::CellField,Vs)
+  fhd_cell_values = map(local_views(Vd),local_views(fhd)) do Vd,fhd
+    free = get_free_dof_values(fhd)
+    diri = get_dirichlet_dof_values(Vd)
+    scatter_free_and_dirichlet_values(Vd,free,diri)
+  end
+
+  free = get_free_dof_values(fhs)
+  diri = get_dirichlet_dof_values(Vs)
+  fhs_cell_values = scatter_free_and_dirichlet_values(Vs,free,diri)
+
+  dmodel = get_background_model(get_triangulation(Vd))
+  map(partition(get_cell_gids(dmodel)),fhd_cell_values) do gids,lfhd_cell_values
+    lfhd_cell_values ≈ fhs_cell_values[local_to_global(gids)]
+  end
+end
+
+# Generate a distributed model from a serial model with global ordering that
+#  matches the serial model
+function ordered_distributed_model_from_serial_model(ranks,model_serial)
+  cell_to_part = reduce(vcat,[[i for j in 1:num_cells(model_serial)/length(ranks)] for i in 1:length(ranks)])
+  append!(cell_to_part,[length(ranks) for i = 1: num_cells(model_serial) % length(ranks)]...)
+  @assert length(cell_to_part) == num_cells(model_serial)
+  DiscreteModel(ranks,model_serial,cell_to_part)
+end
+
+# MultiField
+function test_serial_and_distributed_fields(fhd::DistributedMultiFieldCellField,Vd,fhs::MultiFieldFEFunction,Vs)
+  @assert num_fields(fhd)==num_fields(Vd)==num_fields(fhs)==num_fields(Vs)
+  result = map(i->test_serial_and_distributed_fields(fhd[i],Vd[i],fhs[i],Vs[i]),1:num_fields(fhd)) |> to_parray_of_arrays
+  map(all,result)
 end

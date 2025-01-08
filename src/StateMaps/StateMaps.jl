@@ -40,21 +40,3 @@ function Gridap.jacobian(F,uh::Vector{<:CellField},K::Int)
   _f(uk) = F(uh[1:K-1]...,uk,uh[K+1:end]...)
   return Gridap.jacobian(_f,uh[K])
 end
-
-function GridapDistributed.to_parray_of_arrays(a::NTuple{N,T}) where {N,T<:DebugArray}
-  indices = linear_indices(first(a))
-  map(indices) do i
-    map(a) do aj
-      aj.items[i]
-    end
-  end
-end
-
-function GridapDistributed.to_parray_of_arrays(a::NTuple{N,T}) where {N,T<:MPIArray}
-  indices = linear_indices(first(a))
-  map(indices) do i
-    map(a) do aj
-      PartitionedArrays.getany(aj)
-    end
-  end
-end

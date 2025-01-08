@@ -28,7 +28,7 @@ function main_2d(n;vtk)
   geo = DiscreteGeometry(φh,model)
   cutgeo = cut(model,geo)
 
-  bgcell_to_inoutcut = compute_bgcell_to_inoutcut(model,geo)
+  bgcell_to_inoutcut = compute_bgcell_to_inoutcut(cutgeo,geo)
   cell_to_color, color_to_group = GridapTopOpt.tag_isolated_volumes(model,bgcell_to_inoutcut;groups=((GridapTopOpt.CUT,IN),OUT))
 
   color_to_tagged = GridapTopOpt.find_tagged_volumes(model,["Gamma_D"],cell_to_color,color_to_group)

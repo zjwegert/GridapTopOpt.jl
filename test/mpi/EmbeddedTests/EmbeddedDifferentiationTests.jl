@@ -5,6 +5,8 @@ using GridapTopOpt
 using Gridap, Gridap.Geometry, Gridap.Adaptivity
 using GridapEmbedded, GridapEmbedded.LevelSetCutters
 
+using GridapDistributed, PartitionedArrays
+
 using Gridap.Arrays: Operation
 using GridapTopOpt: get_conormal_vector,get_subfacet_normal_vector,get_ghost_normal_vector
 

@@ -6,6 +6,8 @@ using Gridap, Gridap.Geometry, Gridap.Adaptivity
 using GridapEmbedded, GridapEmbedded.LevelSetCutters
 using GridapSolvers
 
+using GridapDistributed, PartitionedArrays
+
 function main(distribute,mesh_partition)
   ranks = distribute(LinearIndices((prod(mesh_partition),)))
 

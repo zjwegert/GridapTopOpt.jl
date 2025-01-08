@@ -79,9 +79,11 @@ function solve!(s::StabilisedReinit,φh,cache::Nothing)
   nls_cache = instantiate_caches(get_free_dof_values(φh),nls,op)
   s.cache = (;nls_cache,φ_tmp)
   # Solve
-  solve!(get_free_dof_values(φh),nls,op,nls_cache)
-  copy!(φ_tmp,φ)
-  update_collection!(s.Ωs,φh) # TODO: remove?
+  solve!(φ_tmp,nls,op,nls_cache)
+  if _get_solver_flag(nls.log) ∈ (SOLVER_CONVERGED_ATOL,SOLVER_CONVERGED_RTOL)
+    copy!(get_free_dof_values(φh),φ_tmp)
+    update_collection!(s.Ωs,φh)
+  end
   return φh
 end
 

@@ -3,7 +3,8 @@ using Test
 
 using GridapTopOpt
 using Gridap, Gridap.Geometry, Gridap.Adaptivity
-using GridapEmbedded
+using GridapEmbedded, GridapEmbedded.LevelSetCutters
+using GridapSolvers
 
 using GridapDistributed, PartitionedArrays
 
