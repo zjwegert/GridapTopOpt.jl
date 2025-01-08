@@ -23,7 +23,7 @@ struct NonlinearFEStateMap{A,B,C,D,E,F} <: AbstractFEStateMap
 
   @doc """
       NonlinearFEStateMap(
-        res::Function,U,V,V_φ,U_reg,φh;
+        res::Function,jac::Function,U,V,V_φ,U_reg,φh;
         assem_U = SparseMatrixAssembler(U,V),
         assem_adjoint = SparseMatrixAssembler(V,U),
         assem_deriv = SparseMatrixAssembler(U_reg,U_reg),
@@ -66,7 +66,58 @@ struct NonlinearFEStateMap{A,B,C,D,E,F} <: AbstractFEStateMap
     adjoint_K  = assemble_adjoint_matrix(_jac_adj,assem_adjoint,U,V)
     adjoint_x  = allocate_in_domain(adjoint_K); fill!(adjoint_x,zero(eltype(adjoint_x)))
     adjoint_ns = numerical_setup(symbolic_setup(adjoint_ls,adjoint_K),adjoint_K)
-    adj_caches = (adjoint_ns,adjoint_K,adjoint_x,assem_adjoint,adjoint_ls)
+    adj_caches = (adjoint_ns,adjoint_K,adjoint_x,assem_adjoint,adjoint_ls,jac)
+
+    A, B, C = typeof(res), typeof(jac), typeof(spaces)
+    D, E, F = typeof(plb_caches), typeof(fwd_caches), typeof(adj_caches)
+    return new{A,B,C,D,E,F}(res,jac,spaces,plb_caches,fwd_caches,adj_caches)
+  end
+
+  @doc """
+      NonlinearFEStateMap(
+        res::Function,jac::Function,adjoint_jac::Function,U,V,V_φ,U_reg,φh;
+        assem_U = SparseMatrixAssembler(U,V),
+        assem_adjoint = SparseMatrixAssembler(V,U),
+        assem_deriv = SparseMatrixAssembler(U_reg,U_reg),
+        nls::NonlinearSolver = NewtonSolver(LUSolver();maxiter=50,rtol=1.e-8,verbose=true),
+        adjoint_ls::LinearSolver = LUSolver()
+      )
+
+  In addition to the above, pass the jacobian `adjoint_jac` for the purposes of
+  solving the adjoint problem. This can be computed with AD or by hand, but and
+  allows the user to specify a different jacobian for the forward problem (e.g.,
+  for picard iterations).
+  """
+  function NonlinearFEStateMap(
+    res::Function,jac::Function,adjoint_jac::Function,U,V,V_φ,U_reg,φh;
+    assem_U = SparseMatrixAssembler(U,V),
+    assem_adjoint = SparseMatrixAssembler(V,U),
+    assem_deriv = SparseMatrixAssembler(U_reg,U_reg),
+    nls::NonlinearSolver = NewtonSolver(LUSolver();maxiter=50,rtol=1.e-8,verbose=true),
+    adjoint_ls::LinearSolver = LUSolver()
+  )
+    spaces = (U,V,V_φ,U_reg)
+
+    ## Pullback cache
+    uhd = zero(U)
+    vecdata = collect_cell_vector(U_reg,∇(res,[uhd,uhd,φh],3))
+    dudφ_vec = allocate_vector(assem_deriv,vecdata)
+    plb_caches = (dudφ_vec,assem_deriv)
+
+    ## Forward cache
+    x = zero_free_values(U)
+    _res(u,v) = res(u,v,φh)
+    _jac(u,du,v) = jac(u,du,v,φh)
+    op = get_algebraic_operator(FEOperator(_res,_jac,U,V,assem_U))
+    nls_cache = instantiate_caches(x,nls,op)
+    fwd_caches = (nls,nls_cache,x,assem_U)
+
+    ## Adjoint cache
+    _jac_adj(du,v) = adjoint_jac(uhd,du,v,φh)
+    adjoint_K  = assemble_adjoint_matrix(_jac_adj,assem_adjoint,U,V)
+    adjoint_x  = allocate_in_domain(adjoint_K); fill!(adjoint_x,zero(eltype(adjoint_x)))
+    adjoint_ns = numerical_setup(symbolic_setup(adjoint_ls,adjoint_K),adjoint_K)
+    adj_caches = (adjoint_ns,adjoint_K,adjoint_x,assem_adjoint,adjoint_ls,adjoint_jac)
 
     A, B, C = typeof(res), typeof(jac), typeof(spaces)
     D, E, F = typeof(plb_caches), typeof(fwd_caches), typeof(adj_caches)
@@ -107,16 +158,16 @@ function dRdφ(φ_to_u::NonlinearFEStateMap,uh,vh,φh)
 end
 
 function update_adjoint_caches!(φ_to_u::NonlinearFEStateMap,uh,φh)
-  adjoint_ns, adjoint_K, _, assem_adjoint, _ = φ_to_u.adj_caches
+  adjoint_ns, adjoint_K, _, assem_adjoint, _, adjoint_jac = φ_to_u.adj_caches
   U, V, _, _ = φ_to_u.spaces
-  jac(du,v) =  φ_to_u.jac(uh,du,v,φh)
+  jac(du,v) =  adjoint_jac(uh,du,v,φh)
   assemble_adjoint_matrix!(jac,adjoint_K,assem_adjoint,U,V)
   numerical_setup!(adjoint_ns,adjoint_K)
   return φ_to_u.adj_caches
 end
 
 function adjoint_solve!(φ_to_u::NonlinearFEStateMap,du::AbstractVector)
-  adjoint_ns, _, adjoint_x, _, _ = φ_to_u.adj_caches
+  adjoint_ns, _, adjoint_x, _, _, _ = φ_to_u.adj_caches
   solve!(adjoint_x,adjoint_ns,du)
   return adjoint_x
 end
