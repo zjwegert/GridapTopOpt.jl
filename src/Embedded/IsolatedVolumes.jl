@@ -189,6 +189,148 @@ function get_isolated_volumes_mask(
   return GridapDistributed.DistributedCellField(fields,trian)
 end
 
+# Given a vector_partition and indices, returns an exchange cache that 
+# exchanges both the ghost layer and the ghost layer of the neighbors
+function double_layer_exchange_cache(vector_partition,index_partition)
+  function f(a::JaggedArray,b::JaggedArray)
+    JaggedArray(map(vcat,a,b))
+  end
+  neighbors_snd, neighbors_rcv = assembly_neighbors(index_partition)
+  sl_indices_snd, sl_indices_rcv = assembly_local_indices(index_partition,neighbors_snd,neighbors_rcv)
+  dl_indices_snd = map(f, sl_indices_snd, sl_indices_rcv)
+  dl_indices_rcv = map(f, sl_indices_rcv, sl_indices_snd)
+  buffers_snd, buffers_rcv = map(PartitionedArrays.assembly_buffers,vector_partition,dl_indices_snd,dl_indices_rcv) |> tuple_of_arrays
+  map(PartitionedArrays.VectorAssemblyCache,neighbors_snd,neighbors_rcv,dl_indices_snd,dl_indices_rcv,buffers_snd,buffers_rcv)
+end
+
+function generate_volume_gids(
+  cell_ids, n_lcolor, cell_to_lcolor
+)
+  # NOTE: We have to communicate both the snd and rcv layers, i.e 
+  # each processor sends and receives both 
+  #   1) their layer of ghost cells 
+  #   2) the layer of ghost cells of their neighbors
+  # Otherwise, the constructed graph is non-symmetric in cases where a volume ends just 
+  # at the boundary of a processor. If the graph is not symmetric, we can end up with 
+  # false volumes...
+  exchange_caches = double_layer_exchange_cache(cell_to_lcolor,cell_ids)
+  # exchange_caches = PartitionedArrays.p_vector_cache_impl(Vector,cell_to_lcolor,cell_ids)
+
+  # Send and receive local information from neighbors
+  neighbors_snd, neighbors_rcv, buffer_snd, buffer_rcv = map(exchange_caches,cell_to_lcolor) do cache, cell_to_lcolor
+    for (k,lid) in enumerate(cache.local_indices_snd)
+      cache.buffer_snd[k] = cell_to_lcolor[lid]
+    end
+    cache.neighbors_snd,cache.neighbors_rcv,cache.buffer_snd,cache.buffer_rcv
+  end |> tuple_of_arrays;
+
+  graph = ExchangeGraph(neighbors_snd,neighbors_rcv)
+  t = exchange!(buffer_rcv,buffer_snd,graph)
+  wait(t)
+
+  # Prepare local information
+  # For each local volume (color), collect:
+  #   1. All the neighbors touching the volume
+  #   2. The local color of the volume in the neighbor
+  ptrs, lcolor_to_nbors, lcolor_to_nbor_lcolor = map(
+    n_lcolor, exchange_caches, cell_to_lcolor
+  ) do n_lcolor, cache, cell_to_lcolor
+
+    ptrs = zeros(Int16,n_lcolor+1)
+    lcolor_to_nbors = [Int[] for _ in 1:n_lcolor]
+    lcolor_to_nbor_lcolors = [Int16[] for _ in 1:n_lcolor]
+
+    for (lnbor,nbor) in enumerate(cache.neighbors_rcv)
+      seen = Set{Tuple{Int16,Int16}}()
+      for k in cache.buffer_rcv.ptrs[lnbor]:cache.buffer_rcv.ptrs[lnbor+1]-1
+        cell = cache.local_indices_rcv.data[k]
+        nbor_lcolor = cache.buffer_rcv.data[k]
+        lcolor = cell_to_lcolor[cell]
+        if (lcolor,nbor_lcolor) ∉ seen
+          push!(lcolor_to_nbors[lcolor],nbor)
+          push!(lcolor_to_nbor_lcolors[lcolor],nbor_lcolor)
+          push!(seen,(lcolor,nbor_lcolor))
+          ptrs[lcolor+1] += 1
+        end        
+      end
+    end
+
+    PartitionedArrays.length_to_ptrs!(ptrs)
+    return ptrs, vcat(lcolor_to_nbors...), vcat(lcolor_to_nbor_lcolors...)
+  end |> tuple_of_arrays
+
+  # Gather local information in MAIN
+  ptrs = gather(ptrs)
+  lcolor_to_nbors = gather(lcolor_to_nbors)
+  lcolor_to_nbor_lcolor = gather(lcolor_to_nbor_lcolor)
+
+  # Create global ordering in MAIN
+  lcolor_to_color, lcolor_to_owner, n_color = map_main(
+    ptrs, lcolor_to_nbors, lcolor_to_nbor_lcolor; 
+    otherwise = (args...) -> (nothing, nothing, zero(Int16))
+  ) do ptrs, lcolor_to_nbors, lcolor_to_nbor_lcolor
+    
+    n_procs = length(ptrs)
+    n_lcolors = map(p -> length(p)-1, ptrs)
+
+    lcolor_to_nbors = map(jagged_array,lcolor_to_nbors,ptrs)
+    lcolor_to_nbor_lcolor = map(jagged_array,lcolor_to_nbor_lcolor,ptrs)
+    lcolor_to_color = [zeros(Int16,n) for n in n_lcolors]
+    color_to_owner = Int[]
+
+    n_color = zero(Int16)
+    for p in 1:n_procs
+      for lcolor in 1:n_lcolors[p]
+        if iszero(lcolor_to_color[p][lcolor]) # New volume found
+          n_color += one(Int16)
+          push!(color_to_owner,p)
+          lcolor_to_color[p][lcolor] = n_color
+          @debug ">> NEW VOLUME: $n_color"
+
+          q = Queue{Tuple{Int,Int}}()
+          enqueue!(q,(p,lcolor))
+          while !isempty(q)
+            proc, proc_lcolor = dequeue!(q)
+            @debug "   >> PROC: $proc, PROC_LCOLOR: $proc_lcolor"
+            for (nbor, nbor_lcolor) in zip(lcolor_to_nbors[proc][proc_lcolor],lcolor_to_nbor_lcolor[proc][proc_lcolor])
+              nbor_color = lcolor_to_color[nbor][nbor_lcolor]
+              if iszero(nbor_color)
+                # nbor_lcolor has not been colored yet: color it
+                lcolor_to_color[nbor][nbor_lcolor] = n_color
+                enqueue!(q,(nbor,nbor_lcolor))
+              else
+                # nbor has been colored: check consistency
+                @assert nbor_color == n_color
+              end
+            end
+          end
+        end
+      end
+    end
+
+    lcolor_to_owner = map(c -> color_to_owner[c], lcolor_to_color)
+    return JaggedArray(lcolor_to_color), JaggedArray(lcolor_to_owner), n_color
+  end |> tuple_of_arrays;
+
+  # Scatter global color information
+  lcolor_to_color = scatter(lcolor_to_color)
+  lcolor_to_owner = scatter(lcolor_to_owner)
+  n_color = emit(n_color)
+
+  # Locally build color gids
+  color_ids = map(cell_ids,lcolor_to_color,lcolor_to_owner,n_color) do ids, lcolor_to_color, lcolor_to_owner, n_color
+    me = part_id(ids)
+    LocalIndices(Int(n_color),me,collect(Int,lcolor_to_color),collect(Int32,lcolor_to_owner))
+  end
+
+  return PRange(color_ids)
+end
+
+# I tried to be clever, but I think this fails when we have volumes that are locally split in two 
+# such that they neighbor different neighbors. 
+# I have given a lot of though, and I think there is just no way around communicating the whole 
+# graph...
+"""
 function generate_volume_gids(
   cell_ids, n_lcolor, cell_to_lcolor
 )
@@ -207,17 +349,20 @@ function generate_volume_gids(
   wait(t)
 
   # Prepare local information
+  # For each local volume (color), find two things:
+  #   1. The smallest neighbor id sharing the volume
+  #   2. The volume's lcolor in the selected neighbor
   lcolor_to_nbor, lcolor_to_nbor_lcolor = map(cell_ids,n_lcolor,exchange_caches,cell_to_lcolor) do ids, n_lcolor, cache, cell_to_lcolor
     lcolor_to_nbor = fill(part_id(ids),n_lcolor)
-    lcolor_to_nbor_lcolor = zeros(Int16,n_lcolor)
+    lcolor_to_nbor_lcolor = collect(Int16,1:n_lcolor)
 
     for (p,nbor) in enumerate(cache.neighbors_rcv)
       for k in cache.buffer_rcv.ptrs[p]:cache.buffer_rcv.ptrs[p+1]-1
         lid = cache.local_indices_rcv.data[k]
         nbor_lcolor = cache.buffer_rcv.data[k]
         lcolor = cell_to_lcolor[lid]
-        lcolor_to_nbor[lcolor] = min(nbor,lcolor_to_nbor[lcolor])
-        if nbor == lcolor_to_nbor[lcolor]
+        if nbor < lcolor_to_nbor[lcolor]
+          lcolor_to_nbor[lcolor] = nbor
           lcolor_to_nbor_lcolor[lcolor] = nbor_lcolor
         end
       end
@@ -243,14 +388,22 @@ function generate_volume_gids(
         nbor = lcolor_to_nbor.data[k]
         nbor_lcolor = lcolor_to_nbor_lcolor.data[k]
         if nbor < p
+          # Volume has been seen before by a neighbor, 
+          # so we can just copy the color
           color = lcolor_to_color.data[ptrs[nbor]+nbor_lcolor-1]
-        elseif iszero(nbor_lcolor) || !haskey(seen,(nbor,nbor_lcolor))
-          n_color += one(Int16)
-          color = n_color
-          push!(color_to_owner,p)
-          seen[(nbor,nbor_lcolor)] = color
         else
-          color = seen[(nbor,nbor_lcolor)]
+          # I own the volume
+          @assert nbor == p
+          # The following logic is to deal with volumes which are locally split
+          # I.e the same volume has several local colors (since it is locally disconnected)
+          if iszero(nbor_lcolor) || !haskey(seen,(nbor,nbor_lcolor))
+            n_color += one(Int16)
+            color = n_color
+            push!(color_to_owner,p)
+            seen[(nbor,nbor_lcolor)] = color
+          else
+            color = seen[(nbor,nbor_lcolor)]
+          end
         end
         lcolor_to_color.data[k] = color
       end
@@ -272,3 +425,5 @@ function generate_volume_gids(
 
   return PRange(color_ids)
 end
+"""
+
