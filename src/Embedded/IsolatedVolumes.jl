@@ -267,7 +267,7 @@ function generate_volume_gids(
   # Create global ordering in MAIN
   lcolor_to_color, lcolor_to_owner, n_color = map_main(
     ptrs, lcolor_to_nbors, lcolor_to_nbor_lcolor; 
-    otherwise = (args...) -> (nothing, nothing, zero(Int16))
+    otherwise = (args...) -> (JaggedArray([Int16[]]), JaggedArray([Int[]]), zero(Int16))
   ) do ptrs, lcolor_to_nbors, lcolor_to_nbor_lcolor
     
     n_procs = length(ptrs)

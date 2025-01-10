@@ -8,7 +8,7 @@ using Gridap.Geometry, Gridap.FESpaces, Gridap.CellData, Gridap.Adaptivity, Grid
 
 using GridapDistributed, PartitionedArrays
 
-parts = (8,10)
+parts = (12,10)
 ranks = DebugArray(LinearIndices((prod(parts),)))
 
 order = 1
@@ -66,7 +66,7 @@ writevtk(
   append=false
 );
 
-p = 15
+p = 4
 getitem(x) = getitem(local_views(x))
 getitem(x::AbstractArray) = x.items[p]
 writevtk(
