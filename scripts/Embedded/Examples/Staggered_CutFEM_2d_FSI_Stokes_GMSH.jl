@@ -4,14 +4,14 @@ using GridapSolvers, GridapSolvers.BlockSolvers
 using GridapGmsh
 using GridapTopOpt
 
-path = "./results/Staggered_CutFEM_2d_FSI_Stokes_GMSH_removedsomediffs/"
+path = "./results/Staggered_CutFEM_2d_FSI_Stokes_GMSH_finer/"
 mkpath(path)
 
-γ_evo = 0.1
-max_steps = 20
+γ_evo = 0.2
+max_steps = 24 # Based on number of elements in vertical direction divided by 10
 vf = 0.025
-α_coeff = 1#γ_evo*max_steps
-iter_mod = 1
+α_coeff = γ_evo*max_steps
+iter_mod = 10
 D = 2
 
 # Load gmsh mesh (Currently need to update mesh.geo and these values concurrently)
@@ -24,7 +24,7 @@ a = 0.3;
 b = 0.01;
 vol_D = 2.0*0.5
 
-model = GmshDiscreteModel((@__DIR__)*"/fsi/gmsh/mesh.msh")
+model = GmshDiscreteModel((@__DIR__)*"/fsi/gmsh/mesh_finer.msh")
 writevtk(model,path*"model")
 
 Ω_act = Triangulation(model)
@@ -43,39 +43,39 @@ f1((x,y),q,r) = - cos(q*π*x)*cos(q*π*y)/q - r/q
 fin(x) = f0(x,l*(1+5_e),a*(1+5_e))
 fsolid(x) = min(f0(x,l*(1+_e),b*(1+_e)),f0(x,w*(1+_e),a*(1+_e)))
 fholes((x,y),q,r) = max(f1((x,y),q,r),f1((x-1/q,y),q,r))
-φf(x) = min(max(fin(x),fholes(x,22,0.6)),fsolid(x))
+φf(x) = min(max(fin(x),fholes(x,25,0.2)),fsolid(x))
+# φf(x) = min(max(fin(x),fholes(x,22,0.6)),fsolid(x))
 φh = interpolate(φf,V_φ)
+
+# Bite test
+# φf2(x) = max(φf(x),-(max(2/0.2*abs(x[1]-0.3),2/0.2*abs(x[2]-0.3))-1))
+# φh = interpolate(φf2,V_φ)
 writevtk(get_triangulation(φh),path*"initial_lsf",cellfields=["φ"=>φh,"h"=>hₕ])
 
 # Setup integration meshes and measures
 order = 1
-degree = 4*order
+degree = 2*(order+1)
 
-dΩ_act = Measure(Ω_act,4*order)
+dΩ_act = Measure(Ω_act,degree)
 Γf_D = BoundaryTriangulation(model,tags="Gamma_f_D")
 Γf_N = BoundaryTriangulation(model,tags="Gamma_f_N")
 dΓf_D = Measure(Γf_D,degree)
 dΓf_N = Measure(Γf_N,degree)
 Ω = EmbeddedCollection(model,φh) do cutgeo,_
-  _Ωs = Triangulation(cutgeo,PHYSICAL)
-  _Ωf = Triangulation(cutgeo,PHYSICAL_OUT)
-  Ωs = DifferentiableTriangulation(_Ωs,V_φ)
-  Ωf = DifferentiableTriangulation(_Ωf,V_φ)
+  Ωs = DifferentiableTriangulation(Triangulation(cutgeo,PHYSICAL),V_φ)
+  Ωf = DifferentiableTriangulation(Triangulation(cutgeo,PHYSICAL_OUT),V_φ)
   Γ  = DifferentiableTriangulation(EmbeddedBoundary(cutgeo),V_φ)
   Γg = GhostSkeleton(cutgeo)
   (;
     :Ωs      => Ωs,
     :dΩs     => Measure(Ωs,degree),
-    :dΩsNoDiff     => Measure(_Ωs,degree),
     :Ωf      => Ωf,
     :dΩf     => Measure(Ωf,degree),
-    :dΩfNoDiff     => Measure(_Ωf,degree),
     :Γg      => Γg,
     :dΓg     => Measure(Γg,degree),
     :n_Γg    => get_normal_vector(Γg),
     :Γ       => Γ,
     :dΓ      => Measure(Γ,degree),
-    :dΓNoDiff=> Measure(Γ.trian,degree),
     :Ω_act_s => Triangulation(cutgeo,ACTIVE),
     :Ω_act_f => Triangulation(cutgeo,ACTIVE_OUT),
     :χ_s     => GridapTopOpt.get_isolated_volumes_mask(cutgeo,["Gamma_s_D"];IN_is=IN),
@@ -117,7 +117,7 @@ init_X,_ = build_spaces(Ω.Ω_act_s,Ω.Ω_act_f)
 # Properties
 Re = 60 # Reynolds number
 ρ = 1.0 # Density
-cl = H # Characteristic length
+cl = a # Characteristic length
 u0_max = maximum(abs,get_dirichlet_dof_values(init_X[1]))
 μ = ρ*cl*u0_max/Re # Viscosity
 ν = μ/ρ # Kinematic viscosity
@@ -125,8 +125,8 @@ u0_max = maximum(abs,get_dirichlet_dof_values(init_X[1]))
 # Stabilization parameters
 α_Nu    = 100
 α_PSUPG = 1/3
-α_GPμ   = 0.5
-α_GPp   = 0.05
+α_GPμ   = 0.5#1#1e-1#0.5
+α_GPp   = 0.05#1#1e-1#0.05
 
 γ_Nu(h)    = α_Nu*μ/h         # (Eqn. 13, Villanueva and Maute, 2017)
 τ_PSUPG(h) = α_PSUPG*(h^2/4ν) # (Eqn. 32, Peterson et al., 2018)
@@ -146,21 +146,12 @@ j_Γg(p,q) = mean(γ_GPp ∘ hₕ)*jump(Ω.n_Γg ⋅ ∇(p)) * jump(Ω.n_Γg ⋅
 v_χ(p,q) = k_p * Ω.χ_f*p*q # (Isolated volume term, Eqn. 15, Villanueva and Maute, 2017)
 
 function a_fluid((),(u,p),(v,q),φ)
-  n_Γ = get_normal_vector(Ω.Γ.trian)
-  return ∫( a_Ω(u,v)+b_Ω(u,q)+b_Ω(v,p))Ω.dΩf + # Volume terms
-    ∫( -c_Ω(p,q) )Ω.dΩfNoDiff + # Volume terms
-    ∫( a_Γ(u,v,n_Γ)+b_Γ(u,q,n_Γ)+b_Γ(v,p,n_Γ) )Ω.dΓNoDiff +    # Interface terms
+  n_Γ = get_normal_vector(Ω.Γ)
+  return ∫( a_Ω(u,v)+b_Ω(u,q)+b_Ω(v,p)-c_Ω(p,q) )Ω.dΩf + # Volume terms
+    ∫( a_Γ(u,v,n_Γ)+b_Γ(u,q,n_Γ)+b_Γ(v,p,n_Γ) )Ω.dΓ +    # Interface terms
     ∫( i_Γg(u,v) - j_Γg(p,q) )Ω.dΓg +                    # Ghost penalty terms
-    ∫( v_χ(p,q) )Ω.dΩfNoDiff                                   # Isolated volume term
+    ∫( v_χ(p,q) )Ω.dΩf                                   # Isolated volume term
 end
-
-# function a_fluid((),(u,p),(v,q),φ)
-#   n_Γ = get_normal_vector(Ω.Γ)
-#   return ∫( a_Ω(u,v)+b_Ω(u,q)+b_Ω(v,p)-c_Ω(p,q) )Ω.dΩf + # Volume terms
-#     ∫( a_Γ(u,v,n_Γ)+b_Γ(u,q,n_Γ)+b_Γ(v,p,n_Γ) )Ω.dΓ +    # Interface terms
-#     ∫( i_Γg(u,v) - j_Γg(p,q) )Ω.dΓg +                    # Ghost penalty terms
-#     ∫( v_χ(p,q) )Ω.dΩf                                   # Isolated volume term
-# end
 
 l_fluid((),(v,q),φ) = ∫(0q)Ω.dΩf
 
@@ -173,9 +164,9 @@ function lame_parameters(E,ν)
 end
 λs, μs = lame_parameters(0.1,0.05)
 # Stabilization
-α_Gd = 0.1
+α_Gd = 1e-7
 k_d = 1.0
-γ_Gd(h) = α_Gd*(λs + 2μs)*h^3
+γ_Gd(h) = α_Gd*(λs + μs)*h^3
 # Terms
 σ(ε) = λs*tr(ε)*one(ε) + 2*μs*ε
 a_s_Ω(s,d) = ε(s) ⊙ (σ ∘ ε(d)) # Elasticity
@@ -183,7 +174,7 @@ j_s_k(s,d) = mean(γ_Gd ∘ hₕ)*jump(Ω.n_Γg ⋅ ∇(s)) ⋅ jump(Ω.n_Γg �
 v_s_χ(s,d) = k_d*Ω.χ_s*d⋅s # Isolated volume term
 
 function a_solid(((u,p),),d,s,φ)
-  return ∫(a_s_Ω(s,d))Ω.dΩs + ∫(j_s_k(s,d))Ω.dΓg + ∫(v_s_χ(s,d))Ω.dΩsNoDiff
+  return ∫(a_s_Ω(s,d))Ω.dΩs + ∫(j_s_k(s,d))Ω.dΓg + ∫(v_s_χ(s,d))Ω.dΩs
 end
 function l_solid(((u,p),),s,φ)
   n = get_normal_vector(Ω.Γ)
@@ -194,18 +185,14 @@ end
 ∂Rk∂xhi = ((∂R2∂xh1,),)
 
 ## Optimisation functionals
-J_pres(((u,p),d),φ) = ∫(p)dΓf_D - ∫(p)dΓf_N
-∂Jpres∂up((du,dp),((u,p),d),φ) = ∫(dp)dΓf_D - ∫(dp)dΓf_N
-∂Jpres∂d(dd,((u,p),d),φ) = ∫(0dd)dΓf_D - ∫(0dd)dΓf_N
-∂Jpres∂xhi = (∂Jpres∂up,∂Jpres∂d)
-
 J_comp(((u,p),d),φ) = ∫(ε(d) ⊙ (σ ∘ ε(d)))Ω.dΩs
 ∂Jcomp∂up((du,dp),((u,p),d),φ) = ∫(0dp)Ω.dΩs
-∂Jcomp∂d(dd,((u,p),d),φ) = ∫(ε(dd) ⊙ (σ ∘ ε(d)))Ω.dΩs + ∫(ε(d) ⊙ (σ ∘ ε(dd)))Ω.dΩs
+∂Jcomp∂d(dd,((u,p),d),φ) = ∫(ε(dd) ⊙ (σ ∘ ε(d)))Ω.dΩs
+# ∂Jcomp∂d(dd,((u,p),d),φ) = ∫(ε(dd) ⊙ (σ ∘ ε(d)))Ω.dΩs + ∫(ε(d) ⊙ (σ ∘ ε(dd)))Ω.dΩs
 ∂Jpres∂xhi = (∂Jcomp∂up,∂Jcomp∂d)
 
 Vol(((u,p),d),φ) = ∫(vol_D)Ω.dΩs - ∫(vf/vol_D)dΩ_act
-dVol(q,((u,p),d),φ) = ∫(-1/vol_D*q/(norm ∘ (∇(φ))))Ω.dΓ
+dVol(q,(u,p,d),φ) = ∫(-1/vol_D*q/(norm ∘ (∇(φ))))Ω.dΓ
 ∂Vol∂up((du,dp),((u,p),d),φ) = ∫(0dp)dΩ_act
 ∂Vol∂d(dd,((u,p),d),φ) = ∫(0dd ⋅ d)dΩ_act
 ∂Vol∂xhi = (∂Vol∂up,∂Vol∂d)
@@ -223,11 +210,11 @@ state_collection = GridapTopOpt.EmbeddedCollection_in_φh(model,φh) do _φh
   )
 end
 
-pcf = EmbeddedPDEConstrainedFunctionals(state_collection)
+pcf = EmbeddedPDEConstrainedFunctionals(state_collection;analytic_dC=[dVol])
 
 ## Evolution Method
 evo = CutFEMEvolve(V_φ,Ω,dΩ_act,hₕ;max_steps,γg=0.01)
-reinit1 = StabilisedReinit(V_φ,Ω,dΩ_act,hₕ;stabilisation_method=ArtificialViscosity(2.0))
+reinit1 = StabilisedReinit(V_φ,Ω,dΩ_act,hₕ;stabilisation_method=ArtificialViscosity(1.0))
 reinit2 = StabilisedReinit(V_φ,Ω,dΩ_act,hₕ;stabilisation_method=GridapTopOpt.InteriorPenalty(V_φ,γg=1.0))
 reinit = GridapTopOpt.MultiStageStabilisedReinit([reinit1,reinit2])
 ls_evo = UnfittedFEEvolution(evo,reinit)
@@ -262,10 +249,10 @@ for (it,(uh,ph,dh),φh) in optimiser
   end
   write_history(path*"/history.txt",optimiser.history)
 end
-# it = get_history(optimiser).niter; uh,ph,dh = get_state(pcfs)
-# writevtk(Ω_act,path*"Omega_act_$it",
-#   cellfields=["φ"=>φh,"|∇(φ)|"=>(norm ∘ ∇(φh)),"uh"=>uh,"ph"=>ph,"dh"=>dh])
-# writevtk(Ω.Ωf,path*"Omega_f_$it",
-#   cellfields=["uh"=>uh,"ph"=>ph,"dh"=>dh])
-# writevtk(Ω.Ωs,path*"Omega_s_$it",
-#   cellfields=["uh"=>uh,"ph"=>ph,"dh"=>dh])
+it = get_history(optimiser).niter; uh,ph,dh = get_state(pcf)
+writevtk(Ω_act,path*"Omega_act_$it",
+  cellfields=["φ"=>φh,"|∇(φ)|"=>(norm ∘ ∇(φh)),"uh"=>uh,"ph"=>ph,"dh"=>dh])
+writevtk(Ω.Ωf,path*"Omega_f_$it",
+  cellfields=["uh"=>uh,"ph"=>ph,"dh"=>dh])
+writevtk(Ω.Ωs,path*"Omega_s_$it",
+  cellfields=["uh"=>uh,"ph"=>ph,"dh"=>dh])

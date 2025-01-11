@@ -344,7 +344,7 @@ end
 #   - This is only designed for small tests
 #   - We require that the distributed model is generated with a global ordering
 #     that matches the serial model. See function below.
-function test_serial_and_distributed_fields(fhd::CellField,Vd,fhs::CellField,Vs)
+function test_serial_and_distributed_fields(fhd::CellField,Vd,fhs::FEFunction,Vs)
   fhd_cell_values = map(local_views(Vd),local_views(fhd)) do Vd,fhd
     free = get_free_dof_values(fhd)
     diri = get_dirichlet_dof_values(Vd)

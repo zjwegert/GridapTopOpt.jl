@@ -4,13 +4,13 @@ using GridapSolvers, GridapSolvers.BlockSolvers
 using GridapGmsh
 using GridapTopOpt
 
-path = "./results/Staggered_FCM_2d_FSI_Stokes_P2P1_GMSH/"
+path = "./results/Staggered_FCM_2d_FSI_Stokes_P2P1_GMSH_gammag0_01_finer/"
 mkpath(path)
 
-γ_evo = 0.1#0.2
-max_steps = 20
+γ_evo = 0.2
+max_steps = 24 # Based on number of elements in vertical direction divided by 10
 vf = 0.025
-α_coeff = 1#γ_evo*max_steps
+α_coeff = γ_evo*max_steps
 iter_mod = 1
 D = 2
 
@@ -23,7 +23,7 @@ w = 0.025;
 a = 0.3;
 b = 0.01;
 
-model = GmshDiscreteModel((@__DIR__)*"/fsi/gmsh/mesh.msh")
+model = GmshDiscreteModel((@__DIR__)*"/fsi/gmsh/mesh_finer.msh")
 writevtk(model,path*"model")
 
 Ω_act = Triangulation(model)
@@ -42,9 +42,12 @@ f1((x,y),q,r) = - cos(q*π*x)*cos(q*π*y)/q - r/q
 fin(x) = f0(x,l*(1+5_e),a*(1+5_e))
 fsolid(x) = min(f0(x,l*(1+_e),b*(1+_e)),f0(x,w*(1+_e),a*(1+_e)))
 fholes((x,y),q,r) = max(f1((x,y),q,r),f1((x-1/q,y),q,r))
-φf(x) = min(max(fin(x),fholes(x,22,0.6)),fsolid(x))
+φf(x) = min(max(fin(x),fholes(x,25,0.2)),fsolid(x))
+# φf(x) = min(max(fin(x),fholes(x,22,0.6)),fsolid(x))
 φh = interpolate(φf,V_φ)
 writevtk(get_triangulation(φh),path*"initial_lsf",cellfields=["φ"=>φh,"h"=>hₕ])
+
+φh_nondesign = interpolate(fsolid,V_φ)
 
 # Setup integration meshes and measures
 order = 2
@@ -106,14 +109,14 @@ Y = MultiFieldFESpace([V,Q,T];style=mfs)
 # Properties
 Re = 60 # Reynolds number
 ρ = 1.0 # Density
-cl = H # Characteristic length
+cl = a # Characteristic length
 u0_max = maximum(abs,get_dirichlet_dof_values(X[1]))
 μ = ρ*cl*u0_max/Re # Viscosity
 ν = μ/ρ # Kinematic viscosity
 
 # Stabilization parameters
-α_Nu    = 1e5
-γ_Nu(h) = α_Nu*μ/h         # (Eqn. 13, Villanueva and Maute, 2017)
+α_Nu    = 2.5
+γ_Nu(h) = α_Nu*μ/0.001^2
 
 # Terms
 σf_n(u,p,n) = μ*∇(u) ⋅ n - p*n
@@ -160,52 +163,17 @@ pcfs = PDEConstrainedFunctionals(J_comp,[Vol],state_map;analytic_dC=[dVol])
 
 ## Evolution Method
 evo = CutFEMEvolve(V_φ,Ω,dΩ_act,hₕ;max_steps,γg=0.01)
-reinit1 = StabilisedReinit(V_φ,Ω,dΩ_act,hₕ;stabilisation_method=ArtificialViscosity(2.0))
+reinit1 = StabilisedReinit(V_φ,Ω,dΩ_act,hₕ;stabilisation_method=ArtificialViscosity(1.0))
 reinit2 = StabilisedReinit(V_φ,Ω,dΩ_act,hₕ;stabilisation_method=GridapTopOpt.InteriorPenalty(V_φ,γg=1.0))
 reinit = GridapTopOpt.MultiStageStabilisedReinit([reinit1,reinit2])
 ls_evo = UnfittedFEEvolution(evo,reinit)
+
+reinit!(ls_evo,φh_nondesign)
 
 ## Hilbertian extension-regularisation problems
 _α(hₕ) = (α_coeff*hₕ)^2
 a_hilb(p,q) =∫((_α ∘ hₕ)*∇(p)⋅∇(q) + p*q)dΩ_act;
 vel_ext = VelocityExtension(a_hilb,U_reg,V_reg)
-
-# reinit!(ls_evo,φh)
-# _J, _C, _dJ, _dC = evaluate!(pcfs,φh)
-# @show _J, _C
-# uh,ph,dh = get_state(pcfs)
-# @show sum(J_comp(((uh,ph),dh),φh))
-
-# dJ_comp(dd) = ∫(ε(dd) ⊙ (σ ∘ ε(dh)) + ε(dh) ⊙ (σ ∘ ε(dd)))Ω.dΩs
-
-# pcfs.J.∂F∂xhi[1]
-
-# _K = assemble_matrix((u,v)->a_solid(((uh,ph),),v,u,φh),T,R)
-# _l = assemble_vector(dJ_comp,R)
-# λ1 = _K\_l
-
-# writevtk(Ω_act,path*"Omega_act",
-#       cellfields=["φ"=>φh,"dJ"=>FEFunction(U_reg,_dJ),"dC"=>FEFunction(U_reg,_dC[1]),
-#       "λ1_alt" => FEFunction(last(state_map.adj_caches).trial[1],λ1),
-#       "λ1" => FEFunction(last(state_map.adj_caches).trial,state_map.adj_caches[1])[1],
-#       "λ2" => FEFunction(last(state_map.adj_caches).trial,state_map.adj_caches[1])[2],
-#       "λ3" => FEFunction(last(state_map.adj_caches).trial,state_map.adj_caches[1])[3],
-#       "uh"=>uh,"ph"=>ph,"dh"=>dh])
-# error()
-
-# # _,_,_dF,_ = evaluate!(pcfs,φh)
-
-# # global __k = 0
-# # function φ_to_j(φ)
-# #   global __k = __k + 1
-# #   @show __k
-# #   u = state_map(φ)
-# #   pcfs.J(u,φ)
-# # end
-
-# # using FiniteDifferences
-# # fdm_grad = FiniteDifferences.grad(central_fdm(2, 1), φ_to_j, get_free_dof_values(φh))[1]
-# # rel_error = norm(_dF - fdm_grad, Inf)/norm(fdm_grad,Inf)
 
 ## Optimiser
 converged(m) = GridapTopOpt.default_al_converged(
@@ -233,6 +201,10 @@ for (it,(uh,ph,dh),φh,state) in optimiser
       cellfields=["uh"=>uh,"ph"=>ph,"dh"=>dh])
   end
   write_history(path*"/history.txt",optimiser.history)
+
+  φ = get_free_dof_values(φh)
+  φ .= min.(φ,get_free_dof_values(φh_nondesign))
+  reinit!(ls_evo,φh)
 end
 it = get_history(optimiser).niter; uh,ph,dh = get_state(pcfs)
 writevtk(Ω_act,path*"Omega_act_$it",

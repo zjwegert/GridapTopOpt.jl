@@ -1,10 +1,10 @@
 using Gridap, Gridap.Geometry, Gridap.Adaptivity, Gridap.MultiField
 using GridapEmbedded, GridapEmbedded.LevelSetCutters
-using GridapSolvers, GridapSolvers.BlockSolvers
+using GridapSolvers, GridapSolvers.BlockSolvers, GridapSolvers.NonlinearSolvers
 using GridapGmsh
 using GridapTopOpt
 
-path = "./results/Staggered_FCM_2d_FSI_Stokes_GMSH_maxsteps24_evo0_2_diffinit_finer/"
+path = "./results/Staggered_FCM_2d_FSI_NavierStokes_GMSH/"
 mkpath(path)
 
 γ_evo = 0.2
@@ -52,7 +52,7 @@ writevtk(get_triangulation(φh),path*"initial_lsf",cellfields=["φ"=>φh,"h"=>h�
 
 # Setup integration meshes and measures
 order = 1
-degree = 2*order
+degree = 2*(order+1)
 
 dΩ_act = Measure(Ω_act,degree)
 Γf_D = BoundaryTriangulation(model,tags="Gamma_f_D")
@@ -115,23 +115,33 @@ u0_max = maximum(abs,get_dirichlet_dof_values(X[1]))
 ν = μ/ρ # Kinematic viscosity
 
 # Stabilization parameters
-α_Nu    = 2.5#5.0#2.5
-α_PSUPG = 1/3
+α_Nu    = 2.5
+α_PSPG = 0.5
 
-γ_Nu(h)    = α_Nu*μ/0.001^2
-τ_PSUPG(h) = α_PSUPG*(h^2/4ν) # (Eqn. 32, Peterson et al., 2018)
+γ_Nu(h)    = α_Nu*μ/0.0001^2#0.0001^2
+# τ_PSPG(h) = α_PSPG*(h^2/4ν) # (Eqn. 32, Peterson et al., 2018)
+τ_PSPG(h,u) = α_PSPG*((2norm(u)/h)^2 + 9*(4ν/h^2)^2)^-0.5 # (Eqn. 31, Peterson et al., 2018)
 
 # Terms
 σf_n(u,p,n) = μ*∇(u) ⋅ n - p*n
 a_Ω(u,v) = μ*(∇(u) ⊙ ∇(v)) # (Eqn. 3.3, Massing et al., 2014)
 b_Ω(v,p) = - (∇ ⋅ v)*p # (Eqn. 3.4, Massing et al., 2014)
-c_Ω(p,q) = (τ_PSUPG ∘ hₕ)*1/ρ*∇(p) ⋅ ∇(q) # (Eqn. 3.7, Massing et al., 2014)
+c_Ω(p,q,u) = (τ_PSPG ∘ (hₕ,u))*1/ρ*∇(p) ⋅ ∇(q) # (Eqn. 3.7, Massing et al., 2014)
 
-a_fluid((),(u,p),(v,q),φ) =
-  ∫( a_Ω(u,v)+b_Ω(u,q)+b_Ω(v,p)-c_Ω(p,q) )Ω.dΩf + # Volume terms
-  ∫( a_Ω(u,v)+b_Ω(u,q)+b_Ω(v,p)-c_Ω(p,q)+(γ_Nu ∘ hₕ)*u⋅v )Ω.dΩs # Stabilization terms
+a_fluid((u,p),(v,q),φ) =
+  ∫( a_Ω(u,v)+b_Ω(u,q)+b_Ω(v,p) )Ω.dΩf + # Volume terms
+  ∫( a_Ω(u,v)+b_Ω(u,q)+b_Ω(v,p) + (γ_Nu ∘ hₕ)*u⋅v )Ω.dΩs # Stabilization terms
 
-l_fluid((),(v,q),φ) = ∫(0q)Ω.dΩf
+a_PSPG((u,p),(v,q),φ) = ∫( -c_Ω(p,q,u) )Ω.dΩf + ∫( -c_Ω(p,q,u) )Ω.dΩs
+jac_PSPG((u,p),(du,dp),(v,q),φ) = ∫( -c_Ω(dp,q,u) )Ω.dΩf + ∫( -c_Ω(dp,q,u) )Ω.dΩs # Shouldn't diff through u in τ_PSPG
+
+conv(u,∇u) = ρ*(∇u') ⋅ u
+dconv(du,∇du,u,∇u) = conv(u,∇du)+conv(du,∇u)
+c(u,v,φ) = ∫( v ⋅ (conv∘(u,∇(u))) )Ω.dΩf #+ ∫( v ⋅ (conv∘(u,∇(u))) )Ω.dΩs
+dc(u,du,v,φ) = ∫( v ⋅ (dconv∘(du,∇(du),u,∇(u))) )Ω.dΩf #+ ∫( v ⋅ (dconv∘(du,∇(du),u,∇(u))) )Ω.dΩs
+
+res_fluid((),(u,p),(v,q),φ) = a_fluid((u,p),(v,q),φ) + a_PSPG((u,p),(v,q),φ) + c(u,v,φ)
+jac_fluid((),(u,p),(du,dp),(v,q),φ) = a_fluid((du,dp),(v,q),φ) + jac_PSPG((u,p),(du,dp),(v,q),φ) + dc(u,du,v,φ)
 
 ## Structure
 # Material parameters
@@ -155,13 +165,16 @@ function l_solid(((u,p),),s,φ)
   return ∫(σf_n(u,p,n) ⋅ s)Ω.dΓ
 end
 
+res_solid(((u,p),),d,s,φ) = a_solid(((u,p),),d,s,φ) - l_solid(((u,p),),s,φ)
+jac_solid(((u,p),),d,dd,s,φ) = a_solid(((u,p),),dd,s,φ)
+
 ## Optimisation functionals
 J_comp(((u,p),d),φ) = ∫(ε(d) ⊙ (σ ∘ ε(d)))Ω.dΩs
 Vol(((u,p),d),φ) = ∫(vol_D)Ω.dΩs - ∫(vf/vol_D)dΩ_act
 
 ## Staggered operators
-op = StaggeredAffineFEOperator([a_fluid,a_solid],[l_fluid,l_solid],X,Y)
-state_map = StaggeredAffineFEStateMap(op,V_φ,U_reg,φh)
+op = StaggeredNonlinearFEOperator([res_fluid,res_solid],[jac_fluid,jac_solid],X,Y)
+state_map = StaggeredNonlinearFEStateMap(op,V_φ,U_reg,φh)
 pcfs = PDEConstrainedFunctionals(J_comp,[Vol],state_map)
 
 ## Evolution Method
