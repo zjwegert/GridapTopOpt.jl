@@ -324,11 +324,16 @@ function precompute_autodiff_caches(
   )
 
   # Precompute orientations
-  orient(n,fcoords) = round(Int8,dot(n,face_normal(fcoords)))
   orientations = collect(lazy_map(orient,subfacets.facet_to_normal,caches.face_to_coords))
 
   cache = (; caches..., orientations)
   return cache
+end
+
+orient(n,fcoords) = round(Int8,dot(n,face_normal(fcoords)))
+
+function Arrays.return_value(::typeof(orient),n,face_coords)
+  zero(Int8)
 end
 
 function precompute_autodiff_caches(
