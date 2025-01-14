@@ -76,6 +76,9 @@ MUMPSSolver() = PETScLinearSolver(petsc_mumps_setup)
 function petsc_mumps_setup(ksp)
   pc       = Ref{GridapPETSc.PETSC.PC}()
   mumpsmat = Ref{GridapPETSc.PETSC.Mat}()
+
+  @check_error_code GridapPETSc.PETSC.KSPSetFromOptions(ksp[])
+
   @check_error_code GridapPETSc.PETSC.KSPSetType(ksp[],GridapPETSc.PETSC.KSPPREONLY)
   @check_error_code GridapPETSc.PETSC.KSPGetPC(ksp[],pc)
   @check_error_code GridapPETSc.PETSC.PCSetType(pc[],GridapPETSc.PETSC.PCLU)
@@ -85,7 +88,8 @@ function petsc_mumps_setup(ksp)
   @check_error_code GridapPETSc.PETSC.MatMumpsSetIcntl(mumpsmat[],  4, 1)
   @check_error_code GridapPETSc.PETSC.MatMumpsSetIcntl(mumpsmat[], 28, 2)
   @check_error_code GridapPETSc.PETSC.MatMumpsSetIcntl(mumpsmat[], 29, 1)
-  @check_error_code GridapPETSc.PETSC.MatMumpsSetCntl(mumpsmat[],  1, 0.00001)
+  # @check_error_code GridapPETSc.PETSC.MatMumpsSetCntl(mumpsmat[],  1, 0.00001) # relative thresh
+  # @check_error_code GridapPETSc.PETSC.MatMumpsSetCntl(mumpsmat[], 3, 1.0e-6) # absolute thresh
   @check_error_code GridapPETSc.PETSC.KSPView(ksp[],C_NULL)
 end
 
@@ -111,9 +115,11 @@ function main(ranks)
   cw = 0.1;
   vol_D = 2.0*0.5
 
-  model = GmshDiscreteModel(ranks,(@__DIR__)*"/fsi/gmsh/mesh_low_res_3d.msh")
+  model = GmshDiscreteModel(ranks,(@__DIR__)*"/fsi/gmsh/mesh_3d.msh")
   # test_mesh(model) # Only in serial for now
+  map(test_mesh,local_views(model))
   writevtk(model,path*"model")
+  # return model
 
   Ω_act = Triangulation(model)
   hₕ = get_element_diameter_field(model)
@@ -125,7 +131,7 @@ function main(ranks)
   V_reg = TestFESpace(model,reffe_scalar;dirichlet_tags=["Omega_NonDesign","Gamma_s_D"])
   U_reg = TrialFESpace(V_reg)
 
-  lsf = initial_lsf(:wall,(L,H,x0,l,w,a,b,cw))
+  lsf = initial_lsf(:box,(L,H,x0,l,w,a,b,cw))
   φh = interpolate(lsf,V_φ)
   writevtk(get_triangulation(φh),path*"initial_lsf",cellfields=["φ"=>φh,"h"=>hₕ])
 
@@ -214,11 +220,11 @@ function main(ranks)
   σf_n(u,p,n) = μ*∇(u) ⋅ n - p*n
   a_Ω(u,v) = μ*(∇(u) ⊙ ∇(v)) # (Eqn. 3.3, Massing et al., 2014)
   b_Ω(v,p) = - (∇ ⋅ v)*p # (Eqn. 3.4, Massing et al., 2014)
-  c_Ω(p,q,u) = (τ_PSPG ∘ (hₕ,u))*1/ρ*∇(p) ⋅ ∇(q) # (Eqn. 3.7, Massing et al., 2014)
+  c_Ω(p,q,u) = (τ_PSPG ∘ (hₕ,u))*1/ρ*(∇(p) ⋅ ∇(q)) # (Eqn. 3.7, Massing et al., 2014)
 
   a_fluid((u,p),(v,q),φ) =
     ∫( a_Ω(u,v)+b_Ω(u,q)+b_Ω(v,p) )Ω.dΩf + # Volume terms
-    ∫( a_Ω(u,v)+b_Ω(u,q)+b_Ω(v,p) + (γ_Nu ∘ hₕ)*u⋅v )Ω.dΩs # Stabilization terms
+    ∫( a_Ω(u,v)+b_Ω(u,q)+b_Ω(v,p)+(γ_Nu ∘ hₕ)*(u⋅v) )Ω.dΩs # Stabilization terms
 
   a_PSPG((u,p),(v,q),φ) = ∫( -c_Ω(p,q,u) )Ω.dΩf + ∫( -c_Ω(p,q,u) )Ω.dΩs
   jac_PSPG((u,p),(du,dp),(v,q),φ) = ∫( -c_Ω(dp,q,u) )Ω.dΩf + ∫( -c_Ω(dp,q,u) )Ω.dΩs # Shouldn't diff through u in τ_PSPG
@@ -288,11 +294,13 @@ function main(ranks)
   # Elasticity
   elast_ls = ElasticitySolver(R;rtol=1.e-8,maxits=200)
 
-  fluid_nls = NewtonSolver(fluid_ls;maxiter=50,rtol=1.e-8,verbose=i_am_main(ranks))
+  fluid_nls = NewtonSolver(fluid_ls;maxiter=10,rtol=1.e-8,verbose=i_am_main(ranks))
   elast_nls = NewtonSolver(elast_ls;maxiter=1,verbose=i_am_main(ranks))
 
   _op = FEOperator((u,v)->_res_fluid((),u,v),(u,du,v)->_jac_fluid((),u,du,v),UP,VQ)
-  xh = solve(fluid_nls,_op)
+  uh,ph = solve(fluid_nls,_op)
+  writevtk(get_triangulation(model),path*"fluid",cellfields=["uh"=>uh,"ph"=>ph])
+  return
 
   solver = StaggeredFESolver([fluid_nls,elast_ls]);
   xh = zero(op.trial);
@@ -303,66 +311,11 @@ function main(ranks)
   writevtk(Ω.Ωs,path*"Omega_s_res",cellfields=["uh"=>uh,"ph"=>ph,"dh"=>dh])
 end
 
-with_debug() do distribute
-  mesh_partition = (1,1)
+with_mpi() do distribute
+  mesh_partition = (2,2,2)
   ranks = distribute(LinearIndices((prod(mesh_partition),)))
-  petsc_options = "-ksp_monitor -ksp_error_if_not_converged true -ksp_converged_reason"
+  petsc_options = "-ksp_monitor -ksp_error_if_not_converged true"
   GridapPETSc.with(;args=split(petsc_options)) do
     main(ranks)
   end
 end
-
-# state_map = StaggeredNonlinearFEStateMap(op,V_φ,U_reg,φh)
-# pcfs = PDEConstrainedFunctionals(J_comp,[Vol],state_map)
-
-# ## Evolution Method
-# evo = CutFEMEvolve(V_φ,Ω,dΩ_act,hₕ;max_steps,γg=0.01)
-# reinit1 = StabilisedReinit(V_φ,Ω,dΩ_act,hₕ;stabilisation_method=ArtificialViscosity(1.0))
-# reinit2 = StabilisedReinit(V_φ,Ω,dΩ_act,hₕ;stabilisation_method=GridapTopOpt.InteriorPenalty(V_φ,γg=1.0))
-# reinit = GridapTopOpt.MultiStageStabilisedReinit([reinit1,reinit2])
-# ls_evo = UnfittedFEEvolution(evo,reinit)
-
-# reinit!(ls_evo,φh_nondesign)
-
-# ## Hilbertian extension-regularisation problems
-# _α(hₕ) = (α_coeff*hₕ)^2
-# a_hilb(p,q) =∫((_α ∘ hₕ)*∇(p)⋅∇(q) + p*q)dΩ_act;
-# vel_ext = VelocityExtension(a_hilb,U_reg,V_reg)
-
-# ## Optimiser
-# converged(m) = GridapTopOpt.default_al_converged(
-#   m;
-#   L_tol = 0.5hmin,
-#   C_tol = 0.01vf
-# )
-# function has_oscillations(m,os_it)
-#   history = GridapTopOpt.get_history(m)
-#   it = GridapTopOpt.get_last_iteration(history)
-#   all(@.(abs(history[:C,it]) < 0.05vf)) && GridapTopOpt.default_has_oscillations(m,os_it)
-# end
-# optimiser = AugmentedLagrangian(pcfs,ls_evo,vel_ext,φh;
-#   γ=γ_evo,verbose=true,constraint_names=[:Vol],converged,has_oscillations)
-# for (it,(uh,ph,dh),φh) in optimiser
-#   GC.gc()
-#   if iszero(it % iter_mod)
-#     writevtk(Ω_act,path*"Omega_act_$it",
-#       cellfields=["φ"=>φh,"|∇(φ)|"=>(norm ∘ ∇(φh)),"uh"=>uh,"ph"=>ph,"dh"=>dh])
-#     writevtk(Ω.Ωf,path*"Omega_f_$it",
-#       cellfields=["uh"=>uh,"ph"=>ph,"dh"=>dh])
-#     writevtk(Ω.Ωs,path*"Omega_s_$it",
-#       cellfields=["uh"=>uh,"ph"=>ph,"dh"=>dh])
-#   end
-#   write_history(path*"/history.txt",optimiser.history)
-#   error()
-
-#   φ = get_free_dof_values(φh)
-#   φ .= min.(φ,get_free_dof_values(φh_nondesign))
-#   reinit!(ls_evo,φh)
-# end
-# it = get_history(optimiser).niter; uh,ph,dh = get_state(pcfs)
-# writevtk(Ω_act,path*"Omega_act_$it",
-#   cellfields=["φ"=>φh,"|∇(φ)|"=>(norm ∘ ∇(φh)),"uh"=>uh,"ph"=>ph,"dh"=>dh])
-# writevtk(Ω.Ωf,path*"Omega_f_$it",
-#   cellfields=["uh"=>uh,"ph"=>ph,"dh"=>dh])
-# writevtk(Ω.Ωs,path*"Omega_s_$it",
-#   cellfields=["uh"=>uh,"ph"=>ph,"dh"=>dh])

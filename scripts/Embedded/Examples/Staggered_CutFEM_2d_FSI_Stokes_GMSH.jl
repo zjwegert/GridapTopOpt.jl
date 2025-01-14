@@ -11,7 +11,7 @@ mkpath(path)
 max_steps = 24 # Based on number of elements in vertical direction divided by 10
 vf = 0.025
 α_coeff = γ_evo*max_steps
-iter_mod = 10
+iter_mod = 1
 D = 2
 
 # Load gmsh mesh (Currently need to update mesh.geo and these values concurrently)
@@ -123,7 +123,7 @@ u0_max = maximum(abs,get_dirichlet_dof_values(init_X[1]))
 ν = μ/ρ # Kinematic viscosity
 
 # Stabilization parameters
-α_Nu    = 100
+α_Nu    = 1.0#100
 α_PSUPG = 1/3
 α_GPμ   = 0.5#1#1e-1#0.5
 α_GPp   = 0.05#1#1e-1#0.05
