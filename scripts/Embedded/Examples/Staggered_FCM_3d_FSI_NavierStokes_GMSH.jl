@@ -15,62 +15,6 @@ function test_mesh(model)
   @assert isempty(bad_vertices) "Bad vertices detected: re-generate your mesh with a different resolution"
 end
 
-function initial_lsf(lsf::Symbol,geo_info)
-  L,H,x0,l,w,a,b,cw = geo_info
-  _e = 1e-3
-  if lsf == :box
-    return ((x,y,z),) -> max(abs(x-x0),abs(y),abs(z-H/2)) - 0.4+_e
-  elseif lsf == :sphere
-    return ((x,y,z),) -> sqrt((x-x0)^2 + y^2 + (z-H/2)^2) - 0.4+_e
-  elseif lsf == :wall
-    f0((x,y,z),a,b) = max(2/a*abs(x-x0),1/(b/2+1)*abs(y-b/2+1),2/(H-2cw)*abs(z-H/2))-1
-    return x -> min(f0(x,l*(1+_e),b*(1+_e)),f0(x,w*(1+_e),a*(1+_e)))
-  elseif lsf == :initial
-    f0((x,y,z),a,b) = max(2/a*abs(x-x0),1/(b/2+1)*abs(y-b/2+1),2/(H-2cw)*abs(z-H/2))-1
-    f1((x,y,z),q,r) = - cos(q*π*x)*cos(q*π*y)*cos(q*π*z)/q - r/q
-    fin(x) = f0(x,l*(1+5_e),a*(1+5_e))
-    fsolid(x) = min(f0(x,l*(1+_e),b*(1+_e)),f0(x,w*(1+_e),a*(1+_e)))
-    fholes((x,y,z),q,r) = max(f1((x,y,z),q,r),f1((x-1/q,y,z),q,r))
-    return x -> min(max(fin(x),fholes(x,5,0.5)),fsolid(x))
-  else
-    error("Geometry not undefined")
-  end
-end
-
-function petsc_amg_setup(ksp)
-  rtol = PetscScalar(1.e-6)
-  atol = GridapPETSc.PETSC.PETSC_DEFAULT
-  dtol = GridapPETSc.PETSC.PETSC_DEFAULT
-  maxits = GridapPETSc.PETSC.PETSC_DEFAULT
-
-  @check_error_code GridapPETSc.PETSC.KSPSetType(ksp[],GridapPETSc.PETSC.KSPCG)
-  @check_error_code GridapPETSc.PETSC.KSPSetTolerances(ksp[], rtol, atol, dtol, maxits)
-
-  pc = Ref{GridapPETSc.PETSC.PC}()
-  @check_error_code GridapPETSc.PETSC.KSPGetPC(ksp[],pc)
-  @check_error_code GridapPETSc.PETSC.PCSetType(pc[],GridapPETSc.PETSC.PCGAMG)
-
-  # mat = Ref{GridapPETSc.PETSC.Mat}()
-  # @check_error_code GridapPETSc.PETSC.KSPGetOperators(ksp[],mat,C_NULL)
-  # @check_error_code GridapPETSc.PETSC.MatSetBlockSize(mat[],2)
-
-  @check_error_code GridapPETSc.PETSC.KSPView(ksp[],C_NULL)
-end
-
-function petsc_asm_setup(ksp)
-  rtol = PetscScalar(1.e-9)
-  atol = GridapPETSc.PETSC.PETSC_DEFAULT
-  dtol = GridapPETSc.PETSC.PETSC_DEFAULT
-  maxits = GridapPETSc.PETSC.PETSC_DEFAULT
-
-  pc = Ref{GridapPETSc.PETSC.PC}()
-  @check_error_code GridapPETSc.PETSC.KSPSetType(ksp[],GridapPETSc.PETSC.KSPCG)
-  @check_error_code GridapPETSc.PETSC.KSPSetTolerances(ksp[], rtol, atol, dtol, maxits)
-  @check_error_code GridapPETSc.PETSC.KSPGetPC(ksp[],pc)
-  @check_error_code GridapPETSc.PETSC.PCSetType(pc[],GridapPETSc.PETSC.PCASM)
-  @check_error_code GridapPETSc.PETSC.KSPView(ksp[],C_NULL)
-end
-
 MUMPSSolver() = PETScLinearSolver(petsc_mumps_setup)
 
 function petsc_mumps_setup(ksp)
@@ -131,7 +75,13 @@ function main(ranks)
   V_reg = TestFESpace(model,reffe_scalar;dirichlet_tags=["Omega_NonDesign","Gamma_s_D"])
   U_reg = TrialFESpace(V_reg)
 
-  lsf = initial_lsf(:box,(L,H,x0,l,w,a,b,cw))
+  _e = 5e-3
+  f0((x,y,z),a,b) = max(2/a*abs(x-x0),1/(b/2+1)*abs(y-b/2+1),2/(H-2cw)*abs(z-H/2))-1
+  f1((x,y,z),q,r) = - cos(q*π*x)*cos(q*π*y)*cos(q*π*z)/q - r/q
+  fin(x) = f0(x,l*(1+5_e),a*(1+5_e))
+  fsolid(x) = min(f0(x,l*(1+_e),b*(1+_e)),f0(x,w*(1+_e),a*(1+_e)))
+  fholes((x,y,z),q,r) = max(f1((x,y,z),q,r),f1((x-1/q,y,z),q,r))
+  lsf(x) = min(max(fin(x),fholes(x,5,0.5)),fsolid(x))
   φh = interpolate(lsf,V_φ)
   writevtk(get_triangulation(φh),path*"initial_lsf",cellfields=["φ"=>φh,"h"=>hₕ])
 
@@ -275,20 +225,6 @@ function main(ranks)
   op = StaggeredNonlinearFEOperator([_res_fluid,_res_solid],[_jac_fluid,_jac_solid],[UP,R],[VQ,T])#X,Y);
 
   ## Solvers
-  # Fluid
-  # vel_ls = PETScLinearSolver(petsc_asm_setup) # petsc_amg_setup
-  # pres_ls = PETScLinearSolver(petsc_amg_setup) #CGSolver(JacobiLinearSolver();maxiter=20,atol=1e-14,rtol=1.e-6,verbose=i_am_main(ranks))
-  # # pres_ls.log.depth = 5
-
-  # # _zero_uh = zero(U)
-  # # bblocks  = [NonlinearSystemBlock() LinearSystemBlock();
-  # #             LinearSystemBlock()    BiformBlock((p,q) -> ∫(c_Ω(p,q,_zero_uh)-(1.0/μ)*p*q)dΩ_act,Q,Q)]
-  # bblocks  = [NonlinearSystemBlock() LinearSystemBlock();
-  #             LinearSystemBlock()    BiformBlock((p,q) -> ∫(-(1.0/μ)*p*q)dΩ_act,Q,Q)]
-  # P = BlockTriangularSolver(bblocks,[vel_ls,pres_ls])
-  # fluid_ls = FGMRESSolver(30,P;rtol=1.e-8,verbose=i_am_main(ranks))
-  # fluid_ls.log.depth = 3
-
   fluid_ls = MUMPSSolver()
 
   # Elasticity
@@ -297,12 +233,7 @@ function main(ranks)
   fluid_nls = NewtonSolver(fluid_ls;maxiter=10,rtol=1.e-8,verbose=i_am_main(ranks))
   elast_nls = NewtonSolver(elast_ls;maxiter=1,verbose=i_am_main(ranks))
 
-  _op = FEOperator((u,v)->_res_fluid((),u,v),(u,du,v)->_jac_fluid((),u,du,v),UP,VQ)
-  uh,ph = solve(fluid_nls,_op)
-  writevtk(get_triangulation(model),path*"fluid",cellfields=["uh"=>uh,"ph"=>ph])
-  return
-
-  solver = StaggeredFESolver([fluid_nls,elast_ls]);
+  solver = StaggeredFESolver([fluid_nls,elast_nls]);
   xh = zero(op.trial);
   solve!(xh,solver,op);
 
