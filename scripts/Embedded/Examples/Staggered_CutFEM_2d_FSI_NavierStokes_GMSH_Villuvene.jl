@@ -29,7 +29,7 @@ a = 0.3;
 b = 0.01;
 vol_D = 2.0*0.5
 
-model = GmshDiscreteModel((@__DIR__)*"/fsi/gmsh/mesh.msh")
+model = GmshDiscreteModel((@__DIR__)*"/fsi/gmsh/mesh_finer.msh")
 writevtk(model,path*"model")
 
 Ω_act = Triangulation(model)
@@ -55,7 +55,8 @@ fholes((x,y),q,r) = max(f1((x,y),q,r),f1((x-1/q,y),q,r))
 φh_nondesign = interpolate(fsolid,V_φ)
 
 # Bite test
-# φf2(x) = max(φf(x),-(max(2/0.2*abs(x[1]-0.3),2/0.2*abs(x[2]-0.3))-1))
+# _φf2(x) = max(φf(x),-(max(2/0.2*abs(x[1]-0.317),2/0.2*abs(x[2]-0.3))-1))
+# φf2(x) = min(_φf2(x),sqrt((x[1]-0.35)^2+(x[2]-0.26)^2)-0.025)
 # φh = interpolate(φf2,V_φ)
 writevtk(get_triangulation(φh),path*"initial_lsf",cellfields=["φ"=>φh,"h"=>hₕ])
 
@@ -90,7 +91,7 @@ dΓf_N = Measure(Γf_N,degree)
     :Ω_act_f => Ω_act_f,
     :dΩ_act_f => Measure(Ω_act_f,degree),
     :ψ_s     => GridapTopOpt.get_isolated_volumes_mask(cutgeo,["Gamma_s_D"];IN_is=IN),
-    :ψ_f     => GridapTopOpt.get_isolated_volumes_mask(cutgeo,["Gamma_f_D"];IN_is=OUT)
+    :ψ_f     => GridapTopOpt.get_isolated_volumes_mask_without_cuts(cutgeo,["Gamma_f_D"];IN_is=OUT)
   )
 end
 writevtk(get_triangulation(φh),path*"initial_islands",cellfields=["ψ_s"=>Ω.ψ_s,"ψ_f"=>Ω.ψ_f])
@@ -226,7 +227,7 @@ function a_solid(((u,p),),d,s,φ)
 end
 function l_solid(((u,p),),s,φ)
   n = get_normal_vector(Ω.Γ)
-  return ∫(s ⋅ (σ_f(ε(u),p) ⋅ n))Ω.dΓ
+  return ∫(s ⋅ ((1-Ω.ψ_s)*σ_f(ε(u),p) ⋅ n))Ω.dΓ
 end
 
 res_solid(((u,p),),d,s,φ) = a_solid(((u,p),),d,s,φ) - l_solid(((u,p),),s,φ)
@@ -260,6 +261,18 @@ state_collection = GridapTopOpt.EmbeddedCollection_in_φh(model,φh) do _φh
     :C => map(((Ci,∂Ci),) -> GridapTopOpt.StaggeredStateParamMap(Ci,∂Ci,state_map),[(Vol,∂Vol∂xhi),])
   )
 end
+
+## Testing forward solution
+# _x = state_collection.state_map(φh)
+# _xh = FEFunction(state_collection.state_map.spaces.trial,_x);
+# uh,ph,dh = _xh;
+# writevtk(Ω_act,path*"Omega_act",
+#   cellfields=["φ"=>φh,"|∇(φ)|"=>(norm ∘ ∇(φh)),"uh"=>uh,"ph"=>ph,"dh"=>dh,"ψ_s"=>Ω.ψ_s,"ψ_f"=>Ω.ψ_f])
+# writevtk(Ω.Ωf,path*"Omega_f",
+#   cellfields=["uh"=>uh,"ph"=>ph,"dh"=>dh])
+# writevtk(Ω.Ωs,path*"Omega_s",
+#   cellfields=["uh"=>uh,"ph"=>ph,"dh"=>dh])
+# error()
 
 pcf = EmbeddedPDEConstrainedFunctionals(state_collection;analytic_dC=[dVol])
 

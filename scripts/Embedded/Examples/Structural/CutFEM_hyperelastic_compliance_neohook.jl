@@ -145,7 +145,7 @@ function main_lin_elast(n,path="./results/CutFEM_hyperelastic_compliance_neohook
   v_χ(u,v) = k_d*Ωs.χ*u⋅v # Isolated volume term
 
   a(u,v,φ) = ∫(a_Ω(u,v))Ωs.dΩin +
-    ∫(j_Γg(u,v,h))Ωs.dΓg + ∫(v_χ(u,v))Ωs.dΩin
+    ∫(j_Γg(u,v,h) + 0mean(φ))Ωs.dΓg + ∫(v_χ(u,v))Ωs.dΩin
   l(v,φ) = ∫(g⋅v)dΓ_N
 
   ## Optimisation functionals
@@ -312,9 +312,9 @@ function main_neo(n,φ=nothing,λelast=nothing,Λelast=nothing;path="./results/C
   v_χ(u,v) = k_d*Ωs.χ*u⋅v # Isolated volume term
 
   res(u,v,φ) = ∫(a_Ω(u,v))Ωs.dΩin - ∫(g⋅v)dΓ_N +
-    ∫(j_Γg(u,v,h))Ωs.dΓg + ∫(v_χ(u,v))Ωs.dΩin
+    ∫(j_Γg(u,v,h) + 0mean(φ))Ωs.dΓg + ∫(v_χ(u,v))Ωs.dΩin
   res(u,v,φ,g) = ∫(a_Ω(u,v))Ωs.dΩin - ∫(g⋅v)dΓ_N +
-    ∫(j_Γg(u,v,h))Ωs.dΓg + ∫(v_χ(u,v))Ωs.dΩin
+    ∫(j_Γg(u,v,h) + 0mean(φ))Ωs.dΓg + ∫(v_χ(u,v))Ωs.dΩin
 
   ## Optimisation functionals
   Obj(u,φ) = ∫((dE∘(∇(u),∇(u))) ⊙ (S∘∇(u)))Ωs.dΩin
@@ -364,14 +364,14 @@ function main_neo(n,φ=nothing,λelast=nothing,Λelast=nothing;path="./results/C
     γ,verbose=true,constraint_names=[:Vol],converged,initial_parameters)
   for (it,uh,φh) in optimiser
     if iszero(it % iter_mod)
-      data = ["φ"=>φh,"|∇(φ)|"=>(norm ∘ ∇(φh)),"uh"=>uh]
+      data = ["φ"=>φh,"|∇(φ)|"=>(norm ∘ ∇(φh)),"uh"=>uh,"χ"=>Ωs.χ]
       writevtk(Ω,path*"Omega_$it",cellfields=data)
       writevtk(Ωs.Ωin,path*"Omega_in_$it",cellfields=data)
     end
     write_history(path*"/history.txt",optimiser.history)
   end
   it = get_history(optimiser).niter; uh = get_state(pcfs)
-  data = ["φ"=>φh,"|∇(φ)|"=>(norm ∘ ∇(φh)),"uh"=>uh]
+  data = ["φ"=>φh,"|∇(φ)|"=>(norm ∘ ∇(φh)),"uh"=>uh,"χ"=>Ωs.χ]
   writevtk(Ω,path*"Omega_$it",cellfields=data)
   writevtk(Ωs.Ωin,path*"Omega_in_$it",cellfields=data)
 end

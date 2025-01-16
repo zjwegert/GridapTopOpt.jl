@@ -145,6 +145,27 @@ function get_isolated_volumes_mask(
   return CellField(collect(Float64,data),Triangulation(model))
 end
 
+"""
+    get_isolated_volumes_mask_without_cuts(cutgeo::EmbeddedDiscretization,dirichlet_tags)
+
+The same as `get_isolated_volumes_mask` but we do not mark CUT cells.
+"""
+function get_isolated_volumes_mask_without_cuts(
+  cutgeo::EmbeddedDiscretization,dirichlet_tags;
+  IN_is = IN
+)
+  model = get_background_model(cutgeo)
+  geo = get_geometry(cutgeo)
+
+  bgcell_to_inoutcut = compute_bgcell_to_inoutcut(model,geo)
+  groups=(IN_is,(CUT,IN*IN_is))
+  cell_to_color, color_to_group = tag_isolated_volumes(model,bgcell_to_inoutcut;groups)
+  color_to_tagged = find_tagged_volumes(model,dirichlet_tags,cell_to_color,color_to_group)
+
+  data = map(c -> !color_to_tagged[c] && isone(color_to_group[c]), cell_to_color)
+  return CellField(collect(Float64,data),Triangulation(model))
+end
+
 # Distributed
 
 function tag_isolated_volumes(
@@ -189,7 +210,7 @@ function get_isolated_volumes_mask(
   return GridapDistributed.DistributedCellField(fields,trian)
 end
 
-# Given a vector_partition and indices, returns an exchange cache that 
+# Given a vector_partition and indices, returns an exchange cache that
 # exchanges both the ghost layer and the ghost layer of the neighbors
 function double_layer_exchange_cache(vector_partition,index_partition)
   function f(a::JaggedArray,b::JaggedArray)
@@ -206,12 +227,12 @@ end
 function generate_volume_gids(
   cell_ids, n_lcolor, cell_to_lcolor
 )
-  # NOTE: We have to communicate both the snd and rcv layers, i.e 
-  # each processor sends and receives both 
-  #   1) their layer of ghost cells 
+  # NOTE: We have to communicate both the snd and rcv layers, i.e
+  # each processor sends and receives both
+  #   1) their layer of ghost cells
   #   2) the layer of ghost cells of their neighbors
-  # Otherwise, the constructed graph is non-symmetric in cases where a volume ends just 
-  # at the boundary of a processor. If the graph is not symmetric, we can end up with 
+  # Otherwise, the constructed graph is non-symmetric in cases where a volume ends just
+  # at the boundary of a processor. If the graph is not symmetric, we can end up with
   # false volumes...
   exchange_caches = double_layer_exchange_cache(cell_to_lcolor,cell_ids)
   # exchange_caches = PartitionedArrays.p_vector_cache_impl(Vector,cell_to_lcolor,cell_ids)
@@ -251,7 +272,7 @@ function generate_volume_gids(
           push!(lcolor_to_nbor_lcolors[lcolor],nbor_lcolor)
           push!(seen,(lcolor,nbor_lcolor))
           ptrs[lcolor+1] += 1
-        end        
+        end
       end
     end
 
@@ -266,10 +287,10 @@ function generate_volume_gids(
 
   # Create global ordering in MAIN
   lcolor_to_color, lcolor_to_owner, n_color = map_main(
-    ptrs, lcolor_to_nbors, lcolor_to_nbor_lcolor; 
+    ptrs, lcolor_to_nbors, lcolor_to_nbor_lcolor;
     otherwise = (args...) -> (JaggedArray([Int16[]]), JaggedArray([Int[]]), zero(Int16))
   ) do ptrs, lcolor_to_nbors, lcolor_to_nbor_lcolor
-    
+
     n_procs = length(ptrs)
     n_lcolors = map(p -> length(p)-1, ptrs)
 
@@ -326,9 +347,9 @@ function generate_volume_gids(
   return PRange(color_ids)
 end
 
-# I tried to be clever, but I think this fails when we have volumes that are locally split in two 
-# such that they neighbor different neighbors. 
-# I have given a lot of though, and I think there is just no way around communicating the whole 
+# I tried to be clever, but I think this fails when we have volumes that are locally split in two
+# such that they neighbor different neighbors.
+# I have given a lot of though, and I think there is just no way around communicating the whole
 # graph...
 """
 function generate_volume_gids(
@@ -388,7 +409,7 @@ function generate_volume_gids(
         nbor = lcolor_to_nbor.data[k]
         nbor_lcolor = lcolor_to_nbor_lcolor.data[k]
         if nbor < p
-          # Volume has been seen before by a neighbor, 
+          # Volume has been seen before by a neighbor,
           # so we can just copy the color
           color = lcolor_to_color.data[ptrs[nbor]+nbor_lcolor-1]
         else

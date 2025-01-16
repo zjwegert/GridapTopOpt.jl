@@ -1,8 +1,5 @@
 using Gridap, Gridap.Geometry, Gridap.Adaptivity, Gridap.MultiField
 using GridapEmbedded, GridapEmbedded.LevelSetCutters
-using GridapSolvers, GridapSolvers.BlockSolvers
-using GridapGmsh
-using GridapTopOpt
 
 path = "./results/DiffusionTagging/"
 mkpath(path)
@@ -23,30 +20,33 @@ w = 0.025;
 a = 0.3;
 b = 0.01;
 vol_D = 2.0*0.5
+n = 100
 
-model = GmshDiscreteModel((@__DIR__)*"/fsi/gmsh/mesh_finer.msh")
+_model = CartesianDiscreteModel((0,L,0,H),(4n,n))
+base_model = UnstructuredDiscreteModel(_model)
+ref_model = refine(base_model, refinement_method = "barycentric")
+model = ref_model.model
 writevtk(model,path*"model")
 
-Ω_act = Triangulation(model)
-hₕ = CellField(get_element_diameters(model),Ω_act)
-hmin = minimum(get_element_diameters(model))
+h = min(L/(2n),H/n)
 
 # Cut the background model
 reffe_scalar = ReferenceFE(lagrangian,Float64,1)
 V_φ = TestFESpace(model,reffe_scalar)
 
-_e = 1e-3
-f0((x,y),W,H) = max(2/W*abs(x-x0),1/(H/2+1)*abs(y-H/2+1))-1
-f1((x,y),q,r) = - cos(q*π*x)*cos(q*π*y)/q - r/q
-fin(x) = f0(x,l*(1+5_e),a*(1+5_e))
-fsolid(x) = min(f0(x,l*(1+_e),b*(1+_e)),f0(x,w*(1+_e),a*(1+_e)))
-fholes((x,y),q,r) = max(f1((x,y),q,r),f1((x-1/q,y),q,r))
-φf(x) = min(max(fin(x),fholes(x,25,0.2)),fsolid(x))
+# _e = 1e-3
+# f0((x,y),W,H) = max(2/W*abs(x-x0),1/(H/2+1)*abs(y-H/2+1))-1
+# f1((x,y),q,r) = - cos(q*π*x)*cos(q*π*y)/q - r/q
+# fin(x) = f0(x,l*(1+5_e),a*(1+5_e))
+# fsolid(x) = min(f0(x,l*(1+_e),b*(1+_e)),f0(x,w*(1+_e),a*(1+_e)))
+# fholes((x,y),q,r) = max(f1((x,y),q,r),f1((x-1/q,y),q,r))
+# # φf(x) = min(max(fin(x),fholes(x,25,0.2)),fsolid(x))
 # φf(x) = min(max(fin(x),fholes(x,22,0.6)),fsolid(x))
-# φh = interpolate(φf,V_φ)
+# # φh = interpolate(φf,V_φ)
 
-φf2(x) = max(φf(x),-(max(2/0.2*abs(x[1]-0.32),2/0.2*abs(x[2]-0.321))-1))
-φh = interpolate(φf2,V_φ)
+# φf2(x) = max(φf(x),-(max(2/0.2*abs(x[1]-0.32),2/0.2*abs(x[2]-0.321))-1))
+# φh = interpolate(φf2,V_φ)
+φh = interpolate(((x,y),)->-(x-L)^2-y^2+0.01^2,V_φ)
 
 order = 1
 degree = 2*(order+1)
@@ -70,12 +70,12 @@ kw = 1000.0
 kt = 0.99
 
 reffe = ReferenceFE(lagrangian,Float64,1)
-Ξ = TestFESpace(Triangulation(cutgeo,OUT),reffe,conformity=:H1,dirichlet_tags=["Gamma_f_D"])
+Ξ = TestFESpace(Triangulation(cutgeo,OUT),reffe,conformity=:H1,dirichlet_tags=[1,3,7])
 Ψ = TrialFESpace(Ξ)
 
 J(c) = k*∇(c)
 r_Ω(ψ,ξ) = ∫(∇(ξ)⋅J(ψ) - ξ*h_ψ*ψ)dΩf
-r_GP(ψ,ξ) = ∫(mean(γ_GP ∘ hₕ)*jump(∇(ξ)⋅n_Γg)*jump(J(ψ)⋅n_Γg))dΓg
+r_GP(ψ,ξ) = ∫(γ_GP(h)*jump(∇(ξ)⋅n_Γg)*jump(J(ψ)⋅n_Γg))dΓg
 A(ψ,ξ) = r_Ω(ψ,ξ) + r_GP(ψ,ξ)
 B(ξ) = ∫(-ξ*h_ψ*ψ_inf)dΩf
 
@@ -85,7 +85,7 @@ op = AffineFEOperator(A,B,Ξ,Ψ)
 ψbar(ψ) = 1/2 + 1/2*tanh(kw*(ψ-kt*ψ_inf))
 
 cellfields = ["ψ"=>ψh,"ψbar"=>ψbar ∘(ψh),
-  "ξ"=>GridapTopOpt.get_isolated_volumes_mask(cutgeo,["Gamma_f_D"];IN_is=OUT)]
+  "ξ"=>GridapTopOpt.get_isolated_volumes_mask_without_cuts(cutgeo,[1,3,7];IN_is=OUT)]
 
 writevtk(get_triangulation(model),path*"psih_bg",cellfields=cellfields)
 writevtk(Ωf,path*"psih_physical",cellfields=cellfields)
