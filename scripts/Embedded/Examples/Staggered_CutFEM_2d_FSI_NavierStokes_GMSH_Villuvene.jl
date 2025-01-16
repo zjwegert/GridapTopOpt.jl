@@ -307,7 +307,8 @@ for (it,(uh,ph,dh),φh) in optimiser
   GC.gc()
   if iszero(it % iter_mod)
     writevtk(Ω_act,path*"Omega_act_$it",
-      cellfields=["φ"=>φh,"|∇(φ)|"=>(norm ∘ ∇(φh)),"uh"=>uh,"ph"=>ph,"dh"=>dh])
+      cellfields=["φ"=>φh,"|∇(φ)|"=>(norm ∘ ∇(φh)),"uh"=>uh,"ph"=>ph,"dh"=>dh,
+        "ψ_s"=>Ω.ψ_s,"ψ_f"=>Ω.ψ_f])
     writevtk(Ω.Ωf,path*"Omega_f_$it",
       cellfields=["uh"=>uh,"ph"=>ph,"dh"=>dh])
     writevtk(Ω.Ωs,path*"Omega_s_$it",
