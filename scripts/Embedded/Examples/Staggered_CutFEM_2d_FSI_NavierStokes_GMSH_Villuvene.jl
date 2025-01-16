@@ -303,22 +303,28 @@ function has_oscillations(m,os_it)
 end
 optimiser = AugmentedLagrangian(pcf,ls_evo,vel_ext,φh;
   γ=γ_evo,verbose=true,constraint_names=[:Vol],converged,has_oscillations)
-for (it,(uh,ph,dh),φh) in optimiser
-  GC.gc()
-  if iszero(it % iter_mod)
-    writevtk(Ω_act,path*"Omega_act_$it",
-      cellfields=["φ"=>φh,"|∇(φ)|"=>(norm ∘ ∇(φh)),"uh"=>uh,"ph"=>ph,"dh"=>dh,
-        "ψ_s"=>Ω.ψ_s,"ψ_f"=>Ω.ψ_f])
-    writevtk(Ω.Ωf,path*"Omega_f_$it",
-      cellfields=["uh"=>uh,"ph"=>ph,"dh"=>dh])
-    writevtk(Ω.Ωs,path*"Omega_s_$it",
-      cellfields=["uh"=>uh,"ph"=>ph,"dh"=>dh])
-  end
-  write_history(path*"/history.txt",optimiser.history)
+try
+  for (it,(uh,ph,dh),φh) in optimiser
+    GC.gc()
+    if iszero(it % iter_mod)
+      writevtk(Ω_act,path*"Omega_act_$it",
+        cellfields=["φ"=>φh,"|∇(φ)|"=>(norm ∘ ∇(φh)),"uh"=>uh,"ph"=>ph,"dh"=>dh,
+          "ψ_s"=>Ω.ψ_s,"ψ_f"=>Ω.ψ_f])
+      writevtk(Ω.Ωf,path*"Omega_f_$it",
+        cellfields=["uh"=>uh,"ph"=>ph,"dh"=>dh])
+      writevtk(Ω.Ωs,path*"Omega_s_$it",
+        cellfields=["uh"=>uh,"ph"=>ph,"dh"=>dh])
+    end
+    write_history(path*"/history.txt",optimiser.history)
 
-  φ = get_free_dof_values(φh)
-  φ .= min.(φ,get_free_dof_values(φh_nondesign))
-  reinit!(ls_evo,φh)
+    φ = get_free_dof_values(φh)
+    φ .= min.(φ,get_free_dof_values(φh_nondesign))
+    reinit!(ls_evo,φh)
+  end
+catch e
+  println("Error: $e\nPrinting history and exiting...")
+  writevtk(Ω_act,path*"Omega_act_errored",
+    cellfields=["φ"=>φh,"|∇(φ)|"=>(norm ∘ ∇(φh))])
 end
 it = get_history(optimiser).niter; uh,ph,dh = get_state(pcf)
 writevtk(Ω_act,path*"Omega_act_$it",
