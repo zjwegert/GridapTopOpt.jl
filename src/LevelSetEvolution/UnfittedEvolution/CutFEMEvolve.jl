@@ -30,13 +30,14 @@ mutable struct CutFEMEvolve{A,B,C} <: Evolver
       max_steps=10,
       γg = 0.1,
       ode_ls = LUSolver(),
-      ode_nl = NLSolver(ode_ls, show_trace=false, method=:newton, iterations=10),
+      ode_nl = ode_ls,
       ode_solver = MutableRungeKutta(ode_nl, ode_ls, 0.1, :DIRK_CrankNicolson_2_2),
       assembler=SparseMatrixAssembler(V_φ,V_φ)) where {A,B}
-    Γg = SkeletonTriangulation(get_triangulation(V_φ))
+    model = get_background_model(get_triangulation(V_φ))
+    Γg = SkeletonTriangulation(model)
     dΓg = Measure(Γg,2get_order(V_φ))
     n_Γg = get_normal_vector(Γg)
-    hmin = _get_minimum_element_diameter(h)
+    hmin = minimum(get_element_diameters(model))
     params = (;γg,h,hmin,max_steps,dΓg,n_Γg)
     new{A,B,typeof(params)}(ode_solver,Ωs,dΩ_bg,V_φ,assembler,params,nothing)
   end
@@ -49,6 +50,7 @@ get_measure(s::CutFEMEvolve) = s.dΩ_bg
 get_params(s::CutFEMEvolve) = s.params
 get_element_diameters(s::CutFEMEvolve) = s.params.h
 get_cache(s::CutFEMEvolve) = s.cache
+get_hmin(s::CutFEMEvolve) = s.params.hmin
 
 function get_transient_operator(φh,velh,s::CutFEMEvolve)
   V_φ, dΩ_bg, assembler, params = s.space, s.dΩ_bg, s.assembler, s.params

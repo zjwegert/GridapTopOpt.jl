@@ -74,9 +74,11 @@ function main_lin_elast(n,path="./results/CutFEM_hyperelastic_compliance_neohook
   base_model = UnstructuredDiscreteModel(_model)
   ref_model = refine(base_model, refinement_method = "barycentric")
   model = ref_model.model
-  el_Δ = get_el_Δ(_model)
-  h = maximum(el_Δ)
-  h_refine = maximum(el_Δ)/2
+  # el_Δ = get_el_Δ(_model)
+  # h = maximum(el_Δ)
+  # h_refine = maximum(el_Δ)/2
+  hmin = minimum(get_element_diameters(model))
+
   f_Γ_D(x) = (x[1] ≈ 0.0)
   f_Γ_N(x) = (x[1] ≈ xmax && ymax/2-ymax*prop_Γ_N/2 - eps() <= x[2] <= ymax/2+ymax*prop_Γ_N/2 + eps())
   update_labels!(1,model,f_Γ_D,"Gamma_D")
@@ -145,7 +147,7 @@ function main_lin_elast(n,path="./results/CutFEM_hyperelastic_compliance_neohook
   v_χ(u,v) = k_d*Ωs.χ*u⋅v # Isolated volume term
 
   a(u,v,φ) = ∫(a_Ω(u,v))Ωs.dΩin +
-    ∫(j_Γg(u,v,h) + 0mean(φ))Ωs.dΓg + ∫(v_χ(u,v))Ωs.dΩin
+    ∫(j_Γg(u,v,hmin) + 0mean(φ))Ωs.dΓg + ∫(v_χ(u,v))Ωs.dΩin
   l(v,φ) = ∫(g⋅v)dΓ_N
 
   ## Optimisation functionals
@@ -154,9 +156,9 @@ function main_lin_elast(n,path="./results/CutFEM_hyperelastic_compliance_neohook
   dVol(q,u,φ) = ∫(-1/vol_D*q/(norm ∘ (∇(φ))))Ωs.dΓ
 
   ## Finite difference solver and level set function
-  evo = CutFEMEvolve(V_φ,Ωs,dΩ,h;max_steps,γg=0.01)
-  reinit1 = StabilisedReinit(V_φ,Ωs,dΩ,h;stabilisation_method=ArtificialViscosity(1.0))
-  reinit2 = StabilisedReinit(V_φ,Ωs,dΩ,h;stabilisation_method=GridapTopOpt.InteriorPenalty(V_φ,γg=1.0))
+  evo = CutFEMEvolve(V_φ,Ωs,dΩ,hmin;max_steps,γg=0.01)
+  reinit1 = StabilisedReinit(V_φ,Ωs,dΩ,hmin;stabilisation_method=ArtificialViscosity(1.0))
+  reinit2 = StabilisedReinit(V_φ,Ωs,dΩ,hmin;stabilisation_method=GridapTopOpt.InteriorPenalty(V_φ,γg=1.0))
   reinit = GridapTopOpt.MultiStageStabilisedReinit([reinit1,reinit2])
   ls_evo = UnfittedFEEvolution(evo,reinit)
 
@@ -174,14 +176,14 @@ function main_lin_elast(n,path="./results/CutFEM_hyperelastic_compliance_neohook
   pcfs = EmbeddedPDEConstrainedFunctionals(state_collection;analytic_dC=(dVol,))
 
   ## Hilbertian extension-regularisation problems
-  α = (α_coeff*h_refine/order)^2
+  α = (α_coeff*hmin/order)^2
   a_hilb(p,q) =∫(α^2*∇(p)⋅∇(q) + p*q)dΩ
   vel_ext = VelocityExtension(a_hilb,U_reg,V_reg)
 
   ## Optimiser
   converged(m) = GridapTopOpt.default_al_converged(
     m;
-    L_tol = 0.01*h_refine,
+    L_tol = 0.02*hmin,
     C_tol = 0.01
   )
   optimiser = AugmentedLagrangian(pcfs,ls_evo,vel_ext,φh;
@@ -220,9 +222,11 @@ function main_neo(n,φ=nothing,λelast=nothing,Λelast=nothing;path="./results/C
   base_model = UnstructuredDiscreteModel(_model)
   ref_model = refine(base_model, refinement_method = "barycentric")
   model = ref_model.model
-  el_Δ = get_el_Δ(_model)
-  h = maximum(el_Δ)
-  h_refine = maximum(el_Δ)/2
+  # el_Δ = get_el_Δ(_model)
+  # h = maximum(el_Δ)
+  # h_refine = maximum(el_Δ)/2
+  hmin = minimum(get_element_diameters(model))
+
   f_Γ_D(x) = (x[1] ≈ 0.0)
   f_Γ_N(x) = (x[1] ≈ xmax && ymax/2-ymax*prop_Γ_N/2 - eps() <= x[2] <= ymax/2+ymax*prop_Γ_N/2 + eps())
   update_labels!(1,model,f_Γ_D,"Gamma_D")
@@ -312,9 +316,9 @@ function main_neo(n,φ=nothing,λelast=nothing,Λelast=nothing;path="./results/C
   v_χ(u,v) = k_d*Ωs.χ*u⋅v # Isolated volume term
 
   res(u,v,φ) = ∫(a_Ω(u,v))Ωs.dΩin - ∫(g⋅v)dΓ_N +
-    ∫(j_Γg(u,v,h) + 0mean(φ))Ωs.dΓg + ∫(v_χ(u,v))Ωs.dΩin
+    ∫(j_Γg(u,v,hmin) + 0mean(φ))Ωs.dΓg + ∫(v_χ(u,v))Ωs.dΩin
   res(u,v,φ,g) = ∫(a_Ω(u,v))Ωs.dΩin - ∫(g⋅v)dΓ_N +
-    ∫(j_Γg(u,v,h) + 0mean(φ))Ωs.dΓg + ∫(v_χ(u,v))Ωs.dΩin
+    ∫(j_Γg(u,v,hmin) + 0mean(φ))Ωs.dΓg + ∫(v_χ(u,v))Ωs.dΩin
 
   ## Optimisation functionals
   Obj(u,φ) = ∫((dE∘(∇(u),∇(u))) ⊙ (S∘∇(u)))Ωs.dΩin
@@ -322,9 +326,9 @@ function main_neo(n,φ=nothing,λelast=nothing,Λelast=nothing;path="./results/C
   dVol(q,u,φ) = ∫(-1/vol_D*q/(norm ∘ (∇(φ))))Ωs.dΓ
 
   ## Finite difference solver and level set function
-  evo = CutFEMEvolve(V_φ,Ωs,dΩ,h;max_steps,γg=0.01)
-  reinit1 = StabilisedReinit(V_φ,Ωs,dΩ,h;stabilisation_method=ArtificialViscosity(1.0))
-  reinit2 = StabilisedReinit(V_φ,Ωs,dΩ,h;stabilisation_method=GridapTopOpt.InteriorPenalty(V_φ,γg=1.0))
+  evo = CutFEMEvolve(V_φ,Ωs,dΩ,hmin;max_steps,γg=0.01)
+  reinit1 = StabilisedReinit(V_φ,Ωs,dΩ,hmin;stabilisation_method=ArtificialViscosity(1.0))
+  reinit2 = StabilisedReinit(V_φ,Ωs,dΩ,hmin;stabilisation_method=GridapTopOpt.InteriorPenalty(V_φ,γg=1.0))
   reinit = GridapTopOpt.MultiStageStabilisedReinit([reinit1,reinit2])
   ls_evo = UnfittedFEEvolution(evo,reinit)
 
@@ -343,7 +347,7 @@ function main_neo(n,φ=nothing,λelast=nothing,Λelast=nothing;path="./results/C
   pcfs = EmbeddedPDEConstrainedFunctionals(state_collection;analytic_dC=(dVol,))
 
   ## Hilbertian extension-regularisation problems
-  α = (α_coeff*h_refine/order)^2
+  α = (α_coeff*hmin/order)^2
   a_hilb(p,q) =∫(α^2*∇(p)⋅∇(q) + p*q)dΩ
   vel_ext = VelocityExtension(a_hilb,U_reg,V_reg)
 
@@ -357,7 +361,7 @@ function main_neo(n,φ=nothing,λelast=nothing,Λelast=nothing;path="./results/C
   end
   converged(m) = GridapTopOpt.default_al_converged(
     m;
-    L_tol = 0.01*h_refine,
+    L_tol = 0.02*hmin,
     C_tol = 0.01
   )
   optimiser = AugmentedLagrangian(pcfs,ls_evo,vel_ext,φh;

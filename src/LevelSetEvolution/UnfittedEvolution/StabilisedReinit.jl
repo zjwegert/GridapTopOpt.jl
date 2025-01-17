@@ -73,7 +73,7 @@ function solve!(s::StabilisedReinit,φh,cache::Nothing)
   φ = get_free_dof_values(φh);
   φ_tmp = copy(φ)
   # Weak form
-  res, jac = get_residual_and_jacobian(s,φh)
+  res, jac = get_residual_and_jacobian(s,φh,FEFunction(V_φ,φ_tmp))
   # Operator and cache
   op = get_algebraic_operator(FEOperator(res,jac,V_φ,V_φ,assembler))
   nls_cache = instantiate_caches(get_free_dof_values(φh),nls,op)
@@ -93,7 +93,7 @@ function solve!(s::StabilisedReinit,φh,cache)
   # Update φ_tmp
   copy!(φ_tmp,get_free_dof_values(φh))
   # Weak form
-  res, jac = get_residual_and_jacobian(s,φh)
+  res, jac = get_residual_and_jacobian(s,φh,FEFunction(V_φ,φ_tmp))
   # Operator and cache
   op = get_algebraic_operator(FEOperator(res,jac,V_φ,V_φ,assembler))
   # Solve
@@ -109,7 +109,26 @@ struct ArtificialViscosity <: StabilisationMethod
   stabilisation_coefficent::Number
 end
 
-function get_residual_and_jacobian(s::StabilisedReinit{ArtificialViscosity},φh)
+# function get_residual_and_jacobian(s::StabilisedReinit{ArtificialViscosity},φh,φh0)
+#   Ωs, dΩ_bg, = s.Ωs, s.dΩ_bg
+#   γd, h = s.params
+#   ca = s.stabilisation_method.stabilisation_coefficent
+#   ϵ = 1e-20
+
+#   update_collection!(Ωs,φh)
+#   dΓ = Ωs.dΓ
+
+#   W(u,∇u) = sign(u) * ∇u / (ϵ + norm(∇u))
+#   V(w) = ca*h*(sqrt ∘ ( w ⋅ w ))
+#   a(w,u,v) = ∫(v*(W ∘ (w,∇(w))) ⋅ ∇(u) + V(W ∘ (w,∇(w)))*∇(u) ⋅ ∇(v))dΩ_bg + ∫((γd/h)*v*u)dΓ
+#   b(w,v) = ∫((sign ∘ w)*v)dΩ_bg
+#   res(u,v) = a(u,u,v) - b(u,v)
+#   jac(u,du,v) = a(u,du,v)
+#   # jac(u,du,v) = jacobian(res,[u,v],1)
+#   return res,jac
+# end
+
+function get_residual_and_jacobian(s::StabilisedReinit{ArtificialViscosity},φh,φh0)
   Ωs, dΩ_bg, = s.Ωs, s.dΩ_bg
   γd, h = s.params
   ca = s.stabilisation_method.stabilisation_coefficent
@@ -118,10 +137,15 @@ function get_residual_and_jacobian(s::StabilisedReinit{ArtificialViscosity},φh)
   update_collection!(Ωs,φh)
   dΓ = Ωs.dΓ
 
-  W(u,∇u) = sign(u) * ∇u / (ϵ + norm(∇u))
+  S(φ,∇φ,h) = φ/sqrt(φ^2 + h^2*(∇φ ⋅ ∇φ))
+  S(φ,∇φ) = φ/sqrt(φ^2 + h^2*(∇φ ⋅ ∇φ))
+  _sign(h::CellField) = S ∘ (φh0,∇(φh0),h)
+  _sign(h::Real) = S ∘ (φh0,∇(φh0))
+
+  W(∇u) = ∇u / (ϵ + norm(∇u))
   V(w) = ca*h*(sqrt ∘ ( w ⋅ w ))
-  a(w,u,v) = ∫(v*(W ∘ (w,∇(w))) ⋅ ∇(u) + V(W ∘ (w,∇(w)))*∇(u) ⋅ ∇(v))dΩ_bg + ∫((γd/h)*v*u)dΓ
-  b(w,v) = ∫((sign ∘ w)*v)dΩ_bg
+  a(w,u,v) = ∫(v*(_sign(h)*(W ∘ ∇(w))) ⋅ ∇(u) + V((sign ∘ u)*(W ∘ ∇(w)))*∇(u) ⋅ ∇(v))dΩ_bg + ∫((γd/h)*v*u)dΓ
+  b(w,v) = ∫((_sign(h))*v)dΩ_bg
   res(u,v) = a(u,u,v) - b(u,v)
   jac(u,du,v) = a(u,du,v)
   # jac(u,du,v) = jacobian(res,[u,v],1)
@@ -133,12 +157,36 @@ struct InteriorPenalty <: StabilisationMethod
   γg
 end
 function InteriorPenalty(V_φ::FESpace;γg=1.0)
-  Λ = SkeletonTriangulation(get_triangulation(V_φ))
+  model = get_background_model(get_triangulation(V_φ))
+  Λ = SkeletonTriangulation(model)
   dΛ = Measure(Λ,2get_order(V_φ))
   return InteriorPenalty(dΛ,γg)
 end
 
-function get_residual_and_jacobian(s::StabilisedReinit{InteriorPenalty},φh)
+# function get_residual_and_jacobian(s::StabilisedReinit{InteriorPenalty},φh,φh0)
+#   Ωs, dΩ_bg, = s.Ωs, s.dΩ_bg
+#   γd, h = s.params
+#   ϵ = 1e-20
+#   dΛ = s.stabilisation_method.dΛ
+#   γg = s.stabilisation_method.γg
+
+#   update_collection!(Ωs,φh)
+#   dΓ = Ωs.dΓ
+#   γ(h) = γg*h^2
+
+#   aₛ(u,v,h::CellField) = ∫(mean(γ ∘ h)*jump(∇(u)) ⋅ jump(∇(v)))dΛ
+#   aₛ(u,v,h::Real) = ∫(γ(h)*jump(∇(u)) ⋅ jump(∇(v)))dΛ
+
+#   W(u,∇u) = sign(u) * ∇u / (ϵ + norm(∇u))
+#   a(w,u,v) = ∫(v*(W ∘ (w,∇(w))) ⋅ ∇(u))dΩ_bg + aₛ(u,v,h) + ∫((γd/h)*v*u)dΓ
+#   b(w,v) = ∫((sign ∘ w)*v)dΩ_bg
+#   res(u,v) = a(u,u,v) - b(u,v)
+#   jac(u,du,v) = a(u,du,v)
+#   # jac(u,du,v) = jacobian(res,[u,v],1)
+#   return res,jac
+# end
+
+function get_residual_and_jacobian(s::StabilisedReinit{InteriorPenalty},φh,φh0)
   Ωs, dΩ_bg, = s.Ωs, s.dΩ_bg
   γd, h = s.params
   ϵ = 1e-20
@@ -149,12 +197,18 @@ function get_residual_and_jacobian(s::StabilisedReinit{InteriorPenalty},φh)
   dΓ = Ωs.dΓ
   γ(h) = γg*h^2
 
+  S(φ,∇φ,h) = φ/sqrt(φ^2 + h^2*(∇φ ⋅ ∇φ))
+  S(φ,∇φ) = φ/sqrt(φ^2 + h^2*(∇φ ⋅ ∇φ))
+  _sign(h::CellField) = S ∘ (φh0,∇(φh0),h)
+  _sign(h::Real) = S ∘ (φh0,∇(φh0))
+
   aₛ(u,v,h::CellField) = ∫(mean(γ ∘ h)*jump(∇(u)) ⋅ jump(∇(v)))dΛ
   aₛ(u,v,h::Real) = ∫(γ(h)*jump(∇(u)) ⋅ jump(∇(v)))dΛ
 
-  W(u,∇u) = sign(u) * ∇u / (ϵ + norm(∇u))
-  a(w,u,v) = ∫(v*(W ∘ (w,∇(w))) ⋅ ∇(u))dΩ_bg + aₛ(u,v,h) + ∫((γd/h)*v*u)dΓ
-  b(w,v) = ∫((sign ∘ w)*v)dΩ_bg
+  W(∇u) = ∇u / (ϵ + norm(∇u))
+  V(w) = ca*h*(sqrt ∘ ( w ⋅ w ))
+  a(w,u,v) = ∫(v*(_sign(h)*(W ∘ ∇(w))) ⋅ ∇(u))dΩ_bg + aₛ(u,v,h) + ∫((γd/h)*v*u)dΓ
+  b(w,v) = ∫((_sign(h))*v)dΩ_bg
   res(u,v) = a(u,u,v) - b(u,v)
   jac(u,du,v) = a(u,du,v)
   # jac(u,du,v) = jacobian(res,[u,v],1)

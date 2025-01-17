@@ -9,11 +9,12 @@ LinearAlgebra.norm(x::VectorValue,p::Real) = norm(x.data,p)
 Base.abs(x::VectorValue) = VectorValue(abs.(x.data))
 Base.sign(x::VectorValue) = VectorValue(sign.(x.data))
 
-path = "./results/Staggered_CutFEM_2d_FSI_NavierStokes_GMSH_Villuvene/"
+path = "./results/Staggered_CutFEM_2d_FSI_NavierStokes_GMSH_Villuvene_3Steps/"
 mkpath(path)
 
-γ_evo = 0.2
-max_steps = 24 # Based on number of elements in vertical direction divided by 10
+# Based on number of elements in vertical direction (N_y) divided by 10
+γ_evo = 1.6 # = 0.2*N_y/max_steps
+max_steps = 3
 vf = 0.025
 α_coeff = γ_evo*max_steps
 iter_mod = 1

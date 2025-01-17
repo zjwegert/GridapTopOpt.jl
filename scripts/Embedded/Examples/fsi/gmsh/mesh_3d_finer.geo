@@ -13,7 +13,7 @@ cw = 0.1; //+ Width between wall and non-designable domain
 
 //+ Mesh sizes
 size_f = 0.05;
-size_s = 0.02; //+ or 0.01 for finer
+size_s = 0.01; //+ or 0.01 for finer
 
 //+ Main area
 Point(1) = {0,0,0,size_f};

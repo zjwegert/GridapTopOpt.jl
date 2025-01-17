@@ -296,69 +296,69 @@ function get_element_diameter_field(model::DistributedDiscreteModel)
   return DistributedCellField(fields,Ω)
 end
 
-# Based on doi:10.1017/CBO9780511973611. C is the Cayley-Menger matrix.
+# # Based on doi:10.1017/CBO9780511973611. C is the Cayley-Menger matrix.
+# function _get_tri_circumdiameter(coords)
+#   d12 = norm(coords[1]-coords[2])^2
+#   d13 = norm(coords[1]-coords[3])^2
+#   d23 = norm(coords[2]-coords[3])^2
+#   # C = [
+#   #   0  1   1   1
+#   #   1  0  d12 d13
+#   #   1 d12  0  d23
+#   #   1 d13 d23  0
+#   # ];
+#   # M = -2inv(C);
+#   # circumcentre = (M[1,2]*coords[1] + M[1,3]*coords[2] + M[1,4]*coords[3])/sum(M[1,2:end])
+#   # circumdiameter = sqrt(M[1,1])
+#   M11 = -((4*d12*d13*d23)/(d12^2+(d13-d23)^2-2*d12*(d13+d23)))
+#   return sqrt(M11)
+# end
+
+# TODO: I have replaced the get diameter function with one based on the literature.
+#   This is instead of circumdiameter. Once this is tested, all functions here should be
+#   renamed before release!
 function _get_tri_circumdiameter(coords)
-  d12 = norm(coords[1]-coords[2])^2
-  d13 = norm(coords[1]-coords[3])^2
-  d23 = norm(coords[2]-coords[3])^2
-  # C = [
-  #   0  1   1   1
-  #   1  0  d12 d13
-  #   1 d12  0  d23
-  #   1 d13 d23  0
-  # ];
-  # M = -2inv(C);
-  # circumcentre = (M[1,2]*coords[1] + M[1,3]*coords[2] + M[1,4]*coords[3])/sum(M[1,2:end])
-  # circumdiameter = sqrt(M[1,1])
-  M11 = -((4*d12*d13*d23)/(d12^2+(d13-d23)^2-2*d12*(d13+d23)))
-  return sqrt(M11)
+  d12 = norm(coords[1]-coords[2])
+  d13 = norm(coords[1]-coords[3])
+  d23 = norm(coords[2]-coords[3])
+
+  max(d12,d13,d23)
 end
+
+
+# function _get_tet_circumdiameter(coords)
+#   d12 = norm(coords[1]-coords[2])^2
+#   d13 = norm(coords[1]-coords[3])^2
+#   d14 = norm(coords[1]-coords[4])^2
+#   d23 = norm(coords[2]-coords[3])^2
+#   d24 = norm(coords[2]-coords[4])^2
+#   d34 = norm(coords[3]-coords[4])^2
+#   # C = [
+#   #   0  1   1   1   1
+#   #   1  0  d12 d13 d14
+#   #   1 d12  0  d23 d24
+#   #   1 d13 d23  0  d34
+#   #   1 d14 d24 d34  0
+#   # ];
+#   # M = -2inv(C);
+#   # circumcentre = (M[1,2]*coords[1] + M[1,3]*coords[2] + M[1,4]*coords[3] + M[1,5]*coords[4])/sum(M[1,2:end])
+#   # circumdiameter = sqrt(M[1,1])
+#   M11 = (d14^2*d23^2+(d13*d24-d12*d34)^2-2*d14*d23*(d13*d24+d12*d34))/(
+#     d13^2*d24+d12^2*d34+d23*(d14^2+d14*(d23-d24-d34)+d24*d34)-
+#     d13*(d14*(d23+d24-d34)+d24*(d23-d24+d34))-d12*((d23+d24-d34)*d34+
+#     d14*(d23-d24+d34)+d13*(-d23+d24+d34)))
+#   return sqrt(M11)
+# end
 
 function _get_tet_circumdiameter(coords)
-  d12 = norm(coords[1]-coords[2])^2
-  d13 = norm(coords[1]-coords[3])^2
-  d14 = norm(coords[1]-coords[4])^2
-  d23 = norm(coords[2]-coords[3])^2
-  d24 = norm(coords[2]-coords[4])^2
-  d34 = norm(coords[3]-coords[4])^2
-  # C = [
-  #   0  1   1   1   1
-  #   1  0  d12 d13 d14
-  #   1 d12  0  d23 d24
-  #   1 d13 d23  0  d34
-  #   1 d14 d24 d34  0
-  # ];
-  # M = -2inv(C);
-  # circumcentre = (M[1,2]*coords[1] + M[1,3]*coords[2] + M[1,4]*coords[3] + M[1,5]*coords[4])/sum(M[1,2:end])
-  # circumdiameter = sqrt(M[1,1])
-  M11 = (d14^2*d23^2+(d13*d24-d12*d34)^2-2*d14*d23*(d13*d24+d12*d34))/(
-    d13^2*d24+d12^2*d34+d23*(d14^2+d14*(d23-d24-d34)+d24*d34)-
-    d13*(d14*(d23+d24-d34)+d24*(d23-d24+d34))-d12*((d23+d24-d34)*d34+
-    d14*(d23-d24+d34)+d13*(-d23+d24+d34)))
-  return sqrt(M11)
-end
+  d12 = norm(coords[1]-coords[2])
+  d13 = norm(coords[1]-coords[3])
+  d14 = norm(coords[1]-coords[4])
+  d23 = norm(coords[2]-coords[3])
+  d24 = norm(coords[2]-coords[4])
+  d34 = norm(coords[3]-coords[4])
 
-# Test that a distributed and serial field are the same.
-#
-# Note:
-#   - This is only designed for small tests
-#   - We require that the distributed model is generated with a global ordering
-#     that matches the serial model. See function below.
-function test_serial_and_distributed_fields(fhd::CellField,Vd,fhs::FEFunction,Vs)
-  fhd_cell_values = map(local_views(Vd),local_views(fhd)) do Vd,fhd
-    free = get_free_dof_values(fhd)
-    diri = get_dirichlet_dof_values(Vd)
-    scatter_free_and_dirichlet_values(Vd,free,diri)
-  end
-
-  free = get_free_dof_values(fhs)
-  diri = get_dirichlet_dof_values(Vs)
-  fhs_cell_values = scatter_free_and_dirichlet_values(Vs,free,diri)
-
-  dmodel = get_background_model(get_triangulation(Vd))
-  map(partition(get_cell_gids(dmodel)),fhd_cell_values) do gids,lfhd_cell_values
-    lfhd_cell_values ≈ fhs_cell_values[local_to_global(gids)]
-  end
+  max(d12,d13,d14,d23,d24,d34)
 end
 
 # Generate a distributed model from a serial model with global ordering that
