@@ -324,7 +324,10 @@ try
 catch e
   println("Error: $e\nPrinting history and exiting...")
   writevtk(Ω_act,path*"Omega_act_errored",
-    cellfields=["φ"=>φh,"|∇(φ)|"=>(norm ∘ ∇(φh))])
+    cellfields=["φ"=>φh,"|∇(φ)|"=>(norm ∘ ∇(φh)),
+      "ψ_s"=>Ω.ψ_s,"ψ_f"=>Ω.ψ_f])
+    writevtk(Ω.Ωf,path*"Omega_f_errored")
+    writevtk(Ω.Ωs,path*"Omega_s_errored")
 end
 it = get_history(optimiser).niter; uh,ph,dh = get_state(pcf)
 writevtk(Ω_act,path*"Omega_act_$it",
