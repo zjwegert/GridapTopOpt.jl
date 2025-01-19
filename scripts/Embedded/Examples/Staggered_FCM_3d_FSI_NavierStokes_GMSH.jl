@@ -258,7 +258,7 @@ function main(ranks)
   solver = StaggeredFESolver([fluid_nls,elast_nls]);
 
   op = StaggeredNonlinearFEOperator([res_fluid,res_solid],[jac_fluid,jac_solid],[UP,R],[VQ,T])
-  state_map = StaggeredNonlinearFEStateMap(op,V_φ,U_reg,φh;solver)
+  state_map = StaggeredNonlinearFEStateMap(op,V_φ,U_reg,φh;solver,adjoint_solver=solver)
   pcfs = PDEConstrainedFunctionals(J_comp,[Vol],state_map)
 
   ## Evolution Method
