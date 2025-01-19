@@ -175,7 +175,7 @@ r_GP_u(u,v,w,n) = γ_GPu(hₕ,w,n)*jump(Ω.n_Γg ⋅ ∇(u)) ⋅ jump(Ω.n_Γg �
 
 dr_conv(u,du,v) = ρ*v ⋅ (dconv∘(du,∇(du),u,∇(u)))
 dr_SUPG((u,p),(du,dp),(v,q),w) =
-  ((τ_SUPG ∘ (hₕ,w))*(dconv∘(du,∇(du),u,∇(u))) + (τ_PSPG ∘ (hₕ,w))/ρ*∇(q))⋅(ρ*(conv∘(u,∇(u))) + ∇(p) - μ*Δ(u)) +
+  ((τ_SUPG ∘ (hₕ,w))*(conv ∘ (du,∇(v))))⋅(ρ*(conv∘(u,∇(u))) + ∇(p) - μ*Δ(u)) +
   ((τ_SUPG ∘ (hₕ,w))*(conv ∘ (u,∇(v))) + (τ_PSPG ∘ (hₕ,w))/ρ*∇(q))⋅(ρ*(dconv∘(du,∇(du),u,∇(u))) + ∇(dp) - μ*Δ(du))
 
 function res_fluid((),(u,p),(v,q),φ)
@@ -255,7 +255,7 @@ state_collection = GridapTopOpt.EmbeddedCollection_in_φh(model,φh) do _φh
   update_collection!(Ω,_φh)
   X,Y = build_spaces(Ω.Ω_act_s,Ω.Ω_act_f)
   op = StaggeredNonlinearFEOperator([res_fluid,res_solid],[jac_fluid_picard,jac_solid],X,Y)
-  state_map = StaggeredNonlinearFEStateMap(op,∂Rk∂xhi,V_φ,U_reg,_φh)
+  state_map = StaggeredNonlinearFEStateMap(op,∂Rk∂xhi,V_φ,U_reg,_φh;adjoint_jacobians=[jac_fluid_newton,jac_solid])
   (;
     :state_map => state_map,
     :J => GridapTopOpt.StaggeredStateParamMap(J_comp,∂Jpres∂xhi,state_map),
@@ -263,7 +263,7 @@ state_collection = GridapTopOpt.EmbeddedCollection_in_φh(model,φh) do _φh
   )
 end
 
-## Testing forward solution
+# ## Testing forward solution
 # _x = state_collection.state_map(φh)
 # _xh = FEFunction(state_collection.state_map.spaces.trial,_x);
 # uh,ph,dh = _xh;

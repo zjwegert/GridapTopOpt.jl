@@ -9,12 +9,11 @@ LinearAlgebra.norm(x::VectorValue,p::Real) = norm(x.data,p)
 Base.abs(x::VectorValue) = VectorValue(abs.(x.data))
 Base.sign(x::VectorValue) = VectorValue(sign.(x.data))
 
-path = "./results/Staggered_CutFEM_2d_FSI_NavierStokes_GMSH_Villuvene/"
+path = "./results/Staggered_CutFEM_2d_FSI_NavierStokes_GMSH_Villuvene_Newton/"
 mkpath(path)
 
-# Based on number of elements in vertical direction (N_y) divided by 10
-γ_evo = 1.6 # = 0.2*N_y/max_steps
-max_steps = 3
+γ_evo = 0.2
+max_steps = 24 # Based on number of elements in vertical direction divided by 10
 vf = 0.025
 α_coeff = γ_evo*max_steps
 iter_mod = 1
@@ -129,7 +128,7 @@ init_X,_ = build_spaces(Ω.Ω_act_s,Ω.Ω_act_f)
 
 ## Fluid
 # Properties
-Re = 60 # Reynolds number
+Re = 57.5 # Reynolds number
 ρ = 1.0 # Density
 cl = a # Characteristic length
 u0_max = maximum(abs,get_dirichlet_dof_values(init_X[1]))
@@ -139,9 +138,9 @@ u0_max = maximum(abs,get_dirichlet_dof_values(init_X[1]))
 # Stabilization parameters
 α_Nu   = 1000
 α_SUPG = 1/3
-α_GPμ  = 0.05
-α_GPp  = 0.05
-α_GPu  = 0.05
+α_GPμ  = 0.5
+α_GPp  = 0.5
+α_GPu  = 0.5
 
 γ_Nu(h,u)    = α_Nu*(μ/h + ρ*norm(u,Inf)/6) # (Eqn. 13, Villanueva and Maute, 2017)
 τ_SUPG(h,u)  = α_SUPG*((2norm(u)/h)^2 + 9*(4ν/h^2)^2)^-0.5 # (Eqn. 31, Peterson et al., 2018)
@@ -255,8 +254,8 @@ dVol(q,(u,p,d),φ) = ∫(-1/vol_D*q/(norm ∘ (∇(φ))))Ω.dΓ
 state_collection = GridapTopOpt.EmbeddedCollection_in_φh(model,φh) do _φh
   update_collection!(Ω,_φh)
   X,Y = build_spaces(Ω.Ω_act_s,Ω.Ω_act_f)
-  op = StaggeredNonlinearFEOperator([res_fluid,res_solid],[jac_fluid_picard,jac_solid],X,Y)
-  state_map = StaggeredNonlinearFEStateMap(op,∂Rk∂xhi,V_φ,U_reg,_φh;adjoint_jacobians=[jac_fluid_newton,jac_solid])
+  op = StaggeredNonlinearFEOperator([res_fluid,res_solid],[jac_fluid_newton,jac_solid],X,Y)
+  state_map = StaggeredNonlinearFEStateMap(op,∂Rk∂xhi,V_φ,U_reg,_φh)
   (;
     :state_map => state_map,
     :J => GridapTopOpt.StaggeredStateParamMap(J_comp,∂Jpres∂xhi,state_map),
@@ -265,76 +264,75 @@ state_collection = GridapTopOpt.EmbeddedCollection_in_φh(model,φh) do _φh
 end
 
 ## Testing forward solution
-# _x = state_collection.state_map(φh)
-# _xh = FEFunction(state_collection.state_map.spaces.trial,_x);
-# uh,ph,dh = _xh;
-# writevtk(Ω_act,path*"Omega_act",
-#   cellfields=["φ"=>φh,"|∇(φ)|"=>(norm ∘ ∇(φh)),"uh"=>uh,"ph"=>ph,"dh"=>dh,"ψ_s"=>Ω.ψ_s,"ψ_f"=>Ω.ψ_f])
-# writevtk(Ω.Ωf,path*"Omega_f",
-#   cellfields=["uh"=>uh,"ph"=>ph,"dh"=>dh])
-# writevtk(Ω.Ωs,path*"Omega_s",
-#   cellfields=["uh"=>uh,"ph"=>ph,"dh"=>dh])
-# error()
-
-pcf = EmbeddedPDEConstrainedFunctionals(state_collection;analytic_dC=[dVol])
-
-## Evolution Method
-evo = CutFEMEvolve(V_φ,Ω,dΩ_act,hₕ;max_steps,γg=0.01)
-reinit1 = StabilisedReinit(V_φ,Ω,dΩ_act,hₕ;stabilisation_method=ArtificialViscosity(1.0))
-reinit2 = StabilisedReinit(V_φ,Ω,dΩ_act,hₕ;stabilisation_method=GridapTopOpt.InteriorPenalty(V_φ,γg=1.0))
-reinit = GridapTopOpt.MultiStageStabilisedReinit([reinit1,reinit2])
-ls_evo = UnfittedFEEvolution(evo,reinit)
-
-reinit!(ls_evo,φh_nondesign)
-
-## Hilbertian extension-regularisation problems
-_α(hₕ) = (α_coeff*hₕ)^2
-a_hilb(p,q) =∫((_α ∘ hₕ)*∇(p)⋅∇(q) + p*q)dΩ_act;
-vel_ext = VelocityExtension(a_hilb,U_reg,V_reg)
-
-## Optimiser
-converged(m) = GridapTopOpt.default_al_converged(
-  m;
-  L_tol = 0.5hmin,
-  C_tol = 0.01vf
-)
-function has_oscillations(m,os_it)
-  history = GridapTopOpt.get_history(m)
-  it = GridapTopOpt.get_last_iteration(history)
-  all(@.(abs(history[:C,it]) < 0.05vf)) && GridapTopOpt.default_has_oscillations(m,os_it)
-end
-optimiser = AugmentedLagrangian(pcf,ls_evo,vel_ext,φh;
-  γ=γ_evo,verbose=true,constraint_names=[:Vol],converged,has_oscillations)
-try
-  for (it,(uh,ph,dh),φh) in optimiser
-    GC.gc()
-    if iszero(it % iter_mod)
-      writevtk(Ω_act,path*"Omega_act_$it",
-        cellfields=["φ"=>φh,"|∇(φ)|"=>(norm ∘ ∇(φh)),"uh"=>uh,"ph"=>ph,"dh"=>dh,
-          "ψ_s"=>Ω.ψ_s,"ψ_f"=>Ω.ψ_f])
-      writevtk(Ω.Ωf,path*"Omega_f_$it",
-        cellfields=["uh"=>uh,"ph"=>ph,"dh"=>dh])
-      writevtk(Ω.Ωs,path*"Omega_s_$it",
-        cellfields=["uh"=>uh,"ph"=>ph,"dh"=>dh])
-    end
-    write_history(path*"/history.txt",optimiser.history)
-
-    φ = get_free_dof_values(φh)
-    φ .= min.(φ,get_free_dof_values(φh_nondesign))
-    reinit!(ls_evo,φh)
-  end
-catch e
-  println("Error: $e\nPrinting history and exiting...")
-  writevtk(Ω_act,path*"Omega_act_errored",
-    cellfields=["φ"=>φh,"|∇(φ)|"=>(norm ∘ ∇(φh)),
-      "ψ_s"=>Ω.ψ_s,"ψ_f"=>Ω.ψ_f])
-    writevtk(Ω.Ωf,path*"Omega_f_errored")
-    writevtk(Ω.Ωs,path*"Omega_s_errored")
-end
-it = get_history(optimiser).niter; uh,ph,dh = get_state(pcf)
-writevtk(Ω_act,path*"Omega_act_$it",
-  cellfields=["φ"=>φh,"|∇(φ)|"=>(norm ∘ ∇(φh)),"uh"=>uh,"ph"=>ph,"dh"=>dh])
-writevtk(Ω.Ωf,path*"Omega_f_$it",
+_x = state_collection.state_map(φh)
+_xh = FEFunction(state_collection.state_map.spaces.trial,_x);
+uh,ph,dh = _xh;
+writevtk(Ω_act,path*"Omega_act",
+  cellfields=["φ"=>φh,"|∇(φ)|"=>(norm ∘ ∇(φh)),"uh"=>uh,"ph"=>ph,"dh"=>dh,"ψ_s"=>Ω.ψ_s,"ψ_f"=>Ω.ψ_f])
+writevtk(Ω.Ωf,path*"Omega_f",
   cellfields=["uh"=>uh,"ph"=>ph,"dh"=>dh])
-writevtk(Ω.Ωs,path*"Omega_s_$it",
+writevtk(Ω.Ωs,path*"Omega_s",
   cellfields=["uh"=>uh,"ph"=>ph,"dh"=>dh])
+
+# pcf = EmbeddedPDEConstrainedFunctionals(state_collection;analytic_dC=[dVol])
+
+# ## Evolution Method
+# evo = CutFEMEvolve(V_φ,Ω,dΩ_act,hₕ;max_steps,γg=0.01)
+# reinit1 = StabilisedReinit(V_φ,Ω,dΩ_act,hₕ;stabilisation_method=ArtificialViscosity(1.0))
+# reinit2 = StabilisedReinit(V_φ,Ω,dΩ_act,hₕ;stabilisation_method=GridapTopOpt.InteriorPenalty(V_φ,γg=1.0))
+# reinit = GridapTopOpt.MultiStageStabilisedReinit([reinit1,reinit2])
+# ls_evo = UnfittedFEEvolution(evo,reinit)
+
+# reinit!(ls_evo,φh_nondesign)
+
+# ## Hilbertian extension-regularisation problems
+# _α(hₕ) = (α_coeff*hₕ)^2
+# a_hilb(p,q) =∫((_α ∘ hₕ)*∇(p)⋅∇(q) + p*q)dΩ_act;
+# vel_ext = VelocityExtension(a_hilb,U_reg,V_reg)
+
+# ## Optimiser
+# converged(m) = GridapTopOpt.default_al_converged(
+#   m;
+#   L_tol = 0.5hmin,
+#   C_tol = 0.01vf
+# )
+# function has_oscillations(m,os_it)
+#   history = GridapTopOpt.get_history(m)
+#   it = GridapTopOpt.get_last_iteration(history)
+#   all(@.(abs(history[:C,it]) < 0.05vf)) && GridapTopOpt.default_has_oscillations(m,os_it)
+# end
+# optimiser = AugmentedLagrangian(pcf,ls_evo,vel_ext,φh;
+#   γ=γ_evo,verbose=true,constraint_names=[:Vol],converged,has_oscillations)
+# try
+#   for (it,(uh,ph,dh),φh) in optimiser
+#     GC.gc()
+#     if iszero(it % iter_mod)
+#       writevtk(Ω_act,path*"Omega_act_$it",
+#         cellfields=["φ"=>φh,"|∇(φ)|"=>(norm ∘ ∇(φh)),"uh"=>uh,"ph"=>ph,"dh"=>dh,
+#           "ψ_s"=>Ω.ψ_s,"ψ_f"=>Ω.ψ_f])
+#       writevtk(Ω.Ωf,path*"Omega_f_$it",
+#         cellfields=["uh"=>uh,"ph"=>ph,"dh"=>dh])
+#       writevtk(Ω.Ωs,path*"Omega_s_$it",
+#         cellfields=["uh"=>uh,"ph"=>ph,"dh"=>dh])
+#     end
+#     write_history(path*"/history.txt",optimiser.history)
+
+#     φ = get_free_dof_values(φh)
+#     φ .= min.(φ,get_free_dof_values(φh_nondesign))
+#     reinit!(ls_evo,φh)
+#   end
+# catch e
+#   println("Error: $e\nPrinting history and exiting...")
+#   writevtk(Ω_act,path*"Omega_act_errored",
+#     cellfields=["φ"=>φh,"|∇(φ)|"=>(norm ∘ ∇(φh)),
+#       "ψ_s"=>Ω.ψ_s,"ψ_f"=>Ω.ψ_f])
+#     writevtk(Ω.Ωf,path*"Omega_f_errored")
+#     writevtk(Ω.Ωs,path*"Omega_s_errored")
+# end
+# it = get_history(optimiser).niter; uh,ph,dh = get_state(pcf)
+# writevtk(Ω_act,path*"Omega_act_$it",
+#   cellfields=["φ"=>φh,"|∇(φ)|"=>(norm ∘ ∇(φh)),"uh"=>uh,"ph"=>ph,"dh"=>dh])
+# writevtk(Ω.Ωf,path*"Omega_f_$it",
+#   cellfields=["uh"=>uh,"ph"=>ph,"dh"=>dh])
+# writevtk(Ω.Ωs,path*"Omega_s_$it",
+#   cellfields=["uh"=>uh,"ph"=>ph,"dh"=>dh])
