@@ -138,9 +138,9 @@ u0_max = maximum(abs,get_dirichlet_dof_values(init_X[1]))
 # Stabilization parameters
 α_Nu   = 1000
 α_SUPG = 1/3
-α_GPμ  = 0.5
-α_GPp  = 0.5
-α_GPu  = 0.5
+α_GPμ  = 0.05
+α_GPp  = 0.05
+α_GPu  = 0.05
 
 γ_Nu(h,u)    = α_Nu*(μ/h + ρ*norm(u,Inf)/6) # (Eqn. 13, Villanueva and Maute, 2017)
 τ_SUPG(h,u)  = α_SUPG*((2norm(u)/h)^2 + 9*(4ν/h^2)^2)^-0.5 # (Eqn. 31, Peterson et al., 2018)
