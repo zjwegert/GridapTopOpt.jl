@@ -361,6 +361,29 @@ function _get_tet_circumdiameter(coords)
   max(d12,d13,d14,d23,d24,d34)
 end
 
+# Test that a distributed and serial field are the same.
+#
+# Note:
+#   - This is only designed for small tests
+#   - We require that the distributed model is generated with a global ordering
+#     that matches the serial model. See function below.
+function test_serial_and_distributed_fields(fhd::CellField,Vd,fhs::FEFunction,Vs)
+  fhd_cell_values = map(local_views(Vd),local_views(fhd)) do Vd,fhd
+    free = get_free_dof_values(fhd)
+    diri = get_dirichlet_dof_values(Vd)
+    scatter_free_and_dirichlet_values(Vd,free,diri)
+  end
+
+  free = get_free_dof_values(fhs)
+  diri = get_dirichlet_dof_values(Vs)
+  fhs_cell_values = scatter_free_and_dirichlet_values(Vs,free,diri)
+
+  dmodel = get_background_model(get_triangulation(Vd))
+  map(partition(get_cell_gids(dmodel)),fhd_cell_values) do gids,lfhd_cell_values
+    lfhd_cell_values ≈ fhs_cell_values[local_to_global(gids)]
+  end
+end
+
 # Generate a distributed model from a serial model with global ordering that
 #  matches the serial model
 function ordered_distributed_model_from_serial_model(ranks,model_serial)
