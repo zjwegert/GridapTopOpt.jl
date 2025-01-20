@@ -31,6 +31,8 @@ using GridapSolvers
 using GridapSolvers.LinearSolvers, GridapSolvers.NonlinearSolvers, GridapSolvers.BlockSolvers
 using GridapSolvers.SolverInterfaces: SolverVerboseLevel, SOLVER_VERBOSE_NONE, SOLVER_VERBOSE_LOW, SOLVER_VERBOSE_HIGH
 
+using Zygote
+
 using JLD2: save_object, load_object, jldsave
 
 import Base: +
@@ -39,6 +41,7 @@ include("GridapExtensions.jl")
 
 include("ChainRules.jl")
 export PDEConstrainedFunctionals
+export CustomPDEConstrainedFunctionals
 export AffineFEStateMap
 export NonlinearFEStateMap
 export RepeatingAffineFEStateMap

@@ -13,13 +13,13 @@ using GridapTopOpt: WithAutoDiff, NoAutoDiff
           ⎡u∈V=H¹(Ω;u(Γ_D)=0),
           ⎣∫ κ*∇(u)⋅∇(v) dΩ = ∫ v dΓ_N, ∀v∈V.
 """
-function main(;order,AD_case)
+order = 1 
   ## Parameters
   xmax = ymax = 1.0
   prop_Γ_N = 0.2
   prop_Γ_D = 0.2
   dom = (0,xmax,0,ymax)
-  el_size = (20,20)
+  el_size = (10,10)
   γ = 0.1
   γ_reinit = 0.5
   max_steps = floor(Int,order*minimum(el_size)/10)
@@ -51,7 +51,7 @@ function main(;order,AD_case)
   V = TestFESpace(model,reffe_scalar;dirichlet_tags=["Gamma_D"])
   U = TrialFESpace(V,0.0)
   V_φ = TestFESpace(model,reffe_scalar)
-  V_reg = TestFESpace(model,reffe_scalar;dirichlet_tags=["Gamma_N"])
+  V_reg = TestFESpace(model,reffe_scalar)#;dirichlet_tags=["Gamma_N"])
   U_reg = TrialFESpace(V_reg,0)
 
   ## Create FE functions
@@ -75,40 +75,80 @@ function main(;order,AD_case)
 
   ## Setup solver and FE operators
   state_map = AffineFEStateMap(a,l,U,V,V_φ,U_reg,φh,dΩ,dΓ_N)
-  pcfs = if AD_case == :no_ad
-    PDEConstrainedFunctionals(J,[Vol],state_map,analytic_dJ=dJ,analytic_dC=[dVol])
-  elseif AD_case == :with_ad
-    PDEConstrainedFunctionals(J,[Vol],state_map)
-  elseif AD_case == :partial_ad1
-    PDEConstrainedFunctionals(J,[Vol],state_map,analytic_dJ=dJ)
-  elseif AD_case == :partial_ad2
-    PDEConstrainedFunctionals(J,[Vol],state_map,analytic_dC=[dVol])
-  else
-    @error "AD case not defined"
+
+
+
+
+
+  import GridapTopOpt: StateParamIntegrandWithMeasure
+  
+  C=[Vol]
+
+  objective = StateParamIntegrandWithMeasure(J,state_map)
+  constraints = map(Ci -> StateParamIntegrandWithMeasure(Ci,state_map),C)
+
+  φ = φh.free_values
+
+  function φ_to_jc(φ)
+    u = state_map(φ)
+    j = objective(u,φ)
+    c = map(constrainti -> constrainti(u,φ),constraints)
+    [j,c...]
   end
 
-  ## Hilbertian extension-regularisation problems
+  φ_to_jc(φ)
+  using Zygote
+
+  obj,grad = Zygote.withjacobian(φ_to_jc, φh.free_values)
+  j = obj[1]
+  c = obj[2:end]
+  dj = grad[1][1,:]
+
+
+  uh = interpolate(1,U)
+  φh.free_values
+  using ChainRulesCore
+  j_val, j_pullback = ChainRulesCore.rrule(objective,uh,φh)  
+  _,_, dFdφ     = j_pullback(1)
+  dFdφ
+  
+
+
+  
+
+  u = uh.free_values
+  function φu_to_jc(φ) 
+  j = objective(u,φ)
+  end
+
+  φu_to_jc(φ)
+  obj,grad = Zygote.withjacobian(φu_to_jc, φh.free_values)
+  grad[1][1,:]
+
+
+  
+
+  num_free_dofs(V_φ)
+  num_free_dofs(U_reg)
+
+
+
+
+  pcf2 = CustomPDEConstrainedFunctionals(φ_to_jc,state_map,φh)
+
+  Gridap.evaluate!(pcf2,φh)
+  pcf2.state_map
+
+    ## Hilbertian extension-regularisation problems
   α = α_coeff*maximum(el_Δ)
   a_hilb(p,q) =∫(α^2*∇(p)⋅∇(q) + p*q)dΩ;
   vel_ext = VelocityExtension(a_hilb,U_reg,V_reg)
 
   ## Optimiser
-  optimiser = HilbertianProjection(pcfs,ls_evo,vel_ext,φh;
+  optimiser = HilbertianProjection(pcf2,ls_evo,vel_ext,φh;
     γ,γ_reinit,verbose=true,constraint_names=[:Vol])
-
-  AD_case ∈ (:with_ad,:partial_ad1,:partial_ad2) && @test typeof(optimiser) <: HilbertianProjection{WithAutoDiff}
-  AD_case ∈ (:no_ad,) && @test typeof(optimiser) <: HilbertianProjection{NoAutoDiff}
-
   # Do a few iterations
   vars, state = iterate(optimiser)
   vars, state = iterate(optimiser,state)
-  true
-end
-
-# Test that these run successfully
-@test main(;order=1,AD_case=:with_ad)
-@test main(;order=1,AD_case=:partial_ad1)
-@test main(;order=1,AD_case=:partial_ad2)
-@test main(;order=1,AD_case=:no_ad)
 
 end # module

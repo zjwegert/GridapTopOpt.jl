@@ -502,7 +502,7 @@ get_measure(m::AffineFEStateMap) = m.biform.dΩ
 get_spaces(m::AffineFEStateMap) = m.spaces
 get_assemblers(m::AffineFEStateMap) = (m.fwd_caches[6],m.plb_caches[2],m.adj_caches[4])
 
-function forward_solve!(φ_to_u::AffineFEStateMap,φh)
+function forward_solve!(φ_to_u::AffineFEStateMap,φh::FEFunction)
   biform, liform = φ_to_u.biform, φ_to_u.liform
   U, V, _, _ = φ_to_u.spaces
   ns, K, b, x, uhd, assem_U = φ_to_u.fwd_caches
@@ -876,58 +876,9 @@ function adjoint_solve!(φ_to_u::RepeatingAffineFEStateMap,du::AbstractBlockVect
   return adjoint_x
 end
 
-"""
-    struct PDEConstrainedFunctionals{N,A}
+abstract type ParameterisedObjective end
 
-An object that computes the objective, constraints, and their derivatives.
-
-# Implementation
-
-This implementation computes derivatives of a integral quantity
-
-``F(u(\\varphi),\\varphi,\\mathrm{d}\\Omega_1,\\mathrm{d}\\Omega_2,...) =
-\\Sigma_{i}\\int_{\\Omega_i} f_i(\\varphi)~\\mathrm{d}\\Omega``
-
-with respect to an auxiliary parameter ``\\varphi`` where ``u``
-is the solution to a PDE and implicitly depends on ``\\varphi``.
-This requires two pieces of information:
-
- 1) Computation of ``\\frac{\\partial F}{\\partial u}`` and
-    ``\\frac{\\partial F}{\\partial \\varphi}`` (handled by [`StateParamIntegrandWithMeasure `](@ref)).
- 2) Computation of ``\\frac{\\partial F}{\\partial u}
-    \\frac{\\partial u}{\\partial \\varphi}`` at ``\\varphi`` and ``u``
-    using the adjoint method (handled by [`AbstractFEStateMap`](@ref)). I.e., let
-
-    ``\\frac{\\partial F}{\\partial u}
-    \\frac{\\partial u}{\\partial \\varphi} = -\\lambda^\\intercal
-    \\frac{\\partial \\mathcal{R}}{\\partial \\varphi}``
-
-    where ``\\mathcal{R}`` is the residual and solve the (linear) adjoint
-    problem:
-
-    ``\\frac{\\partial \\mathcal{R}}{\\partial u}^\\intercal\\lambda =
-    \\frac{\\partial F}{\\partial u}^\\intercal.``
-
-The gradient is then ``\\frac{\\partial F}{\\partial \\varphi} =
-\\frac{\\partial F}{\\partial \\varphi} -
-\\frac{\\partial F}{\\partial u}\\frac{\\partial u}{\\partial \\varphi}``.
-
-# Parameters
-
-- `J`: A `StateParamIntegrandWithMeasure` corresponding to the objective.
-- `C`: A vector of `StateParamIntegrandWithMeasure` corresponding to the constraints.
-- `dJ`: The DoFs for the objective sensitivity.
-- `dC`: The DoFs for each constraint sensitivity.
-- `analytic_dJ`: a `Function` for computing the analytic objective sensitivity.
-- `analytic_dC`: A vector of `Function` for computing the analytic objective sensitivities.
-- `state_map::A`: The state map for the problem.
-
-# Note
-
-- If `analytic_dJ = nothing` automatic differentiation will be used.
-- If `analytic_dC[i] = nothing` automatic differentiation will be used for `C[i]`.
-"""
-struct PDEConstrainedFunctionals{N,A}
+struct PDEConstrainedFunctionals{N,A} #<: ParameterisedObjective{N,A}
   J
   C
   dJ
@@ -1076,4 +1027,60 @@ end
 function Base.show(io::IO,::MIME"text/plain",f::PDEConstrainedFunctionals)
   print(io,"$(nameof(typeof(f))):
     num_constraints: $(length(f.C))")
+end
+
+
+
+struct CustomPDEConstrainedFunctionals{N,A} #<: ParameterisedObjective{N,A}
+  φ_to_jc :: Function
+  dJ :: Vector{Float64}
+  dC :: Vector{Vector{Float64}}
+  analytic_dJ
+  analytic_dC
+  state_map :: A
+
+    function CustomPDEConstrainedFunctionals(
+      φ_to_jc :: Function,
+      state_map :: AbstractFEStateMap,
+      φ0;
+    )
+    
+    # Pre-allocaitng
+    grad = Zygote.jacobian(φ_to_jc, φ0.free_values)
+    dJ = grad[1][1,:]
+    dC = [collect(row) for row in eachrow(grad[1][2:end,:])]
+    N = length(dC)
+    A = typeof(state_map)
+    analytic_dJ = nothing
+    analytic_dC = fill(nothing,N)
+
+    return new{N,A}(φ_to_jc,dJ,dC,analytic_dJ,analytic_dC,state_map)
+  end
+end
+
+function Fields.evaluate!(pcf::CustomPDEConstrainedFunctionals,φh)
+  φ_to_jc,dJ,dC = pcf.φ_to_jc,pcf.dJ,pcf.dC
+
+  obj,grad = Zygote.withjacobian(φ_to_jc, φh.free_values)
+  j = obj[1]
+  c = obj[2:end]
+  copy!(dJ,grad[1][1,:])
+  copy!(dC,[collect(row) for row in eachrow(grad[1][2:end,:])])
+
+  return j,c,dJ,dC
+end
+
+get_state(m::CustomPDEConstrainedFunctionals) = get_state(m.state_map)
+
+function evaluate_functionals!(pcf::CustomPDEConstrainedFunctionals,φh::FEFunction)
+  φ = φh.free_values
+  return evaluate_functionals!(pcf,φ)
+end
+
+function evaluate_functionals!(pcf::CustomPDEConstrainedFunctionals,φ::AbstractVector)
+  φ_to_jc =  pcf.φ_to_jc
+  obj = φ_to_jc(φ)
+  j = obj[1]
+  c = obj[2:end]
+  return j,c
 end
