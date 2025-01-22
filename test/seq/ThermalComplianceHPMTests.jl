@@ -82,9 +82,9 @@ function φ_to_jc(φ)
   [j,c...]
 end
 
-pcf = CustomPDEConstrainedFunctionals(φ_to_jc,state_map,U_reg,φh)
+pcf = CustomPDEConstrainedFunctionals(φ_to_jc,state_map,φh)
 
-  ## Hilbertian extension-regularisation problems
+## Hilbertian extension-regularisation problems
 α = α_coeff*maximum(el_Δ)
 a_hilb(p,q) =∫(α^2*∇(p)⋅∇(q) + p*q)dΩ;
 vel_ext = VelocityExtension(a_hilb,U_reg,V_reg)
@@ -92,6 +92,7 @@ vel_ext = VelocityExtension(a_hilb,U_reg,V_reg)
 ## Optimiser
 optimiser = HilbertianProjection(pcf,ls_evo,vel_ext,φh;
   γ,γ_reinit,verbose=true,constraint_names=[:Vol])
+
 # Do a few iterations
 vars, state = iterate(optimiser)
 vars, state = iterate(optimiser,state)

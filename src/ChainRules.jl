@@ -1038,12 +1038,10 @@ struct CustomPDEConstrainedFunctionals{N,A} #<: ParameterisedObjective{N,A}
   analytic_dJ
   analytic_dC
   state_map :: A
-  U_reg :: FESpace
 
     function CustomPDEConstrainedFunctionals(
       φ_to_jc :: Function,
       state_map :: AbstractFEStateMap,
-      U_reg :: FESpace,
       φ0;
     )
     
@@ -1057,7 +1055,7 @@ struct CustomPDEConstrainedFunctionals{N,A} #<: ParameterisedObjective{N,A}
     analytic_dJ = nothing
     analytic_dC = fill(nothing,N)
 
-    return new{N,A}(φ_to_jc,dJ,dC,analytic_dJ,analytic_dC,state_map,U_reg)
+    return new{N,A}(φ_to_jc,dJ,dC,analytic_dJ,analytic_dC,state_map)
   end
 end
 
@@ -1070,18 +1068,16 @@ function Fields.evaluate!(pcf::CustomPDEConstrainedFunctionals,φh)
   copy!(dJ,grad[1][1,:])
   copy!(dC,[collect(row) for row in eachrow(grad[1][2:end,:])])
 
-
   # Move the below out of this function
   function add_zero_dirichlet_according_to_U_reg(dJ)
-    U = get_trial_space(pcf.state_map)
-    ∂Jₕ = FEFunction(U,dJ)
-    U_reg = pcf.U_reg
+    V_φ = get_aux_space(pcf.state_map)
+    ∂Jₕ = FEFunction(V_φ,dJ)
+    U_reg = get_deriv_space(pcf.state_map)
     ∂Jₕ_constrained = interpolate(∂Jₕ,U_reg)
     return get_free_dof_values(∂Jₕ_constrained)
   end
   dJ = add_zero_dirichlet_according_to_U_reg(dJ)
   dC = map(add_zero_dirichlet_according_to_U_reg,dC)
-
 
   return j,c,dJ,dC
 end
