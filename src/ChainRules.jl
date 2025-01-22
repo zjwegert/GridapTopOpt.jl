@@ -1038,23 +1038,26 @@ struct CustomPDEConstrainedFunctionals{N,A} #<: ParameterisedObjective{N,A}
   analytic_dJ
   analytic_dC
   state_map :: A
+  U_reg :: FESpace
 
     function CustomPDEConstrainedFunctionals(
       φ_to_jc :: Function,
       state_map :: AbstractFEStateMap,
+      U_reg :: FESpace,
       φ0;
     )
     
     # Pre-allocaitng
     grad = Zygote.jacobian(φ_to_jc, φ0.free_values)
     dJ = grad[1][1,:]
-    dC = [collect(row) for row in eachrow(grad[1][2:end,:])]
+    dC = [collect(row) for row in eachrow(grad[1][2:end,:])]    
+
     N = length(dC)
     A = typeof(state_map)
     analytic_dJ = nothing
     analytic_dC = fill(nothing,N)
 
-    return new{N,A}(φ_to_jc,dJ,dC,analytic_dJ,analytic_dC,state_map)
+    return new{N,A}(φ_to_jc,dJ,dC,analytic_dJ,analytic_dC,state_map,U_reg)
   end
 end
 
@@ -1066,6 +1069,19 @@ function Fields.evaluate!(pcf::CustomPDEConstrainedFunctionals,φh)
   c = obj[2:end]
   copy!(dJ,grad[1][1,:])
   copy!(dC,[collect(row) for row in eachrow(grad[1][2:end,:])])
+
+
+  # Move the below out of this function
+  function add_zero_dirichlet_according_to_U_reg(dJ)
+    U = get_trial_space(pcf.state_map)
+    ∂Jₕ = FEFunction(U,dJ)
+    U_reg = pcf.U_reg
+    ∂Jₕ_constrained = interpolate(∂Jₕ,U_reg)
+    return get_free_dof_values(∂Jₕ_constrained)
+  end
+  dJ = add_zero_dirichlet_according_to_U_reg(dJ)
+  dC = map(add_zero_dirichlet_according_to_U_reg,dC)
+
 
   return j,c,dJ,dC
 end
