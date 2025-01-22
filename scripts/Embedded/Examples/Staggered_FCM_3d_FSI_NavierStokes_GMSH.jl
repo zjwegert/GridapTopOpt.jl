@@ -263,6 +263,9 @@ function main(ranks)
   res_solid(((u,p),),d,s,φ) = a_solid(((u,p),),d,s,φ) - l_solid(((u,p),),s,φ)
   jac_solid(((u,p),),d,dd,s,φ) = a_solid(((u,p),),dd,s,φ)
 
+  ∂R2∂xh1((du,dp),((u,p),),d,s,φ) = -1*l_solid(((du,dp),),s,φ)
+  ∂Rk∂xhi = ((∂R2∂xh1,),)
+
   # ## Optimisation functionals
   J_comp(((u,p),d),φ) = ∫(ε(d) ⊙ (σ ∘ ε(d)))Ω.dΩs
   Vol(((u,p),d),φ) = ∫(vol_D)Ω.dΩs - ∫(vf/vol_D)dΩ_act
@@ -274,7 +277,7 @@ function main(ranks)
   solver = StaggeredFESolver([fluid_nls,elast_nls]);
 
   op = StaggeredNonlinearFEOperator([res_fluid,res_solid],[jac_fluid_newton,jac_solid],[UP,R],[VQ,T])
-  state_map = StaggeredNonlinearFEStateMap(op,V_φ,U_reg,φh;solver,adjoint_solver=solver)
+  state_map = StaggeredNonlinearFEStateMap(op,∂Rk∂xhi,V_φ,U_reg,φh;solver,adjoint_solver=solver)
   pcfs = PDEConstrainedFunctionals(J_comp,[Vol],state_map,analytic_dC=[dVol])
 
   ## Evolution Method
