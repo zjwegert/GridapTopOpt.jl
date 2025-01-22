@@ -1,7 +1,8 @@
 // Gmsh project created on Mon Jan 20 21:49:56 2025
 SetFactory("OpenCASCADE");
+Mesh.SaveAll=1;
 
-// mesh_size = 0.01; // User -setnumber mesh_size 0.01
+mesh_size = {{:mesh_size}};
 
 Rectangle(1) = {0, 0, 0, 1, 0.5, 0};
 Disk(2) = {0.5, 0.2, -0, 0.1, 0.1};

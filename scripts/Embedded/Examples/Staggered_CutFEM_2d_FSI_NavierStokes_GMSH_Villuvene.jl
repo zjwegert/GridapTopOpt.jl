@@ -9,7 +9,7 @@ LinearAlgebra.norm(x::VectorValue,p::Real) = norm(x.data,p)
 Base.abs(x::VectorValue) = VectorValue(abs.(x.data))
 Base.sign(x::VectorValue) = VectorValue(sign.(x.data))
 
-path = "./results/Staggered_CutFEM_2d_FSI_NavierStokes_GMSH_Villuvene/"
+path = "./results/Staggered_CutFEM_2d_FSI_NavierStokes_GMSH_Villuvene_fixed/"
 mkpath(path)
 
 γ_evo = 0.2
@@ -138,9 +138,9 @@ u0_max = maximum(abs,get_dirichlet_dof_values(init_X[1]))
 # Stabilization parameters
 α_Nu   = 1000
 α_SUPG = 1/3
-α_GPμ  = 0.05
-α_GPp  = 0.05
-α_GPu  = 0.05
+α_GPμ  = 0.001
+α_GPp  = 0.001
+α_GPu  = 0.001
 
 γ_Nu(h,u)    = α_Nu*(μ/h + ρ*norm(u,Inf)/6) # (Eqn. 13, Villanueva and Maute, 2017)
 τ_SUPG(h,u)  = α_SUPG*((2norm(u)/h)^2 + 9*(4ν/h^2)^2)^-0.5 # (Eqn. 31, Peterson et al., 2018)
@@ -152,7 +152,7 @@ u0_max = maximum(abs,get_dirichlet_dof_values(init_X[1]))
 k_p          = 1.0 # (Villanueva and Maute, 2017)
 
 # Terms
-βp = 1; βμ = 1;
+βp = -1; βμ = 1;
 
 δ = one(SymTensorValue{D,Float64})
 σ_f(ε,p) = -p*δ + 2μ*ε
@@ -179,7 +179,7 @@ dr_SUPG((u,p),(du,dp),(v,q),w) =
   ((τ_SUPG ∘ (hₕ,w))*(conv ∘ (u,∇(v))) + (τ_PSPG ∘ (hₕ,w))/ρ*∇(q))⋅(ρ*(dconv∘(du,∇(du),u,∇(u))) + ∇(dp) - μ*Δ(du))
 
 function res_fluid((),(u,p),(v,q),φ)
-  n_Γ = get_normal_vector(Ω.Γ)
+  n_Γ = -get_normal_vector(Ω.Γ)
   return ∫(r_conv(u,v) + r_Ωf((u,p),(v,q)))Ω.dΩf +
     ∫(r_SUPG((u,p),(v,q),u))Ω.dΩ_act_f +
     ∫(r_ψ(p,q))Ω.dΩf +
@@ -188,7 +188,7 @@ function res_fluid((),(u,p),(v,q),φ)
 end
 
 function jac_fluid_picard((),(u,p),(du,dp),(v,q),φ)
-  n_Γ = get_normal_vector(Ω.Γ)
+  n_Γ = -get_normal_vector(Ω.Γ)
   return ∫(ρ*v ⋅ (conv∘(u,∇(du))) + r_Ωf((du,dp),(v,q)))Ω.dΩf +
     ∫(r_SUPG_picard((du,dp),(v,q),u))Ω.dΩ_act_f +
     ∫(r_ψ(dp,q))Ω.dΩf +
@@ -197,7 +197,7 @@ function jac_fluid_picard((),(u,p),(du,dp),(v,q),φ)
 end
 
 function jac_fluid_newton((),(u,p),(du,dp),(v,q),φ)
-  n_Γ = get_normal_vector(Ω.Γ)
+  n_Γ = -get_normal_vector(Ω.Γ)
   return ∫(dr_conv(u,du,v) + r_Ωf((du,dp),(v,q)))Ω.dΩf +
     ∫(dr_SUPG((u,p),(du,dp),(v,q),u))Ω.dΩ_act_f +
     ∫(r_ψ(dp,q))Ω.dΩf +
@@ -227,8 +227,8 @@ function a_solid(((u,p),),d,s,φ)
   return ∫(a_s_Ω(s,d))Ω.dΩs + ∫(j_s_k(s,d) + 0mean(φ))Ω.dΓg + ∫(v_s_ψ(s,d))Ω.dΩs
 end
 function l_solid(((u,p),),s,φ)
-  n = get_normal_vector(Ω.Γ)
-  return ∫(s ⋅ ((1-Ω.ψ_s)*σ_f(ε(u),p) ⋅ n))Ω.dΓ
+  n = -get_normal_vector(Ω.Γ)
+  return ∫(-s ⋅ ((1-Ω.ψ_s)*σ_f(ε(u),p) ⋅ n))Ω.dΓ
 end
 
 res_solid(((u,p),),d,s,φ) = a_solid(((u,p),),d,s,φ) - l_solid(((u,p),),s,φ)

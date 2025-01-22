@@ -146,7 +146,7 @@ j_Γg(p,q) = mean(γ_GPp ∘ hₕ)*jump(Ω.n_Γg ⋅ ∇(p)) * jump(Ω.n_Γg ⋅
 v_χ(p,q) = k_p * Ω.χ_f*p*q # (Isolated volume term, Eqn. 15, Villanueva and Maute, 2017)
 
 function a_fluid((),(u,p),(v,q),φ)
-  n_Γ = get_normal_vector(Ω.Γ)
+  n_Γ = -get_normal_vector(Ω.Γ)
   return ∫( a_Ω(u,v)+b_Ω(u,q)+b_Ω(v,p)-c_Ω(p,q) )Ω.dΩf + # Volume terms
     ∫( a_Γ(u,v,n_Γ)+b_Γ(u,q,n_Γ)+b_Γ(v,p,n_Γ) )Ω.dΓ +    # Interface terms
     ∫( i_Γg(u,v) - j_Γg(p,q) )Ω.dΓg +                    # Ghost penalty terms
@@ -177,8 +177,8 @@ function a_solid(((u,p),),d,s,φ)
   return ∫(a_s_Ω(s,d))Ω.dΩs + ∫(j_s_k(s,d))Ω.dΓg + ∫(v_s_χ(s,d))Ω.dΩs
 end
 function l_solid(((u,p),),s,φ)
-  n = get_normal_vector(Ω.Γ)
-  return ∫(σf_n(u,p,n) ⋅ s)Ω.dΓ
+  n = -get_normal_vector(Ω.Γ)
+  return ∫(-σf_n(u,p,n) ⋅ s)Ω.dΓ
 end
 
 ∂R2∂xh1((du,dp),((u,p),),d,s,φ) = -1*l_solid(((du,dp),),s,φ)

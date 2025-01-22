@@ -1,10 +1,13 @@
-using Gridap, Gridap.Geometry, Gridap.Adaptivity, Gridap.MultiField
+using Gridap, Gridap.Geometry, Gridap.Adaptivity, Gridap.MultiField, Gridap.TensorValues
 using GridapEmbedded, GridapEmbedded.LevelSetCutters
 using GridapSolvers, GridapSolvers.BlockSolvers, GridapSolvers.NonlinearSolvers
 using GridapGmsh
 using GridapTopOpt
 
 using GridapDistributed,PartitionedArrays,GridapPETSc
+
+using LinearAlgebra
+LinearAlgebra.norm(x::VectorValue,p::Real) = norm(x.data,p)
 
 function test_mesh(model)
   grid_topology = Geometry.get_grid_topology(model)
@@ -88,10 +91,10 @@ function main(ranks)
   i_am_main(ranks) && mkpath(path)
 
   γ_evo = 0.2
-  max_steps = 24 # TODO: check this
+  max_steps = 10
   vf = 0.025
   α_coeff = γ_evo*max_steps
-  iter_mod = 1
+  iter_mod = 10
   D = 3
 
   # Load gmsh mesh (Currently need to update mesh.geo and these values concurrently)
@@ -108,7 +111,6 @@ function main(ranks)
   model = GmshDiscreteModel(ranks,(@__DIR__)*"/fsi/gmsh/mesh_3d_finer.msh")
   map(test_mesh,local_views(model))
   writevtk(model,path*"model")
-  # return model
 
   Ω_act = Triangulation(model)
   hₕ = get_element_diameter_field(model)
@@ -151,13 +153,9 @@ function main(ranks)
       :dΓg     => Measure(Γg,degree),
       :n_Γg    => get_normal_vector(Γg),
       :Γ       => Γ,
-      :dΓ      => Measure(Γ,degree),
-      :χ_s     => GridapTopOpt.get_isolated_volumes_mask(cutgeo,["Gamma_s_D"];IN_is=IN),
-      :χ_f     => GridapTopOpt.get_isolated_volumes_mask(cutgeo,["Gamma_f_D"];IN_is=OUT)
+      :dΓ      => Measure(Γ,degree)
     )
   end
-  writevtk(get_triangulation(φh),path*"initial_islands",cellfields=["χ_s"=>Ω.χ_s,"χ_f"=>Ω.χ_f])
-  writevtk(Ω.Ωs,path*"Omega_s_initial")
 
   # Setup spaces
   uin(x) = VectorValue(x[2],0.0,0.0)
@@ -189,39 +187,56 @@ function main(ranks)
   # Properties
   Re = 60 # Reynolds number
   ρ = 1.0 # Density
-  NS = 0 # 0 for Stokes, 1 for Navier-Stokes
   cl = a # Characteristic length
   u0_max = 1.0
   μ = ρ*cl*u0_max/Re # Viscosity
   ν = μ/ρ # Kinematic viscosity
 
   # Stabilization parameters
-  α_Nu    = 2.5
-  α_PSPG = 1/3
+  α_Nu   = 1000
+  α_SUPG = 1/3
 
-  γ_Nu(h)    = α_Nu*μ/0.0001^2
-  τ_PSPG(h,u) = α_PSPG*((NS*2norm(u)/h)^2 + 9*(4ν/h^2)^2)^-0.5 # (Eqn. 31, Peterson et al., 2018)
+  γ_Nu(h,u)    = α_Nu*(μ/h + ρ*norm(u,Inf)/6) # (Eqn. 13, Villanueva and Maute, 2017)
+  τ_SUPG(h,u)  = α_SUPG*((2norm(u)/h)^2 + 9*(4ν/h^2)^2)^-0.5 # (Eqn. 31, Peterson et al., 2018)
+  τ_PSPG(h,u)  = τ_SUPG(h,u) # (Sec. 3.2.2, Peterson et al., 2018)
 
   # Terms
-  σf_n(u,p,n) = μ*∇(u) ⋅ n - p*n
-  a_Ω(u,v) = μ*(∇(u) ⊙ ∇(v)) # (Eqn. 3.3, Massing et al., 2014)
-  b_Ω(v,p) = - (∇ ⋅ v)*p # (Eqn. 3.4, Massing et al., 2014)
-  c_Ω(p,q,u) = (τ_PSPG ∘ (hₕ,u))*1/ρ*(∇(p) ⋅ ∇(q)) # (Eqn. 3.7, Massing et al., 2014)
+  δ = one(SymTensorValue{D,Float64})
+  σ_f(ε,p) = -p*δ + 2μ*ε
+  σ_f_β(ε,p) = -βp*p*δ + βμ*2μ*ε
 
-  a_fluid((u,p),(v,q),φ) =
-    ∫( a_Ω(u,v)+b_Ω(u,q)+b_Ω(v,p) )Ω.dΩf + # Volume terms
-    ∫( a_Ω(u,v)+b_Ω(u,q)+b_Ω(v,p)+(γ_Nu ∘ hₕ)*(u⋅v) )Ω.dΩs # Stabilization terms
-
-  a_PSPG((u,p),(v,q),φ) = ∫( -c_Ω(p,q,u) )Ω.dΩf + ∫( -c_Ω(p,q,u) )Ω.dΩs
-  jac_PSPG((u,p),(du,dp),(v,q),φ) = ∫( -c_Ω(dp,q,u) )Ω.dΩf + ∫( -c_Ω(dp,q,u) )Ω.dΩs # Shouldn't diff through u in τ_PSPG
-
-  conv(u,∇u) = NS*ρ*(∇u') ⋅ u
+  conv(u,∇u) = (∇u') ⋅ u
   dconv(du,∇du,u,∇u) = conv(u,∇du)+conv(du,∇u)
-  c(u,v,φ) = ∫( v ⋅ (conv∘(u,∇(u))) )Ω.dΩf + ∫( v ⋅ (conv∘(u,∇(u))) )Ω.dΩs
-  dc(u,du,v,φ) = ∫( v ⋅ (dconv∘(du,∇(du),u,∇(u))) )Ω.dΩf + ∫( v ⋅ (dconv∘(du,∇(du),u,∇(u))) )Ω.dΩs
 
-  res_fluid((),(u,p),(v,q),φ) = a_fluid((u,p),(v,q),φ) + a_PSPG((u,p),(v,q),φ) + c(u,v,φ)
-  jac_fluid((),(u,p),(du,dp),(v,q),φ) = a_fluid((du,dp),(v,q),φ) + jac_PSPG((u,p),(du,dp),(v,q),φ) + dc(u,du,v,φ)
+  r_conv(u,v) = ρ*v ⋅ (conv∘(u,∇(u)))
+  r_Ωf((u,p),(v,q)) = ε(v) ⊙ (σ_f ∘ (ε(u),p)) + q*(∇⋅u)
+  r_SUPG((u,p),(v,q),w) = ((τ_SUPG ∘ (hₕ,w))*(conv ∘ (u,∇(v))) + (τ_PSPG ∘ (hₕ,w))/ρ*∇(q))⋅
+    (ρ*(conv∘(u,∇(u))) + ∇(p) - μ*Δ(u))
+  r_SUPG_picard((u,p),(v,q),w) = ((τ_SUPG ∘ (hₕ,w))*(conv ∘ (w,∇(v))) + (τ_PSPG ∘ (hₕ,w))/ρ*∇(q))⋅
+    (ρ*(conv∘(w,∇(u))) + ∇(p) - μ*Δ(u))
+
+  dr_conv(u,du,v) = ρ*v ⋅ (dconv∘(du,∇(du),u,∇(u)))
+  dr_SUPG((u,p),(du,dp),(v,q),w) =
+    ((τ_SUPG ∘ (hₕ,w))*(conv ∘ (du,∇(v))))⋅(ρ*(conv∘(u,∇(u))) + ∇(p) - μ*Δ(u)) +
+    ((τ_SUPG ∘ (hₕ,w))*(conv ∘ (u,∇(v))) + (τ_PSPG ∘ (hₕ,w))/ρ*∇(q))⋅(ρ*(dconv∘(du,∇(du),u,∇(u))) + ∇(dp) - μ*Δ(du))
+
+  function res_fluid((),(u,p),(v,q),φ)
+    return ∫(r_conv(u,v) + r_Ωf((u,p),(v,q)))Ω.dΩf +
+      ∫(r_conv(u,v) + r_Ωf((u,p),(v,q)) + (γ_Nu ∘ (hₕ,u))*(u⋅v))Ω.dΩs +
+      ∫(r_SUPG((u,p),(v,q),u))dΩ_act
+  end
+
+  function jac_fluid_picard((),(u,p),(du,dp),(v,q),φ)
+    return ∫(ρ*v ⋅ (conv∘(u,∇(du))) + r_Ωf((du,dp),(v,q)))Ω.dΩs +
+    ∫(ρ*v ⋅ (conv∘(u,∇(du))) + r_Ωf((du,dp),(v,q)) + (γ_Nu ∘ (hₕ,u))*(du⋅v))Ω.dΩf +
+      ∫(r_SUPG_picard((du,dp),(v,q),u))dΩ_act
+  end
+
+  function jac_fluid_newton((),(u,p),(du,dp),(v,q),φ)
+    return ∫(dr_conv(u,du,v) + r_Ωf((du,dp),(v,q)))Ω.dΩf +
+      ∫(dr_conv(u,du,v) + r_Ωf((du,dp),(v,q)) + (γ_Nu ∘ (hₕ,u))*(du⋅v))Ω.dΩs +
+      ∫(dr_SUPG((u,p),(du,dp),(v,q),u))dΩ_act
+  end
 
   ## Structure
   # Material parameters
@@ -242,7 +257,7 @@ function main(ranks)
   end
   function l_solid(((u,p),),s,φ)
     n = get_normal_vector(Ω.Γ)
-    return ∫(σf_n(u,p,n) ⋅ s)Ω.dΓ
+    return ∫(s ⋅ (σ_f(ε(u),p) ⋅ n))Ω.dΓ
   end
 
   res_solid(((u,p),),d,s,φ) = a_solid(((u,p),),d,s,φ) - l_solid(((u,p),),s,φ)
@@ -251,15 +266,16 @@ function main(ranks)
   # ## Optimisation functionals
   J_comp(((u,p),d),φ) = ∫(ε(d) ⊙ (σ ∘ ε(d)))Ω.dΩs
   Vol(((u,p),d),φ) = ∫(vol_D)Ω.dΩs - ∫(vf/vol_D)dΩ_act
+  dVol(q,(u,p,d),φ) = ∫(-1/vol_D*q/(norm ∘ (∇(φ))))Ω.dΓ
 
   ## Staggered operators
   fluid_nls = NewtonSolver(MUMPSSolver();maxiter=10,rtol=1.e-8,verbose=i_am_main(ranks))
   elast_nls = NewtonSolver(ElasticitySolver(R;rtol=1.e-8,maxits=200);maxiter=1,verbose=i_am_main(ranks))
   solver = StaggeredFESolver([fluid_nls,elast_nls]);
 
-  op = StaggeredNonlinearFEOperator([res_fluid,res_solid],[jac_fluid,jac_solid],[UP,R],[VQ,T])
+  op = StaggeredNonlinearFEOperator([res_fluid,res_solid],[jac_fluid_newton,jac_solid],[UP,R],[VQ,T])
   state_map = StaggeredNonlinearFEStateMap(op,V_φ,U_reg,φh;solver,adjoint_solver=solver)
-  pcfs = PDEConstrainedFunctionals(J_comp,[Vol],state_map)
+  pcfs = PDEConstrainedFunctionals(J_comp,[Vol],state_map,analytic_dC=[dVol])
 
   ## Evolution Method
   evolve_ls = MUMPSSolver()
@@ -303,8 +319,12 @@ function main(ranks)
     end
     write_history(path*"/history.txt",optimiser.history;ranks)
 
-    # φ = get_free_dof_values(φh)
-    # φ .= min.(φ,get_free_dof_values(φh_nondesign))
+    # # Geometric operation to re-add the non-designable region # TODO: Move to a function
+    # _φ = get_free_dof_values(φh)
+    # _φ_nondesign = get_free_dof_values(φh_nondesign)
+    # map(local_views(_φ),local_views(_φ_nondesign)) do φ,φ_nondesign
+    #   φ .= min.(φ,φ_nondesign)
+    # end
     # reinit!(ls_evo,φh)
   end
   it = get_history(optimiser).niter; uh,ph,dh = get_state(pcfs)
@@ -317,8 +337,8 @@ function main(ranks)
 end
 
 with_mpi() do distribute
-  mesh_partition = (2,2,2)
-  ranks = distribute(LinearIndices((prod(mesh_partition),)))
+  ncpus = 96
+  ranks = distribute(LinearIndices((ncpus,)))
   petsc_options = "-ksp_converged_reason -ksp_error_if_not_converged true -ksp_gmres_modifiedgramschmidt"
   GridapPETSc.with(;args=split(petsc_options)) do
     main(ranks)
