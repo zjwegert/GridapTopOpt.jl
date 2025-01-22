@@ -133,6 +133,17 @@ function PDEConstrainedFunctionals(
 end
 
 function PDEConstrainedFunctionals(
+  objective   :: StaggeredStateParamMap,
+  constraints :: Vector{<:StaggeredStateParamMap},
+  state_map   :: StaggeredFEStateMapTypes;
+  analytic_dJ = nothing,
+  analytic_dC = fill(nothing,length(constraints)))
+
+# Create StateParamMaps
+return PDEConstrainedFunctionals(objective,constraints,state_map;analytic_dJ,analytic_dC)
+end
+
+function PDEConstrainedFunctionals(
   objective   :: Function,
   constraints :: Vector{<:Function},
   state_map   :: StaggeredFEStateMapTypes;

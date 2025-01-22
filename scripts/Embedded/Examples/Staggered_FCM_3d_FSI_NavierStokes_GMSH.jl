@@ -268,8 +268,15 @@ function main(ranks)
 
   # ## Optimisation functionals
   J_comp(((u,p),d),φ) = ∫(ε(d) ⊙ (σ ∘ ε(d)))Ω.dΩs
+  ∂Jcomp∂up((du,dp),((u,p),d),φ) = ∫(0dp)Ω.dΩs
+  ∂Jcomp∂d(dd,((u,p),d),φ) = ∫(ε(dd) ⊙ (σ ∘ ε(d)))Ω.dΩs + ∫(ε(d) ⊙ (σ ∘ ε(dd)))Ω.dΩs
+  ∂Jcomp∂xhi = (∂Jcomp∂up,∂Jcomp∂d)
+
   Vol(((u,p),d),φ) = ∫(vol_D)Ω.dΩs - ∫(vf/vol_D)dΩ_act
   dVol(q,(u,p,d),φ) = ∫(-1/vol_D*q/(norm ∘ (∇(φ))))Ω.dΓ
+  ∂Vol∂up((du,dp),((u,p),d),φ) = ∫(0dp)dΩ_act
+  ∂Vol∂d(dd,((u,p),d),φ) = ∫(0dd ⋅ d)dΩ_act
+  ∂Vol∂xhi = (∂Vol∂up,∂Vol∂d)
 
   ## Staggered operators
   fluid_nls = NewtonSolver(MUMPSSolver();maxiter=10,rtol=1.e-8,verbose=i_am_main(ranks))
@@ -278,7 +285,11 @@ function main(ranks)
 
   op = StaggeredNonlinearFEOperator([res_fluid,res_solid],[jac_fluid_newton,jac_solid],[UP,R],[VQ,T])
   state_map = StaggeredNonlinearFEStateMap(op,∂Rk∂xhi,V_φ,U_reg,φh;solver,adjoint_solver=solver)
-  pcfs = PDEConstrainedFunctionals(J_comp,[Vol],state_map,analytic_dC=[dVol])
+
+  J_sm = GridapTopOpt.StaggeredStateParamMap(J_comp,∂Jcomp∂xhi,state_map)
+  C_sm = map(((Ci,∂Ci),) -> GridapTopOpt.StaggeredStateParamMap(Ci,∂Ci,state_map),[(Vol,∂Vol∂xhi),])
+  pcfs = PDEConstrainedFunctionals(J_sm,C_sm,state_map;analytic_dC=[dVol])
+  # pcfs = PDEConstrainedFunctionals(J_comp,[Vol],state_map,analytic_dC=[dVol])
 
   ## Evolution Method
   evolve_ls = MUMPSSolver()
