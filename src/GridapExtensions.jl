@@ -96,27 +96,28 @@ end
 
 ################# Gridap convience #################
 # Allow to swap test and trial in AffineFEOperator
-function Gridap.FESpaces.AffineFEOperator(
-  weakform::Function,trial::FESpace,test::FESpace,assem::Assembler)
-  if isa(test,TrialFESpace)
-    @warn """\n
-    You are building an AffineFEOperator with a test space of type TrialFESpace.
+# TODO: Don't do this, currently it will cause problems with AD!!
+# function Gridap.FESpaces.AffineFEOperator(
+#   weakform::Function,trial::FESpace,test::FESpace,assem::Assembler)
+#   if isa(test,TrialFESpace)
+#     @warn """\n
+#     You are building an AffineFEOperator with a test space of type TrialFESpace.
 
-    This may result in unexpected behaviour.
-    """ maxlog=1
-  end
+#     This may result in unexpected behaviour.
+#     """ maxlog=1
+#   end
 
-  u = get_trial_fe_basis(trial)
-  v = get_fe_basis(test)
+#   u = get_trial_fe_basis(trial)
+#   v = get_fe_basis(test)
 
-  uhd = zero(trial)
-  matcontribs, veccontribs = weakform(u,v)
-  data = collect_cell_matrix_and_vector(trial,test,matcontribs,veccontribs,uhd)
-  A,b = assemble_matrix_and_vector(assem,data)
-  #GC.gc()
+#   uhd = zero(trial)
+#   matcontribs, veccontribs = weakform(u,v)
+#   data = collect_cell_matrix_and_vector(trial,test,matcontribs,veccontribs,uhd)
+#   A,b = assemble_matrix_and_vector(assem,data)
+#   #GC.gc()
 
-  AffineFEOperator(trial,test,A,b)
-end
+#   AffineFEOperator(trial,test,A,b)
+# end
 
 # Base.one for FESpace
 function Base.one(f::FESpace)
@@ -180,6 +181,154 @@ function MultiField.get_block_ranges(spaces::Vector{<:FESpace})
   SB = Tuple(map(num_fields,spaces))
   MultiField.get_block_ranges(NB,SB,Tuple(1:sum(SB)))
 end
+
+# StaggeredAdjointAffineFEOperator
+# TODO: Jordi, this was created because there is a problem with AD when the
+#   trial and test spaces are swapped. The below fixes this because we assemble
+#   the adjoint directly. We should look into this problem in future.
+
+using GridapSolvers.BlockSolvers: BlockFESpaceTypes, BlockSparseMatrixAssembler
+
+"""
+    struct StaggeredAdjointAffineFEOperator{NB,SB} <: StaggeredFEOperator{NB,SB}
+      ...
+    end
+
+Affine staggered operator, used to solve staggered problems
+where the k-th equation is linear in `u_k` and the transpose of the stiffness
+matrix is assembled.
+
+Such a problem is formulated by a set of bilinear/linear form pairs:
+
+    a_k((u_1,...,u_{k-1}),u_k,v_k) = ∫(...)
+    l_k((u_1,...,u_{k-1}),v_k) = ∫(...)
+
+than cam be assembled into a set of linear systems:
+
+    A_kᵀ u_k = b_k
+
+where `A_kᵀ` and `b_k` only depend on the previous variables `u_1,...,u_{k-1}` and
+`A_kᵀ` is the tranpose of `A_k`.
+"""
+struct StaggeredAdjointAffineFEOperator{NB,SB} <: StaggeredFEOperator{NB,SB}
+  biforms :: Vector{<:Function}
+  liforms :: Vector{<:Function}
+  trials  :: Vector{<:FESpace}
+  tests   :: Vector{<:FESpace}
+  assems  :: Vector{<:Assembler}
+  trial   :: BlockFESpaceTypes{NB,SB}
+  test    :: BlockFESpaceTypes{NB,SB}
+
+  @doc """
+    function StaggeredAdjointAffineFEOperator(
+      biforms :: Vector{<:Function},
+      liforms :: Vector{<:Function},
+      trials  :: Vector{<:FESpace},
+      tests   :: Vector{<:FESpace},
+      [assems :: Vector{<:Assembler}]
+    )
+
+  Constructor for a `StaggeredAdjointAffineFEOperator` operator, taking in each
+  equation as a pair of bilinear/linear forms and the corresponding trial/test spaces.
+  The trial/test spaces can be single or multi-field spaces.
+  """
+  function StaggeredAdjointAffineFEOperator(
+    biforms :: Vector{<:Function},
+    liforms :: Vector{<:Function},
+    trials  :: Vector{<:FESpace},
+    tests   :: Vector{<:FESpace},
+    assems  :: Vector{<:Assembler} = map(SparseMatrixAssembler,trials,tests)
+  )
+    @assert length(biforms) == length(liforms) == length(trials) == length(tests) == length(assems)
+    trial = combine_fespaces(trials)
+    test  = combine_fespaces(tests)
+    NB, SB = length(trials), Tuple(map(num_fields,trials))
+    new{NB,SB}(biforms,liforms,trials,tests,assems,trial,test)
+  end
+
+  @doc """
+    function StaggeredAdjointAffineFEOperator(
+      biforms :: Vector{<:Function},
+      liforms :: Vector{<:Function},
+      trial   :: BlockFESpaceTypes{NB,SB,P},
+      test    :: BlockFESpaceTypes{NB,SB,P},
+      [assem  :: BlockSparseMatrixAssembler{NB,NV,SB,P}]
+    ) where {NB,NV,SB,P}
+
+  Constructor for a `StaggeredAdjointAffineFEOperator` operator, taking in each
+  equation as a pair of bilinear/linear forms and the global trial/test spaces.
+  """
+  function StaggeredAdjointAffineFEOperator(
+    biforms :: Vector{<:Function},
+    liforms :: Vector{<:Function},
+    trial   :: BlockFESpaceTypes{NB,SB,P},
+    test    :: BlockFESpaceTypes{NB,SB,P},
+    assem   :: BlockSparseMatrixAssembler{NB,NV,SB,P} = SparseMatrixAssembler(trial,test)
+  ) where {NB,NV,SB,P}
+    @assert length(biforms) == length(liforms) == NB
+    @assert P == Tuple(1:sum(SB)) "Permutations not supported"
+    trials = blocks(trial)
+    tests  = blocks(test)
+    assems = diag(blocks(assem))
+    new{NB,SB}(biforms,liforms,trials,tests,assems,trial,test)
+  end
+end
+
+FESpaces.get_trial(op::StaggeredAdjointAffineFEOperator) = op.trial
+FESpaces.get_test(op::StaggeredAdjointAffineFEOperator) = op.test
+
+function GridapSolvers.BlockSolvers.get_operator(op::StaggeredAdjointAffineFEOperator{NB}, xhs, k) where NB
+  @assert NB >= k
+  a(uk,vk) = op.biforms[k](xhs,uk,vk)
+  l(vk) = op.liforms[k](xhs,vk)
+  A = assemble_adjoint_matrix(a,op.assems[k],op.trials[k],op.tests[k])
+  b = assemble_vector(l,op.assems[k],op.tests[k])
+  affine_op = AffineOperator(A,b)
+  return AffineFEOperator(op.trials[k],op.tests[k],affine_op)
+end
+
+function GridapSolvers.BlockSolvers.get_operator!(op_k::AffineFEOperator, op::StaggeredAdjointAffineFEOperator{NB}, xhs, k) where NB
+  @assert NB >= k
+  A, b = get_matrix(op_k), get_vector(op_k)
+  a(uk,vk) = op.biforms[k](xhs,uk,vk)
+  l(vk) = op.liforms[k](xhs,vk)
+  assemble_adjoint_matrix!(a,A,op.assems[k],op.trials[k],op.tests[k])
+  assemble_vector!(l,b,op.assems[k],op.tests[k])
+  return op_k
+end
+
+# function assemble_adjoint_matrix_and_vector(f::Function,b::Function,a::Assembler,U::FESpace,V::FESpace,uhd)
+#   v = get_fe_basis(V)
+#   u = get_trial_fe_basis(U)
+#   fcontr = transpose_contributions(f(u,v))
+#   assemble_matrix_and_vector(a,collect_cell_matrix_and_vector(V,U,fcontr,b(v),uhd))
+# end
+
+# function assemble_adjoint_matrix_and_vector!(f::Function,b::Function,A::AbstractMatrix,B::AbstractVector,
+#     a::Assembler,U::FESpace,V::FESpace,uhd)
+#   v = get_fe_basis(V)
+#   u = get_trial_fe_basis(U)
+#   fcontr = transpose_contributions(f(u,v))
+#   assemble_matrix_and_vector!(A,B,a,collect_cell_matrix_and_vector(V,U,fcontr,b(v),uhd))
+# end
+
+# function GridapSolvers.BlockSolvers.get_operator(op::StaggeredAdjointAffineFEOperator{NB}, xhs, k) where NB
+#   @assert NB >= k
+#   a(uk,vk) = op.biforms[k](xhs,uk,vk)
+#   l(vk) = op.liforms[k](xhs,vk)
+#   A, b = assemble_adjoint_matrix_and_vector(a,l,op.assems[k],op.trials[k],op.tests[k],zero(op.tests[k]))
+#   affine_op = AffineOperator(A,b)
+#   return AffineFEOperator(op.trials[k],op.tests[k],affine_op)
+# end
+
+# function GridapSolvers.BlockSolvers.get_operator!(op_k::AffineFEOperator, op::StaggeredAdjointAffineFEOperator{NB}, xhs, k) where NB
+#   @assert NB >= k
+#   A, b = get_matrix(op_k), get_vector(op_k)
+#   a(uk,vk) = op.biforms[k](xhs,uk,vk)
+#   l(vk) = op.liforms[k](xhs,vk)
+#   assemble_adjoint_matrix_and_vector!(a,l,A,b,op.assems[k],op.trials[k],op.tests[k],zero(op.tests[k]))
+#   return op_k
+# end
 
 ################# Embedded #################
 # Fix for isbitstype bug in Gridap.Polynomials

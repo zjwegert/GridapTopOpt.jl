@@ -13,6 +13,7 @@ using Test
   include("ThreeStaggeredNonlinearFEStateMapTest.jl")
 
   include("TwoStaggeredAffineFEStateMapTest_ADTypeUnstableBug.jl")
+  include("NonSymmetricThreeStaggeredNonlinearFEStateMapTest.jl")
 end
 
 end # module

@@ -1,4 +1,4 @@
-module ThreeStaggeredNonlinearFEStateMapTest
+module NonSymmetricThreeStaggeredNonlinearFEStateMapTest
 
 using GridapTopOpt
 using Gridap, Gridap.MultiField
@@ -32,12 +32,12 @@ function main(;verbose,analytic_partials)
   dF(u,du) = 2.0 * u * du + du
 
   r1((),u1,v1,φ) = ∫((F(u1) - φ * F(sol[1])) * v1)dΩ
-  r2((u1,),(u2,u3),(v2,v3),φ) = ∫(φ * u1 * (F(u2) - F(sol[2])) * v2)dΩ + ∫((F(u3) - F(sol[3])) * v3)dΩ
+  r2((u1,),(u2,u3),(v2,v3),φ) = ∫(φ * u1 * (F(u2) - F(sol[2])) * v2)dΩ + ∫((F(u3) - F(sol[3])) * v3)dΩ + ∫(u2 * v3)dΩ
   r3((u1,(u2,u3)),u4,v4,φ) = ∫(u3 * (φ * F(u4) - F(sol[4])) * v4)dΩ
 
   if analytic_partials
     j1 = ((),u1,du1,dv1,φ) -> ∫(dF(u1,du1) * dv1)dΩ
-    j2 = ((u1,),(u2,u3),(du2,du3),(dv2,dv3),φ) -> ∫(u1 * φ *  dF(u2,du2) * dv2)dΩ + ∫(dF(u3,du3) * dv3)dΩ
+    j2 = ((u1,),(u2,u3),(du2,du3),(dv2,dv3),φ) -> ∫(u1 * φ *  dF(u2,du2) * dv2)dΩ + ∫(dF(u3,du3) * dv3)dΩ + ∫(du2 * dv3)dΩ
     j3 = ((u1,(u2,u3)),u4,du4,dv4,φ) -> ∫(φ * u3 * dF(u4,du4) * dv4)dΩ
   else
     j1 = ((),u1,du1,v1,φ) -> Gridap.jacobian((u1,v1,φ)->r1((),u1,v1,φ),[u1,v1,φ],1)
@@ -65,22 +65,6 @@ function main(;verbose,analytic_partials)
   else
     φ_to_u = StaggeredNonlinearFEStateMap(op,V_φ,U_reg,φh;solver)
   end
-
-  ## Test solution
-  GridapTopOpt.forward_solve!(φ_to_u,φh)
-  xh = get_state(φ_to_u)
-  xh_exact = interpolate(sol,op.trial)
-  for k in 1:length(sol)
-    eh_k = xh[k] - xh_exact[k]
-    e_k = sqrt(sum(∫(eh_k * eh_k)dΩ))
-    verbose && println("Error in field $k: $e_k")
-    @test e_k < 1e-10
-  end
-
-  ## Update LSF for testing gradient
-  φh = interpolate(x->x[1]*x[2]+1,V_φ)
-  GridapTopOpt.forward_solve!(φ_to_u,φh)
-  xh = get_state(φ_to_u)
 
   ## Test gradient
   F((u1,(u2,u3),u4),φ) = ∫(u1*u2*u3*u4*φ)dΩ

@@ -38,6 +38,7 @@ struct StaggeredAffineFEStateMap{NB,SB,A,B,C,D,E,F} <: AbstractFEStateMap
       U_reg           :: FESpace,
       φh;
       assem_deriv     :: Assembler = SparseMatrixAssembler(U_reg,U_reg),
+      assems_adjoint  :: Vector{<:Assembler} = map(SparseMatrixAssembler,op.tests,op.trials),
       solver          :: StaggeredFESolver{NB} = StaggeredFESolver(fill(LUSolver(),length(op.biforms))),
       adjoint_solver  :: StaggeredFESolver{NB} = StaggeredFESolver(fill(LUSolver(),length(op.biforms)))
     ) where {NB,SB}
@@ -73,12 +74,12 @@ struct StaggeredAffineFEStateMap{NB,SB,A,B,C,D,E,F} <: AbstractFEStateMap
     fwd_caches = (zero_free_values(op.trial),op.trial,op_cache,op_at_φ)
 
     ## Adjoint cache
-    op_adjoint = dummy_generate_adjoint_operator(op_at_φ,φh,xh_one,∂Rk∂xhi)
+    op_adjoint = dummy_generate_adjoint_operator(op_at_φ,assems_adjoint,φh,xh_one,∂Rk∂xhi)
     op_cache = _instantiate_caches(xh_one,adjoint_solver,op_adjoint)
     adj_caches = (zero_free_values(op_adjoint.trial),op_adjoint.trial,op_cache,op_adjoint)
 
     spaces = (;trial=op_at_φ.trial,test=op_at_φ.test,aux_space=V_φ,deriv_space=U_reg,trials=op_at_φ.trials,tests=op_at_φ.tests)
-    assems = (;assems=op_at_φ.assems,assem_deriv,adjoint_assems=op_adjoint.assems)
+    assems = (;assems=op_at_φ.assems,assem_deriv,adjoint_assems=assems_adjoint)
     _solvers = (;solver,adjoint_solver)
     A,B,C,D,E,F = typeof(spaces), typeof(assems), typeof(_solvers),
       typeof(plb_caches), typeof(fwd_caches), typeof(adj_caches)
@@ -92,6 +93,7 @@ function StaggeredAffineFEStateMap(
   U_reg           :: FESpace,
   φh;
   assem_deriv     :: Assembler = SparseMatrixAssembler(U_reg,U_reg),
+  assems_adjoint  :: Vector{<:Assembler} = map(SparseMatrixAssembler,op.tests,op.trials),
   solver          :: StaggeredFESolver{NB} = StaggeredFESolver(fill(LUSolver(),length(op.biforms))),
   adjoint_solver  :: StaggeredFESolver{NB} = StaggeredFESolver(fill(LUSolver(),length(op.biforms)))
 ) where {NB,SB}
@@ -111,7 +113,7 @@ function StaggeredAffineFEStateMap(
     ∂Rk∂xhi = (∂Rk∂xhi...,_∂Rk∂xhi)
   end
 
-  return StaggeredAffineFEStateMap(op,∂Rk∂xhi,V_φ,U_reg,φh;assem_deriv,solver,adjoint_solver)
+  return StaggeredAffineFEStateMap(op,∂Rk∂xhi,V_φ,U_reg,φh;assem_deriv,assems_adjoint,solver,adjoint_solver)
 end
 
 get_state(m::StaggeredAffineFEStateMap) = FEFunction(m.fwd_caches[2],m.fwd_caches[1])
@@ -202,6 +204,7 @@ mutable struct StaggeredNonlinearFEStateMap{NB,SB,A,B,C,D,E,F} <: AbstractFEStat
       U_reg             :: FESpace,
       φh;
       assem_deriv       :: Assembler = SparseMatrixAssembler(U_reg,U_reg),
+      assems_adjoint    :: Vector{<:Assembler} = map(SparseMatrixAssembler,op.tests,op.trials),
       solver            :: StaggeredFESolver{NB} = StaggeredFESolver(
         fill(NewtonSolver(LUSolver();maxiter=50,rtol=1.e-8,verbose=true),length(op.residuals))),
       adjoint_solver    :: StaggeredFESolver{NB} = StaggeredFESolver(fill(LUSolver(),length(op.residuals))),
@@ -238,12 +241,12 @@ mutable struct StaggeredNonlinearFEStateMap{NB,SB,A,B,C,D,E,F} <: AbstractFEStat
     fwd_caches = (zero_free_values(op.trial),op.trial,op_cache,op_at_φ)
 
     ## Adjoint cache
-    op_adjoint = dummy_generate_adjoint_operator(op_at_φ,φh,xh_one,∂Rk∂xhi)
+    op_adjoint = dummy_generate_adjoint_operator(op_at_φ,assems_adjoint,φh,xh_one,∂Rk∂xhi)
     op_cache = _instantiate_caches(xh_one,adjoint_solver,op_adjoint)
     adj_caches = (zero_free_values(op_adjoint.trial),op_adjoint.trial,op_cache,op_adjoint)
 
     spaces = (;trial=op_at_φ.trial,test=op_at_φ.test,aux_space=V_φ,deriv_space=U_reg,trials=op_at_φ.trials,tests=op_at_φ.tests)
-    assems = (;assems=op_at_φ.assems,assem_deriv,adjoint_assems=op_adjoint.assems)
+    assems = (;assems=op_at_φ.assems,assem_deriv,adjoint_assems=assems_adjoint)
     _solvers = (;solver,adjoint_solver)
     A,B,C,D,E,F = typeof(spaces), typeof(assems), typeof(_solvers),
       typeof(plb_caches), typeof(fwd_caches), typeof(adj_caches)
@@ -257,6 +260,7 @@ function StaggeredNonlinearFEStateMap(
   U_reg          :: FESpace,
   φh;
   assem_deriv    :: Assembler = SparseMatrixAssembler(U_reg,U_reg),
+  assems_adjoint  :: Vector{<:Assembler} = map(SparseMatrixAssembler,op.tests,op.trials),
   solver         :: StaggeredFESolver{NB} = StaggeredFESolver(
     fill(NewtonSolver(LUSolver();maxiter=50,rtol=1.e-8,verbose=true),length(op.residuals))),
   adjoint_solver :: StaggeredFESolver{NB} = StaggeredFESolver(fill(LUSolver(),length(op.residuals))),
@@ -277,7 +281,7 @@ function StaggeredNonlinearFEStateMap(
     ∂Rk∂xhi = (∂Rk∂xhi...,_∂Rk∂xhi)
   end
 
-  return StaggeredNonlinearFEStateMap(op,∂Rk∂xhi,V_φ,U_reg,φh;assem_deriv,solver,adjoint_solver,adjoint_jacobians)
+  return StaggeredNonlinearFEStateMap(op,∂Rk∂xhi,V_φ,U_reg,φh;assem_deriv,assems_adjoint,solver,adjoint_solver,adjoint_jacobians)
 end
 
 get_state(m::StaggeredNonlinearFEStateMap) = FEFunction(get_trial_space(m),m.fwd_caches[1])
@@ -327,16 +331,20 @@ function get_staggered_operator_at_φ(φ_to_u::StaggeredNonlinearFEStateMap,φh)
   _get_staggered_nonlinear_operator_at_φ(residuals, jacobians, trials, tests, assems, φh)
 end
 
+function get_staggered_operator_at_φ(op::StaggeredNonlinearFEOperator,φh)
+  residuals, jacobians, trials, tests, assems = op.residuals,op.jacobians,
+    op.trials,op.tests,op.assems
+  _get_staggered_nonlinear_operator_at_φ(residuals, jacobians, trials, tests, assems, φh)
+end
+
 function get_staggered_operator_at_φ_with_adjoint_jacs(φ_to_u::StaggeredNonlinearFEStateMap,φh)
   residuals, adjoint_jacobians, trials, tests, assems = φ_to_u.residuals,φ_to_u.adjoint_jacobians,
     φ_to_u.spaces.trials,φ_to_u.spaces.tests,φ_to_u.assems.assems
   _get_staggered_nonlinear_operator_at_φ(residuals, adjoint_jacobians, trials, tests, assems, φh)
 end
 
-function get_staggered_operator_at_φ(op::StaggeredNonlinearFEOperator,φh)
-  residuals, jacobians, trials, tests, assems = op.residuals,op.jacobians,
-    op.trials,op.tests,op.assems
-  _get_staggered_nonlinear_operator_at_φ(residuals, jacobians, trials, tests, assems, φh)
+function get_staggered_operator_at_φ_with_adjoint_jacs(φ_to_u::StaggeredAffineFEStateMap,φh)
+  get_staggered_operator_at_φ(φ_to_u,φh)
 end
 
 ## Generic methods on both types
@@ -347,8 +355,9 @@ function adjoint_solve!(φ_to_u::StaggeredFEStateMapTypes,xh,φh,dFdxj)
   solvers = φ_to_u.solvers
   ∂Rk∂xhi = φ_to_u.∂Rk∂xhi
   x_adjoint,X_adjoint,cache,_ = φ_to_u.adj_caches
+  adjoint_assems = φ_to_u.assems.adjoint_assems
   op_at_φ = get_staggered_operator_at_φ_with_adjoint_jacs(φ_to_u,φh)
-  op_adjoint = generate_adjoint_operator(op_at_φ,φh,xh,dFdxj,∂Rk∂xhi)
+  op_adjoint = generate_adjoint_operator(op_at_φ,adjoint_assems,φh,xh,dFdxj,∂Rk∂xhi)
 
   solve!(FEFunction(X_adjoint,x_adjoint),solvers.adjoint_solver,op_adjoint,cache);
   return x_adjoint
@@ -356,7 +365,7 @@ end
 
 function pullback(φ_to_u::StaggeredFEStateMapTypes{NB},xh,φh,dFdxj;kwargs...) where NB
   Σ_λᵀs_∂Rs∂φ, assem_deriv = φ_to_u.plb_caches
-  Λ = last(φ_to_u.adj_caches).trial
+  Λ = last(φ_to_u.adj_caches).test
   U_reg = GridapTopOpt.get_deriv_space(φ_to_u)
 
   # Adjoint Solve
@@ -382,7 +391,7 @@ function ChainRulesCore.rrule(φ_to_u::StaggeredFEStateMapTypes,φh)
 end
 
 # Building adjoint operators
-function generate_adjoint_operator(op_at_φ::StaggeredFEOperator{NB},φh,xh,dFdxj,∂Rk∂xhi) where NB
+function generate_adjoint_operator(op_at_φ::StaggeredFEOperator{NB},adjoint_assems,φh,xh,dFdxj,∂Rk∂xhi) where NB
   xh_comb = _get_solutions(op_at_φ,xh)
   a_adj,l_adj=(),()
   for k = 1:NB-1
@@ -397,21 +406,21 @@ function generate_adjoint_operator(op_at_φ::StaggeredFEOperator{NB},φh,xh,dFdx
   end
   a_adj = (a_adj...,_get_kth_jacobian(op_at_φ,xh_comb,NB))
   l_adj = (l_adj...,(xhs,Λk) -> dFdxj[NB](Λk,xh_comb,φh))
-  StaggeredAffineFEOperator(collect(reverse(a_adj)),collect(reverse(l_adj)),
-    reverse(op_at_φ.tests),reverse(op_at_φ.trials),reverse(op_at_φ.assems))
+  StaggeredAdjointAffineFEOperator(collect(reverse(a_adj)),collect(reverse(l_adj)),
+    reverse(op_at_φ.trials),reverse(op_at_φ.tests),reverse(adjoint_assems))
 end
 
 # Jacobian of kth residual
 function _get_kth_jacobian(op::StaggeredNonlinearFEOperator{NB},xh_comb,k::Int) where NB
-  jac(xhs,λk,Λk) = op.jacobians[k](xh_comb[1:end-NB+k-1],xh_comb[k],Λk,λk)
+  jac(xhs,λk,Λk) = op.jacobians[k](xh_comb[1:end-NB+k-1],xh_comb[k],λk,Λk)
 end
 
 function _get_kth_jacobian(op::StaggeredAffineFEOperator{NB},xh_comb,k::Int) where NB
-  jac(xhs,λk,Λk) = op.biforms[k](xh_comb[1:end-NB+k-1],Λk,λk)
+  jac(xhs,λk,Λk) = op.biforms[k](xh_comb[1:end-NB+k-1],λk,Λk)
 end
 
 # Dummy adjoint operator for setting up the cache
-function dummy_generate_adjoint_operator(op_at_φ::StaggeredFEOperator{NB},φh,xh,∂Rk∂xhi) where NB
+function dummy_generate_adjoint_operator(op_at_φ::StaggeredFEOperator{NB},adjoint_assems,φh,xh,∂Rk∂xhi) where NB
   xhs,cs = (),()
   for k = 1:NB
     xh_k = get_solution(op_at_φ,xh,k)
@@ -421,7 +430,7 @@ function dummy_generate_adjoint_operator(op_at_φ::StaggeredFEOperator{NB},φh,x
     xhs = (xhs...,xh_k)
 
   end
-  generate_adjoint_operator(op_at_φ,φh,xh,cs,∂Rk∂xhi)
+  generate_adjoint_operator(op_at_φ,adjoint_assems,φh,xh,cs,∂Rk∂xhi)
 end
 
 function dummy_linear_form(op_at_φ::StaggeredAffineFEOperator,xhs,xh_k,dxk,k)
