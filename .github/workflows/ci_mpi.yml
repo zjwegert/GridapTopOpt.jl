@@ -55,7 +55,7 @@ jobs:
           ./configure --prefix=$PETSC_INSTALL --with-cc=mpicc --with-cxx=mpicxx --with-fc=mpif90 \
              --download-mumps --download-scalapack --download-parmetis --download-metis \
              --download-ptscotch --with-debugging --with-x=0 --with-shared=1 \
-             --with-mpi=1 --with-64-bit-indices
+             --with-mpi=1 --with-64-bit-indices --download-fblaslapack=1
           make
           make install
       - uses: julia-actions/julia-buildpkg@latest
