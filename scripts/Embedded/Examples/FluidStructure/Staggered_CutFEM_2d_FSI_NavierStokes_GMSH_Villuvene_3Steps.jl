@@ -13,7 +13,7 @@ else
   global γg_evo =  0.1
 end
 
-path = "./results/Staggered_CutFEM_2d_FSI_NavierStokes_GMSH_Villuvene_gammag$γg_evo/"
+path = "./results/Staggered_CutFEM_2d_FSI_NavierStokes_GMSH_Villuvene_3Step_gammag$γg_evo/"
 mkpath(path)
 
 # Based on number of elements in vertical direction (N_y) divided by 10
