@@ -13,7 +13,7 @@ else
   global γg_evo =  0.1
 end
 
-path = "./results/Staggered_FCM_2d_FSI_NavierStokes_GMSH_with_ad_jac_gammag0_1_alphaNu0_001sq_TEST/"
+path = "./results/Staggered_FCM_2d_FSI_NavierStokes_GMSH_with_ad_jac_gammag$γg_evo/"
 mkpath(path)
 
 γ_evo = 0.2

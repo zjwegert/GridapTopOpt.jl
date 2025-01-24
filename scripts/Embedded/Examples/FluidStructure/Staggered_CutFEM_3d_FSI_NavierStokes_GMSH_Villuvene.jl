@@ -93,7 +93,7 @@ function gmres_amg_ksp_setup(rtol,maxits)
 end
 
 function main(ranks)
-  path = "./results/Staggered_CutFEM_3d_FSI_NavierStokes_GMSH_Villuvene/"
+  path = "./results/Staggered_CutFEM_3d_FSI_NavierStokes_GMSH_Villuvene_gammag$γg_evo/"
   i_am_main(ranks) && mkpath(path)
 
   γ_evo = 0.2
