@@ -31,3 +31,4 @@ GridapTopOpt.so
 # Ensure never to write results to git
 results/*
 tmp/*
+*.msh

@@ -30,7 +30,7 @@ a = 0.3;
 b = 0.01;
 vol_D = 2.0*0.5
 
-model = GmshDiscreteModel((@__DIR__)*"/fsi/gmsh/mesh_finer.msh")
+model = GmshDiscreteModel((@__DIR__)*"/FluidStructure/Meshes/mesh_finer.msh")
 writevtk(model,path*"model")
 
 Ω_act = Triangulation(model)
@@ -100,6 +100,7 @@ writevtk(get_triangulation(φh),path*"initial_islands",cellfields=["ψ_s"=>Ω.ψ
 
 # Setup spaces
 uin(x) = VectorValue(16x[2]*(H-x[2]),0.0)
+uin_dot_e1(x) = uin(x)⋅VectorValue(1.0,0.0)
 
 reffe_u = ReferenceFE(lagrangian,VectorValue{D,Float64},order,space=:P)
 reffe_p = ReferenceFE(lagrangian,Float64,order,space=:P)
@@ -132,7 +133,7 @@ init_X,_ = build_spaces(Ω.Ω_act_s,Ω.Ω_act_f)
 Re = 60 # Reynolds number
 ρ = 1.0 # Density
 cl = a # Characteristic length
-u0_max = maximum(abs,get_dirichlet_dof_values(init_X[1]))
+u0_max = sum(∫(uin_dot_e1)dΓf_D)/sum(∫(1)dΓf_D)
 μ = ρ*cl*u0_max/Re # Viscosity
 ν = μ/ρ # Kinematic viscosity
 
@@ -279,7 +280,7 @@ end
 pcf = EmbeddedPDEConstrainedFunctionals(state_collection;analytic_dC=[dVol])
 
 ## Evolution Method
-evo = CutFEMEvolve(V_φ,Ω,dΩ_act,hₕ;max_steps,γg=0.01)
+evo = CutFEMEvolve(V_φ,Ω,dΩ_act,hₕ;max_steps,γg=0.1)
 reinit1 = StabilisedReinit(V_φ,Ω,dΩ_act,hₕ;stabilisation_method=ArtificialViscosity(1.0))
 reinit2 = StabilisedReinit(V_φ,Ω,dΩ_act,hₕ;stabilisation_method=GridapTopOpt.InteriorPenalty(V_φ,γg=1.0))
 reinit = GridapTopOpt.MultiStageStabilisedReinit([reinit1,reinit2])

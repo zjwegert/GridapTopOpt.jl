@@ -294,7 +294,7 @@ function main_fcm(data,params;R=0.1,c=(0.5,0.2))
   ν = μ/ρ # Kinematic viscosity
 
   # Stabilization parameters
-  γ_Nu(h,u)    = α_Nu*(μ/h + ρ*norm(u,Inf)/6) # (Eqn. 13, Villanueva and Maute, 2017)
+  γ_Nu         = α_Nu*(μ/0.01^2)
   τ_SUPG(h,u)  = α_SUPG*((2norm(u)/h)^2 + 9*(4ν/h^2)^2)^-0.5 # (Eqn. 31, Peterson et al., 2018)
   τ_PSPG(h,u)  = τ_SUPG(h,u) # (Sec. 3.2.2, Peterson et al., 2018)
 
@@ -320,19 +320,19 @@ function main_fcm(data,params;R=0.1,c=(0.5,0.2))
 
   function res_fluid((u,p),(v,q))
     return ∫(r_conv(u,v) + r_Ωf((u,p),(v,q)))Ω.dΩf +
-      ∫(r_conv(u,v) + r_Ωf((u,p),(v,q)) + (γ_Nu ∘ (hₕ,u))*(u⋅v))Ω.dΩs +
+      ∫(r_conv(u,v) + r_Ωf((u,p),(v,q)) + γ_Nu*(u⋅v))Ω.dΩs +
       ∫(r_SUPG((u,p),(v,q),u))dΩ_act
   end
 
   function jac_fluid_picard((u,p),(du,dp),(v,q))
     return ∫(ρ*v ⋅ (conv∘(u,∇(du))) + r_Ωf((du,dp),(v,q)))Ω.dΩs +
-    ∫(ρ*v ⋅ (conv∘(u,∇(du))) + r_Ωf((du,dp),(v,q)) + (γ_Nu ∘ (hₕ,u))*(du⋅v))Ω.dΩf +
+    ∫(ρ*v ⋅ (conv∘(u,∇(du))) + r_Ωf((du,dp),(v,q)) + γ_Nu*(du⋅v))Ω.dΩf +
       ∫(r_SUPG_picard((du,dp),(v,q),u))dΩ_act
   end
 
   function jac_fluid_newton((u,p),(du,dp),(v,q))
     return ∫(dr_conv(u,du,v) + r_Ωf((du,dp),(v,q)))Ω.dΩf +
-      ∫(dr_conv(u,du,v) + r_Ωf((du,dp),(v,q)) + (γ_Nu ∘ (hₕ,u))*(du⋅v))Ω.dΩs +
+      ∫(dr_conv(u,du,v) + r_Ωf((du,dp),(v,q)) + γ_Nu*(du⋅v))Ω.dΩs +
       ∫(dr_SUPG((u,p),(du,dp),(v,q),u))dΩ_act
   end
 
@@ -549,5 +549,5 @@ end
 # main_cutfem(data,params)
 
 # data = JLD2.load((@__DIR__)*"/data.jld2")["data"]
-# params = (;Re=60,mesh_size=0.0025,α_Nu=1000,α_SUPG=1/3,α_GPμ=0,α_GPp=0,α_GPu=0,βp=0,βμ=0)
+# params = (;Re=60,mesh_size=0.0025,α_Nu=2.5*100,α_SUPG=1/3,α_GPμ=0,α_GPp=0,α_GPu=0,βp=0,βμ=0)
 # main_fcm(data,params)

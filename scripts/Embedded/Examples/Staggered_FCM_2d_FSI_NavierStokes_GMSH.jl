@@ -7,7 +7,7 @@ using GridapTopOpt
 using LinearAlgebra
 LinearAlgebra.norm(x::VectorValue,p::Real) = norm(x.data,p)
 
-path = "./results/Staggered_FCM_2d_FSI_NavierStokes_GMSH/"
+path = "./results/Staggered_FCM_2d_FSI_NavierStokes_GMSH_gammag0_05_alphaNu0_001sq/"
 mkpath(path)
 
 γ_evo = 0.2
@@ -27,7 +27,7 @@ a = 0.3;
 b = 0.01;
 vol_D = 2.0*0.5
 
-model = GmshDiscreteModel((@__DIR__)*"/fsi/gmsh/mesh_finer.msh")
+model = GmshDiscreteModel((@__DIR__)*"/FluidStructure/Meshes/mesh_finer.msh")
 writevtk(model,path*"model")
 
 Ω_act = Triangulation(model)
@@ -85,6 +85,7 @@ writevtk(get_triangulation(φh),path*"initial_islands",cellfields=["χ_s"=>Ω.χ
 
 # Setup spaces
 uin(x) = VectorValue(16x[2]*(H-x[2]),0.0)
+uin_dot_e1(x) = uin(x)⋅VectorValue(1.0,0.0)
 
 reffe_u = ReferenceFE(lagrangian,VectorValue{D,Float64},order,space=:P)
 reffe_p = ReferenceFE(lagrangian,Float64,order,space=:P)
@@ -109,20 +110,23 @@ Y = MultiFieldFESpace([V,Q,T];style=mfs)
 ### Weak form
 
 ## Fluid
+NS = 1 # Turn convection on and off
+SUPG = 1 # Turn SUPG on and off
+
 # Properties
-Re = 60 # Reynolds number
+Re = 50 # Reynolds number
 ρ = 1.0 # Density
 cl = a # Characteristic length
-u0_max = maximum(abs,get_dirichlet_dof_values(X[1]))
+u0_max = sum(∫(uin_dot_e1)dΓf_D)/sum(∫(1)dΓf_D)
 μ = ρ*cl*u0_max/Re # Viscosity
 ν = μ/ρ # Kinematic viscosity
 
 # Stabilization parameters
-α_Nu   = 1000
+α_Nu   = 2.5*10
 α_SUPG = 1/3
 
-γ_Nu(h,u)    = α_Nu*(μ/h + ρ*norm(u,Inf)/6) # (Eqn. 13, Villanueva and Maute, 2017)
-τ_SUPG(h,u)  = α_SUPG*((2norm(u)/h)^2 + 9*(4ν/h^2)^2)^-0.5 # (Eqn. 31, Peterson et al., 2018)
+γ_Nu         = α_Nu*(μ/0.001^2)
+τ_SUPG(h,u)  = α_SUPG*(SUPG*(2norm(u)/h)^2 + 9*(4ν/h^2)^2)^-0.5 # (Eqn. 31, Peterson et al., 2018)
 τ_PSPG(h,u)  = τ_SUPG(h,u) # (Sec. 3.2.2, Peterson et al., 2018)
 
 # Terms
@@ -133,33 +137,33 @@ u0_max = maximum(abs,get_dirichlet_dof_values(X[1]))
 conv(u,∇u) = (∇u') ⋅ u
 dconv(du,∇du,u,∇u) = conv(u,∇du)+conv(du,∇u)
 
-r_conv(u,v) = ρ*v ⋅ (conv∘(u,∇(u)))
+r_conv(u,v) = NS*ρ*v ⋅ (conv∘(u,∇(u)))
 r_Ωf((u,p),(v,q)) = ε(v) ⊙ (σ_f ∘ (ε(u),p)) + q*(∇⋅u)
-r_SUPG((u,p),(v,q),w) = ((τ_SUPG ∘ (hₕ,w))*(conv ∘ (u,∇(v))) + (τ_PSPG ∘ (hₕ,w))/ρ*∇(q))⋅
-  (ρ*(conv∘(u,∇(u))) + ∇(p) - μ*Δ(u))
-r_SUPG_picard((u,p),(v,q),w) = ((τ_SUPG ∘ (hₕ,w))*(conv ∘ (w,∇(v))) + (τ_PSPG ∘ (hₕ,w))/ρ*∇(q))⋅
-  (ρ*(conv∘(w,∇(u))) + ∇(p) - μ*Δ(u))
+r_SUPG((u,p),(v,q),w) = (NS*SUPG*(τ_SUPG ∘ (hₕ,w))*(conv ∘ (u,∇(v))) + (τ_PSPG ∘ (hₕ,w))/ρ*∇(q))⋅
+  (NS*SUPG*ρ*(conv∘(u,∇(u))) + ∇(p) - μ*Δ(u))
+r_SUPG_picard((u,p),(v,q),w) = (NS*SUPG*(τ_SUPG ∘ (hₕ,w))*(conv ∘ (w,∇(v))) + (τ_PSPG ∘ (hₕ,w))/ρ*∇(q))⋅
+  (NS*SUPG*ρ*(conv∘(w,∇(u))) + ∇(p) - μ*Δ(u))
 
-dr_conv(u,du,v) = ρ*v ⋅ (dconv∘(du,∇(du),u,∇(u)))
+dr_conv(u,du,v) = NS*ρ*v ⋅ (dconv∘(du,∇(du),u,∇(u)))
 dr_SUPG((u,p),(du,dp),(v,q),w) =
-  ((τ_SUPG ∘ (hₕ,w))*(conv ∘ (du,∇(v))))⋅(ρ*(conv∘(u,∇(u))) + ∇(p) - μ*Δ(u)) +
-  ((τ_SUPG ∘ (hₕ,w))*(conv ∘ (u,∇(v))) + (τ_PSPG ∘ (hₕ,w))/ρ*∇(q))⋅(ρ*(dconv∘(du,∇(du),u,∇(u))) + ∇(dp) - μ*Δ(du))
+  (NS*SUPG*(τ_SUPG ∘ (hₕ,w))*(conv ∘ (du,∇(v))))⋅(NS*SUPG*ρ*(conv∘(u,∇(u))) + ∇(p) - μ*Δ(u)) +
+  (NS*SUPG*(τ_SUPG ∘ (hₕ,w))*(conv ∘ (u,∇(v))) + (τ_PSPG ∘ (hₕ,w))/ρ*∇(q))⋅(NS*SUPG*ρ*(dconv∘(du,∇(du),u,∇(u))) + ∇(dp) - μ*Δ(du))
 
 function res_fluid((),(u,p),(v,q),φ)
   return ∫(r_conv(u,v) + r_Ωf((u,p),(v,q)))Ω.dΩf +
-    ∫(r_conv(u,v) + r_Ωf((u,p),(v,q)) + (γ_Nu ∘ (hₕ,u))*(u⋅v))Ω.dΩs +
+    ∫(r_conv(u,v) + r_Ωf((u,p),(v,q)) + γ_Nu*(u⋅v))Ω.dΩs +
     ∫(r_SUPG((u,p),(v,q),u))dΩ_act
 end
 
 function jac_fluid_picard((),(u,p),(du,dp),(v,q),φ)
-  return ∫(ρ*v ⋅ (conv∘(u,∇(du))) + r_Ωf((du,dp),(v,q)))Ω.dΩs +
-  ∫(ρ*v ⋅ (conv∘(u,∇(du))) + r_Ωf((du,dp),(v,q)) + (γ_Nu ∘ (hₕ,u))*(du⋅v))Ω.dΩf +
+  return ∫(NS*ρ*v ⋅ (conv∘(u,∇(du))) + r_Ωf((du,dp),(v,q)))Ω.dΩs +
+    ∫(NS*ρ*v ⋅ (conv∘(u,∇(du))) + r_Ωf((du,dp),(v,q)) + γ_Nu*(du⋅v))Ω.dΩf +
     ∫(r_SUPG_picard((du,dp),(v,q),u))dΩ_act
 end
 
 function jac_fluid_newton((),(u,p),(du,dp),(v,q),φ)
   return ∫(dr_conv(u,du,v) + r_Ωf((du,dp),(v,q)))Ω.dΩf +
-    ∫(dr_conv(u,du,v) + r_Ωf((du,dp),(v,q)) + (γ_Nu ∘ (hₕ,u))*(du⋅v))Ω.dΩs +
+    ∫(dr_conv(u,du,v) + r_Ωf((du,dp),(v,q)) + γ_Nu*(du⋅v))Ω.dΩs +
     ∫(dr_SUPG((u,p),(du,dp),(v,q),u))dΩ_act
 end
 
@@ -205,13 +209,13 @@ dVol(q,(u,p,d),φ) = ∫(-1/vol_D*q/(norm ∘ (∇(φ))))Ω.dΓ
 
 ## Staggered operators
 op = StaggeredNonlinearFEOperator([res_fluid,res_solid],[jac_fluid_newton,jac_solid],X,Y)
-state_map = StaggeredNonlinearFEStateMap(op,∂Rk∂xhi,V_φ,U_reg,φh)
+state_map = StaggeredNonlinearFEStateMap(op,∂Rk∂xhi,V_φ,U_reg,φh;adjoint_jacobians=[jac_fluid_newton,jac_solid])
 J_sm = GridapTopOpt.StaggeredStateParamMap(J_comp,∂Jcomp∂xhi,state_map)
 C_sm = map(((Ci,∂Ci),) -> GridapTopOpt.StaggeredStateParamMap(Ci,∂Ci,state_map),[(Vol,∂Vol∂xhi),])
 pcfs = PDEConstrainedFunctionals(J_sm,C_sm,state_map;analytic_dC=[dVol])
 
 ## Evolution Method
-evo = CutFEMEvolve(V_φ,Ω,dΩ_act,hₕ;max_steps,γg=0.01)
+evo = CutFEMEvolve(V_φ,Ω,dΩ_act,hₕ;max_steps,γg=0.1)
 reinit1 = StabilisedReinit(V_φ,Ω,dΩ_act,hₕ;stabilisation_method=ArtificialViscosity(1.0))
 reinit2 = StabilisedReinit(V_φ,Ω,dΩ_act,hₕ;stabilisation_method=GridapTopOpt.InteriorPenalty(V_φ,γg=1.0))
 reinit = GridapTopOpt.MultiStageStabilisedReinit([reinit1,reinit2])
