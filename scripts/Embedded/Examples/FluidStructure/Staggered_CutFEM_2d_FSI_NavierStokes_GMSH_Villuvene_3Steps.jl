@@ -6,14 +6,19 @@ using GridapTopOpt
 
 using LinearAlgebra
 LinearAlgebra.norm(x::VectorValue,p::Real) = norm(x.data,p)
-Base.abs(x::VectorValue) = VectorValue(abs.(x.data))
-Base.sign(x::VectorValue) = VectorValue(sign.(x.data))
 
-path = "./results/Staggered_CutFEM_2d_FSI_NavierStokes_GMSH_Villuvene_fixed/"
+if isassigned(ARGS,1)
+  global γg_evo =  parse(Float64,ARGS[1])
+else
+  global γg_evo =  0.1
+end
+
+path = "./results/Staggered_CutFEM_2d_FSI_NavierStokes_GMSH_Villuvene/"
 mkpath(path)
 
-γ_evo = 0.2
-max_steps = 24 # Based on number of elements in vertical direction divided by 10
+# Based on number of elements in vertical direction (N_y) divided by 10
+γ_evo = 1.6 # = 0.2*N_y/max_steps
+max_steps = 3
 vf = 0.025
 α_coeff = γ_evo*max_steps
 iter_mod = 1
@@ -29,7 +34,7 @@ a = 0.3;
 b = 0.01;
 vol_D = 2.0*0.5
 
-model = GmshDiscreteModel((@__DIR__)*"/FluidStructure/Meshes/mesh_finer.msh")
+model = GmshDiscreteModel((@__DIR__)*"/Meshes/mesh_finer.msh")
 writevtk(model,path*"model")
 
 Ω_act = Triangulation(model)
@@ -264,7 +269,7 @@ state_collection = GridapTopOpt.EmbeddedCollection_in_φh(model,φh) do _φh
   )
 end
 
-# ## Testing forward solution
+## Testing forward solution
 # _x = state_collection.state_map(φh)
 # _xh = FEFunction(state_collection.state_map.spaces.trial,_x);
 # uh,ph,dh = _xh;
@@ -279,7 +284,7 @@ end
 pcf = EmbeddedPDEConstrainedFunctionals(state_collection;analytic_dC=[dVol])
 
 ## Evolution Method
-evo = CutFEMEvolve(V_φ,Ω,dΩ_act,hₕ;max_steps,γg=0.1)
+evo = CutFEMEvolve(V_φ,Ω,dΩ_act,hₕ;max_steps,γg=γg_evo)
 reinit1 = StabilisedReinit(V_φ,Ω,dΩ_act,hₕ;stabilisation_method=ArtificialViscosity(1.0))
 reinit2 = StabilisedReinit(V_φ,Ω,dΩ_act,hₕ;stabilisation_method=GridapTopOpt.InteriorPenalty(V_φ,γg=1.0))
 reinit = GridapTopOpt.MultiStageStabilisedReinit([reinit1,reinit2])

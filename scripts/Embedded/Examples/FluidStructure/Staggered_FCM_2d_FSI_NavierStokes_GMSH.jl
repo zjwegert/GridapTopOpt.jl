@@ -7,7 +7,13 @@ using GridapTopOpt
 using LinearAlgebra
 LinearAlgebra.norm(x::VectorValue,p::Real) = norm(x.data,p)
 
-path = "./results/Staggered_FCM_2d_FSI_NavierStokes_GMSH_with_ad_jac_gammag0_1_alphaNu0_001sq_TEST/"
+if isassigned(ARGS,1)
+  global γg_evo =  parse(Float64,ARGS[1])
+else
+  global γg_evo =  0.1
+end
+
+path = "./results/Staggered_FCM_2d_FSI_NavierStokes_GMSH_gammag0_05_alphaNu0_001sq/"
 mkpath(path)
 
 γ_evo = 0.2
@@ -27,7 +33,7 @@ a = 0.3;
 b = 0.01;
 vol_D = 2.0*0.5
 
-model = GmshDiscreteModel((@__DIR__)*"/FluidStructure/Meshes/mesh_finer.msh")
+model = GmshDiscreteModel((@__DIR__)*"/Meshes/mesh_finer.msh")
 writevtk(model,path*"model")
 
 Ω_act = Triangulation(model)
@@ -122,7 +128,7 @@ u0_max = sum(∫(uin_dot_e1)dΓf_D)/sum(∫(1)dΓf_D)
 ν = μ/ρ # Kinematic viscosity
 
 # Stabilization parameters
-α_Nu   = 2.5
+α_Nu   = 2.5*10
 α_SUPG = 1/3
 
 γ_Nu         = α_Nu*(μ/0.001^2)
@@ -155,31 +161,17 @@ function res_fluid((),(u,p),(v,q),φ)
     ∫(r_SUPG((u,p),(v,q),u))dΩ_act
 end
 
+function jac_fluid_picard((),(u,p),(du,dp),(v,q),φ)
+  return ∫(NS*ρ*v ⋅ (conv∘(u,∇(du))) + r_Ωf((du,dp),(v,q)))Ω.dΩs +
+    ∫(NS*ρ*v ⋅ (conv∘(u,∇(du))) + r_Ωf((du,dp),(v,q)) + γ_Nu*(du⋅v))Ω.dΩf +
+    ∫(r_SUPG_picard((du,dp),(v,q),u))dΩ_act
+end
+
 function jac_fluid_newton((),(u,p),(du,dp),(v,q),φ)
   return ∫(dr_conv(u,du,v) + r_Ωf((du,dp),(v,q)))Ω.dΩf +
     ∫(dr_conv(u,du,v) + r_Ωf((du,dp),(v,q)) + γ_Nu*(du⋅v))Ω.dΩs +
     ∫(dr_SUPG((u,p),(du,dp),(v,q),u))dΩ_act
 end
-
-function jac_fluid_picard((),(u,p),(du,dp),(v,q),φ)
-  return ∫(ρ*v ⋅ (conv∘(u,∇(du))) + r_Ωf((du,dp),(v,q)))Ω.dΩs +
-    ∫(ρ*v ⋅ (conv∘(u,∇(du))) + r_Ωf((du,dp),(v,q)) + γ_Nu*(du⋅v))Ω.dΩf +
-    ∫(r_SUPG_picard((du,dp),(v,q),u))dΩ_act
-end
-
-jac_fluid_AD((),x,dx,y,φ) = jacobian((_x,_y,_φ)->res_fluid((),_x,_y,_φ),[x,y,φ],1)
-
-X = MultiFieldFESpace([U,P])
-Y = MultiFieldFESpace([V,Q])
-_op = FEOperator((u,v)->res_fluid((),u,v,φh),(u,du,v)->jac_fluid_newton((),u,du,v,φh),X,Y)
-_solver = NewtonSolver(LUSolver();maxiter=100,rtol=1.e-14,verbose=true)
-uh,ph = solve(_solver,_op);
-writevtk(Ω.Ωf,path*"Omega_f",
-  cellfields=["uh"=>uh,"ph"=>ph])
-writevtk(Ω.Ωs,path*"Omega_s",
-  cellfields=["uh"=>uh,"ph"=>ph])
-error()
-
 
 ## Structure
 # Material parameters
@@ -196,9 +188,6 @@ end
 a_s_Ω(s,d) = ε(s) ⊙ (σ ∘ ε(d))
 
 function a_solid(((u,p),),d,s,φ)
-  return ∫(a_s_Ω(s,d)+0u⋅d)Ω.dΩs + ∫(ϵ*a_s_Ω(s,d)+0u⋅d)Ω.dΩf
-end
-function _a_solid(((u,p),),d,s,φ)
   return ∫(a_s_Ω(s,d))Ω.dΩs + ∫(ϵ*a_s_Ω(s,d))Ω.dΩf
 end
 function l_solid(((u,p),),s,φ)
@@ -207,20 +196,32 @@ function l_solid(((u,p),),s,φ)
 end
 
 res_solid(((u,p),),d,s,φ) = a_solid(((u,p),),d,s,φ) - l_solid(((u,p),),s,φ)
-jac_solid(((u,p),),d,dd,s,φ) = _a_solid(((u,p),),dd,s,φ)
+jac_solid(((u,p),),d,dd,s,φ) = a_solid(((u,p),),dd,s,φ)
+
+∂R2∂xh1((du,dp),((u,p),),d,s,φ) = -1*l_solid(((du,dp),),s,φ)
+∂Rk∂xhi = ((∂R2∂xh1,),)
 
 ## Optimisation functionals
-J_comp(((u,p),d),φ) = ∫(ε(d) ⊙ (σ ∘ ε(d)) + 0u⋅d)Ω.dΩs
+J_comp(((u,p),d),φ) = ∫(ε(d) ⊙ (σ ∘ ε(d)))Ω.dΩs
+∂Jcomp∂up((du,dp),((u,p),d),φ) = ∫(0dp)Ω.dΩs
+∂Jcomp∂d(dd,((u,p),d),φ) = ∫(ε(dd) ⊙ (σ ∘ ε(d)))Ω.dΩs + ∫(ε(d) ⊙ (σ ∘ ε(dd)))Ω.dΩs
+∂Jcomp∂xhi = (∂Jcomp∂up,∂Jcomp∂d)
+
 Vol(((u,p),d),φ) = ∫(vol_D)Ω.dΩs - ∫(vf/vol_D)dΩ_act
 dVol(q,(u,p,d),φ) = ∫(-1/vol_D*q/(norm ∘ (∇(φ))))Ω.dΓ
+∂Vol∂up((du,dp),((u,p),d),φ) = ∫(0dp)dΩ_act
+∂Vol∂d(dd,((u,p),d),φ) = ∫(0dd ⋅ d)dΩ_act
+∂Vol∂xhi = (∂Vol∂up,∂Vol∂d)
 
 ## Staggered operators
 op = StaggeredNonlinearFEOperator([res_fluid,res_solid],[jac_fluid_newton,jac_solid],X,Y)
-state_map = StaggeredNonlinearFEStateMap(op,V_φ,U_reg,φh;adjoint_jacobians=[jac_fluid_AD,jac_solid])
-pcfs = PDEConstrainedFunctionals(J_comp,[Vol],state_map;analytic_dC=[dVol])
+state_map = StaggeredNonlinearFEStateMap(op,∂Rk∂xhi,V_φ,U_reg,φh;adjoint_jacobians=[jac_fluid_newton,jac_solid])
+J_sm = GridapTopOpt.StaggeredStateParamMap(J_comp,∂Jcomp∂xhi,state_map)
+C_sm = map(((Ci,∂Ci),) -> GridapTopOpt.StaggeredStateParamMap(Ci,∂Ci,state_map),[(Vol,∂Vol∂xhi),])
+pcfs = PDEConstrainedFunctionals(J_sm,C_sm,state_map;analytic_dC=[dVol])
 
 ## Evolution Method
-evo = CutFEMEvolve(V_φ,Ω,dΩ_act,hₕ;max_steps,γg=0.1)
+evo = CutFEMEvolve(V_φ,Ω,dΩ_act,hₕ;max_steps,γg=γg_evo)
 reinit1 = StabilisedReinit(V_φ,Ω,dΩ_act,hₕ;stabilisation_method=ArtificialViscosity(1.0))
 reinit2 = StabilisedReinit(V_φ,Ω,dΩ_act,hₕ;stabilisation_method=GridapTopOpt.InteriorPenalty(V_φ,γg=1.0))
 reinit = GridapTopOpt.MultiStageStabilisedReinit([reinit1,reinit2])

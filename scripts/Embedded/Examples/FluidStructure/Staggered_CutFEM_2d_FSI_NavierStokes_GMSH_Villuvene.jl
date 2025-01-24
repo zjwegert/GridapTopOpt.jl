@@ -6,10 +6,14 @@ using GridapTopOpt
 
 using LinearAlgebra
 LinearAlgebra.norm(x::VectorValue,p::Real) = norm(x.data,p)
-Base.abs(x::VectorValue) = VectorValue(abs.(x.data))
-Base.sign(x::VectorValue) = VectorValue(sign.(x.data))
 
-path = "./results/Staggered_CutFEM_2d_FSI_NavierStokes_GMSH_Villuvene_Newton_ADAdjointJacobian/"
+if isassigned(ARGS,1)
+  global γg_evo =  parse(Float64,ARGS[1])
+else
+  global γg_evo =  0.1
+end
+
+path = "./results/Staggered_CutFEM_2d_FSI_NavierStokes_GMSH_Villuvene_fixed/"
 mkpath(path)
 
 γ_evo = 0.2
@@ -29,7 +33,7 @@ a = 0.3;
 b = 0.01;
 vol_D = 2.0*0.5
 
-model = GmshDiscreteModel((@__DIR__)*"/FluidStructure/Meshes/mesh_finer.msh")
+model = GmshDiscreteModel((@__DIR__)*"/Meshes/mesh_finer.msh")
 writevtk(model,path*"model")
 
 Ω_act = Triangulation(model)
@@ -206,8 +210,6 @@ function jac_fluid_newton((),(u,p),(du,dp),(v,q),φ)
     ∫(r_GP_μ(du,v) + r_GP_p(dp,q,u) + r_GP_u(du,v,u,Ω.n_Γg) + 0mean(φ))Ω.dΓg
 end
 
-jac_fluid_AD((),x,dx,y,φ) = jacobian((_x,_y,_φ)->res_fluid((),_x,_y,_φ),[x,y,φ],1)
-
 ## Structure
 # Material parameters
 function lame_parameters(E,ν)
@@ -258,7 +260,7 @@ state_collection = GridapTopOpt.EmbeddedCollection_in_φh(model,φh) do _φh
   update_collection!(Ω,_φh)
   X,Y = build_spaces(Ω.Ω_act_s,Ω.Ω_act_f)
   op = StaggeredNonlinearFEOperator([res_fluid,res_solid],[jac_fluid_picard,jac_solid],X,Y)
-  state_map = StaggeredNonlinearFEStateMap(op,∂Rk∂xhi,V_φ,U_reg,_φh;adjoint_jacobians=[jac_fluid_AD,jac_solid])
+  state_map = StaggeredNonlinearFEStateMap(op,∂Rk∂xhi,V_φ,U_reg,_φh;adjoint_jacobians=[jac_fluid_newton,jac_solid])
   (;
     :state_map => state_map,
     :J => GridapTopOpt.StaggeredStateParamMap(J_comp,∂Jpres∂xhi,state_map),
@@ -281,7 +283,7 @@ end
 pcf = EmbeddedPDEConstrainedFunctionals(state_collection;analytic_dC=[dVol])
 
 ## Evolution Method
-evo = CutFEMEvolve(V_φ,Ω,dΩ_act,hₕ;max_steps,γg=0.1)
+evo = CutFEMEvolve(V_φ,Ω,dΩ_act,hₕ;max_steps,γg=γg_evo)
 reinit1 = StabilisedReinit(V_φ,Ω,dΩ_act,hₕ;stabilisation_method=ArtificialViscosity(1.0))
 reinit2 = StabilisedReinit(V_φ,Ω,dΩ_act,hₕ;stabilisation_method=GridapTopOpt.InteriorPenalty(V_φ,γg=1.0))
 reinit = GridapTopOpt.MultiStageStabilisedReinit([reinit1,reinit2])

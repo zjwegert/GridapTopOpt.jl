@@ -9,6 +9,12 @@ using GridapDistributed,PartitionedArrays,GridapPETSc
 using LinearAlgebra
 LinearAlgebra.norm(x::VectorValue,p::Real) = norm(x.data,p)
 
+if isassigned(ARGS,1)
+  global γg_evo =  parse(Float64,ARGS[1])
+else
+  global γg_evo =  0.1
+end
+
 function test_mesh(model)
   grid_topology = Geometry.get_grid_topology(model)
   D = num_cell_dims(grid_topology)
@@ -87,11 +93,11 @@ function gmres_amg_ksp_setup(rtol,maxits)
 end
 
 function main(ranks)
-  path = "./results/Staggered_CutFEM_3d_FSI_NavierStokes_GMSH_Villuvene/"
+  path = "./results/Staggered_FCM_3d_FSI_NavierStokes_GMSH/"
   i_am_main(ranks) && mkpath(path)
 
   γ_evo = 0.2
-  max_steps = 10 # Based on number of elements in vertical direction divided by 10
+  max_steps = 10
   vf = 0.025
   α_coeff = γ_evo*max_steps
   iter_mod = 10
@@ -108,7 +114,7 @@ function main(ranks)
   cw = 0.1;
   vol_D = L*H
 
-  model = GmshDiscreteModel(ranks,(@__DIR__)*"/FluidStructure/Meshes/mesh_3d_finer.msh")
+  model = GmshDiscreteModel(ranks,(@__DIR__)*"/Meshes/mesh_3d_finer.msh")
   map(test_mesh,local_views(model))
   writevtk(model,path*"model")
 
@@ -140,16 +146,12 @@ function main(ranks)
 
   dΩ_act = Measure(Ω_act,degree)
   Γf_D = BoundaryTriangulation(model,tags="Gamma_f_D")
-  Γf_N = BoundaryTriangulation(model,tags="Gamma_f_N")
   dΓf_D = Measure(Γf_D,degree)
-  dΓf_N = Measure(Γf_N,degree)
   Ω = EmbeddedCollection(model,φh) do cutgeo,_
     Ωs = DifferentiableTriangulation(Triangulation(cutgeo,PHYSICAL),V_φ)
     Ωf = DifferentiableTriangulation(Triangulation(cutgeo,PHYSICAL_OUT),V_φ)
     Γ  = DifferentiableTriangulation(EmbeddedBoundary(cutgeo),V_φ)
     Γg = GhostSkeleton(cutgeo)
-    Ω_act_s = Triangulation(cutgeo,ACTIVE)
-    Ω_act_f = Triangulation(cutgeo,ACTIVE_OUT)
     (;
       :Ωs      => Ωs,
       :dΩs     => Measure(Ωs,degree),
@@ -159,16 +161,9 @@ function main(ranks)
       :dΓg     => Measure(Γg,degree),
       :n_Γg    => get_normal_vector(Γg),
       :Γ       => Γ,
-      :dΓ      => Measure(Γ,degree),
-      :Ω_act_s => Ω_act_s,
-      :dΩ_act_s => Measure(Ω_act_s,degree),
-      :Ω_act_f => Ω_act_f,
-      :dΩ_act_f => Measure(Ω_act_f,degree),
-      :ψ_s     => GridapTopOpt.get_isolated_volumes_mask(cutgeo,["Gamma_s_D"];IN_is=IN),
-      :ψ_f     => GridapTopOpt.get_isolated_volumes_mask(cutgeo,["Gamma_f_D"];IN_is=OUT)
+      :dΓ      => Measure(Γ,degree)
     )
   end
-  writevtk(get_triangulation(φh),path*"initial_islands",cellfields=["ψ_s"=>Ω.ψ_s,"ψ_f"=>Ω.ψ_f])
 
   # Setup spaces
   uin(x) = VectorValue(x[2],0.0,0.0)
@@ -178,32 +173,31 @@ function main(ranks)
   reffe_p = ReferenceFE(lagrangian,Float64,order,space=:P)
   reffe_d = ReferenceFE(lagrangian,VectorValue{D,Float64},order)
 
-  function build_spaces(Ω_act_s,Ω_act_f)
-    # Test spaces
-    V = TestFESpace(Ω_act_f,reffe_u,conformity=:H1,
-      dirichlet_tags=["Gamma_f_D","Gamma_s_D","Gamma_Bottom","Gamma_Top",
+  # Test spaces
+  V = TestFESpace(Ω_act,reffe_u,conformity=:H1,
+    dirichlet_tags=["Gamma_f_D","Gamma_s_D","Gamma_Bottom","Gamma_Top",
       "Gamma_Left","Gamma_Right","Gamma_TopCorners"],
-      dirichlet_masks=[(true,true,true),(true,true,true),(true,true,true),
-        (false,true,false),(false,false,true),(false,false,true),(false,true,true)])
-    Q = TestFESpace(Ω_act_f,reffe_p,conformity=:H1)
-    T = TestFESpace(Ω_act_s,reffe_d,conformity=:H1,dirichlet_tags=["Gamma_s_D"])
+    dirichlet_masks=[(true,true,true),(true,true,true),(true,true,true),
+      (false,true,false),(false,false,true),(false,false,true),(false,true,true)])
+  Q = TestFESpace(Ω_act,reffe_p,conformity=:H1)
+  T = TestFESpace(Ω_act,reffe_d,conformity=:H1,dirichlet_tags=["Gamma_s_D"])
 
-    # Trial spaces
-    U = TrialFESpace(V,[uin,[VectorValue(0.0,0.0,0.0) for _ = 1:6]...])
-    P = TrialFESpace(Q)
-    R = TrialFESpace(T)
+  # Trial spaces
+  U = TrialFESpace(V,[uin,[VectorValue(0.0,0.0,0.0) for _ = 1:6]...])
+  P = TrialFESpace(Q)
+  R = TrialFESpace(T)
 
-    # Multifield spaces
-    UP = MultiFieldFESpace([U,P])
-    VQ = MultiFieldFESpace([V,Q])
-    return (UP,VQ),(R,T)
-  end
+  # Multifield spaces
+  UP = MultiFieldFESpace([U,P])
+  VQ = MultiFieldFESpace([V,Q])
 
   ### Weak form
-
   ## Fluid
+  NS = 1 # Turn convection on and off
+  SUPG = 1 # Turn SUPG on and off
+
   # Properties
-  Re = 60 # Reynolds number
+  Re = 50 # Reynolds number
   ρ = 1.0 # Density
   cl = a # Characteristic length
   u0_max = sum(∫(uin_dot_e1)dΓf_D)/sum(∫(1)dΓf_D)
@@ -211,24 +205,14 @@ function main(ranks)
   ν = μ/ρ # Kinematic viscosity
 
   # Stabilization parameters
-  α_Nu   = 1000
+  α_Nu   = 2.5
   α_SUPG = 1/3
-  α_GPμ  = 0.05
-  α_GPp  = 0.05
-  α_GPu  = 0.05
 
-  γ_Nu(h,u)    = α_Nu*(μ/h + ρ*norm(u,Inf)/6) # (Eqn. 13, Villanueva and Maute, 2017)
-  τ_SUPG(h,u)  = α_SUPG*((2norm(u)/h)^2 + 9*(4ν/h^2)^2)^-0.5 # (Eqn. 31, Peterson et al., 2018)
+  γ_Nu         = α_Nu*(μ/0.001^2)
+  τ_SUPG(h,u)  = α_SUPG*(SUPG*(2norm(u)/h)^2 + 9*(4ν/h^2)^2)^-0.5 # (Eqn. 31, Peterson et al., 2018)
   τ_PSPG(h,u)  = τ_SUPG(h,u) # (Sec. 3.2.2, Peterson et al., 2018)
-  γ_GPμ(h)     = α_GPμ*μ*h # (Eqn. 32, Villanueva and Maute, 2017)
-  γ_GPp(h,u)   = α_GPp*(μ/h+ρ*norm(u,Inf)/6)^-1*h^2 # (Eqn. 35, Villanueva and Maute, 2017)
-  γ_GPu(h,un)  = α_GPu*ρ*abs(un)*h^2 # (Eqn. 37, Villanueva and Maute, 2017)
-  γ_GPu(h,u,n) = (γ_GPu ∘ (h.plus,(u⋅n).plus) + γ_GPu ∘ (h.minus,(u⋅n).minus))/2
-  k_p          = 1.0 # (Villanueva and Maute, 2017)
 
   # Terms
-  βp = -1; βμ = 1;
-
   δ = one(SymTensorValue{D,Float64})
   σ_f(ε,p) = -p*δ + 2μ*ε
   σ_f_β(ε,p) = -βp*p*δ + βμ*2μ*ε
@@ -236,48 +220,34 @@ function main(ranks)
   conv(u,∇u) = (∇u') ⋅ u
   dconv(du,∇du,u,∇u) = conv(u,∇du)+conv(du,∇u)
 
-  r_conv(u,v) = ρ*v ⋅ (conv∘(u,∇(u)))
-  r_Ωf((u,p),(v,q)) = ε(v) ⊙ (σ_f ∘ (ε(u),p)) + q*(∇⋅u) # (Eqn. 6 without conv, Villanueva and Maute, 2017)
-  r_Γ((u,p),(v,q),n,w) = -v⋅((σ_f ∘ (ε(u),p))⋅n) - u⋅((σ_f_β ∘ (ε(v),q))⋅n) + (γ_Nu ∘ (hₕ,w))*u⋅v # (Eqn. 12, Villanueva and Maute, 2017)
-  r_ψ(p,q) = k_p * Ω.ψ_f*p*q # (Eqn. 15, Villanueva and Maute, 2017)
-  r_SUPG((u,p),(v,q),w) = ((τ_SUPG ∘ (hₕ,w))*(conv ∘ (u,∇(v))) + (τ_PSPG ∘ (hₕ,w))/ρ*∇(q))⋅
-    (ρ*(conv∘(u,∇(u))) + ∇(p) - μ*Δ(u))
-  r_SUPG_picard((u,p),(v,q),w) = ((τ_SUPG ∘ (hₕ,w))*(conv ∘ (w,∇(v))) + (τ_PSPG ∘ (hₕ,w))/ρ*∇(q))⋅
-    (ρ*(conv∘(w,∇(u))) + ∇(p) - μ*Δ(u))
-  r_GP_μ(u,v) = mean(γ_GPμ ∘ hₕ)*jump(Ω.n_Γg ⋅ ∇(u)) ⋅ jump(Ω.n_Γg ⋅ ∇(v))
-  r_GP_p(p,q,w) = mean(γ_GPp ∘ (hₕ,w))*jump(Ω.n_Γg ⋅ ∇(p)) * jump(Ω.n_Γg ⋅ ∇(q))
-  r_GP_u(u,v,w,n) = γ_GPu(hₕ,w,n)*jump(Ω.n_Γg ⋅ ∇(u)) ⋅ jump(Ω.n_Γg ⋅ ∇(v))
+  r_conv(u,v) = NS*ρ*v ⋅ (conv∘(u,∇(u)))
+  r_Ωf((u,p),(v,q)) = ε(v) ⊙ (σ_f ∘ (ε(u),p)) + q*(∇⋅u)
+  r_SUPG((u,p),(v,q),w) = (NS*SUPG*(τ_SUPG ∘ (hₕ,w))*(conv ∘ (u,∇(v))) + (τ_PSPG ∘ (hₕ,w))/ρ*∇(q))⋅
+    (NS*SUPG*ρ*(conv∘(u,∇(u))) + ∇(p) - μ*Δ(u))
+  r_SUPG_picard((u,p),(v,q),w) = (NS*SUPG*(τ_SUPG ∘ (hₕ,w))*(conv ∘ (w,∇(v))) + (τ_PSPG ∘ (hₕ,w))/ρ*∇(q))⋅
+    (NS*SUPG*ρ*(conv∘(w,∇(u))) + ∇(p) - μ*Δ(u))
 
-  dr_conv(u,du,v) = ρ*v ⋅ (dconv∘(du,∇(du),u,∇(u)))
+  dr_conv(u,du,v) = NS*ρ*v ⋅ (dconv∘(du,∇(du),u,∇(u)))
   dr_SUPG((u,p),(du,dp),(v,q),w) =
-    ((τ_SUPG ∘ (hₕ,w))*(conv ∘ (du,∇(v))))⋅(ρ*(conv∘(u,∇(u))) + ∇(p) - μ*Δ(u)) +
-    ((τ_SUPG ∘ (hₕ,w))*(conv ∘ (u,∇(v))) + (τ_PSPG ∘ (hₕ,w))/ρ*∇(q))⋅(ρ*(dconv∘(du,∇(du),u,∇(u))) + ∇(dp) - μ*Δ(du))
+    (NS*SUPG*(τ_SUPG ∘ (hₕ,w))*(conv ∘ (du,∇(v))))⋅(NS*SUPG*ρ*(conv∘(u,∇(u))) + ∇(p) - μ*Δ(u)) +
+    (NS*SUPG*(τ_SUPG ∘ (hₕ,w))*(conv ∘ (u,∇(v))) + (τ_PSPG ∘ (hₕ,w))/ρ*∇(q))⋅(NS*SUPG*ρ*(dconv∘(du,∇(du),u,∇(u))) + ∇(dp) - μ*Δ(du))
 
   function res_fluid((),(u,p),(v,q),φ)
-    n_Γ = -get_normal_vector(Ω.Γ)
     return ∫(r_conv(u,v) + r_Ωf((u,p),(v,q)))Ω.dΩf +
-      ∫(r_SUPG((u,p),(v,q),u))Ω.dΩ_act_f +
-      ∫(r_ψ(p,q))Ω.dΩf +
-      ∫(r_Γ((u,p),(v,q),n_Γ,u))Ω.dΓ +
-      ∫(r_GP_μ(u,v) + r_GP_p(p,q,u) + r_GP_u(u,v,u,Ω.n_Γg) + 0mean(φ))Ω.dΓg
+      ∫(r_conv(u,v) + r_Ωf((u,p),(v,q)) + γ_Nu*(u⋅v))Ω.dΩs +
+      ∫(r_SUPG((u,p),(v,q),u))dΩ_act
   end
 
   function jac_fluid_picard((),(u,p),(du,dp),(v,q),φ)
-    n_Γ = -get_normal_vector(Ω.Γ)
-    return ∫(ρ*v ⋅ (conv∘(u,∇(du))) + r_Ωf((du,dp),(v,q)))Ω.dΩf +
-      ∫(r_SUPG_picard((du,dp),(v,q),u))Ω.dΩ_act_f +
-      ∫(r_ψ(dp,q))Ω.dΩf +
-      ∫(r_Γ((du,dp),(v,q),n_Γ,u))Ω.dΓ +
-      ∫(r_GP_μ(du,v) + r_GP_p(dp,q,u) + r_GP_u(du,v,u,Ω.n_Γg) + 0mean(φ))Ω.dΓg
+    return ∫(NS*ρ*v ⋅ (conv∘(u,∇(du))) + r_Ωf((du,dp),(v,q)))Ω.dΩs +
+      ∫(NS*ρ*v ⋅ (conv∘(u,∇(du))) + r_Ωf((du,dp),(v,q)) + γ_Nu*(du⋅v))Ω.dΩf +
+      ∫(r_SUPG_picard((du,dp),(v,q),u))dΩ_act
   end
 
   function jac_fluid_newton((),(u,p),(du,dp),(v,q),φ)
-    n_Γ = -get_normal_vector(Ω.Γ)
     return ∫(dr_conv(u,du,v) + r_Ωf((du,dp),(v,q)))Ω.dΩf +
-      ∫(dr_SUPG((u,p),(du,dp),(v,q),u))Ω.dΩ_act_f +
-      ∫(r_ψ(dp,q))Ω.dΩf +
-      ∫(r_Γ((du,dp),(v,q),n_Γ,u))Ω.dΓ +
-      ∫(r_GP_μ(du,v) + r_GP_p(dp,q,u) + r_GP_u(du,v,u,Ω.n_Γg) + 0mean(φ))Ω.dΓg
+      ∫(dr_conv(u,du,v) + r_Ωf((du,dp),(v,q)) + γ_Nu*(du⋅v))Ω.dΩs +
+      ∫(dr_SUPG((u,p),(du,dp),(v,q),u))dΩ_act
   end
 
   ## Structure
@@ -288,22 +258,18 @@ function main(ranks)
     (λ, μ)
   end
   λs, μs = lame_parameters(0.1,0.05)
-  # Stabilization
-  α_Gd = 1e-7
-  k_d = 1.0
-  γ_Gd(h) = α_Gd*(λs + μs)*h^3
+  # Ersatz parameter
+  ϵ = (λs + 2μs)*1e-3
   # Terms
   σ(ε) = λs*tr(ε)*one(ε) + 2*μs*ε
-  a_s_Ω(s,d) = ε(s) ⊙ (σ ∘ ε(d)) # Elasticity
-  j_s_k(s,d) = mean(γ_Gd ∘ hₕ)*jump(Ω.n_Γg ⋅ ∇(s)) ⋅ jump(Ω.n_Γg ⋅ ∇(d)) # (Eqn. 3.11, Burman et al., 2018)
-  v_s_ψ(s,d) = k_d*Ω.ψ_s*d⋅s # Isolated volume term
+  a_s_Ω(s,d) = ε(s) ⊙ (σ ∘ ε(d))
 
   function a_solid(((u,p),),d,s,φ)
-    return ∫(a_s_Ω(s,d))Ω.dΩs + ∫(j_s_k(s,d) + 0mean(φ))Ω.dΓg + ∫(v_s_ψ(s,d))Ω.dΩs
+    return ∫(a_s_Ω(s,d))Ω.dΩs + ∫(ϵ*a_s_Ω(s,d))Ω.dΩf
   end
   function l_solid(((u,p),),s,φ)
-    n = -get_normal_vector(Ω.Γ)
-    return ∫(-s ⋅ ((1-Ω.ψ_s)*σ_f(ε(u),p) ⋅ n))Ω.dΓ
+    n = get_normal_vector(Ω.Γ)
+    return ∫(s ⋅ (σ_f(ε(u),p) ⋅ n))Ω.dΓ
   end
 
   res_solid(((u,p),),d,s,φ) = a_solid(((u,p),),d,s,φ) - l_solid(((u,p),),s,φ)
@@ -315,9 +281,8 @@ function main(ranks)
   # ## Optimisation functionals
   J_comp(((u,p),d),φ) = ∫(ε(d) ⊙ (σ ∘ ε(d)))Ω.dΩs
   ∂Jcomp∂up((du,dp),((u,p),d),φ) = ∫(0dp)Ω.dΩs
-  # ∂Jcomp∂d(dd,((u,p),d),φ) = ∫(2ε(dd) ⊙ (σ ∘ ε(d)))Ω.dΩs
   ∂Jcomp∂d(dd,((u,p),d),φ) = ∫(ε(dd) ⊙ (σ ∘ ε(d)))Ω.dΩs + ∫(ε(d) ⊙ (σ ∘ ε(dd)))Ω.dΩs
-  ∂Jpres∂xhi = (∂Jcomp∂up,∂Jcomp∂d)
+  ∂Jcomp∂xhi = (∂Jcomp∂up,∂Jcomp∂d)
 
   Vol(((u,p),d),φ) = ∫(vol_D)Ω.dΩs - ∫(vf/vol_D)dΩ_act
   dVol(q,(u,p,d),φ) = ∫(-1/vol_D*q/(norm ∘ (∇(φ))))Ω.dΓ
@@ -330,27 +295,19 @@ function main(ranks)
   elast_nls = NewtonSolver(ElasticitySolver(R;rtol=1.e-8,maxits=200);maxiter=1,verbose=i_am_main(ranks))
   solver = StaggeredFESolver([fluid_nls,elast_nls]);
 
-  state_collection = GridapTopOpt.EmbeddedCollection_in_φh(model,φh) do _φh
-    update_collection!(Ω,_φh)
-    (UP,VQ),(R,T) = build_spaces(Ω.Ω_act_s,Ω.Ω_act_f)
-    op = StaggeredNonlinearFEOperator([res_fluid,res_solid],[jac_fluid_picard,jac_solid],[UP,R],[VQ,T])
-    state_map = StaggeredNonlinearFEStateMap(op,∂Rk∂xhi,V_φ,U_reg,_φh;
-      adjoint_jacobians=[jac_fluid_newton,jac_solid],solver,adjoint_solver=solver)
-    (;
-      :state_map => state_map,
-      :J => GridapTopOpt.StaggeredStateParamMap(J_comp,∂Jpres∂xhi,state_map),
-      :C => map(((Ci,∂Ci),) -> GridapTopOpt.StaggeredStateParamMap(Ci,∂Ci,state_map),[(Vol,∂Vol∂xhi),])
-    )
-  end
+  op = StaggeredNonlinearFEOperator([res_fluid,res_solid],[jac_fluid_newton,jac_solid],[UP,R],[VQ,T])
+  state_map = StaggeredNonlinearFEStateMap(op,∂Rk∂xhi,V_φ,U_reg,φh;solver,adjoint_solver=solver)
 
-  pcf = EmbeddedPDEConstrainedFunctionals(state_collection;analytic_dC=[dVol])
+  J_sm = GridapTopOpt.StaggeredStateParamMap(J_comp,∂Jcomp∂xhi,state_map)
+  C_sm = map(((Ci,∂Ci),) -> GridapTopOpt.StaggeredStateParamMap(Ci,∂Ci,state_map),[(Vol,∂Vol∂xhi),])
+  pcfs = PDEConstrainedFunctionals(J_sm,C_sm,state_map;analytic_dC=[dVol])
 
   ## Evolution Method
   evolve_ls = MUMPSSolver()
   evolve_nls = NewtonSolver(evolve_ls;maxiter=1,verbose=i_am_main(ranks))
   reinit_nls = NewtonSolver(MUMPSSolver();maxiter=20,rtol=1.e-14,verbose=i_am_main(ranks))
 
-  evo = CutFEMEvolve(V_φ,Ω,dΩ_act,hₕ;max_steps,γg=0.1,ode_ls=evolve_ls,ode_nl=evolve_nls)
+  evo = CutFEMEvolve(V_φ,Ω,dΩ_act,hₕ;max_steps,γg=γg_evo,ode_ls=evolve_ls,ode_nl=evolve_nls)
   reinit1 = StabilisedReinit(V_φ,Ω,dΩ_act,hₕ;stabilisation_method=ArtificialViscosity(0.5),nls=reinit_nls)
   reinit2 = StabilisedReinit(V_φ,Ω,dΩ_act,hₕ;stabilisation_method=GridapTopOpt.InteriorPenalty(V_φ,γg=0.1),nls=reinit_nls)
   reinit = GridapTopOpt.MultiStageStabilisedReinit([reinit1,reinit2])
@@ -374,39 +331,28 @@ function main(ranks)
     it = GridapTopOpt.get_last_iteration(history)
     all(@.(abs(history[:C,it]) < 0.05vf)) && GridapTopOpt.default_has_oscillations(m,os_it)
   end
-  optimiser = AugmentedLagrangian(pcf,ls_evo,vel_ext,φh;
+  optimiser = AugmentedLagrangian(pcfs,ls_evo,vel_ext,φh;
     γ=γ_evo,verbose=i_am_main(ranks),constraint_names=[:Vol],converged,has_oscillations)
-  try
-    for (it,(uh,ph,dh),φh) in optimiser
-      GC.gc()
-      if iszero(it % iter_mod)
-        writevtk(Ω_act,path*"Omega_act_$it",
-          cellfields=["φ"=>φh,"|∇(φ)|"=>(norm ∘ ∇(φh)),"uh"=>uh,"ph"=>ph,"dh"=>dh,
-            "ψ_s"=>Ω.ψ_s,"ψ_f"=>Ω.ψ_f])
-        writevtk(Ω.Ωf,path*"Omega_f_$it",
-          cellfields=["uh"=>uh,"ph"=>ph,"dh"=>dh])
-        writevtk(Ω.Ωs,path*"Omega_s_$it",
-          cellfields=["uh"=>uh,"ph"=>ph,"dh"=>dh])
-      end
-      write_history(path*"/history.txt",optimiser.history;ranks)
-
-      # # Geometric operation to re-add the non-designable region # TODO: Move to a function
-      # _φ = get_free_dof_values(φh)
-      # _φ_nondesign = get_free_dof_values(φh_nondesign)
-      # map(local_views(_φ),local_views(_φ_nondesign)) do φ,φ_nondesign
-      #   φ .= min.(φ,φ_nondesign)
-      # end
-      # reinit!(ls_evo,φh)
+  for (it,(uh,ph,dh),φh) in optimiser
+    if iszero(it % iter_mod)
+      writevtk(Ω_act,path*"Omega_act_$it",
+        cellfields=["φ"=>φh,"|∇(φ)|"=>(norm ∘ ∇(φh)),"uh"=>uh,"ph"=>ph,"dh"=>dh])
+      writevtk(Ω.Ωf,path*"Omega_f_$it",
+        cellfields=["uh"=>uh,"ph"=>ph,"dh"=>dh])
+      writevtk(Ω.Ωs,path*"Omega_s_$it",
+        cellfields=["uh"=>uh,"ph"=>ph,"dh"=>dh])
     end
-  catch e
-    i_am_main(ranks) && println("Error: $e\nPrinting history and exiting...")
-    writevtk(Ω_act,path*"Omega_act_errored",
-      cellfields=["φ"=>φh,"|∇(φ)|"=>(norm ∘ ∇(φh)),
-        "ψ_s"=>Ω.ψ_s,"ψ_f"=>Ω.ψ_f])
-      writevtk(Ω.Ωf,path*"Omega_f_errored")
-      writevtk(Ω.Ωs,path*"Omega_s_errored")
+    write_history(path*"/history.txt",optimiser.history;ranks)
+
+    # # Geometric operation to re-add the non-designable region # TODO: Move to a function
+    # _φ = get_free_dof_values(φh)
+    # _φ_nondesign = get_free_dof_values(φh_nondesign)
+    # map(local_views(_φ),local_views(_φ_nondesign)) do φ,φ_nondesign
+    #   φ .= min.(φ,φ_nondesign)
+    # end
+    # reinit!(ls_evo,φh)
   end
-  it = get_history(optimiser).niter; uh,ph,dh = get_state(pcf)
+  it = get_history(optimiser).niter; uh,ph,dh = get_state(pcfs)
   writevtk(Ω_act,path*"Omega_act_$it",
     cellfields=["φ"=>φh,"|∇(φ)|"=>(norm ∘ ∇(φh)),"uh"=>uh,"ph"=>ph,"dh"=>dh])
   writevtk(Ω.Ωf,path*"Omega_f_$it",
