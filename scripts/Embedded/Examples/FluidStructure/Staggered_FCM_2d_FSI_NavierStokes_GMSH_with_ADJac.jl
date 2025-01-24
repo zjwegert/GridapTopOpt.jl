@@ -175,18 +175,6 @@ end
 
 jac_fluid_AD((),x,dx,y,φ) = jacobian((_x,_y,_φ)->res_fluid((),_x,_y,_φ),[x,y,φ],1)
 
-X = MultiFieldFESpace([U,P])
-Y = MultiFieldFESpace([V,Q])
-_op = FEOperator((u,v)->res_fluid((),u,v,φh),(u,du,v)->jac_fluid_newton((),u,du,v,φh),X,Y)
-_solver = NewtonSolver(LUSolver();maxiter=100,rtol=1.e-14,verbose=true)
-uh,ph = solve(_solver,_op);
-writevtk(Ω.Ωf,path*"Omega_f",
-  cellfields=["uh"=>uh,"ph"=>ph])
-writevtk(Ω.Ωs,path*"Omega_s",
-  cellfields=["uh"=>uh,"ph"=>ph])
-error()
-
-
 ## Structure
 # Material parameters
 function lame_parameters(E,ν)
