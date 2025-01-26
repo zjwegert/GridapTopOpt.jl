@@ -1029,8 +1029,6 @@ function Base.show(io::IO,::MIME"text/plain",f::PDEConstrainedFunctionals)
     num_constraints: $(length(f.C))")
 end
 
-
-
 struct CustomPDEConstrainedFunctionals{N,A} #<: ParameterisedObjective{N,A}
   φ_to_jc :: Function
   dJ :: Vector{Float64}
@@ -1038,15 +1036,20 @@ struct CustomPDEConstrainedFunctionals{N,A} #<: ParameterisedObjective{N,A}
   analytic_dJ
   analytic_dC
   state_map :: A
+  V_φ :: FESpace
 
     function CustomPDEConstrainedFunctionals(
       φ_to_jc :: Function,
       state_map :: AbstractFEStateMap,
-      φ0;
+      φh_bg;
     )
+
+    V_φ = φh_bg.fe_space
+    φh = interpolate(φh_bg,get_aux_space(state_map))
+    φ = φh.free_values
     
     # Pre-allocaitng
-    grad = Zygote.jacobian(φ_to_jc, φ0.free_values)
+    grad = Zygote.jacobian(φ_to_jc, φ)
     dJ = grad[1][1,:]
     dC = [collect(row) for row in eachrow(grad[1][2:end,:])]    
 
@@ -1055,29 +1058,20 @@ struct CustomPDEConstrainedFunctionals{N,A} #<: ParameterisedObjective{N,A}
     analytic_dJ = nothing
     analytic_dC = fill(nothing,N)
 
-    return new{N,A}(φ_to_jc,dJ,dC,analytic_dJ,analytic_dC,state_map)
+    return new{N,A}(φ_to_jc,dJ,dC,analytic_dJ,analytic_dC,state_map,V_φ)
   end
 end
 
-function Fields.evaluate!(pcf::CustomPDEConstrainedFunctionals,φh)
+function Fields.evaluate!(pcf::CustomPDEConstrainedFunctionals,φh_bg)
   φ_to_jc,dJ,dC = pcf.φ_to_jc,pcf.dJ,pcf.dC
+
+  φh = interpolate(φh_bg,get_aux_space(pcf.state_map))
 
   obj,grad = Zygote.withjacobian(φ_to_jc, φh.free_values)
   j = obj[1]
   c = obj[2:end]
   copy!(dJ,grad[1][1,:])
   copy!(dC,[collect(row) for row in eachrow(grad[1][2:end,:])])
-
-  # Move the below out of this function
-  function add_zero_dirichlet_according_to_U_reg(dJ)
-    V_φ = get_aux_space(pcf.state_map)
-    ∂Jₕ = FEFunction(V_φ,dJ)
-    U_reg = get_deriv_space(pcf.state_map)
-    ∂Jₕ_constrained = interpolate(∂Jₕ,U_reg)
-    return get_free_dof_values(∂Jₕ_constrained)
-  end
-  dJ = add_zero_dirichlet_according_to_U_reg(dJ)
-  dC = map(add_zero_dirichlet_according_to_U_reg,dC)
 
   return j,c,dJ,dC
 end
@@ -1089,8 +1083,11 @@ function evaluate_functionals!(pcf::CustomPDEConstrainedFunctionals,φh::FEFunct
   return evaluate_functionals!(pcf,φ)
 end
 
-function evaluate_functionals!(pcf::CustomPDEConstrainedFunctionals,φ::AbstractVector)
+function evaluate_functionals!(pcf::CustomPDEConstrainedFunctionals,φ_bg::AbstractVector)
   φ_to_jc =  pcf.φ_to_jc
+  φh_bg = FEFunction(pcf.V_φ,φ_bg)
+  φh = interpolate(φh_bg,get_aux_space(pcf.state_map))
+  φ = φh.free_values
   obj = φ_to_jc(φ)
   j = obj[1]
   c = obj[2:end]

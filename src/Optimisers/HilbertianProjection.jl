@@ -281,7 +281,9 @@ function Base.iterate(m::HilbertianProjection,state)
 
   ## Line search
   U_reg = get_deriv_space(m.problem.state_map)
-  V_φ   = get_aux_space(m.problem.state_map)
+  @show num_free_dofs(U_reg)
+  V_φ   = φh.fe_space #get_aux_space(m.problem.state_map)
+  @show num_free_dofs(V_φ)
   interpolate!(FEFunction(U_reg,θ),vel,V_φ)
   J, C, dJ, dC, γ = _linesearch!(m,state)
 

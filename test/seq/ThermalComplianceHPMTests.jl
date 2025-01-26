@@ -43,11 +43,15 @@ U = TrialFESpace(V,0.0)
 
 V_φ = TestFESpace(model,reffe_scalar)#;dirichlet_tags=["Gamma_N"])
 # U_φ = TrialFESpace(V_φ,-0.1)
+
+V_φ_ = TestFESpace(model,reffe_scalar;dirichlet_tags=["Gamma_N"])
+U_φ_ = TrialFESpace(V_φ_,-0.01)
+
 V_reg = TestFESpace(model,reffe_scalar;dirichlet_tags=["Gamma_N"])
 U_reg = TrialFESpace(V_reg,0)
 
 ## Create FE functions
-φh = interpolate(initial_lsf(4,0.2),V_φ)
+φh = interpolate(initial_lsf(4,0.2),U_φ_)
 
 ## Interpolation and weak form
 interp = SmoothErsatzMaterialInterpolation(η = η_coeff*maximum(el_Δ))
@@ -66,7 +70,7 @@ dVol(q,u,φ,dΩ,dΓ_N) = ∫(-1/vol_D*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
 ls_evo = HamiltonJacobiEvolution(FirstOrderStencil(2,Float64),model,V_φ,tol,max_steps)
 
 ## Setup solver and FE operators
-state_map = AffineFEStateMap(a,l,U,V,V_φ,U_reg,φh,dΩ,dΓ_N)
+state_map = AffineFEStateMap(a,l,U,V,U_φ_,U_reg,φh,dΩ,dΓ_N)
 
 import GridapTopOpt: StateParamIntegrandWithMeasure
 
@@ -75,6 +79,10 @@ C=[Vol]
 objective = StateParamIntegrandWithMeasure(J,state_map)
 constraints = map(Ci -> StateParamIntegrandWithMeasure(Ci,state_map),C)
 
+using Zygote
+
+φ = φh.free_values
+
 function φ_to_jc(φ)
   u = state_map(φ)
   j = objective(u,φ)
@@ -82,7 +90,20 @@ function φ_to_jc(φ)
   [j,c...]
 end
 
-pcf = CustomPDEConstrainedFunctionals(φ_to_jc,state_map,φh)
+φ_to_jc(φ)
+
+
+φh.fe_space
+
+Zygote.jacobian(φ_to_jc,φ)
+
+φh_bg =  interpolate(φh,V_φ)
+
+
+φh_bg.free_values
+φh.free_values
+
+pcf = CustomPDEConstrainedFunctionals(φ_to_jc,state_map,φh_bg)
 
 ## Hilbertian extension-regularisation problems
 α = α_coeff*maximum(el_Δ)
@@ -90,7 +111,7 @@ a_hilb(p,q) =∫(α^2*∇(p)⋅∇(q) + p*q)dΩ;
 vel_ext = VelocityExtension(a_hilb,U_reg,V_reg)
 
 ## Optimiser
-optimiser = HilbertianProjection(pcf,ls_evo,vel_ext,φh;
+optimiser = HilbertianProjection(pcf,ls_evo,vel_ext,φh_bg;
   γ,γ_reinit,verbose=true,constraint_names=[:Vol])
 
 # Do a few iterations
