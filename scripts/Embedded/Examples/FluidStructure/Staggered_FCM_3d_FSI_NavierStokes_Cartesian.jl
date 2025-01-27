@@ -92,7 +92,7 @@ function gmres_amg_ksp_setup(rtol,maxits)
   return ksp_setup
 end
 
-function main(ranks)
+function main(ranks,mesh_partition)
   path = "./results/Staggered_FCM_3d_FSI_NavierStokes_GMSH_gammag$γg_evo/"
   i_am_main(ranks) && mkpath(path)
 
@@ -114,8 +114,30 @@ function main(ranks)
   cw = 0.1;
   vol_D = L*H
 
-  model = GmshDiscreteModel(ranks,(@__DIR__)*"/Meshes/mesh_3d_finer.msh")
-  map(test_mesh,local_views(model))
+  _model = CartesianDiscreteModel(ranks,mesh_partition,(0,4,0,1,0,1),(200,50,50))
+  base_model = UnstructuredDiscreteModel(_model)
+  ref_model = refine(base_model, refinement_method = "barycentric")
+  model = Adaptivity.get_model(ref_model)
+
+  f_G_Left(x) = x[3] == 0.0
+  f_G_Right(x) = x[3] == 1.0
+  f_G_Top(x) = x[2] == 1.0
+  f_G_Bottom(x) = x[2] == 0.0
+  f_G_TopCorners(x) = x[2] == 1.0 && (x[3] == 0.0 || x[3] == 1.0)
+  f_G_D(x) = x[1] == 0.0
+  f_G_N(x) = x[1] == 4.0
+  f_NonDesign(x) = ((x0 - w/2 - eps() <= x[1] <= x0 + w/2 + eps() && 0.0 <= x[2] <= a + eps() && cw - eps() <= x[3] <= H - cw + eps()) ||
+    (x0 - l/2 - eps() <= x[1] <= x0 + l/2 + eps() && 0.0 <= x[2] <= b + eps() && cw - eps() <= x[3] <= H - cw + eps()))
+
+  update_labels!(1,model,f_G_Left,"Gamma_Left")
+  update_labels!(2,model,f_G_Right,"Gamma_Right")
+  update_labels!(3,model,f_G_Top,"Gamma_Top")
+  update_labels!(4,model,f_G_Bottom,"Gamma_Bottom")
+  update_labels!(5,model,f_G_TopCorners,"Gamma_TopCorners")
+  update_labels!(6,model,f_G_D,"Gamma_f_D")
+  update_labels!(7,model,f_G_D,"Gamma_f_N")
+  update_labels!(8,model,f_NonDesign,"Omega_NonDesign")
+  update_labels!(9,model,x->f_NonDesign(x) && f_G_Bottom(x),"Gamma_s_D")
   writevtk(model,path*"model")
 
   Ω_act = Triangulation(model)
@@ -128,7 +150,7 @@ function main(ranks)
   V_reg = TestFESpace(model,reffe_scalar;dirichlet_tags=["Omega_NonDesign","Gamma_s_D"])
   U_reg = TrialFESpace(V_reg)
 
-  _e = sqrt(2)*1e-3#1e-2
+  _e = 0.0 #5e-3
   f0((x,y,z),a,b) = max(2/a*abs(x-x0),1/(b/2+1)*abs(y-b/2+1),2/(H-2cw)*abs(z-H/2))-1
   f1((x,y,z),q,r) = - cos(q*π*x)*cos(q*π*y)*cos(q*π*z)/q - r/q
   fin(x) = f0(x,l*(1+_e),a*(1+_e))
@@ -164,20 +186,6 @@ function main(ranks)
       :dΓ      => Measure(Γ,degree)
     )
   end
-
-  ## Evolution Method
-  evolve_ls = MUMPSSolver()
-  evolve_nls = NewtonSolver(evolve_ls;maxiter=1,verbose=i_am_main(ranks))
-  reinit_nls = NewtonSolver(MUMPSSolver();maxiter=20,rtol=1.e-14,verbose=i_am_main(ranks))
-
-  evo = CutFEMEvolve(V_φ,Ω,dΩ_act,hₕ;max_steps,γg=γg_evo,ode_ls=evolve_ls,ode_nl=evolve_nls)
-  reinit1 = StabilisedReinit(V_φ,Ω,dΩ_act,hₕ;stabilisation_method=ArtificialViscosity(0.5),nls=reinit_nls)
-  reinit2 = StabilisedReinit(V_φ,Ω,dΩ_act,hₕ;stabilisation_method=GridapTopOpt.InteriorPenalty(V_φ,γg=0.1),nls=reinit_nls)
-  reinit = GridapTopOpt.MultiStageStabilisedReinit([reinit1,reinit2])
-  ls_evo = UnfittedFEEvolution(evo,reinit)
-
-  reinit!(ls_evo,φh)
-  # reinit!(ls_evo,φh_nondesign)
 
   # Setup spaces
   uin(x) = VectorValue(x[2],0.0,0.0)
@@ -316,6 +324,19 @@ function main(ranks)
   C_sm = map(((Ci,∂Ci),) -> GridapTopOpt.StaggeredStateParamMap(Ci,∂Ci,state_map),[(Vol,∂Vol∂xhi),])
   pcfs = PDEConstrainedFunctionals(J_sm,C_sm,state_map;analytic_dC=[dVol])
 
+  ## Evolution Method
+  evolve_ls = MUMPSSolver()
+  evolve_nls = NewtonSolver(evolve_ls;maxiter=1,verbose=i_am_main(ranks))
+  reinit_nls = NewtonSolver(MUMPSSolver();maxiter=20,rtol=1.e-14,verbose=i_am_main(ranks))
+
+  evo = CutFEMEvolve(V_φ,Ω,dΩ_act,hₕ;max_steps,γg=γg_evo,ode_ls=evolve_ls,ode_nl=evolve_nls)
+  reinit1 = StabilisedReinit(V_φ,Ω,dΩ_act,hₕ;stabilisation_method=ArtificialViscosity(0.5),nls=reinit_nls)
+  reinit2 = StabilisedReinit(V_φ,Ω,dΩ_act,hₕ;stabilisation_method=GridapTopOpt.InteriorPenalty(V_φ,γg=0.1),nls=reinit_nls)
+  reinit = GridapTopOpt.MultiStageStabilisedReinit([reinit1,reinit2])
+  ls_evo = UnfittedFEEvolution(evo,reinit)
+
+  # reinit!(ls_evo,φh_nondesign)
+
   ## Hilbertian extension-regularisation problems
   _α(hₕ) = (α_coeff*hₕ)^2
   a_hilb(p,q) =∫((_α ∘ hₕ)*∇(p)⋅∇(q) + p*q)dΩ_act;
@@ -363,10 +384,10 @@ function main(ranks)
 end
 
 with_mpi() do distribute
-  ncpus = 96
-  ranks = distribute(LinearIndices((ncpus,)))
+  mesh_partition = (6,4,4)
+  ranks = distribute(LinearIndices((prod(mesh_partition),)))
   petsc_options = "-ksp_converged_reason -ksp_error_if_not_converged true -ksp_gmres_modifiedgramschmidt"
   GridapPETSc.with(;args=split(petsc_options)) do
-    main(ranks)
+    main(ranks,mesh_partition)
   end
 end

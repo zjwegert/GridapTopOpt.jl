@@ -333,12 +333,12 @@ function main(ranks)
 
   ## Staggered operators
   fluid_nls = NewtonSolver(MUMPSSolver();maxiter=10,rtol=1.e-8,verbose=i_am_main(ranks))
-  elast_nls = NewtonSolver(ElasticitySolver(R;rtol=1.e-8,maxits=200);maxiter=1,verbose=i_am_main(ranks))
-  solver = StaggeredFESolver([fluid_nls,elast_nls]);
 
   state_collection = GridapTopOpt.EmbeddedCollection_in_φh(model,φh) do _φh
     update_collection!(Ω,_φh)
     (UP,VQ),(R,T) = build_spaces(Ω.Ω_act_s,Ω.Ω_act_f)
+    elast_nls = NewtonSolver(ElasticitySolver(R;rtol=1.e-8,maxits=200);maxiter=1,verbose=i_am_main(ranks))
+    solver = StaggeredFESolver([fluid_nls,elast_nls]);
     op = StaggeredNonlinearFEOperator([res_fluid,res_solid],[jac_fluid_picard,jac_solid],[UP,R],[VQ,T])
     state_map = StaggeredNonlinearFEStateMap(op,∂Rk∂xhi,V_φ,U_reg,_φh;
       adjoint_jacobians=[jac_fluid_newton,jac_solid],solver,adjoint_solver=solver)
