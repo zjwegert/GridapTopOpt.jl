@@ -128,7 +128,7 @@ u0_max = sum(∫(uin_dot_e1)dΓf_D)/sum(∫(1)dΓf_D)
 ν = μ/ρ # Kinematic viscosity
 
 # Stabilization parameters
-α_Nu   = 2.5*10
+α_Nu   = 2.5
 α_SUPG = 1/3
 
 γ_Nu         = α_Nu*(μ/0.001^2)
