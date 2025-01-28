@@ -33,7 +33,7 @@ mutable struct StabilisedReinit{A,B,C,D} <: Reinitialiser
   cache
   function StabilisedReinit(V_φ::C,Ωs::EmbeddedCollection,dΩ_bg::B,h;
       γd = 20.0,
-      nls = NewtonSolver(LUSolver();maxiter=10,rtol=1.e-14,verbose=true),
+      nls = NewtonSolver(LUSolver();maxiter=20,rtol=1.e-14,verbose=true),
       assembler=SparseMatrixAssembler(V_φ,V_φ),
       stabilisation_method::A = InteriorPenalty(V_φ)) where {A,B,C}
 
