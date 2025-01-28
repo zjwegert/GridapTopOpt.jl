@@ -373,7 +373,7 @@ end
 
 with_mpi() do distribute
   n = 300
-  mesh_partition = (2,2,2)
+  mesh_partition = (2,2)
   ranks = distribute(LinearIndices((prod(mesh_partition),)))
   petsc_options = "-ksp_converged_reason -ksp_error_if_not_converged true -ksp_gmres_modifiedgramschmidt"
   GridapPETSc.with(;args=split(petsc_options)) do
