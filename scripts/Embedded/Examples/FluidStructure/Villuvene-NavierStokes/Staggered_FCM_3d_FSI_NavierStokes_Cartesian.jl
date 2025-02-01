@@ -244,33 +244,34 @@ function main(ranks,mesh_partition)
 
   r_conv(u,v) = NS*ρ*v ⋅ (conv∘(u,∇(u)))
   r_Ωf((u,p),(v,q)) = ε(v) ⊙ (σ_f ∘ (ε(u),p)) + q*(∇⋅u)
-  r_SUPG((u,p),(v,q),w) = (NS*SUPG*(τ_SUPG ∘ (hₕ,w))*(conv ∘ (u,∇(v))) + (τ_PSPG ∘ (hₕ,w))/ρ*∇(q))⋅
-    (NS*SUPG*ρ*(conv∘(u,∇(u))) + ∇(p) - μ*Δ(u))
-  r_SUPG_picard((u,p),(v,q),w) = (NS*SUPG*(τ_SUPG ∘ (hₕ,w))*(conv ∘ (w,∇(v))) + (τ_PSPG ∘ (hₕ,w))/ρ*∇(q))⋅
-    (NS*SUPG*ρ*(conv∘(w,∇(u))) + ∇(p) - μ*Δ(u))
+
+  # Additional Brinkmann terms in SUPG based on 10.1002/nme.3151
+  r_SUPG((u,p),(v,q),w;IN_Ωf=1) = (NS*SUPG*IN_Ωf*(τ_SUPG ∘ (hₕ,w))*(conv ∘ (u,∇(v))) + (τ_PSPG ∘ (hₕ,w))/ρ*∇(q))⋅
+  (NS*SUPG*ρ*(conv∘(u,∇(u))) + ∇(p) - μ*Δ(u) + (1-IN_Ωf)*γ_Nu*u)
+  r_SUPG_picard((u,p),(v,q),w;IN_Ωf=1) = (NS*SUPG*IN_Ωf*(τ_SUPG ∘ (hₕ,w))*(conv ∘ (w,∇(v))) + (τ_PSPG ∘ (hₕ,w))/ρ*∇(q))⋅
+  (NS*SUPG*ρ*(conv∘(w,∇(u))) + ∇(p) - μ*Δ(u) + (1-IN_Ωf)*γ_Nu*u)
 
   dr_conv(u,du,v) = NS*ρ*v ⋅ (dconv∘(du,∇(du),u,∇(u)))
-  dr_SUPG((u,p),(du,dp),(v,q),w) =
-    (NS*SUPG*(τ_SUPG ∘ (hₕ,w))*(conv ∘ (du,∇(v))))⋅(NS*SUPG*ρ*(conv∘(u,∇(u))) + ∇(p) - μ*Δ(u)) +
-    (NS*SUPG*(τ_SUPG ∘ (hₕ,w))*(conv ∘ (u,∇(v))) + (τ_PSPG ∘ (hₕ,w))/ρ*∇(q))⋅(NS*SUPG*ρ*(dconv∘(du,∇(du),u,∇(u))) + ∇(dp) - μ*Δ(du))
+  dr_SUPG((u,p),(du,dp),(v,q),w;IN_Ωf=1) =
+  (NS*SUPG*IN_Ωf*(τ_SUPG ∘ (hₕ,w))*(conv ∘ (du,∇(v))))⋅(NS*SUPG*ρ*(conv∘(u,∇(u))) + ∇(p) - μ*Δ(u) + (1-IN_Ωf)*γ_Nu*u) +
+  (NS*SUPG*IN_Ωf*(τ_SUPG ∘ (hₕ,w))*(conv ∘ (u,∇(v))) + (τ_PSPG ∘ (hₕ,w))/ρ*∇(q))⋅(NS*SUPG*ρ*(dconv∘(du,∇(du),u,∇(u))) + ∇(dp) - μ*Δ(du) + (1-IN_Ωf)*γ_Nu*du)
 
   function res_fluid((),(u,p),(v,q),φ)
-    return ∫(r_conv(u,v) + r_Ωf((u,p),(v,q)))Ω.dΩf +
-      ∫(r_conv(u,v) + r_Ωf((u,p),(v,q)) + γ_Nu*(u⋅v))Ω.dΩs +
-      ∫(r_SUPG((u,p),(v,q),u))dΩ_act
-  end
-
-  function jac_fluid_picard((),(u,p),(du,dp),(v,q),φ)
-    return ∫(NS*ρ*v ⋅ (conv∘(u,∇(du))) + r_Ωf((du,dp),(v,q)))Ω.dΩs +
-      ∫(NS*ρ*v ⋅ (conv∘(u,∇(du))) + r_Ωf((du,dp),(v,q)) + γ_Nu*(du⋅v))Ω.dΩf +
-      ∫(r_SUPG_picard((du,dp),(v,q),u))dΩ_act
+  return ∫(r_conv(u,v) + r_Ωf((u,p),(v,q)) + r_SUPG((u,p),(v,q),u))Ω.dΩf +
+    ∫(r_conv(u,v) + r_Ωf((u,p),(v,q)) + γ_Nu*(u⋅v) + r_SUPG((u,p),(v,q),u;IN_Ωf=0))Ω.dΩs
   end
 
   function jac_fluid_newton((),(u,p),(du,dp),(v,q),φ)
-    return ∫(dr_conv(u,du,v) + r_Ωf((du,dp),(v,q)))Ω.dΩf +
-      ∫(dr_conv(u,du,v) + r_Ωf((du,dp),(v,q)) + γ_Nu*(du⋅v))Ω.dΩs +
-      ∫(dr_SUPG((u,p),(du,dp),(v,q),u))dΩ_act
+  return ∫(dr_conv(u,du,v) + r_Ωf((du,dp),(v,q)) + dr_SUPG((u,p),(du,dp),(v,q),u))Ω.dΩf +
+    ∫(dr_conv(u,du,v) + r_Ωf((du,dp),(v,q)) + γ_Nu*(du⋅v) + dr_SUPG((u,p),(du,dp),(v,q),u;IN_Ωf=0))Ω.dΩs
   end
+
+  function jac_fluid_picard((),(u,p),(du,dp),(v,q),φ)
+  return ∫(NS*ρ*v ⋅ (conv∘(u,∇(du))) + r_Ωf((du,dp),(v,q)) + r_SUPG_picard((du,dp),(v,q),u))Ω.dΩs +
+    ∫(NS*ρ*v ⋅ (conv∘(u,∇(du))) + r_Ωf((du,dp),(v,q)) + γ_Nu*(du⋅v) + r_SUPG_picard((du,dp),(v,q),u;IN_Ωf=0))Ω.dΩf
+  end
+
+  jac_fluid_AD((),x,dx,y,φ) = jacobian((_x,_y,_φ)->res_fluid((),_x,_y,_φ),[x,y,φ],1)
 
   ## Structure
   # Material parameters

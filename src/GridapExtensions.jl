@@ -418,3 +418,23 @@ end
 #   !isempty(x) && ForwardDiff.extract_gradient!(T, result, ydual) # <-- Watch for empty cell contributions
 #   return result
 # end
+
+################# MultiField #################
+# TODO: Remove this once resolved in GridapDistributed#169
+function test_triangulation(Ω1,Ω2)
+  @assert typeof(Ω1.grid) == typeof(Ω2.grid)
+  t = map(fieldnames(typeof(Ω1.grid))) do field
+    getfield(Ω1.grid,field) == getfield(Ω2.grid,field)
+  end
+  all(t)
+  a = Ω1.model === Ω2.model
+  b = Ω1.tface_to_mface == Ω2.tface_to_mface
+  a && b && all(t)
+end
+
+function CellData.get_triangulation(f::MultiFieldCellField)
+  s1 = first(f.single_fields)
+  trian = get_triangulation(s1)
+  @check all(map(i->test_triangulation(trian,get_triangulation(i)),f.single_fields))
+  trian
+end

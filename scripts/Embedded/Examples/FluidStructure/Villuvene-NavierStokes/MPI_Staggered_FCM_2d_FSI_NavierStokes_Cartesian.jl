@@ -145,7 +145,7 @@ function main(n,ranks,mesh_partition)
   V_reg = TestFESpace(model,reffe_scalar;dirichlet_tags=["Omega_NonDesign","Gamma_s_D"])
   U_reg = TrialFESpace(V_reg)
 
-  _e = 1/2*hmin
+  _e = 1/3*hmin
   f0((x,y),W,H) = max(2/W*abs(x-x0),1/(H/2+1)*abs(y-H/2+1))-1
   f1((x,y),q,r) = - cos(q*π*x)*cos(q*π*y)/q - r/q
   fin(x) = f0(x,l*(1+5_e),a*(1+5_e))
@@ -205,9 +205,8 @@ function main(n,ranks,mesh_partition)
   R = TrialFESpace(T)
 
   # Multifield spaces
-  mfs = BlockMultiFieldStyle(2,(2,1))
-  X = MultiFieldFESpace([U,P,R];style=mfs)
-  Y = MultiFieldFESpace([V,Q,T];style=mfs)
+  UP = MultiFieldFESpace([U,P])
+  VQ = MultiFieldFESpace([V,Q])
 
   ### Weak form
 
@@ -241,32 +240,31 @@ function main(n,ranks,mesh_partition)
 
   r_conv(u,v) = NS*ρ*v ⋅ (conv∘(u,∇(u)))
   r_Ωf((u,p),(v,q)) = ε(v) ⊙ (σ_f ∘ (ε(u),p)) + q*(∇⋅u)
-  r_SUPG((u,p),(v,q),w) = (NS*SUPG*(τ_SUPG ∘ (hₕ,w))*(conv ∘ (u,∇(v))) + (τ_PSPG ∘ (hₕ,w))/ρ*∇(q))⋅
-    (NS*SUPG*ρ*(conv∘(u,∇(u))) + ∇(p) - μ*Δ(u))
-  r_SUPG_picard((u,p),(v,q),w) = (NS*SUPG*(τ_SUPG ∘ (hₕ,w))*(conv ∘ (w,∇(v))) + (τ_PSPG ∘ (hₕ,w))/ρ*∇(q))⋅
-    (NS*SUPG*ρ*(conv∘(w,∇(u))) + ∇(p) - μ*Δ(u))
+
+  # Additional Brinkmann terms in SUPG based on 10.1002/nme.3151
+  r_SUPG((u,p),(v,q),w;IN_Ωf=1) = (NS*SUPG*IN_Ωf*(τ_SUPG ∘ (hₕ,w))*(conv ∘ (u,∇(v))) + (τ_PSPG ∘ (hₕ,w))/ρ*∇(q))⋅
+  (NS*SUPG*ρ*(conv∘(u,∇(u))) + ∇(p) - μ*Δ(u) + (1-IN_Ωf)*γ_Nu*u)
+  r_SUPG_picard((u,p),(v,q),w;IN_Ωf=1) = (NS*SUPG*IN_Ωf*(τ_SUPG ∘ (hₕ,w))*(conv ∘ (w,∇(v))) + (τ_PSPG ∘ (hₕ,w))/ρ*∇(q))⋅
+  (NS*SUPG*ρ*(conv∘(w,∇(u))) + ∇(p) - μ*Δ(u) + (1-IN_Ωf)*γ_Nu*u)
 
   dr_conv(u,du,v) = NS*ρ*v ⋅ (dconv∘(du,∇(du),u,∇(u)))
-  dr_SUPG((u,p),(du,dp),(v,q),w) =
-    (NS*SUPG*(τ_SUPG ∘ (hₕ,w))*(conv ∘ (du,∇(v))))⋅(NS*SUPG*ρ*(conv∘(u,∇(u))) + ∇(p) - μ*Δ(u)) +
-    (NS*SUPG*(τ_SUPG ∘ (hₕ,w))*(conv ∘ (u,∇(v))) + (τ_PSPG ∘ (hₕ,w))/ρ*∇(q))⋅(NS*SUPG*ρ*(dconv∘(du,∇(du),u,∇(u))) + ∇(dp) - μ*Δ(du))
+  dr_SUPG((u,p),(du,dp),(v,q),w;IN_Ωf=1) =
+  (NS*SUPG*IN_Ωf*(τ_SUPG ∘ (hₕ,w))*(conv ∘ (du,∇(v))))⋅(NS*SUPG*ρ*(conv∘(u,∇(u))) + ∇(p) - μ*Δ(u) + (1-IN_Ωf)*γ_Nu*u) +
+  (NS*SUPG*IN_Ωf*(τ_SUPG ∘ (hₕ,w))*(conv ∘ (u,∇(v))) + (τ_PSPG ∘ (hₕ,w))/ρ*∇(q))⋅(NS*SUPG*ρ*(dconv∘(du,∇(du),u,∇(u))) + ∇(dp) - μ*Δ(du) + (1-IN_Ωf)*γ_Nu*du)
 
   function res_fluid((),(u,p),(v,q),φ)
-    return ∫(r_conv(u,v) + r_Ωf((u,p),(v,q)))Ω.dΩf +
-      ∫(r_conv(u,v) + r_Ωf((u,p),(v,q)) + γ_Nu*(u⋅v))Ω.dΩs +
-      ∫(r_SUPG((u,p),(v,q),u))dΩ_act
-  end
-
-  function jac_fluid_picard((),(u,p),(du,dp),(v,q),φ)
-    return ∫(NS*ρ*v ⋅ (conv∘(u,∇(du))) + r_Ωf((du,dp),(v,q)))Ω.dΩs +
-      ∫(NS*ρ*v ⋅ (conv∘(u,∇(du))) + r_Ωf((du,dp),(v,q)) + γ_Nu*(du⋅v))Ω.dΩf +
-      ∫(r_SUPG_picard((du,dp),(v,q),u))dΩ_act
+  return ∫(r_conv(u,v) + r_Ωf((u,p),(v,q)) + r_SUPG((u,p),(v,q),u))Ω.dΩf +
+    ∫(r_conv(u,v) + r_Ωf((u,p),(v,q)) + γ_Nu*(u⋅v) + r_SUPG((u,p),(v,q),u;IN_Ωf=0))Ω.dΩs
   end
 
   function jac_fluid_newton((),(u,p),(du,dp),(v,q),φ)
-    return ∫(dr_conv(u,du,v) + r_Ωf((du,dp),(v,q)))Ω.dΩf +
-      ∫(dr_conv(u,du,v) + r_Ωf((du,dp),(v,q)) + γ_Nu*(du⋅v))Ω.dΩs +
-      ∫(dr_SUPG((u,p),(du,dp),(v,q),u))dΩ_act
+  return ∫(dr_conv(u,du,v) + r_Ωf((du,dp),(v,q)) + dr_SUPG((u,p),(du,dp),(v,q),u))Ω.dΩf +
+    ∫(dr_conv(u,du,v) + r_Ωf((du,dp),(v,q)) + γ_Nu*(du⋅v) + dr_SUPG((u,p),(du,dp),(v,q),u;IN_Ωf=0))Ω.dΩs
+  end
+
+  function jac_fluid_picard((),(u,p),(du,dp),(v,q),φ)
+  return ∫(NS*ρ*v ⋅ (conv∘(u,∇(du))) + r_Ωf((du,dp),(v,q)) + r_SUPG_picard((du,dp),(v,q),u))Ω.dΩs +
+    ∫(NS*ρ*v ⋅ (conv∘(u,∇(du))) + r_Ωf((du,dp),(v,q)) + γ_Nu*(du⋅v) + r_SUPG_picard((du,dp),(v,q),u;IN_Ωf=0))Ω.dΩf
   end
 
   jac_fluid_AD((),x,dx,y,φ) = jacobian((_x,_y,_φ)->res_fluid((),_x,_y,_φ),[x,y,φ],1)
@@ -288,8 +286,10 @@ function main(n,ranks,mesh_partition)
   function a_solid(((u,p),),d,s,φ)
     return ∫(a_s_Ω(s,d))Ω.dΩs + ∫(ϵ*a_s_Ω(s,d))Ω.dΩf
   end
+  _n(∇φ) = ∇φ/(10^-20+norm(∇φ))
   function l_solid(((u,p),),s,φ)
-    n = get_normal_vector(Ω.Γ)
+    # n = get_normal_vector(Ω.Γ)  # TODO: This is currently broken in distributed when using AD
+    n = _n ∘ ∇(φ)
     return ∫(s ⋅ (σ_f(ε(u),p) ⋅ n))Ω.dΓ
   end
 
@@ -306,7 +306,7 @@ function main(n,ranks,mesh_partition)
   elast_nls = NewtonSolver(ElasticitySolver(R;rtol=1.e-8,maxits=200);maxiter=1,verbose=i_am_main(ranks))
   solver = StaggeredFESolver([fluid_nls,elast_nls]);
 
-  op = StaggeredNonlinearFEOperator([res_fluid,res_solid],[jac_fluid_newton,jac_solid],X,Y)
+  op = StaggeredNonlinearFEOperator([res_fluid,res_solid],[jac_fluid_AD,jac_solid],[UP,R],[VQ,T])
   state_map = StaggeredNonlinearFEStateMap(op,V_φ,U_reg,φh;adjoint_jacobians=[jac_fluid_AD,jac_solid],solver,adjoint_solver=solver)
   pcfs = PDEConstrainedFunctionals(J_comp,[Vol],state_map;analytic_dC=[dVol])
 
@@ -372,7 +372,7 @@ function main(n,ranks,mesh_partition)
 end
 
 with_mpi() do distribute
-  n = 300
+  n = 200
   mesh_partition = (2,2)
   ranks = distribute(LinearIndices((prod(mesh_partition),)))
   petsc_options = "-ksp_converged_reason -ksp_error_if_not_converged true -ksp_gmres_modifiedgramschmidt"

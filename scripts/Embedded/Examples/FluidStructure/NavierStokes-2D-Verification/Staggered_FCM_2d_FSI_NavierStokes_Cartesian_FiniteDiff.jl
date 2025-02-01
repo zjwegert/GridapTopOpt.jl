@@ -7,23 +7,17 @@ using GridapTopOpt
 using LinearAlgebra
 LinearAlgebra.norm(x::VectorValue,p::Real) = norm(x.data,p)
 
+path = "./results/Staggered_FCM_2d_FSI_NavierStokes_Cartesian_low_res_ad_test/"
+files_path = path*"data/"
+mkpath(files_path)
+
 if isassigned(ARGS,1)
   global γg_evo =  parse(Float64,ARGS[1])
 else
   global γg_evo =  0.1
 end
 
-path = "./results/Staggered_FCM_2d_FSI_NavierStokes_GMSH_gammag$γg_evo/"
-mkpath(path)
-
-γ_evo = 0.2
-max_steps = 24 # Based on number of elements in vertical direction divided by 10
-vf = 0.025
-α_coeff = γ_evo*max_steps
-iter_mod = 1
-D = 2
-
-# Load gmsh mesh (Currently need to update mesh.geo and these values concurrently)
+## Geo info
 L = 2.0;
 H = 0.5;
 x0 = 0.5;
@@ -33,7 +27,33 @@ a = 0.3;
 b = 0.01;
 vol_D = 2.0*0.5
 
-model = GmshDiscreteModel((@__DIR__)*"/Meshes/mesh_finer.msh")
+## Params
+n = 10
+γ_evo = 0.2
+max_steps = floor(Int,min(L*n,H*n)/10)
+vf = 0.025
+α_coeff = γ_evo*max_steps
+iter_mod = 1
+D = 2
+
+_model = CartesianDiscreteModel((0,L,0,H),(floor(L*n),floor(H*n)))
+base_model = UnstructuredDiscreteModel(_model)
+ref_model = refine(base_model, refinement_method = "barycentric")
+model = Adaptivity.get_model(ref_model)
+
+f_Γ_Top(x) = x[2] == H
+f_Γ_Bottom(x) = x[2] == 0.0
+f_Γ_D(x) = x[1] == 0.0
+f_Γ_N(x) = x[1] == L
+f_NonDesign(x) = ((x0 - w/2 - eps() <= x[1] <= x0 + w/2 + eps() && 0.0 <= x[2] <= a + eps()) ||
+  (x0 - l/2 - eps() <= x[1] <= x0 + l/2 + eps() && 0.0 <= x[2] <= b + eps()))
+
+update_labels!(1,model,f_Γ_Top,"Gamma_Top")
+update_labels!(2,model,f_Γ_Bottom,"Gamma_Bottom")
+update_labels!(3,model,f_Γ_D,"Gamma_f_D")
+update_labels!(4,model,f_Γ_N,"Gamma_f_N")
+update_labels!(5,model,f_NonDesign,"Omega_NonDesign")
+update_labels!(6,model,x->f_NonDesign(x) && f_Γ_Bottom(x),"Gamma_s_D")
 writevtk(model,path*"model")
 
 Ω_act = Triangulation(model)
@@ -43,21 +63,12 @@ hmin = minimum(get_element_diameters(model))
 # Cut the background model
 reffe_scalar = ReferenceFE(lagrangian,Float64,1)
 V_φ = TestFESpace(model,reffe_scalar)
-V_reg = TestFESpace(model,reffe_scalar;dirichlet_tags=["Omega_NonDesign","Gamma_s_D"])
+V_reg = TestFESpace(model,reffe_scalar)#;dirichlet_tags=["Omega_NonDesign","Gamma_s_D"])
 U_reg = TrialFESpace(V_reg)
 
-_e = 1e-3
-f0((x,y),W,H) = max(2/W*abs(x-x0),1/(H/2+1)*abs(y-H/2+1))-1
-f1((x,y),q,r) = - cos(q*π*x)*cos(q*π*y)/q - r/q
-fin(x) = f0(x,l*(1+5_e),a*(1+5_e))
-fsolid(x) = min(f0(x,l*(1+_e),b*(1+_e)),f0(x,w*(1+_e),a*(1+_e)))
-fholes((x,y),q,r) = max(f1((x,y),q,r),f1((x-1/q,y),q,r))
-φf(x) = min(max(fin(x),fholes(x,25,0.2)),fsolid(x))
-# φf(x) = min(max(fin(x),fholes(x,22,0.6)),fsolid(x))
+φf(x) = (x[1]-x0)^2/(l/2-hmin/3)^2 + x[2]^2/(a-hmin/3)^2 - 1
 φh = interpolate(φf,V_φ)
 writevtk(get_triangulation(φh),path*"initial_lsf",cellfields=["φ"=>φh,"h"=>hₕ])
-
-φh_nondesign = interpolate(fsolid,V_φ)
 
 # Setup integration meshes and measures
 order = 1
@@ -83,11 +94,8 @@ dΓf_N = Measure(Γf_N,degree)
     :n_Γg    => get_normal_vector(Γg),
     :Γ       => Γ,
     :dΓ      => Measure(Γ,degree),
-    :χ_s     => GridapTopOpt.get_isolated_volumes_mask(cutgeo,["Gamma_s_D"];IN_is=IN),
-    :χ_f     => GridapTopOpt.get_isolated_volumes_mask(cutgeo,["Gamma_f_D"];IN_is=OUT)
   )
 end
-writevtk(get_triangulation(φh),path*"initial_islands",cellfields=["χ_s"=>Ω.χ_s,"χ_f"=>Ω.χ_f])
 
 # Setup spaces
 uin(x) = VectorValue(16x[2]*(H-x[2]),0.0)
@@ -99,7 +107,7 @@ reffe_d = ReferenceFE(lagrangian,VectorValue{D,Float64},order)
 
 # Test spaces
 V = TestFESpace(Ω_act,reffe_u,conformity=:H1,
-  dirichlet_tags=["Gamma_f_D","Gamma_NoSlipTop","Gamma_NoSlipBottom","Gamma_s_D"])
+  dirichlet_tags=["Gamma_f_D","Gamma_Top","Gamma_Bottom","Gamma_s_D"])
 Q = TestFESpace(Ω_act,reffe_p,conformity=:H1)
 T = TestFESpace(Ω_act,reffe_d,conformity=:H1,dirichlet_tags=["Gamma_s_D"])
 
@@ -173,6 +181,8 @@ function jac_fluid_newton((),(u,p),(du,dp),(v,q),φ)
     ∫(dr_SUPG((u,p),(du,dp),(v,q),u))dΩ_act
 end
 
+jac_fluid_AD((),x,dx,y,φ) = jacobian((_x,_y,_φ)->res_fluid((),_x,_y,_φ),[x,y,φ],1)
+
 ## Structure
 # Material parameters
 function lame_parameters(E,ν)
@@ -213,60 +223,32 @@ dVol(q,(u,p,d),φ) = ∫(-1/vol_D*q/(norm ∘ (∇(φ))))Ω.dΓ
 ∂Vol∂d(dd,((u,p),d),φ) = ∫(0dd ⋅ d)dΩ_act
 ∂Vol∂xhi = (∂Vol∂up,∂Vol∂d)
 
-## Staggered operators
-op = StaggeredNonlinearFEOperator([res_fluid,res_solid],[jac_fluid_newton,jac_solid],X,Y)
-state_map = StaggeredNonlinearFEStateMap(op,∂Rk∂xhi,V_φ,U_reg,φh;adjoint_jacobians=[jac_fluid_newton,jac_solid])
-J_sm = GridapTopOpt.StaggeredStateParamMap(J_comp,∂Jcomp∂xhi,state_map)
-C_sm = map(((Ci,∂Ci),) -> GridapTopOpt.StaggeredStateParamMap(Ci,∂Ci,state_map),[(Vol,∂Vol∂xhi),])
-pcfs = PDEConstrainedFunctionals(J_sm,C_sm,state_map;analytic_dC=[dVol])
-
-## Evolution Method
 evo = CutFEMEvolve(V_φ,Ω,dΩ_act,hₕ;max_steps,γg=γg_evo)
 reinit1 = StabilisedReinit(V_φ,Ω,dΩ_act,hₕ;stabilisation_method=ArtificialViscosity(1.0))
 reinit2 = StabilisedReinit(V_φ,Ω,dΩ_act,hₕ;stabilisation_method=GridapTopOpt.InteriorPenalty(V_φ,γg=1.0))
 reinit = GridapTopOpt.MultiStageStabilisedReinit([reinit1,reinit2])
 ls_evo = UnfittedFEEvolution(evo,reinit)
 
-reinit!(ls_evo,φh_nondesign)
+reinit!(ls_evo,φh)
+writevtk(get_triangulation(φh),path*"initial_lsf",cellfields=["φ"=>φh,"h"=>hₕ,"|∇(φ)|"=>(norm ∘ ∇(φh))])
 
-## Hilbertian extension-regularisation problems
-_α(hₕ) = (α_coeff*hₕ)^2
-a_hilb(p,q) =∫((_α ∘ hₕ)*∇(p)⋅∇(q) + p*q)dΩ_act;
-vel_ext = VelocityExtension(a_hilb,U_reg,V_reg)
+## Staggered operators
+op = StaggeredNonlinearFEOperator([res_fluid,res_solid],[jac_fluid_newton,jac_solid],X,Y)
+state_map = StaggeredNonlinearFEStateMap(op,∂Rk∂xhi,V_φ,U_reg,φh;adjoint_jacobians=[jac_fluid_AD,jac_solid])
+J_sm = GridapTopOpt.StaggeredStateParamMap(J_comp,∂Jcomp∂xhi,state_map)
+C_sm = map(((Ci,∂Ci),) -> GridapTopOpt.StaggeredStateParamMap(Ci,∂Ci,state_map),[(Vol,∂Vol∂xhi),])
+pcfs = PDEConstrainedFunctionals(J_sm,C_sm,state_map;analytic_dC=[dVol])
+_,_,_dF,_ = evaluate!(pcfs,φh)
 
-## Optimiser
-converged(m) = GridapTopOpt.default_al_converged(
-  m;
-  L_tol = 0.5hmin,
-  C_tol = 0.01vf
-)
-function has_oscillations(m,os_it)
-  history = GridapTopOpt.get_history(m)
-  it = GridapTopOpt.get_last_iteration(history)
-  all(@.(abs(history[:C,it]) < 0.05vf)) && GridapTopOpt.default_has_oscillations(m,os_it)
+counter = 0
+function φ_to_j(φ)
+  global counter += 1
+  println("       Counter: ",counter)
+  update_collection!(Ω,FEFunction(V_φ,φ))
+  u = state_map(φ)
+  pcfs.J(u,φ)
 end
-optimiser = AugmentedLagrangian(pcfs,ls_evo,vel_ext,φh;
-  γ=γ_evo,verbose=true,constraint_names=[:Vol],converged,has_oscillations)
-for (it,(uh,ph,dh),φh) in optimiser
-  GC.gc()
-  if iszero(it % iter_mod)
-    writevtk(Ω_act,path*"Omega_act_$it",
-      cellfields=["φ"=>φh,"|∇(φ)|"=>(norm ∘ ∇(φh)),"uh"=>uh,"ph"=>ph,"dh"=>dh])
-    writevtk(Ω.Ωf,path*"Omega_f_$it",
-      cellfields=["uh"=>uh,"ph"=>ph,"dh"=>dh])
-    writevtk(Ω.Ωs,path*"Omega_s_$it",
-      cellfields=["uh"=>uh,"ph"=>ph,"dh"=>dh])
-  end
-  write_history(path*"/history.txt",optimiser.history)
 
-  φ = get_free_dof_values(φh)
-  φ .= min.(φ,get_free_dof_values(φh_nondesign))
-  reinit!(ls_evo,φh)
-end
-it = get_history(optimiser).niter; uh,ph,dh = get_state(pcfs)
-writevtk(Ω_act,path*"Omega_act_$it",
-  cellfields=["φ"=>φh,"|∇(φ)|"=>(norm ∘ ∇(φh)),"uh"=>uh,"ph"=>ph,"dh"=>dh])
-writevtk(Ω.Ωf,path*"Omega_f_$it",
-  cellfields=["uh"=>uh,"ph"=>ph,"dh"=>dh])
-writevtk(Ω.Ωs,path*"Omega_s_$it",
-  cellfields=["uh"=>uh,"ph"=>ph,"dh"=>dh])
+using FiniteDifferences
+fdm_grad = FiniteDifferences.grad(central_fdm(5, 1), φ_to_j, get_free_dof_values(φh))[1]
+norm(_dF - fdm_grad,Inf)/norm(fdm_grad,Inf)

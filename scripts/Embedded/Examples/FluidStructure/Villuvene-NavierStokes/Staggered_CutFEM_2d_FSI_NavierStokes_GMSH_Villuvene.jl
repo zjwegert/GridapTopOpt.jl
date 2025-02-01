@@ -10,10 +10,10 @@ LinearAlgebra.norm(x::VectorValue,p::Real) = norm(x.data,p)
 if isassigned(ARGS,1)
   global γg_evo =  parse(Float64,ARGS[1])
 else
-  global γg_evo =  0.1
+  global γg_evo =  0.01
 end
 
-path = "./results/Staggered_CutFEM_2d_FSI_NavierStokes_GMSH_Villuvene_Newton_gammag$γg_evo/"
+path = "./results/Staggered_CutFEM_2d_FSI_NavierStokes_GMSH_Villuvene_gammag$(γg_evo)_fullObj/"
 mkpath(path)
 
 γ_evo = 0.2
@@ -73,13 +73,14 @@ dΩ_act = Measure(Ω_act,degree)
 Γf_N = BoundaryTriangulation(model,tags="Gamma_f_N")
 dΓf_D = Measure(Γf_D,degree)
 dΓf_N = Measure(Γf_N,degree)
-Ω = EmbeddedCollection(model,φh) do cutgeo,_
+Ω = EmbeddedCollection(model,φh) do cutgeo,cutgeo_facets
   Ωs = DifferentiableTriangulation(Triangulation(cutgeo,PHYSICAL),V_φ)
   Ωf = DifferentiableTriangulation(Triangulation(cutgeo,PHYSICAL_OUT),V_φ)
   Γ  = DifferentiableTriangulation(EmbeddedBoundary(cutgeo),V_φ)
   Γg = GhostSkeleton(cutgeo)
   Ω_act_s = Triangulation(cutgeo,ACTIVE)
   Ω_act_f = Triangulation(cutgeo,ACTIVE_OUT)
+  Λ_f = SkeletonTriangulation(cutgeo_facets,ACTIVE_OUT)
   (;
     :Ωs      => Ωs,
     :dΩs     => Measure(Ωs,degree),
@@ -94,6 +95,9 @@ dΓf_N = Measure(Γf_N,degree)
     :dΩ_act_s => Measure(Ω_act_s,degree),
     :Ω_act_f => Ω_act_f,
     :dΩ_act_f => Measure(Ω_act_f,degree),
+    :Λ_f => Λ_f,
+    :dΛ_f => Measure(Λ_f,degree),
+    :n_Λ_f    => get_normal_vector(Λ_f),
     :ψ_s     => GridapTopOpt.get_isolated_volumes_mask(cutgeo,["Gamma_s_D"];IN_is=IN),
     :ψ_f     => GridapTopOpt.get_isolated_volumes_mask(cutgeo,["Gamma_f_D"];IN_is=OUT),
     # :ψ_f     => GridapTopOpt.get_isolated_volumes_mask_without_cuts(cutgeo,["Gamma_f_D"];IN_is=OUT)
@@ -143,9 +147,9 @@ u0_max = sum(∫(uin_dot_e1)dΓf_D)/sum(∫(1)dΓf_D)
 # Stabilization parameters
 α_Nu   = 1000
 α_SUPG = 1/3
-α_GPμ  = 0.001
-α_GPp  = 0.001
-α_GPu  = 0.001
+α_GPμ  = 0.01
+α_GPp  = 0.01
+α_GPu  = 0.01
 
 γ_Nu(h,u)    = α_Nu*(μ/h + ρ*norm(u,Inf)/6) # (Eqn. 13, Villanueva and Maute, 2017)
 τ_SUPG(h,u)  = α_SUPG*((2norm(u)/h)^2 + 9*(4ν/h^2)^2)^-0.5 # (Eqn. 31, Peterson et al., 2018)
@@ -175,7 +179,7 @@ r_SUPG((u,p),(v,q),w) = ((τ_SUPG ∘ (hₕ,w))*(conv ∘ (u,∇(v))) + (τ_PSPG
 r_SUPG_picard((u,p),(v,q),w) = ((τ_SUPG ∘ (hₕ,w))*(conv ∘ (w,∇(v))) + (τ_PSPG ∘ (hₕ,w))/ρ*∇(q))⋅
   (ρ*(conv∘(w,∇(u))) + ∇(p) - μ*Δ(u))
 r_GP_μ(u,v) = mean(γ_GPμ ∘ hₕ)*jump(Ω.n_Γg ⋅ ∇(u)) ⋅ jump(Ω.n_Γg ⋅ ∇(v))
-r_GP_p(p,q,w) = mean(γ_GPp ∘ (hₕ,w))*jump(Ω.n_Γg ⋅ ∇(p)) * jump(Ω.n_Γg ⋅ ∇(q))
+r_GP_p(p,q,w,n) = mean(γ_GPp ∘ (hₕ,w))*jump(n ⋅ ∇(p)) * jump(n ⋅ ∇(q))
 r_GP_u(u,v,w,n) = γ_GPu(hₕ,w,n)*jump(Ω.n_Γg ⋅ ∇(u)) ⋅ jump(Ω.n_Γg ⋅ ∇(v))
 
 dr_conv(u,du,v) = ρ*v ⋅ (dconv∘(du,∇(du),u,∇(u)))
@@ -189,7 +193,8 @@ function res_fluid((),(u,p),(v,q),φ)
     ∫(r_SUPG((u,p),(v,q),u))Ω.dΩ_act_f +
     ∫(r_ψ(p,q))Ω.dΩf +
     ∫(r_Γ((u,p),(v,q),n_Γ,u))Ω.dΓ +
-    ∫(r_GP_μ(u,v) + r_GP_p(p,q,u) + r_GP_u(u,v,u,Ω.n_Γg) + 0mean(φ))Ω.dΓg
+    ∫(r_GP_μ(u,v) + r_GP_p(p,q,u,Ω.n_Γg) + r_GP_u(u,v,u,Ω.n_Γg) + 0mean(φ))Ω.dΓg +
+    ∫(r_GP_p(p,q,u,Ω.n_Λ_f) + 0mean(φ))Ω.dΛ_f
 end
 
 function jac_fluid_picard((),(u,p),(du,dp),(v,q),φ)
@@ -198,7 +203,8 @@ function jac_fluid_picard((),(u,p),(du,dp),(v,q),φ)
     ∫(r_SUPG_picard((du,dp),(v,q),u))Ω.dΩ_act_f +
     ∫(r_ψ(dp,q))Ω.dΩf +
     ∫(r_Γ((du,dp),(v,q),n_Γ,u))Ω.dΓ +
-    ∫(r_GP_μ(du,v) + r_GP_p(dp,q,u) + r_GP_u(du,v,u,Ω.n_Γg) + 0mean(φ))Ω.dΓg
+    ∫(r_GP_μ(du,v) + r_GP_p(dp,q,u,Ω.n_Γg) + r_GP_u(du,v,u,Ω.n_Γg) + 0mean(φ))Ω.dΓg +
+    ∫(r_GP_p(dp,q,u,Ω.n_Λ_f) + 0mean(φ))Ω.dΛ_f
 end
 
 function jac_fluid_newton((),(u,p),(du,dp),(v,q),φ)
@@ -207,7 +213,8 @@ function jac_fluid_newton((),(u,p),(du,dp),(v,q),φ)
     ∫(dr_SUPG((u,p),(du,dp),(v,q),u))Ω.dΩ_act_f +
     ∫(r_ψ(dp,q))Ω.dΩf +
     ∫(r_Γ((du,dp),(v,q),n_Γ,u))Ω.dΓ +
-    ∫(r_GP_μ(du,v) + r_GP_p(dp,q,u) + r_GP_u(du,v,u,Ω.n_Γg) + 0mean(φ))Ω.dΓg
+    ∫(r_GP_μ(du,v) + r_GP_p(dp,q,u,Ω.n_Γg) + r_GP_u(du,v,u,Ω.n_Γg) + 0mean(φ))Ω.dΓg +
+    ∫(r_GP_p(dp,q,u,Ω.n_Λ_f) + 0mean(φ))Ω.dΛ_f
 end
 
 jac_fluid_AD((),x,dx,y,φ) = jacobian((_x,_y,_φ)->res_fluid((),_x,_y,_φ),[x,y,φ],1)
@@ -221,7 +228,7 @@ function lame_parameters(E,ν)
 end
 λs, μs = lame_parameters(0.1,0.05)
 # Stabilization
-α_Gd = 1e-7
+α_Gd = 0.01
 k_d = 1.0
 γ_Gd(h) = α_Gd*(λs + μs)*h^3
 # Terms
@@ -231,11 +238,12 @@ j_s_k(s,d) = mean(γ_Gd ∘ hₕ)*jump(Ω.n_Γg ⋅ ∇(s)) ⋅ jump(Ω.n_Γg �
 v_s_ψ(s,d) = k_d*Ω.ψ_s*d⋅s # Isolated volume term
 
 function a_solid(((u,p),),d,s,φ)
-  return ∫(a_s_Ω(s,d))Ω.dΩs + ∫(j_s_k(s,d) + 0mean(φ))Ω.dΓg + ∫(v_s_ψ(s,d))Ω.dΩs
+  return ∫(a_s_Ω(s,d))Ω.dΩs + ∫(j_s_k(s,d) + 0mean(φ))Ω.dΓg #+ ∫(v_s_ψ(s,d))Ω.dΩs
 end
 function l_solid(((u,p),),s,φ)
   n = -get_normal_vector(Ω.Γ)
-  return ∫(-s ⋅ ((1-Ω.ψ_s)*σ_f(ε(u),p) ⋅ n))Ω.dΓ
+  # return ∫(-s ⋅ ((1-Ω.ψ_s)*σ_f(ε(u),p) ⋅ n))Ω.dΓ
+  return ∫(-s ⋅ (σ_f(ε(u),p) ⋅ n))Ω.dΓ
 end
 
 res_solid(((u,p),),d,s,φ) = a_solid(((u,p),),d,s,φ) - l_solid(((u,p),),s,φ)
@@ -247,8 +255,7 @@ jac_solid(((u,p),),d,dd,s,φ) = a_solid(((u,p),),dd,s,φ)
 # ## Optimisation functionals
 J_comp(((u,p),d),φ) = ∫(ε(d) ⊙ (σ ∘ ε(d)))Ω.dΩs
 ∂Jcomp∂up((du,dp),((u,p),d),φ) = ∫(0dp)Ω.dΩs
-# ∂Jcomp∂d(dd,((u,p),d),φ) = ∫(2ε(dd) ⊙ (σ ∘ ε(d)))Ω.dΩs
-∂Jcomp∂d(dd,((u,p),d),φ) = ∫(ε(dd) ⊙ (σ ∘ ε(d)))Ω.dΩs + ∫(ε(d) ⊙ (σ ∘ ε(dd)))Ω.dΩs
+∂Jcomp∂d(dd,((u,p),d),φ) = ∫(2ε(dd) ⊙ (σ ∘ ε(d)))Ω.dΩs
 ∂Jpres∂xhi = (∂Jcomp∂up,∂Jcomp∂d)
 
 Vol(((u,p),d),φ) = ∫(vol_D)Ω.dΩs - ∫(vf/vol_D)dΩ_act
@@ -262,7 +269,7 @@ state_collection = GridapTopOpt.EmbeddedCollection_in_φh(model,φh) do _φh
   update_collection!(Ω,_φh)
   X,Y = build_spaces(Ω.Ω_act_s,Ω.Ω_act_f)
   op = StaggeredNonlinearFEOperator([res_fluid,res_solid],[jac_fluid_picard,jac_solid],X,Y)
-  state_map = StaggeredNonlinearFEStateMap(op,∂Rk∂xhi,V_φ,U_reg,_φh;adjoint_jacobians=[jac_fluid_AD,jac_solid])
+  state_map = StaggeredNonlinearFEStateMap(op,∂Rk∂xhi,V_φ,U_reg,_φh;adjoint_jacobians=[jac_fluid_newton,jac_solid])
   (;
     :state_map => state_map,
     :J => GridapTopOpt.StaggeredStateParamMap(J_comp,∂Jpres∂xhi,state_map),

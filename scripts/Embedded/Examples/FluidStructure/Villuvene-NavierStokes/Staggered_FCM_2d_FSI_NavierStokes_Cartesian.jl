@@ -7,23 +7,17 @@ using GridapTopOpt
 using LinearAlgebra
 LinearAlgebra.norm(x::VectorValue,p::Real) = norm(x.data,p)
 
+path = "./results/Staggered_FCM_2d_FSI_NavierStokes_Cartesian/"
+files_path = path*"data/"
+mkpath(files_path)
+
 if isassigned(ARGS,1)
   global γg_evo =  parse(Float64,ARGS[1])
 else
   global γg_evo =  0.1
 end
 
-path = "./results/Staggered_FCM_2d_FSI_NavierStokes_GMSH_with_ad_jac_gammag$γg_evo/"
-mkpath(path)
-
-γ_evo = 0.2
-max_steps = 24 # Based on number of elements in vertical direction divided by 10
-vf = 0.025
-α_coeff = γ_evo*max_steps
-iter_mod = 1
-D = 2
-
-# Load gmsh mesh (Currently need to update mesh.geo and these values concurrently)
+## Geo info
 L = 2.0;
 H = 0.5;
 x0 = 0.5;
@@ -33,7 +27,33 @@ a = 0.3;
 b = 0.01;
 vol_D = 2.0*0.5
 
-model = GmshDiscreteModel((@__DIR__)*"/Meshes/mesh_finer.msh")
+## Params
+n = 300
+γ_evo = 0.2
+max_steps = floor(Int,min(L*n,H*n)/10)
+vf = 0.025
+α_coeff = γ_evo*max_steps
+iter_mod = 1
+D = 2
+
+_model = CartesianDiscreteModel((0,L,0,H),(floor(L*n),floor(H*n)))
+base_model = UnstructuredDiscreteModel(_model)
+ref_model = refine(base_model, refinement_method = "barycentric")
+model = Adaptivity.get_model(ref_model)
+
+f_Γ_Top(x) = x[2] == H
+f_Γ_Bottom(x) = x[2] == 0.0
+f_Γ_D(x) = x[1] == 0.0
+f_Γ_N(x) = x[1] == L
+f_NonDesign(x) = ((x0 - w/2 - eps() <= x[1] <= x0 + w/2 + eps() && 0.0 <= x[2] <= a + eps()) ||
+  (x0 - l/2 - eps() <= x[1] <= x0 + l/2 + eps() && 0.0 <= x[2] <= b + eps()))
+
+update_labels!(1,model,f_Γ_Top,"Gamma_Top")
+update_labels!(2,model,f_Γ_Bottom,"Gamma_Bottom")
+update_labels!(3,model,f_Γ_D,"Gamma_f_D")
+update_labels!(4,model,f_Γ_N,"Gamma_f_N")
+update_labels!(5,model,f_NonDesign,"Omega_NonDesign")
+update_labels!(6,model,x->f_NonDesign(x) && f_Γ_Bottom(x),"Gamma_s_D")
 writevtk(model,path*"model")
 
 Ω_act = Triangulation(model)
@@ -99,7 +119,7 @@ reffe_d = ReferenceFE(lagrangian,VectorValue{D,Float64},order)
 
 # Test spaces
 V = TestFESpace(Ω_act,reffe_u,conformity=:H1,
-  dirichlet_tags=["Gamma_f_D","Gamma_NoSlipTop","Gamma_NoSlipBottom","Gamma_s_D"])
+  dirichlet_tags=["Gamma_f_D","Gamma_Top","Gamma_Bottom","Gamma_s_D"])
 Q = TestFESpace(Ω_act,reffe_p,conformity=:H1)
 T = TestFESpace(Ω_act,reffe_d,conformity=:H1,dirichlet_tags=["Gamma_s_D"])
 
@@ -145,32 +165,31 @@ dconv(du,∇du,u,∇u) = conv(u,∇du)+conv(du,∇u)
 
 r_conv(u,v) = NS*ρ*v ⋅ (conv∘(u,∇(u)))
 r_Ωf((u,p),(v,q)) = ε(v) ⊙ (σ_f ∘ (ε(u),p)) + q*(∇⋅u)
-r_SUPG((u,p),(v,q),w) = (NS*SUPG*(τ_SUPG ∘ (hₕ,w))*(conv ∘ (u,∇(v))) + (τ_PSPG ∘ (hₕ,w))/ρ*∇(q))⋅
-  (NS*SUPG*ρ*(conv∘(u,∇(u))) + ∇(p) - μ*Δ(u))
-r_SUPG_picard((u,p),(v,q),w) = (NS*SUPG*(τ_SUPG ∘ (hₕ,w))*(conv ∘ (w,∇(v))) + (τ_PSPG ∘ (hₕ,w))/ρ*∇(q))⋅
-  (NS*SUPG*ρ*(conv∘(w,∇(u))) + ∇(p) - μ*Δ(u))
+
+# Additional Brinkmann terms in SUPG based on 10.1002/nme.3151
+r_SUPG((u,p),(v,q),w;IN_Ωf=1) = (NS*SUPG*IN_Ωf*(τ_SUPG ∘ (hₕ,w))*(conv ∘ (u,∇(v))) + (τ_PSPG ∘ (hₕ,w))/ρ*∇(q))⋅
+  (NS*SUPG*ρ*(conv∘(u,∇(u))) + ∇(p) - μ*Δ(u) + (1-IN_Ωf)*γ_Nu*u)
+r_SUPG_picard((u,p),(v,q),w;IN_Ωf=1) = (NS*SUPG*IN_Ωf*(τ_SUPG ∘ (hₕ,w))*(conv ∘ (w,∇(v))) + (τ_PSPG ∘ (hₕ,w))/ρ*∇(q))⋅
+  (NS*SUPG*ρ*(conv∘(w,∇(u))) + ∇(p) - μ*Δ(u) + (1-IN_Ωf)*γ_Nu*u)
 
 dr_conv(u,du,v) = NS*ρ*v ⋅ (dconv∘(du,∇(du),u,∇(u)))
-dr_SUPG((u,p),(du,dp),(v,q),w) =
-  (NS*SUPG*(τ_SUPG ∘ (hₕ,w))*(conv ∘ (du,∇(v))))⋅(NS*SUPG*ρ*(conv∘(u,∇(u))) + ∇(p) - μ*Δ(u)) +
-  (NS*SUPG*(τ_SUPG ∘ (hₕ,w))*(conv ∘ (u,∇(v))) + (τ_PSPG ∘ (hₕ,w))/ρ*∇(q))⋅(NS*SUPG*ρ*(dconv∘(du,∇(du),u,∇(u))) + ∇(dp) - μ*Δ(du))
+dr_SUPG((u,p),(du,dp),(v,q),w;IN_Ωf=1) =
+  (NS*SUPG*IN_Ωf*(τ_SUPG ∘ (hₕ,w))*(conv ∘ (du,∇(v))))⋅(NS*SUPG*ρ*(conv∘(u,∇(u))) + ∇(p) - μ*Δ(u) + (1-IN_Ωf)*γ_Nu*u) +
+  (NS*SUPG*IN_Ωf*(τ_SUPG ∘ (hₕ,w))*(conv ∘ (u,∇(v))) + (τ_PSPG ∘ (hₕ,w))/ρ*∇(q))⋅(NS*SUPG*ρ*(dconv∘(du,∇(du),u,∇(u))) + ∇(dp) - μ*Δ(du) + (1-IN_Ωf)*γ_Nu*du)
 
 function res_fluid((),(u,p),(v,q),φ)
-  return ∫(r_conv(u,v) + r_Ωf((u,p),(v,q)))Ω.dΩf +
-    ∫(r_conv(u,v) + r_Ωf((u,p),(v,q)) + γ_Nu*(u⋅v))Ω.dΩs +
-    ∫(r_SUPG((u,p),(v,q),u))dΩ_act
+  return ∫(r_conv(u,v) + r_Ωf((u,p),(v,q)) + r_SUPG((u,p),(v,q),u))Ω.dΩf +
+    ∫(r_conv(u,v) + r_Ωf((u,p),(v,q)) + γ_Nu*(u⋅v) + r_SUPG((u,p),(v,q),u;IN_Ωf=0))Ω.dΩs
 end
 
 function jac_fluid_newton((),(u,p),(du,dp),(v,q),φ)
-  return ∫(dr_conv(u,du,v) + r_Ωf((du,dp),(v,q)))Ω.dΩf +
-    ∫(dr_conv(u,du,v) + r_Ωf((du,dp),(v,q)) + γ_Nu*(du⋅v))Ω.dΩs +
-    ∫(dr_SUPG((u,p),(du,dp),(v,q),u))dΩ_act
+  return ∫(dr_conv(u,du,v) + r_Ωf((du,dp),(v,q)) + dr_SUPG((u,p),(du,dp),(v,q),u))Ω.dΩf +
+    ∫(dr_conv(u,du,v) + r_Ωf((du,dp),(v,q)) + γ_Nu*(du⋅v) + dr_SUPG((u,p),(du,dp),(v,q),u;IN_Ωf=0))Ω.dΩs
 end
 
 function jac_fluid_picard((),(u,p),(du,dp),(v,q),φ)
-  return ∫(ρ*v ⋅ (conv∘(u,∇(du))) + r_Ωf((du,dp),(v,q)))Ω.dΩs +
-    ∫(ρ*v ⋅ (conv∘(u,∇(du))) + r_Ωf((du,dp),(v,q)) + γ_Nu*(du⋅v))Ω.dΩf +
-    ∫(r_SUPG_picard((du,dp),(v,q),u))dΩ_act
+  return ∫(NS*ρ*v ⋅ (conv∘(u,∇(du))) + r_Ωf((du,dp),(v,q)) + r_SUPG_picard((du,dp),(v,q),u))Ω.dΩs +
+    ∫(NS*ρ*v ⋅ (conv∘(u,∇(du))) + r_Ωf((du,dp),(v,q)) + γ_Nu*(du⋅v) + r_SUPG_picard((du,dp),(v,q),u;IN_Ωf=0))Ω.dΩf
 end
 
 jac_fluid_AD((),x,dx,y,φ) = jacobian((_x,_y,_φ)->res_fluid((),_x,_y,_φ),[x,y,φ],1)
@@ -190,9 +209,6 @@ end
 a_s_Ω(s,d) = ε(s) ⊙ (σ ∘ ε(d))
 
 function a_solid(((u,p),),d,s,φ)
-  return ∫(a_s_Ω(s,d)+0u⋅d)Ω.dΩs + ∫(ϵ*a_s_Ω(s,d)+0u⋅d)Ω.dΩf
-end
-function _a_solid(((u,p),),d,s,φ)
   return ∫(a_s_Ω(s,d))Ω.dΩs + ∫(ϵ*a_s_Ω(s,d))Ω.dΩf
 end
 function l_solid(((u,p),),s,φ)
@@ -201,17 +217,29 @@ function l_solid(((u,p),),s,φ)
 end
 
 res_solid(((u,p),),d,s,φ) = a_solid(((u,p),),d,s,φ) - l_solid(((u,p),),s,φ)
-jac_solid(((u,p),),d,dd,s,φ) = _a_solid(((u,p),),dd,s,φ)
+jac_solid(((u,p),),d,dd,s,φ) = a_solid(((u,p),),dd,s,φ)
+
+∂R2∂xh1((du,dp),((u,p),),d,s,φ) = -1*l_solid(((du,dp),),s,φ)
+∂Rk∂xhi = ((∂R2∂xh1,),)
 
 ## Optimisation functionals
-J_comp(((u,p),d),φ) = ∫(ε(d) ⊙ (σ ∘ ε(d)) + 0u⋅d)Ω.dΩs
+J_comp(((u,p),d),φ) = ∫(ε(d) ⊙ (σ ∘ ε(d)))Ω.dΩs
+∂Jcomp∂up((du,dp),((u,p),d),φ) = ∫(0dp)Ω.dΩs
+∂Jcomp∂d(dd,((u,p),d),φ) = ∫(ε(dd) ⊙ (σ ∘ ε(d)))Ω.dΩs + ∫(ε(d) ⊙ (σ ∘ ε(dd)))Ω.dΩs
+∂Jcomp∂xhi = (∂Jcomp∂up,∂Jcomp∂d)
+
 Vol(((u,p),d),φ) = ∫(vol_D)Ω.dΩs - ∫(vf/vol_D)dΩ_act
 dVol(q,(u,p,d),φ) = ∫(-1/vol_D*q/(norm ∘ (∇(φ))))Ω.dΓ
+∂Vol∂up((du,dp),((u,p),d),φ) = ∫(0dp)dΩ_act
+∂Vol∂d(dd,((u,p),d),φ) = ∫(0dd ⋅ d)dΩ_act
+∂Vol∂xhi = (∂Vol∂up,∂Vol∂d)
 
 ## Staggered operators
 op = StaggeredNonlinearFEOperator([res_fluid,res_solid],[jac_fluid_newton,jac_solid],X,Y)
-state_map = StaggeredNonlinearFEStateMap(op,V_φ,U_reg,φh;adjoint_jacobians=[jac_fluid_AD,jac_solid])
-pcfs = PDEConstrainedFunctionals(J_comp,[Vol],state_map;analytic_dC=[dVol])
+state_map = StaggeredNonlinearFEStateMap(op,∂Rk∂xhi,V_φ,U_reg,φh;adjoint_jacobians=[jac_fluid_newton,jac_solid])
+J_sm = GridapTopOpt.StaggeredStateParamMap(J_comp,∂Jcomp∂xhi,state_map)
+C_sm = map(((Ci,∂Ci),) -> GridapTopOpt.StaggeredStateParamMap(Ci,∂Ci,state_map),[(Vol,∂Vol∂xhi),])
+pcfs = PDEConstrainedFunctionals(J_sm,C_sm,state_map;analytic_dC=[dVol])
 
 ## Evolution Method
 evo = CutFEMEvolve(V_φ,Ω,dΩ_act,hₕ;max_steps,γg=γg_evo)
@@ -243,11 +271,11 @@ optimiser = AugmentedLagrangian(pcfs,ls_evo,vel_ext,φh;
 for (it,(uh,ph,dh),φh) in optimiser
   GC.gc()
   if iszero(it % iter_mod)
-    writevtk(Ω_act,path*"Omega_act_$it",
+    writevtk(Ω_act,files_path*"Omega_act_$it",
       cellfields=["φ"=>φh,"|∇(φ)|"=>(norm ∘ ∇(φh)),"uh"=>uh,"ph"=>ph,"dh"=>dh])
-    writevtk(Ω.Ωf,path*"Omega_f_$it",
+    writevtk(Ω.Ωf,files_path*"Omega_f_$it",
       cellfields=["uh"=>uh,"ph"=>ph,"dh"=>dh])
-    writevtk(Ω.Ωs,path*"Omega_s_$it",
+    writevtk(Ω.Ωs,files_path*"Omega_s_$it",
       cellfields=["uh"=>uh,"ph"=>ph,"dh"=>dh])
   end
   write_history(path*"/history.txt",optimiser.history)
@@ -257,9 +285,11 @@ for (it,(uh,ph,dh),φh) in optimiser
   reinit!(ls_evo,φh)
 end
 it = get_history(optimiser).niter; uh,ph,dh = get_state(pcfs)
-writevtk(Ω_act,path*"Omega_act_$it",
-  cellfields=["φ"=>φh,"|∇(φ)|"=>(norm ∘ ∇(φh)),"uh"=>uh,"ph"=>ph,"dh"=>dh])
-writevtk(Ω.Ωf,path*"Omega_f_$it",
-  cellfields=["uh"=>uh,"ph"=>ph,"dh"=>dh])
-writevtk(Ω.Ωs,path*"Omega_s_$it",
-  cellfields=["uh"=>uh,"ph"=>ph,"dh"=>dh])
+for _dir in (path,files_path)
+  writevtk(Ω_act,_dir*"Omega_act_$it",
+    cellfields=["φ"=>φh,"|∇(φ)|"=>(norm ∘ ∇(φh)),"uh"=>uh,"ph"=>ph,"dh"=>dh])
+  writevtk(Ω.Ωf,_dir*"Omega_f_$it",
+    cellfields=["uh"=>uh,"ph"=>ph,"dh"=>dh])
+  writevtk(Ω.Ωs,_dir*"Omega_s_$it",
+    cellfields=["uh"=>uh,"ph"=>ph,"dh"=>dh])
+end

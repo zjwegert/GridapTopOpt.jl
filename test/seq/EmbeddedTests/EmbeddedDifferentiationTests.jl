@@ -40,6 +40,8 @@ function level_set(shape::Symbol;N=4)
     x -> cos(2π*x[1])*cos(2π*x[2])-0.11 # "Regular" LSF
   elseif shape == :regular_3d
     x -> cos(2π*x[1])*cos(2π*x[2])*cos(2π*x[3])-0.11 # "Regular" LSF
+  else
+    error("Unknown shape")
   end
 end
 

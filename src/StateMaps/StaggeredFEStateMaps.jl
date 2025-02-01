@@ -58,9 +58,9 @@ struct StaggeredAffineFEStateMap{NB,SB,A,B,C,D,E,F} <: AbstractFEStateMap
     xhs, λᵀs_∂Rs∂φ = (), ()
     for k in 1:NB
       xh_k = get_solution(op,uhd,k)
-      _a(uk,vk,φh) = op.biforms[k](xhs,uk,vk,φh)
-      _l(vk,φh) = op.liforms[k](xhs,vk,φh)
-      λᵀk_∂Rk∂φ = ∇((uk,vk,φh) -> _a(uk,vk,φh) - _l(vk,φh),[xh_k,xh_k,φh],3)
+      _a(uk,vk,φ) = op.biforms[k](xhs,uk,vk,φ)
+      _l(vk,φ) = op.liforms[k](xhs,vk,φ)
+      λᵀk_∂Rk∂φ = ∇((uk,vk,φ) -> _a(uk,vk,φ) - _l(vk,φ),[xh_k,xh_k,φh],3)
       xhs, λᵀs_∂Rs∂φ = (xhs...,xh_k), (λᵀs_∂Rs∂φ...,λᵀk_∂Rk∂φ)
     end
     vecdata = collect_cell_vector(U_reg,sum(λᵀs_∂Rs∂φ))
@@ -69,13 +69,14 @@ struct StaggeredAffineFEStateMap{NB,SB,A,B,C,D,E,F} <: AbstractFEStateMap
 
     ## Forward cache
     op_at_φ = get_staggered_operator_at_φ(op,φh)
-    xh_one = one(op.trial)
-    op_cache = _instantiate_caches(xh_one,solver,op_at_φ)
+    xh = zero(op.trial)
+    op_cache = _instantiate_caches(xh,solver,op_at_φ)
     fwd_caches = (zero_free_values(op.trial),op.trial,op_cache,op_at_φ)
 
     ## Adjoint cache
-    op_adjoint = dummy_generate_adjoint_operator(op_at_φ,assems_adjoint,φh,xh_one,∂Rk∂xhi)
-    op_cache = _instantiate_caches(xh_one,adjoint_solver,op_adjoint)
+    xh_adj = zero(op.trial)
+    op_adjoint = dummy_generate_adjoint_operator(op_at_φ,assems_adjoint,φh,xh_adj,∂Rk∂xhi)
+    op_cache = _instantiate_caches(xh_adj,adjoint_solver,op_adjoint)
     adj_caches = (zero_free_values(op_adjoint.trial),op_adjoint.trial,op_cache,op_adjoint)
 
     spaces = (;trial=op_at_φ.trial,test=op_at_φ.test,aux_space=V_φ,deriv_space=U_reg,trials=op_at_φ.trials,tests=op_at_φ.tests)
@@ -236,13 +237,14 @@ mutable struct StaggeredNonlinearFEStateMap{NB,SB,A,B,C,D,E,F} <: AbstractFEStat
 
     ## Forward cache
     op_at_φ = get_staggered_operator_at_φ(op,φh)
-    xh_one = one(op.trial)
-    op_cache = _instantiate_caches(xh_one,solver,op_at_φ)
+    xh = zero(op.trial)
+    op_cache = _instantiate_caches(xh,solver,op_at_φ)
     fwd_caches = (zero_free_values(op.trial),op.trial,op_cache,op_at_φ)
 
     ## Adjoint cache
-    op_adjoint = dummy_generate_adjoint_operator(op_at_φ,assems_adjoint,φh,xh_one,∂Rk∂xhi)
-    op_cache = _instantiate_caches(xh_one,adjoint_solver,op_adjoint)
+    xh_adj = zero(op.trial)
+    op_adjoint = dummy_generate_adjoint_operator(op_at_φ,assems_adjoint,φh,xh_adj,∂Rk∂xhi)
+    op_cache = _instantiate_caches(xh_adj,adjoint_solver,op_adjoint)
     adj_caches = (zero_free_values(op_adjoint.trial),op_adjoint.trial,op_cache,op_adjoint)
 
     spaces = (;trial=op_at_φ.trial,test=op_at_φ.test,aux_space=V_φ,deriv_space=U_reg,trials=op_at_φ.trials,tests=op_at_φ.tests)
@@ -360,6 +362,20 @@ function adjoint_solve!(φ_to_u::StaggeredFEStateMapTypes,xh,φh,dFdxj)
   op_adjoint = generate_adjoint_operator(op_at_φ,adjoint_assems,φh,xh,dFdxj,∂Rk∂xhi)
 
   solve!(FEFunction(X_adjoint,x_adjoint),solvers.adjoint_solver,op_adjoint,cache);
+  return x_adjoint
+end
+
+# TODO: Caching the adjoint is disabled in MPI mode as the ghost information is incorrect if cached with
+#       a fake adjoint as we do in serial. This is a temporary solution and needs to be fixed
+function adjoint_solve!(φ_to_u::StaggeredFEStateMapTypes,xh,φh::DistributedCellField,dFdxj)
+  solvers = φ_to_u.solvers
+  ∂Rk∂xhi = φ_to_u.∂Rk∂xhi
+  x_adjoint,X_adjoint,cache,_ = φ_to_u.adj_caches
+  adjoint_assems = φ_to_u.assems.adjoint_assems
+  op_at_φ = get_staggered_operator_at_φ_with_adjoint_jacs(φ_to_u,φh)
+  op_adjoint = generate_adjoint_operator(op_at_φ,adjoint_assems,φh,xh,dFdxj,∂Rk∂xhi)
+
+  solve!(FEFunction(X_adjoint,x_adjoint),solvers.adjoint_solver,op_adjoint);
   return x_adjoint
 end
 

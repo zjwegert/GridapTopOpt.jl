@@ -308,33 +308,62 @@ function main_fcm(data,params;R=0.1,c=(0.5,0.2))
 
   r_conv(u,v) = ρ*v ⋅ (conv∘(u,∇(u)))
   r_Ωf((u,p),(v,q)) = ε(v) ⊙ (σ_f ∘ (ε(u),p)) + q*(∇⋅u)
-  r_SUPG((u,p),(v,q),w) = ((τ_SUPG ∘ (hₕ,w))*(conv ∘ (u,∇(v))) + (τ_PSPG ∘ (hₕ,w))/ρ*∇(q))⋅
-    (ρ*(conv∘(u,∇(u))) + ∇(p) - μ*Δ(u))
-  r_SUPG_picard((u,p),(v,q),w) = ((τ_SUPG ∘ (hₕ,w))*(conv ∘ (w,∇(v))) + (τ_PSPG ∘ (hₕ,w))/ρ*∇(q))⋅
-    (ρ*(conv∘(w,∇(u))) + ∇(p) - μ*Δ(u))
 
-  dr_conv(u,du,v) = ρ*v ⋅ (dconv∘(du,∇(du),u,∇(u)))
-  dr_SUPG((u,p),(du,dp),(v,q),w) =
-    ((τ_SUPG ∘ (hₕ,w))*(conv ∘ (du,∇(v))))⋅(ρ*(conv∘(u,∇(u))) + ∇(p) - μ*Δ(u)) +
-    ((τ_SUPG ∘ (hₕ,w))*(conv ∘ (u,∇(v))) + (τ_PSPG ∘ (hₕ,w))/ρ*∇(q))⋅(ρ*(dconv∘(du,∇(du),u,∇(u))) + ∇(dp) - μ*Δ(du))
+  # r_SUPG((u,p),(v,q),w) = ((τ_SUPG ∘ (hₕ,w))*(conv ∘ (u,∇(v))) + (τ_PSPG ∘ (hₕ,w))/ρ*∇(q))⋅
+  #   (ρ*(conv∘(u,∇(u))) + ∇(p) - μ*Δ(u))
+  # r_SUPG_picard((u,p),(v,q),w) = ((τ_SUPG ∘ (hₕ,w))*(conv ∘ (w,∇(v))) + (τ_PSPG ∘ (hₕ,w))/ρ*∇(q))⋅
+  #   (ρ*(conv∘(w,∇(u))) + ∇(p) - μ*Δ(u))
+
+  # dr_conv(u,du,v) = ρ*v ⋅ (dconv∘(du,∇(du),u,∇(u)))
+  # dr_SUPG((u,p),(du,dp),(v,q),w) =
+  #   ((τ_SUPG ∘ (hₕ,w))*(conv ∘ (du,∇(v))))⋅(ρ*(conv∘(u,∇(u))) + ∇(p) - μ*Δ(u)) +
+  #   ((τ_SUPG ∘ (hₕ,w))*(conv ∘ (u,∇(v))) + (τ_PSPG ∘ (hₕ,w))/ρ*∇(q))⋅(ρ*(dconv∘(du,∇(du),u,∇(u))) + ∇(dp) - μ*Δ(du))
+
+  # function res_fluid((u,p),(v,q))
+  #   return ∫(r_conv(u,v) + r_Ωf((u,p),(v,q)))Ω.dΩf +
+  #     ∫(r_conv(u,v) + r_Ωf((u,p),(v,q)) + γ_Nu*(u⋅v))Ω.dΩs +
+  #     ∫(r_SUPG((u,p),(v,q),u))dΩ_act
+  # end
+
+  # function jac_fluid_picard((u,p),(du,dp),(v,q))
+  #   return ∫(ρ*v ⋅ (conv∘(u,∇(du))) + r_Ωf((du,dp),(v,q)))Ω.dΩs +
+  #   ∫(ρ*v ⋅ (conv∘(u,∇(du))) + r_Ωf((du,dp),(v,q)) + γ_Nu*(du⋅v))Ω.dΩf +
+  #     ∫(r_SUPG_picard((du,dp),(v,q),u))dΩ_act
+  # end
+
+  # function jac_fluid_newton((u,p),(du,dp),(v,q))
+  #   return ∫(dr_conv(u,du,v) + r_Ωf((du,dp),(v,q)))Ω.dΩf +
+  #     ∫(dr_conv(u,du,v) + r_Ωf((du,dp),(v,q)) + γ_Nu*(du⋅v))Ω.dΩs +
+  #     ∫(dr_SUPG((u,p),(du,dp),(v,q),u))dΩ_act
+  # end
+
+  # Additional Brinkmann terms in SUPG based on 10.1002/nme.3151
+  r_SUPG((u,p),(v,q),w;IN_Ωf=1) = (IN_Ωf*(τ_SUPG ∘ (hₕ,w))*(conv ∘ (u,∇(v))) + (τ_PSPG ∘ (hₕ,w))/ρ*∇(q))⋅
+    (ρ*(conv∘(u,∇(u))) + ∇(p) - μ*Δ(u) + (1-IN_Ωf)*γ_Nu*u)
+  r_SUPG_picard((u,p),(v,q),w;IN_Ωf=1) = (IN_Ωf*(τ_SUPG ∘ (hₕ,w))*(conv ∘ (w,∇(v))) + (τ_PSPG ∘ (hₕ,w))/ρ*∇(q))⋅
+    (ρ*(conv∘(w,∇(u))) + ∇(p) - μ*Δ(u) + (1-IN_Ωf)*γ_Nu*u)
+
+  dr_conv(u,du,v) = NS*ρ*v ⋅ (dconv∘(du,∇(du),u,∇(u)))
+  dr_SUPG((u,p),(du,dp),(v,q),w;IN_Ωf=1) =
+    (IN_Ωf*(τ_SUPG ∘ (hₕ,w))*(conv ∘ (du,∇(v))))⋅(ρ*(conv∘(u,∇(u))) + ∇(p) - μ*Δ(u) + (1-IN_Ωf)*γ_Nu*u) +
+    (IN_Ωf*(τ_SUPG ∘ (hₕ,w))*(conv ∘ (u,∇(v))) + (τ_PSPG ∘ (hₕ,w))/ρ*∇(q))⋅(ρ*(dconv∘(du,∇(du),u,∇(u))) + ∇(dp) - μ*Δ(du) + (1-IN_Ωf)*γ_Nu*du)
 
   function res_fluid((u,p),(v,q))
-    return ∫(r_conv(u,v) + r_Ωf((u,p),(v,q)))Ω.dΩf +
-      ∫(r_conv(u,v) + r_Ωf((u,p),(v,q)) + γ_Nu*(u⋅v))Ω.dΩs +
-      ∫(r_SUPG((u,p),(v,q),u))dΩ_act
-  end
-
-  function jac_fluid_picard((u,p),(du,dp),(v,q))
-    return ∫(ρ*v ⋅ (conv∘(u,∇(du))) + r_Ωf((du,dp),(v,q)))Ω.dΩs +
-    ∫(ρ*v ⋅ (conv∘(u,∇(du))) + r_Ωf((du,dp),(v,q)) + γ_Nu*(du⋅v))Ω.dΩf +
-      ∫(r_SUPG_picard((du,dp),(v,q),u))dΩ_act
+    return ∫(r_conv(u,v) + r_Ωf((u,p),(v,q)) + r_SUPG((u,p),(v,q),u))Ω.dΩf +
+      ∫(r_conv(u,v) + r_Ωf((u,p),(v,q)) + γ_Nu*(u⋅v) + r_SUPG((u,p),(v,q),u;IN_Ωf=0))Ω.dΩs
   end
 
   function jac_fluid_newton((u,p),(du,dp),(v,q))
-    return ∫(dr_conv(u,du,v) + r_Ωf((du,dp),(v,q)))Ω.dΩf +
-      ∫(dr_conv(u,du,v) + r_Ωf((du,dp),(v,q)) + γ_Nu*(du⋅v))Ω.dΩs +
-      ∫(dr_SUPG((u,p),(du,dp),(v,q),u))dΩ_act
+    return ∫(dr_conv(u,du,v) + r_Ωf((du,dp),(v,q)) + dr_SUPG((u,p),(du,dp),(v,q),u))Ω.dΩf +
+      ∫(dr_conv(u,du,v) + r_Ωf((du,dp),(v,q)) + γ_Nu*(du⋅v) + dr_SUPG((u,p),(du,dp),(v,q),u;IN_Ωf=0))Ω.dΩs
   end
+
+  function jac_fluid_picard((u,p),(du,dp),(v,q))
+    return ∫(ρ*v ⋅ (conv∘(u,∇(du))) + r_Ωf((du,dp),(v,q)) + r_SUPG_picard((du,dp),(v,q),u))Ω.dΩs +
+      ∫(ρ*v ⋅ (conv∘(u,∇(du))) + r_Ωf((du,dp),(v,q)) + γ_Nu*(du⋅v) + r_SUPG_picard((du,dp),(v,q),u;IN_Ωf=0))Ω.dΩf
+  end
+
+  jac_fluid_AD((),x,dx,y,φ) = jacobian(_x->res_fluid(_x,y),x)
 
   op = FEOperator(res_fluid,jac_fluid_newton,X,Y)
   solver = NewtonSolver(LUSolver();maxiter=100,rtol=1.e-14,verbose=true)
@@ -342,6 +371,9 @@ function main_fcm(data,params;R=0.1,c=(0.5,0.2))
 
   fname="fcm_Re$(Re)_msh$(mesh_size)_aNU$(α_Nu)_aSUPG$(round(α_SUPG,sigdigits=2))_aGPmu$(α_GPμ)_aGPp$(α_GPp)_aGPu$(α_GPu)_Bp$(βp)_Bmu$(βμ)"
   writevtk(Ω.Ωf,data_path*fname,
+    cellfields=["uh"=>uh,"ph"=>ph])
+  fname="fcm_GAMMA_Re$(Re)_msh$(mesh_size)_aNU$(α_Nu)_aSUPG$(round(α_SUPG,sigdigits=2))_aGPmu$(α_GPμ)_aGPp$(α_GPp)_aGPu$(α_GPu)_Bp$(βp)_Bmu$(βμ)"
+  writevtk(Ω.Γ,data_path*fname,
     cellfields=["uh"=>uh,"ph"=>ph])
 
   n_Γ = -get_normal_vector(Ω.Γ)
@@ -548,6 +580,6 @@ end
 # params = (;Re=60,mesh_size=0.001,α_Nu=10000,α_SUPG=1/3,α_GPμ=0.001,α_GPp=0.001,α_GPu=0.001,βp=-1,βμ=1)
 # main_cutfem(data,params)
 
-# data = JLD2.load((@__DIR__)*"/data.jld2")["data"]
-# params = (;Re=60,mesh_size=0.0025,α_Nu=2.5*100,α_SUPG=1/3,α_GPμ=0,α_GPp=0,α_GPu=0,βp=0,βμ=0)
-# main_fcm(data,params)
+data = JLD2.load((@__DIR__)*"/data.jld2")["data"]
+params = (;Re=60,mesh_size=0.005,α_Nu=2.5*100,α_SUPG=1/3,α_GPμ=0,α_GPp=0,α_GPu=0,βp=0,βμ=0)
+main_fcm(data,params)
