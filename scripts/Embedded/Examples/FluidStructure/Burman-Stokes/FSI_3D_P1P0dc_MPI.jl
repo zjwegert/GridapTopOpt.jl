@@ -203,6 +203,8 @@ function main(ranks)
   k_p    = 1.0 # (Villanueva and Maute, 2017)
 
   # Terms
+  _n(∇φ) = ∇φ/(10^-20+norm(∇φ)) # TODO: Currently required as diff through get_normal_vector is broken in distributed
+
   σf_n(u,p,n) = μ*∇(u) ⋅ n - p*n
   a_Ω(u,v) = μ*(∇(u) ⊙ ∇(v))
   b_Ω(v,p) = -p*(∇⋅v)
@@ -213,7 +215,8 @@ function main(ranks)
   v_ψ(p,q) = k_p * Ω.ψ_f*p*q # (Isolated volume term, Eqn. 15, Villanueva and Maute, 2017)
 
   function a_fluid((),(u,p),(v,q),φ)
-    n_Γ = -get_normal_vector(Ω.Γ)
+    # n_Γ = -get_normal_vector(Ω.Γ)
+    n_Γ = -(_n ∘ ∇(φ))
     return ∫(a_Ω(u,v) + b_Ω(v,p) + b_Ω(u,q) + v_ψ(p,q))Ω.dΩf +
       ∫(a_Γ(u,v,n_Γ) + b_Γ(v,p,n_Γ) + b_Γ(u,q,n_Γ))Ω.dΓ +
       ∫(ju(u,v) + 0mean(φ))Ω.dΓg - ∫(jp(p,q) + 0mean(φ))Ω.dΓi
@@ -243,7 +246,8 @@ function main(ranks)
     return ∫(a_s_Ω(d,s))Ω.dΩs + ∫(j_s_k(d,s) + 0mean(φ))Ω.dΓg + ∫(v_s_ψ(d,s))Ω.dΩs
   end
   function l_solid(((u,p),),s,φ)
-    n = -get_normal_vector(Ω.Γ)
+    # n = -get_normal_vector(Ω.Γ)
+    n = -(_n ∘ ∇(φ))
     return ∫(-σf_n(u,p,n) ⋅ s)Ω.dΓ
   end
 
