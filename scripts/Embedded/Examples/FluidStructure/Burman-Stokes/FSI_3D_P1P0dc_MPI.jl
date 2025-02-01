@@ -88,7 +88,7 @@ function main(ranks)
   cw = 0.1;
   vol_D = L*H
 
-  model = GmshDiscreteModel(ranks,(@__DIR__)*"/Meshes/mesh_3d_finer.msh")
+  model = GmshDiscreteModel(ranks,(@__DIR__)*"/../Meshes/mesh_3d_finer.msh")
   map(test_mesh,local_views(model))
   writevtk(model,path*"model")
 
