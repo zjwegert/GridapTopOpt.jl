@@ -243,7 +243,9 @@ function main(ranks)
   v_s_ψ(d,s) = k_d*Ω.ψ_s*d⋅s # Isolated volume term
 
   function a_solid(((u,p),),d,s,φ)
-    return ∫(a_s_Ω(d,s))Ω.dΩs + ∫(j_s_k(d,s) + 0mean(φ))Ω.dΓg + ∫(v_s_ψ(d,s))Ω.dΩs
+    return ∫(a_s_Ω(d,s))Ω.dΩs +
+      ∫(j_s_k(d,s) + 0mean(φ) + 0*jump(p*p))Ω.dΓg +
+      ∫(v_s_ψ(d,s))Ω.dΩs
   end
   function l_solid(((u,p),),s,φ)
     # n = -get_normal_vector(Ω.Γ)
