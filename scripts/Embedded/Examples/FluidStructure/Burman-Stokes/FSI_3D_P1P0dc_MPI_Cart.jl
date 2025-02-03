@@ -371,7 +371,7 @@ function main(ranks,mesh_partition)
 end
 
 with_mpi() do distribute
-  mesh_partition = (6,4,4)
+  mesh_partition = (4,8,8)
   ranks = distribute(LinearIndices((prod(mesh_partition),)))
   petsc_options = "-ksp_converged_reason -ksp_error_if_not_converged true"
   GridapPETSc.with(;args=split(petsc_options)) do
