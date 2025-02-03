@@ -66,7 +66,7 @@ function gamg_ksp_setup(;rtol=10^-8,maxits=100)
 end
 
 function main(ranks)
-  path = "./results/FSI_3D_Burman_P1P1_MPI/"
+  path = "./results/FSI_3D_Burman_P1P0dc_MPI/"
   files_path = path*"data/"
   i_am_main(ranks) && mkpath(files_path)
 
@@ -102,15 +102,14 @@ function main(ranks)
   V_reg = TestFESpace(model,reffe_scalar;dirichlet_tags=["Omega_NonDesign","Gamma_s_D"])
   U_reg = TrialFESpace(V_reg)
 
-  _e = 5e-3
-  f0((x,y),W,H) = max(2/W*abs(x-x0),1/(H/2+1)*abs(y-H/2+1))-1
-  f1((x,y),q,r) = - cos(q*π*x)*cos(q*π*y)/q - r/q
-  fin(x) = f0(x,l*(1+5_e),a*(1+5_e))
+  _e = 1/3*hmin
+  f0((x,y,z),a,b) = max(2/a*abs(x-x0),1/(b/2+1)*abs(y-b/2+1),2/(H-2cw)*abs(z-H/2))-1
+  f1((x,y,z),q,r) = - cos(q*π*x)*cos(q*π*y)*cos(q*π*z)/q - r/q
+  fin(x) = f0(x,l*(1+_e),a*(1+_e))
   fsolid(x) = min(f0(x,l*(1+_e),b*(1+_e)),f0(x,w*(1+_e),a*(1+_e)))
-  fholes((x,y),q,r) = max(f1((x,y),q,r),f1((x-1/q,y),q,r))
-  φf(x) = min(max(fin(x),fholes(x,25,0.2)),fsolid(x))
-  # φf(x) = min(max(fin(x),fholes(x,22,0.6)),fsolid(x))
-  φh = interpolate(φf,V_φ)
+  fholes((x,y,z),q,r) = max(f1((x,y,z),q,r),f1((x-1/q,y,z),q,r))
+  lsf(x) = min(max(fin(x),fholes(x,5,0.5)),fsolid(x))
+  φh = interpolate(lsf,V_φ)
 
   φh_nondesign = interpolate(fsolid,V_φ)
 
