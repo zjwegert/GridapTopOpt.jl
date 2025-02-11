@@ -131,6 +131,17 @@ function main(ranks,mesh_partition)
   fholes((x,y,z),q,r) = max(f1((x,y,z),q,r),f1((x-1/q,y,z),q,r))
   lsf(x) = min(max(fin(x),fholes(x,5,0.5)),fsolid(x))
   φh = interpolate(lsf,V_φ)
+  writevtk(get_triangulation(φh),path*"initial_lsf",cellfields=["φh"=>φh])
+
+  _φ = get_free_dof_values(φh)
+  map(local_views(_φ)) do φ
+    idx = findall(isapprox(0.0;atol=eps()),φ)
+    if !isempty(idx)
+      i_am_main(ranks) && println("    Correcting level values at $(length(idx)) nodes")
+    end
+    φ[idx] .+= 100*eps(eltype(φ))
+  end
+  consistent!(_φ) |> wait
 
   φh_nondesign = interpolate(fsolid,V_φ)
 
@@ -166,11 +177,12 @@ function main(ranks,mesh_partition)
       :Γi => Γi,
       :dΓi => Measure(Γi,degree),
       :n_Γi    => get_normal_vector(Γi),
-      :ψ_s     => GridapTopOpt.get_isolated_volumes_mask(cutgeo,["Gamma_s_D"];IN_is=IN),
-      :ψ_f     => GridapTopOpt.get_isolated_volumes_mask(cutgeo,["Gamma_f_D"];IN_is=OUT),
+      :ψ_s     => GridapTopOpt.get_isolated_volumes_mask(cutgeo,["Gamma_s_D"];groups=(IN,(GridapTopOpt.CUT,OUT))),
+      :ψ_f     => GridapTopOpt.get_isolated_volumes_mask(cutgeo,["Gamma_f_D"];groups=(OUT,(GridapTopOpt.CUT,IN))),
     )
   end
   writevtk(get_triangulation(φh),path*"initial_islands",cellfields=["ψ_s"=>Ω.ψ_s,"ψ_f"=>Ω.ψ_f])
+  return
 
   # Setup spaces
   uin(x) = VectorValue(x[2],0.0,0.0)
@@ -239,7 +251,8 @@ function main(ranks,mesh_partition)
     # n_Γ = -(_n ∘ ∇(φ))
     return ∫(a_Ω(u,v) + b_Ω(v,p) + b_Ω(u,q) + v_ψ(p,q))Ω.dΩf +
       ∫(a_Γ(u,v,n_Γ) + b_Γ(v,p,n_Γ) + b_Γ(u,q,n_Γ))Ω.dΓ +
-      ∫(ju(u,v) + 0mean(φ))Ω.dΓg - ∫(jp(p,q) + 0mean(φ))Ω.dΓi
+      ∫(ju(u,v))Ω.dΓg - ∫(jp(p,q))Ω.dΓi
+      # ∫(ju(u,v) + 0mean(φ))Ω.dΓg - ∫(jp(p,q) + 0mean(φ))Ω.dΓi
   end
 
   l_fluid((),(v,q),φ) =  ∫(0q)Ω.dΩf
@@ -264,7 +277,8 @@ function main(ranks,mesh_partition)
 
   function a_solid(((u,p),),d,s,φ)
     return ∫(a_s_Ω(d,s))Ω.dΩs +
-      ∫(j_s_k(d,s) + 0mean(φ) + 0*jump(p*p))Ω.dΓg +
+      # ∫(j_s_k(d,s) + 0mean(φ) + 0*jump(p*p))Ω.dΓg +
+      ∫(j_s_k(d,s))Ω.dΓg +
       ∫(v_s_ψ(d,s))Ω.dΩs
   end
   function l_solid(((u,p),),s,φ)
@@ -360,6 +374,7 @@ function main(ranks,mesh_partition)
     end
     consistent!(_φ) |> wait
     reinit!(ls_evo,φh)
+    return "First Iteration done!"
   end
   it = get_history(optimiser).niter; uh,ph,dh = get_state(pcf)
   writevtk(Ω_act,path*"Omega_act_$it",
@@ -371,7 +386,7 @@ function main(ranks,mesh_partition)
 end
 
 with_mpi() do distribute
-  mesh_partition = (4,8,8)
+  mesh_partition = (2,2,2)
   ranks = distribute(LinearIndices((prod(mesh_partition),)))
   petsc_options = "-ksp_converged_reason -ksp_error_if_not_converged true"
   GridapPETSc.with(;args=split(petsc_options)) do

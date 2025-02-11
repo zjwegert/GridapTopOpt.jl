@@ -54,7 +54,11 @@ fsolid(x) = min(f0(x,l*(1+_e),b*(1+_e)),f0(x,w*(1+_e),a*(1+_e)))
 fholes((x,y),q,r) = max(f1((x,y),q,r),f1((x-1/q,y),q,r))
 φf(x) = min(max(fin(x),fholes(x,25,0.2)),fsolid(x))
 # φf(x) = min(max(fin(x),fholes(x,22,0.6)),fsolid(x))
-φh = interpolate(φf,V_φ)
+# φh = interpolate(φf,V_φ)
+
+_φf2(x) = max(φf(x),-(max(2/0.2*abs(x[1]-0.319),2/0.2*abs(x[2]-0.3))-1))
+φf2(x) = min(_φf2(x),sqrt((x[1]-0.35)^2+(x[2]-0.26)^2)-0.025)
+φh = interpolate(φf2,V_φ)
 
 φh_nondesign = interpolate(fsolid,V_φ)
 
@@ -75,6 +79,14 @@ dΓf_N = Measure(Γf_N,degree)
   Ω_act_s = Triangulation(cutgeo,ACTIVE)
   Ω_act_f = Triangulation(cutgeo,ACTIVE_OUT)
   Γi = SkeletonTriangulation(cutgeo_facets,ACTIVE_OUT)
+
+  bgcell_to_inoutcut = compute_bgcell_to_inoutcut(cutgeo,get_geometry(cutgeo))
+  # cell_to_color_fluid, _ = GridapTopOpt.tag_isolated_volumes(model,bgcell_to_inoutcut;groups=((GridapTopOpt.CUT,OUT),IN))
+  # cell_to_color_solid, _ = GridapTopOpt.tag_isolated_volumes(model,bgcell_to_inoutcut;groups=((GridapTopOpt.CUT,IN),OUT))
+
+  cell_to_color_fluid, _ = GridapTopOpt.tag_isolated_volumes(model,bgcell_to_inoutcut;groups=(OUT,(GridapTopOpt.CUT,IN)))
+  cell_to_color_solid, _ = GridapTopOpt.tag_isolated_volumes(model,bgcell_to_inoutcut;groups=(IN,(GridapTopOpt.CUT,OUT)))
+
   (;
     :Ωs      => Ωs,
     :dΩs     => Measure(Ωs,degree),
@@ -92,11 +104,22 @@ dΓf_N = Measure(Γf_N,degree)
     :Γi => Γi,
     :dΓi => Measure(Γi,degree),
     :n_Γi    => get_normal_vector(Γi),
-    :ψ_s     => GridapTopOpt.get_isolated_volumes_mask(cutgeo,["Gamma_s_D"];IN_is=IN),
-    :ψ_f     => GridapTopOpt.get_isolated_volumes_mask(cutgeo,["Gamma_f_D"];IN_is=OUT),
+    :ψ_s     => GridapTopOpt.get_isolated_volumes_mask(cutgeo,["Gamma_s_D"];groups=(IN,(GridapTopOpt.CUT,OUT))),
+    :ψ_f     => GridapTopOpt.get_isolated_volumes_mask(cutgeo,["Gamma_f_D"];groups=(OUT,(GridapTopOpt.CUT,IN))),
+    :bgcell_to_inoutcut => bgcell_to_inoutcut,
+    :cell_to_color_fluid => cell_to_color_fluid,
+    :cell_to_color_solid => cell_to_color_solid
   )
 end
-writevtk(get_triangulation(φh),path*"initial_islands",cellfields=["ψ_s"=>Ω.ψ_s,"ψ_f"=>Ω.ψ_f])
+writevtk(get_triangulation(φh),path*"initial_islands",cellfields=["φh"=>φh,"ψ_s"=>Ω.ψ_s,"ψ_f"=>Ω.ψ_f],
+  celldata=[
+    "inoutcut"=>Ω.bgcell_to_inoutcut,
+    "volumes fluid"=>Ω.cell_to_color_fluid,
+    "volumes solid"=>Ω.cell_to_color_solid
+  ])
+writevtk(Ω.Ωs,path*"Omega_s_initial")
+writevtk(Ω.Ωf,path*"Omega_f_initial")
+error()
 
 # Setup spaces
 uin(x) = VectorValue(16x[2]*(H-x[2]),0.0)

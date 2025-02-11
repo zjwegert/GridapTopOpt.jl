@@ -91,7 +91,7 @@ function tag_isolated_volumes(
     cell += 1
   end
 
-  return cell_to_color, color_to_group
+  return cell_to_color, color_to_group, cell_to_nbors
 end
 
 function find_tagged_volumes(
@@ -122,49 +122,38 @@ Given an EmbeddedDiscretization `cutgeo` and a list of tags `dirichlet_tags`,
 this function returns a CellField which is `1` on isolated volumes and `0` otherwise.
 
 We define an isolated volume as a volume that is IN but is not constrained by any
-of the tags in `dirichlet_tags`.
+of the tags in `dirichlet_tags`. Specify the In domain using the first entry in groups.
 
-Specify the in domain using `IN_is`. Taking `IN_is = OUT` will find isolated
-volumes for the `OUT` domain.
+By default, the isolated volume mask will always include CUT cells regardless of the
+groups. This can be disabled by setting `include_cuts` to false.
 """
 function get_isolated_volumes_mask(
   cutgeo::EmbeddedDiscretization,dirichlet_tags;
-  IN_is = IN
+  groups = (OUT,(CUT,IN)),
+  include_cuts = true
 )
   model = get_background_model(cutgeo)
   geo = get_geometry(cutgeo)
 
   bgcell_to_inoutcut = compute_bgcell_to_inoutcut(model,geo)
-  # Note: We switch IN and OUT based on the IN_is parameter. Namely,
-  #   IN_is = IN  -> groups = ((CUT,IN),IN*IN) = ((CUT,IN),OUT)
-  #   IN_is = OUT -> groups = ((CUT,OUT),IN*OUT) = ((CUT,IN),IN)
-  cell_to_color, color_to_group = tag_isolated_volumes(model,bgcell_to_inoutcut;groups=((CUT,IN_is),IN*IN_is))
+  cell_to_color, color_to_group, cell_to_nbors = tag_isolated_volumes(model,bgcell_to_inoutcut;groups)
   color_to_tagged = find_tagged_volumes(model,dirichlet_tags,cell_to_color,color_to_group)
 
   data = map(c -> !color_to_tagged[c] && isone(color_to_group[c]), cell_to_color)
+  # include_cuts && add_cuts!(data,bgcell_to_inoutcut,cell_to_nbors)
+
   return CellField(collect(Float64,data),Triangulation(model))
 end
 
-"""
-    get_isolated_volumes_mask_without_cuts(cutgeo::EmbeddedDiscretization,dirichlet_tags)
-
-The same as `get_isolated_volumes_mask` but we do not mark CUT cells.
-"""
-function get_isolated_volumes_mask_without_cuts(
-  cutgeo::EmbeddedDiscretization,dirichlet_tags;
-  IN_is = IN
-)
-  model = get_background_model(cutgeo)
-  geo = get_geometry(cutgeo)
-
-  bgcell_to_inoutcut = compute_bgcell_to_inoutcut(model,geo)
-  groups=(IN_is,(CUT,IN*IN_is))
-  cell_to_color, color_to_group = tag_isolated_volumes(model,bgcell_to_inoutcut;groups)
-  color_to_tagged = find_tagged_volumes(model,dirichlet_tags,cell_to_color,color_to_group)
-
-  data = map(c -> !color_to_tagged[c] && isone(color_to_group[c]), cell_to_color)
-  return CellField(collect(Float64,data),Triangulation(model))
-end
+# function add_cuts!(data,cell_to_inoutcut,cell_to_nbors)
+#   for neighbors in cell_to_nbors[data]
+#     for j in neighbors
+#       if !data[j] && cell_to_inoutcut[j] == CUT
+#         data[j] = true
+#       end
+#     end
+#   end
+# end
 
 # Distributed
 
@@ -174,7 +163,7 @@ function tag_isolated_volumes(
   groups::Tuple
 ) where Dc
 
-  cell_to_lcolor, lcolor_to_group = map(local_views(model),cell_to_state) do model, cell_to_state
+  cell_to_lcolor, lcolor_to_group, cell_to_nbors = map(local_views(model),cell_to_state) do model, cell_to_state
     tag_isolated_volumes(model,cell_to_state;groups)
   end |> tuple_of_arrays
 
@@ -182,18 +171,19 @@ function tag_isolated_volumes(
   n_lcolor = map(length,lcolor_to_group)
   color_gids = generate_volume_gids(cell_ids, n_lcolor, cell_to_lcolor)
 
-  return cell_to_lcolor, lcolor_to_group, color_gids
+  return cell_to_lcolor, lcolor_to_group, color_gids, cell_to_nbors
 end
 
 function get_isolated_volumes_mask(
   cutgeo::GridapEmbedded.Distributed.DistributedEmbeddedDiscretization,dirichlet_tags;
-  IN_is = IN
+  groups = (OUT,(CUT,IN)),
+  include_cuts = true
 )
   model = get_background_model(cutgeo)
   geo = get_geometry(cutgeo)
 
   bgcell_to_inoutcut = map(compute_bgcell_to_inoutcut,local_views(model),local_views(geo))
-  cell_to_lcolor, lcolor_to_group, color_gids = tag_isolated_volumes(model,bgcell_to_inoutcut;groups=((CUT,IN_is),IN*IN_is))
+  cell_to_lcolor, lcolor_to_group, color_gids, cell_to_nbors = tag_isolated_volumes(model,bgcell_to_inoutcut;groups)
 
   lcolor_to_tagged = map(local_views(model),cell_to_lcolor,lcolor_to_group) do model, cell_to_lcolor, lcolor_to_group
     find_tagged_volumes(model,dirichlet_tags,cell_to_lcolor,lcolor_to_group)
@@ -207,6 +197,13 @@ function get_isolated_volumes_mask(
     data = map(c -> !lcolor_to_tagged[c] && isone(lcolor_to_group[c]), cell_to_lcolor)
     CellField(collect(Float64,data),trian)
   end
+
+  # fields = map(local_views(trian),cell_to_lcolor,lcolor_to_group,lcolor_to_tagged,cell_to_nbors,bgcell_to_inoutcut) do trian, cell_to_lcolor,
+  #     lcolor_to_group, lcolor_to_tagged, cell_to_nbors, bgcell_to_inoutcut
+  #   data = map(c -> !lcolor_to_tagged[c] && isone(lcolor_to_group[c]), cell_to_lcolor)
+  #   include_cuts && add_cuts!(data,bgcell_to_inoutcut,cell_to_nbors)
+  #   CellField(collect(Float64,data),trian)
+  # end
   return GridapDistributed.DistributedCellField(fields,trian)
 end
 

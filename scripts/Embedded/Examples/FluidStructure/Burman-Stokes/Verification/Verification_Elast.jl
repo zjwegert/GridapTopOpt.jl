@@ -172,8 +172,8 @@ function main_cutfem(data,params;R=0.1,c=(0.5,0.2))
       :Fi => Fi,
       :dFi => Measure(Fi,degree),
       :n_Fi    => get_normal_vector(Fi),
-      # :ψ_s     => GridapTopOpt.get_isolated_volumes_mask(cutgeo,["Gamma_s_D"];IN_is=IN),
-      # :ψ_f     => GridapTopOpt.get_isolated_volumes_mask(cutgeo,["Gamma_f_D"];IN_is=OUT),
+      # :ψ_s     => GridapTopOpt.get_isolated_volumes_mask(cutgeo,["Gamma_s_D"];groups=(IN,(GridapTopOpt.CUT,OUT))),
+      # :ψ_f     => GridapTopOpt.get_isolated_volumes_mask(cutgeo,["Gamma_f_D"];groups=(OUT,(GridapTopOpt.CUT,IN))),
     )
   end
 

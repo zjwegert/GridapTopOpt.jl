@@ -98,9 +98,8 @@ dΓf_N = Measure(Γf_N,degree)
     :Λ_f => Λ_f,
     :dΛ_f => Measure(Λ_f,degree),
     :n_Λ_f    => get_normal_vector(Λ_f),
-    :ψ_s     => GridapTopOpt.get_isolated_volumes_mask(cutgeo,["Gamma_s_D"];IN_is=IN),
-    :ψ_f     => GridapTopOpt.get_isolated_volumes_mask(cutgeo,["Gamma_f_D"];IN_is=OUT),
-    # :ψ_f     => GridapTopOpt.get_isolated_volumes_mask_without_cuts(cutgeo,["Gamma_f_D"];IN_is=OUT)
+    :ψ_s     => GridapTopOpt.get_isolated_volumes_mask(cutgeo,["Gamma_s_D"];groups=(IN,(GridapTopOpt.CUT,OUT))),
+    :ψ_f     => GridapTopOpt.get_isolated_volumes_mask(cutgeo,["Gamma_f_D"];groups=(OUT,(GridapTopOpt.CUT,IN))),
   )
 end
 writevtk(get_triangulation(φh),path*"initial_islands",cellfields=["ψ_s"=>Ω.ψ_s,"ψ_f"=>Ω.ψ_f])

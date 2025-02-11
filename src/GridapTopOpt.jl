@@ -51,6 +51,7 @@ include("Embedded/Embedded.jl")
 export DifferentiableTriangulation
 export SubFacetBoundaryTriangulation, SubFacetSkeletonTriangulation
 export EmbeddedCollection, update_collection!, add_recipe!
+export CUT
 
 include("StateMaps/StateMaps.jl")
 export PDEConstrainedFunctionals

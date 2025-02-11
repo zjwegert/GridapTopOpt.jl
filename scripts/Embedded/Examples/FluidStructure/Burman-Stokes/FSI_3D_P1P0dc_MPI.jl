@@ -145,11 +145,12 @@ function main(ranks)
       :Γi => Γi,
       :dΓi => Measure(Γi,degree),
       :n_Γi    => get_normal_vector(Γi),
-      :ψ_s     => GridapTopOpt.get_isolated_volumes_mask(cutgeo,["Gamma_s_D"];IN_is=IN),
-      :ψ_f     => GridapTopOpt.get_isolated_volumes_mask(cutgeo,["Gamma_f_D"];IN_is=OUT),
+      :ψ_s     => GridapTopOpt.get_isolated_volumes_mask(cutgeo,["Gamma_s_D"];groups=(IN,(GridapTopOpt.CUT,OUT))),
+      :ψ_f     => GridapTopOpt.get_isolated_volumes_mask(cutgeo,["Gamma_f_D"];groups=(OUT,(GridapTopOpt.CUT,IN))),
     )
   end
   writevtk(get_triangulation(φh),path*"initial_islands",cellfields=["ψ_s"=>Ω.ψ_s,"ψ_f"=>Ω.ψ_f])
+  return
 
   # Setup spaces
   uin(x) = VectorValue(x[2],0.0,0.0)
@@ -350,7 +351,7 @@ function main(ranks)
 end
 
 with_mpi() do distribute
-  ncpus = 96
+  ncpus = 8
   ranks = distribute(LinearIndices((ncpus,)))
   petsc_options = "-ksp_converged_reason -ksp_error_if_not_converged true"
   GridapPETSc.with(;args=split(petsc_options)) do
