@@ -44,15 +44,16 @@ cutgeo = cut(model,geo)
 Ωf = DifferentiableTriangulation(Triangulation(cutgeo,PHYSICAL_OUT),V_φ)
 
 bgcell_to_inoutcut = compute_bgcell_to_inoutcut(model,geo)
-cell_to_color, color_to_group = GridapTopOpt.tag_isolated_volumes(model,bgcell_to_inoutcut;groups=(OUT,(GridapTopOpt.CUT,IN)))
+cell_to_color, color_to_group = GridapTopOpt.tag_disconnected_volumes(model,bgcell_to_inoutcut;groups=((GridapTopOpt.CUT,IN),OUT))
 
-ψ_s =  GridapTopOpt.get_isolated_volumes_mask(cutgeo,["Gamma_s_D"];groups=(IN,(GridapTopOpt.CUT,OUT)))
-ψ_f =  GridapTopOpt.get_isolated_volumes_mask(cutgeo,["Gamma_f_D"];groups=(OUT,(GridapTopOpt.CUT,IN)))
+ψ_s =  GridapTopOpt.get_isolated_volumes_mask(cutgeo,["Gamma_s_D"];groups=((GridapTopOpt.CUT,IN),OUT)) # Good one
+ψ_f =  GridapTopOpt.get_isolated_volumes_mask(cutgeo,["Gamma_f_D"];groups=(IN,(GridapTopOpt.CUT,OUT)))
 
 writevtk(get_triangulation(φh),path*"initial_islands",cellfields=["φh"=>φh,"ψ_f"=>ψ_f,"ψ_s"=>ψ_s],
   celldata=[
     "inoutcut"=>bgcell_to_inoutcut,
     "volumes"=>cell_to_color,
-  ])
-writevtk(Ωs,path*"Omega_s_initial")
-writevtk(Ωf,path*"Omega_f_initial")
+  ]; append = false
+)
+writevtk(Ωs,path*"Omega_s_initial"; append = false)
+writevtk(Ωf,path*"Omega_f_initial"; append = false)

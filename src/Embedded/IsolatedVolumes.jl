@@ -56,7 +56,7 @@ function tag_volume!(
 end
 
 """
-    function tag_isolated_volumes(
+    function tag_disconnected_volumes(
         model::DiscreteModel{Dc},
         cell_to_state::Vector{<:Integer};
         groups = Tuple(unique(cell_to_state))
@@ -66,7 +66,7 @@ Given a DiscreteModel `model` and an initial coloring `cell_to_state`,
 returns another coloring such that each color corresponds to a connected component of the
 graph of cells that are connected by a face and have their state in the same group.
 """
-function tag_isolated_volumes(
+function tag_disconnected_volumes(
   model::DiscreteModel{Dc},
   cell_to_state::Vector{<:Integer};
   groups = Tuple(unique(cell_to_state))
@@ -91,10 +91,10 @@ function tag_isolated_volumes(
     cell += 1
   end
 
-  return cell_to_color, color_to_group, cell_to_nbors
+  return cell_to_color, color_to_group
 end
 
-function find_tagged_volumes(
+function find_isolated_volumes(
   model::DiscreteModel{Dc},tags,
   cell_to_color::Vector{Int16},
   color_to_group::Vector{Int8};
@@ -112,7 +112,24 @@ function find_tagged_volumes(
     end
   end
 
-  return is_tagged
+  is_isolated = map(!, is_tagged)
+  return is_isolated
+end
+
+function find_onlycut_volumes(
+  model::DiscreteModel,
+  cell_to_color::Vector{Int16},
+  cell_to_state::Vector{Int8},
+  color_to_group::Vector{Int8};
+)
+  onlycut = trues(length(color_to_group))
+  for cell in 1:num_cells(model)
+    color = cell_to_color[cell]
+    if cell_to_state[cell] != CUT
+      onlycut[color] = false
+    end
+  end
+  return onlycut
 end
 
 """
@@ -124,86 +141,86 @@ this function returns a CellField which is `1` on isolated volumes and `0` other
 We define an isolated volume as a volume that is IN but is not constrained by any
 of the tags in `dirichlet_tags`. Specify the In domain using the first entry in groups.
 
-By default, the isolated volume mask will always include CUT cells regardless of the
-groups. This can be disabled by setting `include_cuts` to false.
+If `remove_cuts` is `true`, then volumes that only contain CUT cells are also considered isolated.
 """
 function get_isolated_volumes_mask(
   cutgeo::EmbeddedDiscretization,dirichlet_tags;
-  groups = (OUT,(CUT,IN)),
-  include_cuts = true
+  groups = ((CUT,IN),OUT),
+  remove_cuts = true
 )
   model = get_background_model(cutgeo)
   geo = get_geometry(cutgeo)
 
   bgcell_to_inoutcut = compute_bgcell_to_inoutcut(model,geo)
-  cell_to_color, color_to_group, cell_to_nbors = tag_isolated_volumes(model,bgcell_to_inoutcut;groups)
-  color_to_tagged = find_tagged_volumes(model,dirichlet_tags,cell_to_color,color_to_group)
+  cell_to_color, color_to_group = tag_disconnected_volumes(model,bgcell_to_inoutcut;groups)
+  color_to_isolated = find_isolated_volumes(model,dirichlet_tags,cell_to_color,color_to_group)
 
-  data = map(c -> !color_to_tagged[c] && isone(color_to_group[c]), cell_to_color)
-  # include_cuts && add_cuts!(data,bgcell_to_inoutcut,cell_to_nbors)
+  if remove_cuts
+    color_to_onlycut = find_onlycut_volumes(model,cell_to_color,bgcell_to_inoutcut,color_to_group)
+    color_to_isolated .= color_to_isolated .| color_to_onlycut
+  end
 
+  data = map(c -> color_to_isolated[c] && isone(color_to_group[c]), cell_to_color)
   return CellField(collect(Float64,data),Triangulation(model))
 end
 
-# function add_cuts!(data,cell_to_inoutcut,cell_to_nbors)
-#   for neighbors in cell_to_nbors[data]
-#     for j in neighbors
-#       if !data[j] && cell_to_inoutcut[j] == CUT
-#         data[j] = true
-#       end
-#     end
-#   end
-# end
-
 # Distributed
 
-function tag_isolated_volumes(
+function tag_disconnected_volumes(
   model::GridapDistributed.DistributedDiscreteModel{Dc},
   cell_to_state::AbstractVector{<:Vector{<:Integer}};
   groups::Tuple
 ) where Dc
 
-  cell_to_lcolor, lcolor_to_group, cell_to_nbors = map(local_views(model),cell_to_state) do model, cell_to_state
-    tag_isolated_volumes(model,cell_to_state;groups)
+  cell_to_lcolor, lcolor_to_group = map(local_views(model),cell_to_state) do model, cell_to_state
+    tag_disconnected_volumes(model,cell_to_state;groups)
   end |> tuple_of_arrays
 
   cell_ids = partition(get_cell_gids(model))
   n_lcolor = map(length,lcolor_to_group)
   color_gids = generate_volume_gids(cell_ids, n_lcolor, cell_to_lcolor)
 
-  return cell_to_lcolor, lcolor_to_group, color_gids, cell_to_nbors
+  return cell_to_lcolor, lcolor_to_group, color_gids
 end
 
 function get_isolated_volumes_mask(
   cutgeo::GridapEmbedded.Distributed.DistributedEmbeddedDiscretization,dirichlet_tags;
-  groups = (OUT,(CUT,IN)),
-  include_cuts = true
+  groups = ((CUT,IN),OUT),
+  remove_cuts = true
 )
+  function consistent_vols!(lcolor_to_mask, color_gids)
+    aux = PVector(lcolor_to_mask,partition(color_gids))
+    assemble!(&,aux) |> wait
+    consistent!(aux) |> wait
+  end
+
   model = get_background_model(cutgeo)
   geo = get_geometry(cutgeo)
 
   bgcell_to_inoutcut = map(compute_bgcell_to_inoutcut,local_views(model),local_views(geo))
-  cell_to_lcolor, lcolor_to_group, color_gids, cell_to_nbors = tag_isolated_volumes(model,bgcell_to_inoutcut;groups)
+  cell_to_lcolor, lcolor_to_group, color_gids = tag_disconnected_volumes(model,bgcell_to_inoutcut;groups)
 
-  lcolor_to_tagged = map(local_views(model),cell_to_lcolor,lcolor_to_group) do model, cell_to_lcolor, lcolor_to_group
-    find_tagged_volumes(model,dirichlet_tags,cell_to_lcolor,lcolor_to_group)
+  lcolor_to_isolated = map(local_views(model),cell_to_lcolor,lcolor_to_group) do model, cell_to_lcolor, lcolor_to_group
+    find_isolated_volumes(model,dirichlet_tags,cell_to_lcolor,lcolor_to_group)
   end
-  aux = PVector(lcolor_to_tagged,partition(color_gids))
-  assemble!(|,aux) |> wait
-  consistent!(aux) |> wait
+  consistent_vols!(lcolor_to_isolated,color_gids)
+
+  if remove_cuts
+    lcolor_to_onlycut = map(local_views(model),cell_to_lcolor,bgcell_to_inoutcut,lcolor_to_group) do model, cell_to_lcolor, bgcell_to_inoutcut, lcolor_to_group
+      find_onlycut_volumes(model,cell_to_lcolor,bgcell_to_inoutcut,lcolor_to_group)
+    end
+    consistent_vols!(lcolor_to_onlycut,color_gids)
+    map(lcolor_to_isolated,lcolor_to_onlycut) do isolated, onlycut
+      isolated .= isolated .| onlycut
+    end
+  end
 
   trian = Triangulation(GridapDistributed.WithGhost(),model)
-  fields = map(local_views(trian),cell_to_lcolor,lcolor_to_group,lcolor_to_tagged) do trian, cell_to_lcolor, lcolor_to_group, lcolor_to_tagged
-    data = map(c -> !lcolor_to_tagged[c] && isone(lcolor_to_group[c]), cell_to_lcolor)
+  fields = map(local_views(trian),cell_to_lcolor,lcolor_to_group,lcolor_to_isolated) do trian, cell_to_lcolor, lcolor_to_group, lcolor_to_isolated
+    data = map(c -> lcolor_to_isolated[c] && isone(lcolor_to_group[c]), cell_to_lcolor)
     CellField(collect(Float64,data),trian)
   end
 
-  # fields = map(local_views(trian),cell_to_lcolor,lcolor_to_group,lcolor_to_tagged,cell_to_nbors,bgcell_to_inoutcut) do trian, cell_to_lcolor,
-  #     lcolor_to_group, lcolor_to_tagged, cell_to_nbors, bgcell_to_inoutcut
-  #   data = map(c -> !lcolor_to_tagged[c] && isone(lcolor_to_group[c]), cell_to_lcolor)
-  #   include_cuts && add_cuts!(data,bgcell_to_inoutcut,cell_to_nbors)
-  #   CellField(collect(Float64,data),trian)
-  # end
   return GridapDistributed.DistributedCellField(fields,trian)
 end
 
