@@ -94,8 +94,8 @@ dΓf_N = Measure(Γf_N,degree)
     :n_Γ  => get_normal_vector(Γ.trian),
     :Ω_act_s => Triangulation(cutgeo,ACTIVE),
     :Ω_act_f => Triangulation(cutgeo,ACTIVE_OUT),
-    :χ_s => GridapTopOpt.get_isolated_volumes_mask(cutgeo,["Gamma_s_D"];groups=(IN,(GridapTopOpt.CUT,OUT))),
-    :χ_f => GridapTopOpt.get_isolated_volumes_mask(cutgeo,["Gamma_f_D"];groups=(OUT,(GridapTopOpt.CUT,IN)))
+    :χ_s => GridapTopOpt.get_isolated_volumes_mask(cutgeo,["Gamma_s_D"];groups=((GridapTopOpt.CUT,IN),OUT)),
+    :χ_f => GridapTopOpt.get_isolated_volumes_mask(cutgeo,["Gamma_f_D"];groups=((GridapTopOpt.CUT,OUT),IN))
   )
 end
 

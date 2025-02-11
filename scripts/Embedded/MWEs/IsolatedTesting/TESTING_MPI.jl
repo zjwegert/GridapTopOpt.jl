@@ -19,7 +19,7 @@ function main(ranks)
   a = 0.3;
   b = 0.01;
 
-  model = GmshDiscreteModel(ranks,(@__DIR__)*"/mesh_finer.msh")
+  model = GmshDiscreteModel("test/meshes/mesh_finer.msh")
   writevtk(model,path*"model")
 
   # Cut the background model
@@ -45,8 +45,8 @@ function main(ranks)
   Ωs = DifferentiableTriangulation(Triangulation(cutgeo,PHYSICAL),V_φ)
   Ωf = DifferentiableTriangulation(Triangulation(cutgeo,PHYSICAL_OUT),V_φ)
 
-  ψ_s =  GridapTopOpt.get_isolated_volumes_mask(cutgeo,["Gamma_s_D"];groups=((GridapTopOpt.CUT,IN),OUT)) # Good one
-  ψ_f =  GridapTopOpt.get_isolated_volumes_mask(cutgeo,["Gamma_f_D"];groups=(IN,(GridapTopOpt.CUT,OUT)))
+  ψ_s =  GridapTopOpt.get_isolated_volumes_mask(cutgeo,["Gamma_s_D"];groups=((GridapTopOpt.CUT,IN),OUT))
+  ψ_f =  GridapTopOpt.get_isolated_volumes_mask(cutgeo,["Gamma_f_D"];groups=((GridapTopOpt.CUT,OUT),IN))
 
   writevtk(get_triangulation(φh),path*"initial_islands",cellfields=["φh"=>φh,"ψ_f"=>ψ_f,"ψ_s"=>ψ_s];append=false)
   writevtk(Ωs,path*"Omega_s_initial";append=false)

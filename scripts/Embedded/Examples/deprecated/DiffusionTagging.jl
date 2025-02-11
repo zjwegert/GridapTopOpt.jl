@@ -85,7 +85,7 @@ op = AffineFEOperator(A,B,Ξ,Ψ)
 ψbar(ψ) = 1/2 + 1/2*tanh(kw*(ψ-kt*ψ_inf))
 
 cellfields = ["ψ"=>ψh,"ψbar"=>ψbar ∘(ψh),
-  "ξ"=>GridapTopOpt.get_isolated_volumes_mask(cutgeo,["Gamma_f_D"];groups=(OUT,(GridapTopOpt.CUT,IN)))]
+  "ξ"=>GridapTopOpt.get_isolated_volumes_mask(cutgeo,["Gamma_f_D"];groups=((GridapTopOpt.CUT,OUT),IN))]
 
 writevtk(get_triangulation(model),path*"psih_bg",cellfields=cellfields)
 writevtk(Ωf,path*"psih_physical",cellfields=cellfields)
