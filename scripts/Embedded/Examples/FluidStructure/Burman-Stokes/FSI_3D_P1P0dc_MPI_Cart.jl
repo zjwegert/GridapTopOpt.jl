@@ -131,7 +131,7 @@ function main(ranks,mesh_partition)
   fholes((x,y,z),q,r) = max(f1((x,y,z),q,r),f1((x-1/q,y,z),q,r))
   lsf(x) = min(max(fin(x),fholes(x,5,0.5)),fsolid(x))
   φh = interpolate(lsf,V_φ)
-  writevtk(get_triangulation(φh),path*"initial_lsf",cellfields=["φh"=>φh])
+  φh_nondesign = interpolate(fsolid,V_φ)
 
   _φ = get_free_dof_values(φh)
   map(local_views(_φ)) do φ
@@ -143,7 +143,7 @@ function main(ranks,mesh_partition)
   end
   consistent!(_φ) |> wait
 
-  φh_nondesign = interpolate(fsolid,V_φ)
+  writevtk(get_triangulation(φh),path*"initial_lsf",cellfields=["φh"=>φh])
 
   # Setup integration meshes and measures
   order = 1
@@ -182,7 +182,6 @@ function main(ranks,mesh_partition)
     )
   end
   writevtk(get_triangulation(φh),path*"initial_islands",cellfields=["ψ_s"=>Ω.ψ_s,"ψ_f"=>Ω.ψ_f])
-  return
 
   # Setup spaces
   uin(x) = VectorValue(x[2],0.0,0.0)

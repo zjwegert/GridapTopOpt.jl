@@ -110,8 +110,19 @@ function main(ranks)
   fholes((x,y,z),q,r) = max(f1((x,y,z),q,r),f1((x-1/q,y,z),q,r))
   lsf(x) = min(max(fin(x),fholes(x,5,0.5)),fsolid(x))
   φh = interpolate(lsf,V_φ)
-
   φh_nondesign = interpolate(fsolid,V_φ)
+
+  _φ = get_free_dof_values(φh)
+  map(local_views(_φ)) do φ
+    idx = findall(isapprox(0.0;atol=eps()),φ)
+    if !isempty(idx)
+      i_am_main(ranks) && println("    Correcting level values at $(length(idx)) nodes")
+    end
+    φ[idx] .+= 100*eps(eltype(φ))
+  end
+  consistent!(_φ) |> wait
+
+  writevtk(get_triangulation(φh),path*"initial_lsf",cellfields=["φh"=>φh])
 
   # Setup integration meshes and measures
   order = 1
@@ -150,7 +161,6 @@ function main(ranks)
     )
   end
   writevtk(get_triangulation(φh),path*"initial_islands",cellfields=["ψ_s"=>Ω.ψ_s,"ψ_f"=>Ω.ψ_f])
-  return
 
   # Setup spaces
   uin(x) = VectorValue(x[2],0.0,0.0)
@@ -351,7 +361,7 @@ function main(ranks)
 end
 
 with_mpi() do distribute
-  ncpus = 8
+  ncpus = 96
   ranks = distribute(LinearIndices((ncpus,)))
   petsc_options = "-ksp_converged_reason -ksp_error_if_not_converged true"
   GridapPETSc.with(;args=split(petsc_options)) do
