@@ -54,13 +54,16 @@ fsolid(x) = min(f0(x,l*(1+_e),b*(1+_e)),f0(x,w*(1+_e),a*(1+_e)))
 fholes((x,y),q,r) = max(f1((x,y),q,r),f1((x-1/q,y),q,r))
 φf(x) = min(max(fin(x),fholes(x,25,0.2)),fsolid(x))
 # φf(x) = min(max(fin(x),fholes(x,22,0.6)),fsolid(x))
-# φh = interpolate(φf,V_φ)
-
-_φf2(x) = max(φf(x),-(max(2/0.2*abs(x[1]-0.319),2/0.2*abs(x[2]-0.3))-1))
-φf2(x) = min(_φf2(x),sqrt((x[1]-0.35)^2+(x[2]-0.26)^2)-0.025)
-φh = interpolate(φf2,V_φ)
-
+φh = interpolate(φf,V_φ)
 φh_nondesign = interpolate(fsolid,V_φ)
+
+# Ensure values at DoFs are non-zero to satify assumptions for derivatives
+φ = get_free_dof_values(φh)
+idx = findall(isapprox(0.0;atol=eps()),φ)
+if length(idx)>0
+  println("    Correcting level values at $(length(idx)) nodes")
+  φ[idx] .+= 100*eps(eltype(φ))
+end
 
 # Setup integration meshes and measures
 order = 1
@@ -79,14 +82,6 @@ dΓf_N = Measure(Γf_N,degree)
   Ω_act_s = Triangulation(cutgeo,ACTIVE)
   Ω_act_f = Triangulation(cutgeo,ACTIVE_OUT)
   Γi = SkeletonTriangulation(cutgeo_facets,ACTIVE_OUT)
-
-  bgcell_to_inoutcut = compute_bgcell_to_inoutcut(cutgeo,get_geometry(cutgeo))
-  # cell_to_color_fluid, _ = GridapTopOpt.tag_isolated_volumes(model,bgcell_to_inoutcut;groups=((GridapTopOpt.CUT,OUT),IN))
-  # cell_to_color_solid, _ = GridapTopOpt.tag_isolated_volumes(model,bgcell_to_inoutcut;groups=((GridapTopOpt.CUT,IN),OUT))
-
-  cell_to_color_fluid, _ = GridapTopOpt.tag_isolated_volumes(model,bgcell_to_inoutcut;groups=(OUT,(GridapTopOpt.CUT,IN)))
-  cell_to_color_solid, _ = GridapTopOpt.tag_isolated_volumes(model,bgcell_to_inoutcut;groups=(IN,(GridapTopOpt.CUT,OUT)))
-
   (;
     :Ωs      => Ωs,
     :dΩs     => Measure(Ωs,degree),
@@ -104,22 +99,11 @@ dΓf_N = Measure(Γf_N,degree)
     :Γi => Γi,
     :dΓi => Measure(Γi,degree),
     :n_Γi    => get_normal_vector(Γi),
-    :ψ_s     => GridapTopOpt.get_isolated_volumes_mask(cutgeo,["Gamma_s_D"];groups=((GridapTopOpt.CUT,IN),OUT)),
-    :ψ_f     => GridapTopOpt.get_isolated_volumes_mask(cutgeo,["Gamma_f_D"];groups=((GridapTopOpt.CUT,OUT),IN)),
-    :bgcell_to_inoutcut => bgcell_to_inoutcut,
-    :cell_to_color_fluid => cell_to_color_fluid,
-    :cell_to_color_solid => cell_to_color_solid
+    :ψ_s     => GridapTopOpt.get_isolated_volumes_mask(cutgeo,["Gamma_s_D"];groups=(IN,(GridapTopOpt.CUT,OUT))),
+    :ψ_f     => GridapTopOpt.get_isolated_volumes_mask(cutgeo,["Gamma_f_D"];groups=(OUT,(GridapTopOpt.CUT,IN))),
   )
 end
-writevtk(get_triangulation(φh),path*"initial_islands",cellfields=["φh"=>φh,"ψ_s"=>Ω.ψ_s,"ψ_f"=>Ω.ψ_f],
-  celldata=[
-    "inoutcut"=>Ω.bgcell_to_inoutcut,
-    "volumes fluid"=>Ω.cell_to_color_fluid,
-    "volumes solid"=>Ω.cell_to_color_solid
-  ])
-writevtk(Ω.Ωs,path*"Omega_s_initial")
-writevtk(Ω.Ωf,path*"Omega_f_initial")
-error()
+writevtk(get_triangulation(φh),path*"initial_islands",cellfields=["φh"=>φh,"ψ_s"=>Ω.ψ_s,"ψ_f"=>Ω.ψ_f])
 
 # Setup spaces
 uin(x) = VectorValue(16x[2]*(H-x[2]),0.0)
@@ -184,7 +168,7 @@ function a_fluid((),(u,p),(v,q),φ)
   n_Γ = -get_normal_vector(Ω.Γ)
   return ∫(a_Ω(u,v) + b_Ω(v,p) + b_Ω(u,q) + v_ψ(p,q))Ω.dΩf +
     ∫(a_Γ(u,v,n_Γ) + b_Γ(v,p,n_Γ) + b_Γ(u,q,n_Γ))Ω.dΓ +
-    ∫(ju(u,v) + 0mean(φ))Ω.dΓg - ∫(jp(p,q) + 0mean(φ))Ω.dΓi
+    ∫(ju(u,v))Ω.dΓg - ∫(jp(p,q))Ω.dΓi
 end
 
 l_fluid((),(v,q),φ) =  ∫(0q)Ω.dΩf
@@ -208,7 +192,7 @@ j_s_k(d,s) = mean(γ_Gd ∘ hₕ)*jump(Ω.n_Γg ⋅ ∇(s)) ⋅ jump(Ω.n_Γg �
 v_s_ψ(d,s) = k_d*Ω.ψ_s*d⋅s # Isolated volume term
 
 function a_solid(((u,p),),d,s,φ)
-  return ∫(a_s_Ω(d,s))Ω.dΩs + ∫(j_s_k(d,s) + 0mean(φ))Ω.dΓg + ∫(v_s_ψ(d,s))Ω.dΩs
+  return ∫(a_s_Ω(d,s) + v_s_ψ(d,s))Ω.dΩs + ∫(j_s_k(d,s))Ω.dΓg
 end
 function l_solid(((u,p),),s,φ)
   n = -get_normal_vector(Ω.Γ)
@@ -289,6 +273,13 @@ try
     φ = get_free_dof_values(φh)
     φ .= min.(φ,get_free_dof_values(φh_nondesign))
     reinit!(ls_evo,φh)
+
+    φ = get_free_dof_values(φh)
+    idx = findall(isapprox(0.0;atol=eps()),φ)
+    if length(idx)>0
+      println("    Correcting level values at $(length(idx)) nodes")
+      φ[idx] .+= 100*eps(eltype(φ))
+    end
   end
 catch e
   println("Error: $e\nPrinting history and exiting...")
