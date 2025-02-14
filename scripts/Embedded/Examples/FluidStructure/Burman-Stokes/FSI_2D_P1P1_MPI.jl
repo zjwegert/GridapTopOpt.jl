@@ -213,7 +213,7 @@ function main(ranks)
     n_Γ = -get_normal_vector(Ω.Γ)
     return ∫(a_Ω(u,v) + b_Ω(v,p) + b_Ω(u,q) + v_ψ(p,q))Ω.dΩf +
       ∫(a_Γ(u,v,n_Γ) + b_Γ(v,p,n_Γ) + b_Γ(u,q,n_Γ))Ω.dΓ +
-      ∫(ju(u,v) + 0mean(φ))Ω.dΓg - ∫(jp(p,q) + 0mean(φ))Ω.dΓi
+      ∫(ju(u,v))Ω.dΓg - ∫(jp(p,q))Ω.dΓi
   end
 
   l_fluid((),(v,q),φ) =  ∫(0q)Ω.dΩf
@@ -244,7 +244,7 @@ function main(ranks)
 
   function a_solid(((u,p),),d,s,φ)
     return ∫(a_s_Ω(d,s))Ω.dΩs +
-      ∫(j_s_k(d,s) + 0mean(φ) + 0*jump(p*p))Ω.dΓg +
+      ∫(j_s_k(d,s))Ω.dΓg +
       ∫(v_s_ψ(d,s))Ω.dΩs
   end
   function l_solid(((u,p),),s,φ)
@@ -285,15 +285,15 @@ function main(ranks)
     )
   end
 
-  x = GridapTopOpt.forward_solve!(state_collection.state_map,φh)
-  uh,ph,dh = get_state(state_collection.state_map)
-  writevtk(Ω_act,path*"Omega_act_test",
-    cellfields=["φ"=>φh,"|∇(φ)|"=>(norm ∘ ∇(φh)),"uh"=>uh,"ph"=>ph,"dh"=>dh])
-  writevtk(Ω.Ωf,path*"Omega_f_test",
-    cellfields=["uh"=>uh,"ph"=>ph,"dh"=>dh])
-  writevtk(Ω.Ωs,path*"Omega_s_test",
-    cellfields=["uh"=>uh,"ph"=>ph,"dh"=>dh])
-  return
+  # x = GridapTopOpt.forward_solve!(state_collection.state_map,φh)
+  # uh,ph,dh = get_state(state_collection.state_map)
+  # writevtk(Ω_act,path*"Omega_act_test",
+  #   cellfields=["φ"=>φh,"|∇(φ)|"=>(norm ∘ ∇(φh)),"uh"=>uh,"ph"=>ph,"dh"=>dh])
+  # writevtk(Ω.Ωf,path*"Omega_f_test",
+  #   cellfields=["uh"=>uh,"ph"=>ph,"dh"=>dh])
+  # writevtk(Ω.Ωs,path*"Omega_s_test",
+  #   cellfields=["uh"=>uh,"ph"=>ph,"dh"=>dh])
+  # return
 
   pcf = EmbeddedPDEConstrainedFunctionals(state_collection;analytic_dC=[dVol])
 
@@ -350,6 +350,7 @@ function main(ranks)
     end
     consistent!(_φ) |> wait
     reinit!(ls_evo,φh)
+    return
   end
   it = get_history(optimiser).niter; uh,ph,dh = get_state(pcf)
   writevtk(Ω_act,path*"Omega_act_$it",
