@@ -24,7 +24,7 @@ a = 0.3;
 b = 0.01;
 vol_D = 2.0*0.5
 
-model = GmshDiscreteModel((@__DIR__)*"/fsi/gmsh/mesh_finer.msh")
+model = GmshDiscreteModel("scripts/Embedded/Examples/FluidStructure/Meshes/mesh_finer.msh")
 writevtk(model,path*"model")
 
 Ω_act = Triangulation(model)
@@ -70,7 +70,7 @@ kw = 1000.0
 kt = 0.99
 
 reffe = ReferenceFE(lagrangian,Float64,1)
-Ξ = TestFESpace(Triangulation(cutgeo,OUT),reffe,conformity=:H1,dirichlet_tags=["Gamma_f_D"])
+Ξ = TestFESpace(Triangulation(cutgeo,ACTIVE_OUT),reffe,conformity=:H1,dirichlet_tags=["Gamma_f_D"])
 Ψ = TrialFESpace(Ξ)
 
 J(c) = k*∇(c)
@@ -84,12 +84,15 @@ op = AffineFEOperator(A,B,Ξ,Ψ)
 
 ψbar(ψ) = 1/2 + 1/2*tanh(kw*(ψ-kt*ψ_inf))
 
+bgcell_to_inoutcut = compute_bgcell_to_inoutcut(cutgeo,geo)
 cellfields = ["ψ"=>ψh,"ψbar"=>ψbar ∘(ψh),
   "ξ"=>GridapTopOpt.get_isolated_volumes_mask(cutgeo,["Gamma_f_D"];groups=(OUT,(IN,GridapTopOpt.CUT)))]
 
-writevtk(get_triangulation(model),path*"psih_bg",cellfields=cellfields)
-writevtk(Ωf,path*"psih_physical",cellfields=cellfields)
-writevtk(Triangulation(cutgeo,CUT_OUT),path*"psih_cut_out",cellfields=cellfields)
-writevtk(Triangulation(cutgeo,CUT_IN),path*"psih_cut_in",cellfields=cellfields)
-writevtk(Triangulation(cutgeo,ACTIVE_OUT),path*"psih_active_out",cellfields=cellfields)
-writevtk(Triangulation(cutgeo,ACTIVE_IN),path*"psih_active_in",cellfields=cellfields)
+writevtk(get_triangulation(model),path*"psih_bg",cellfields=cellfields,celldata=["bgcell_to_inoutcut"=>bgcell_to_inoutcut])
+writevtk(Ωf,path*"psih_physical",cellfields=cellfields,celldata=["bgcell_to_inoutcut"=>bgcell_to_inoutcut])
+writevtk(Triangulation(cutgeo,CUT_OUT),path*"psih_cut_out",cellfields=cellfields,celldata=["bgcell_to_inoutcut"=>bgcell_to_inoutcut])
+writevtk(Triangulation(cutgeo,CUT_IN),path*"psih_cut_in",cellfields=cellfields,celldata=["bgcell_to_inoutcut"=>bgcell_to_inoutcut])
+writevtk(Triangulation(cutgeo,ACTIVE_OUT),path*"psih_active_out",cellfields=cellfields,celldata=["bgcell_to_inoutcut"=>bgcell_to_inoutcut])
+writevtk(Triangulation(cutgeo,ACTIVE_IN),path*"psih_active_in",cellfields=cellfields,celldata=["bgcell_to_inoutcut"=>bgcell_to_inoutcut])
+
+writevtk(Triangulation(cutgeo,ACTIVE_OUT),path*"psih_out")
