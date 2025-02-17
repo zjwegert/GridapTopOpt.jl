@@ -89,7 +89,7 @@ function main_cutfem(data,params;R=0.1,c=(0.5,0.2))
       :dΓ      => Measure(Γ,degree),
       :Ω_act_f => Ω_act_f,
       :dΩ_act_f => Measure(Ω_act_f,degree),
-      :ψ_f     => GridapTopOpt.get_isolated_volumes_mask(cutgeo,["Gamma_f_D"];groups=(OUT,(GridapTopOpt.CUT,IN))),
+      :ψ_f     => GridapTopOpt.get_isolated_volumes_mask(cutgeo,["Gamma_f_D"];groups=((GridapTopOpt.CUT,OUT),IN)),
     )
   end
 

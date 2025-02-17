@@ -466,33 +466,29 @@ function DifferentiableTriangulation(trian::DistributedTriangulation,fe_space)
 end
 
 # TODO: Dispatch more appropriately on trian?!?!
-function FESpaces._change_argument(op,f,local_trians,uh::DistributedCellField)
-  serial_cf(::Triangulation,space,cell_u) = CellField(space,cell_u)
-  serial_cf(::SkeletonTriangulation,space,cell_u) = SkeletonCellFieldPair(space,cell_u)
-  function dist_cf(uh::DistributedCellField,trians,spaces,cell_u)
-    DistributedCellField(
-      map(serial_cf,trians,spaces,cell_u),
-      get_triangulation(uh)
-    )
+function FESpaces._change_argument(op,f,local_trians,uh::GridapDistributed.DistributedADTypes)
+  function dist_cf(uh::DistributedCellField,cfs)
+    DistributedCellField(cfs,get_triangulation(uh))
   end
-  function dist_cf(uh::DistributedMultiFieldCellField,trians,spaces,cell_u)
-    mf_cfs = map(serial_cf,trians,spaces,cell_u)
+  function dist_cf(uh::DistributedMultiFieldCellField,cfs)
     sf_cfs = map(DistributedCellField,
-      [tuple_of_arrays(map(cf -> Tuple(cf.single_fields),mf_cfs))...],
+      [tuple_of_arrays(map(cf -> Tuple(cf.single_fields),cfs))...],
       map(get_triangulation,uh)
     )
-    DistributedMultiFieldCellField(sf_cfs,mf_cfs)
+    DistributedMultiFieldCellField(sf_cfs,cfs)
   end
 
-  spaces = map(get_fe_space,local_views(uh))
+  uhs = local_views(uh)
+  spaces = map(get_fe_space,uhs)
   function g(cell_u)
-    cf = dist_cf(uh,local_trians,spaces,cell_u)
+    cfs = map(CellField,spaces,cell_u)
+    cf = dist_cf(uh,cfs)
     map(update_trian!,local_trians,spaces,local_views(cf))
-    cell_grad = f(cf)
+    cg = f(cf)
     map(local_trians,spaces) do Ω, V
       update_trian!(Ω,V,nothing)
     end
-    map(get_contribution,local_views(cell_grad),local_trians)
+    map(get_contribution,local_views(cg),local_trians)
   end
   g
 end
