@@ -11,6 +11,114 @@ function generate_neighbor_graph(model::DiscreteModel{Dc}) where Dc
   return cell_to_nbors
 end
 
+function find_unique_points(
+  point_to_coords::AbstractVector
+)
+  f(pt::Number) = round(pt;sigdigits=12)
+  f(id::Integer) = f(point_to_coords[id])
+
+  ids = Base.OneTo(length(point_to_coords))
+  upoints = unique(f,ids)
+  return collect(Int32,indexin(f.(ids),f.(upoints))), point_to_coords[upoints]
+end
+
+function generate_subcell_topology(cutgeo)
+  model = get_background_model(cutgeo)
+
+  bgcell_to_inoutcut = GridapEmbedded.Interfaces.compute_bgcell_to_inoutcut(cutgeo,cutgeo.geo)
+  subcell_to_inout = GridapEmbedded.Interfaces.compute_subcell_to_inout(cutgeo,cutgeo.geo)
+  cell_to_bgcell = findall(!iszero,bgcell_to_inoutcut)
+
+  n_bgcells = length(cell_to_bgcell)
+  n_subcells = length(subcell_to_inout)
+  n_cells = n_bgcells + n_subcells
+
+  cell_to_inout = vcat(bgcell_to_inoutcut[cell_to_bgcell],subcell_to_inout)
+
+  Dc = num_cell_dims(model)
+  topo = get_grid_topology(model)
+  n_bgnodes = num_faces(topo, 0)
+  bgcell_to_bgnode = Geometry.get_faces(topo, Dc, 0)
+  subcell_to_bgnode = cutgeo.subcells.cell_to_points
+
+  point_to_upoint, ucoords = find_unique_points(
+    lazy_append(Geometry.get_vertex_coordinates(topo), cutgeo.subcells.point_to_coords)
+  )
+
+  data = Vector{Int32}(undef,length(bgcell_to_bgnode.data)+length(subcell_to_bgnode.data))
+  ptrs = Vector{Int32}(undef,n_cells+1)
+  ptrs[1] = 1
+  cell = 1
+  for bgcell in cell_to_bgcell
+    nodes = view(point_to_upoint,view(bgcell_to_bgnode,bgcell))
+    ptrs[cell+1] = ptrs[cell] + length(nodes)
+    data[ptrs[cell]:ptrs[cell+1]-1] .= nodes
+    cell += 1
+  end
+  for subcell in 1:n_subcells
+    nodes = view(point_to_upoint,view(subcell_to_bgnode,subcell) .+ n_bgnodes)
+    ptrs[cell+1] = ptrs[cell] + length(nodes)
+    data[ptrs[cell]:ptrs[cell+1]-1] .= nodes
+    cell += 1
+  end
+  resize!(data,ptrs[end]-1)
+
+  cell_to_nodes = Table(data,ptrs)
+
+  polys = [get_polytopes(model)...,TRI]
+  cell_types = collect(Int8,lazy_append(get_cell_type(topo)[cell_to_bgcell],Fill(Int8(length(polys)),n_subcells)))
+
+  new_topo = UnstructuredGridTopology(ucoords,cell_to_nodes,cell_types,polys)
+  cell_to_bgcell = collect(lazy_append(cell_to_bgcell,cutgeo.subcells.cell_to_bgcell))
+  return new_topo, cell_to_inout, cell_to_bgcell
+end
+
+function generate_subcell_model(cutgeo)
+  topo, cell_to_inout, cell_to_bgcell = GridapTopOpt.generate_subcell_topology(cutgeo)
+  grid = UnstructuredGrid(
+    Geometry.get_vertex_coordinates(topo), Geometry.get_faces(topo,2,0), 
+    map(p -> Gridap.ReferenceFEs.LagrangianRefFE(Float64,p,1), get_polytopes(topo)),
+    get_cell_type(topo)
+  )
+  model = UnstructuredDiscreteModel(grid,topo,FaceLabeling(topo))
+  return model, cell_to_inout, cell_to_bgcell
+end
+
+function project_colors(
+  model,cell_to_bgcell,cell_to_color,color_to_group,target
+)
+  bgcell_to_color = zeros(Int16,num_cells(model))
+  for (cell,bgcell) in enumerate(cell_to_bgcell)
+    color = cell_to_color[cell]
+    group = color_to_group[color]
+    if (group == target) || iszero(bgcell_to_color[bgcell])
+      bgcell_to_color[bgcell] = color
+    end
+  end
+  return bgcell_to_color
+end
+
+function get_isolated_volumes_mask_v2(
+  cutgeo::EmbeddedDiscretization,dirichlet_tags
+)
+  model = get_background_model(cutgeo)
+
+  scmodel, cell_to_inout, cell_to_bgcell = generate_subcell_model(cutgeo)
+  cell_to_color, color_to_group = tag_disconnected_volumes(scmodel,cell_to_inout;groups=(IN,OUT))
+
+  bgcell_to_color_IN = project_colors(model,cell_to_bgcell,cell_to_color,color_to_group,1)
+  color_to_isolated_IN = find_isolated_volumes(model,dirichlet_tags,bgcell_to_color_IN,color_to_group)
+  data_IN = map(c -> color_to_isolated_IN[c] && isone(color_to_group[c]), bgcell_to_color_IN)
+  cf_IN = CellField(collect(Float64,data_IN),Triangulation(model))
+
+  bgcell_to_color_OUT = project_colors(model,cell_to_bgcell,cell_to_color,color_to_group,2)
+  color_to_isolated_OUT = find_isolated_volumes(model,dirichlet_tags,bgcell_to_color_OUT,color_to_group)
+  data_OUT = map(c -> color_to_isolated_OUT[c] && !isone(color_to_group[c]), bgcell_to_color_OUT)
+  cf_OUT = CellField(collect(Float64,data_OUT),Triangulation(model))
+
+  return cf_IN, cf_OUT
+end
+
 """
     function tag_volume!(
         cell::Int,color::Int16,group::Union{Integer,NTuple{N,Integer}},

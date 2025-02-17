@@ -53,8 +53,9 @@ function main(ranks)
   writevtk(Ωf,path*"Omega_f_initial";append=false)
 end
 
-with_mpi() do distribute
+with_debug() do distribute
   ncpus = 4
   ranks = distribute(LinearIndices((ncpus,)))
   main(ranks)
 end
+
