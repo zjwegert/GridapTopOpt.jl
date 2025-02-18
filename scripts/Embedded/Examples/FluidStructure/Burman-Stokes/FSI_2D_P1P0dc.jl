@@ -59,10 +59,10 @@ fholes((x,y),q,r) = max(f1((x,y),q,r),f1((x-1/q,y),q,r))
 
 # Ensure values at DoFs are non-zero to satify assumptions for derivatives
 φ = get_free_dof_values(φh)
-idx = findall(isapprox(0.0;atol=eps()),φ)
+idx = findall(isapprox(0.0;atol=1e-10),φ)
 if length(idx)>0
   println("    Correcting level values at $(length(idx)) nodes")
-  φ[idx] .+= 100*eps(eltype(φ))
+  φ[idx] .+= 1e-10
 end
 
 # Setup integration meshes and measures
@@ -82,6 +82,9 @@ dΓf_N = Measure(Γf_N,degree)
   Ω_act_s = Triangulation(cutgeo,ACTIVE)
   Ω_act_f = Triangulation(cutgeo,ACTIVE_OUT)
   Γi = SkeletonTriangulation(cutgeo_facets,ACTIVE_OUT)
+  ψ_s,_ = GridapTopOpt.get_isolated_volumes_mask_v2(cutgeo,["Gamma_s_D"])
+  _,ψ_f = GridapTopOpt.get_isolated_volumes_mask_v2(cutgeo,["Gamma_f_D"])
+
   (;
     :Ωs      => Ωs,
     :dΩs     => Measure(Ωs,degree),
@@ -99,8 +102,8 @@ dΓf_N = Measure(Γf_N,degree)
     :Γi => Γi,
     :dΓi => Measure(Γi,degree),
     :n_Γi    => get_normal_vector(Γi),
-    :ψ_s     => GridapTopOpt.get_isolated_volumes_mask(cutgeo,["Gamma_s_D"];groups=(IN,(GridapTopOpt.CUT,OUT))),
-    :ψ_f     => GridapTopOpt.get_isolated_volumes_mask(cutgeo,["Gamma_f_D"];groups=(OUT,(GridapTopOpt.CUT,IN))),
+    :ψ_s     => ψ_s,
+    :ψ_f     => ψ_f,
   )
 end
 writevtk(get_triangulation(φh),path*"initial_islands",cellfields=["φh"=>φh,"ψ_s"=>Ω.ψ_s,"ψ_f"=>Ω.ψ_f])
