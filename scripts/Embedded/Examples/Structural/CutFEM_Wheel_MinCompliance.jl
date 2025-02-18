@@ -152,7 +152,8 @@ function main(ranks)
   ## Optimisation functionals
   vol_D = sum(∫(1)dΩ_bg)
   J_comp(d,φ) = ∫(ε(d) ⊙ (σ ∘ ε(d)))Ω_data.dΩ
-  Vol(d,φ) = ∫(vol_D)Ω_data.dΩ - ∫(vf/vol_D)dΩ_bg
+  Vol(d,φ) = ∫(vol_D)Ω_data.dΩ - ∫(vf/vol_D)dΩ_bg +
+    ∫(0d⋅_g)Ω_data.dΩ # Fix when differentiating wrt to d
   dVol(q,d,φ) = ∫(-1/vol_D*q/(norm ∘ (∇(φ))))Ω_data.dΓ
 
   ## Setup solver and FE operators
