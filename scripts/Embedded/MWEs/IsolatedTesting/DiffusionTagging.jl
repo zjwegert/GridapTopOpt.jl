@@ -48,6 +48,13 @@ fholes((x,y),q,r) = max(f1((x,y),q,r),f1((x-1/q,y),q,r))
 φf2(x) = max(φf(x),-(max(2/0.2*abs(x[1]-0.32),2/0.2*abs(x[2]-0.321))-1))
 φh = interpolate(φf2,V_φ)
 
+φ = get_free_dof_values(φh)
+idx = findall(isapprox(0.0;atol=1e-10),φ)
+if length(idx)>0
+  println("    Correcting level values at $(length(idx)) nodes")
+  φ[idx] .+= 1e-10
+end
+
 order = 1
 degree = 2*(order+1)
 
@@ -56,6 +63,7 @@ cutgeo = cut(model,geo)
 
 # Ωs = Triangulation(cutgeo,PHYSICAL)
 Ωf = Triangulation(cutgeo,PHYSICAL_OUT)
+writevtk(Ωf,path*"psih_physical")
 # dΩs = Measure(Ωs,degree)
 # dΩf = Measure(Ωf,degree)
 
@@ -63,13 +71,13 @@ cutgeo = cut(model,geo)
 # n_Γg = get_normal_vector(Γg)
 # dΓg = Measure(Γg,degree)
 
-ψ_s = GridapTopOpt.get_isolated_volumes_mask(cutgeo,["Gamma_s_D"];groups=((GridapTopOpt.CUT,IN),OUT))
-ψ_f = GridapTopOpt.get_isolated_volumes_mask(cutgeo,["Gamma_f_D"];groups=((GridapTopOpt.CUT,OUT),IN))
+ψ_s,_ = GridapTopOpt.get_isolated_volumes_mask_v2(cutgeo,["Gamma_s_D"])
+_,ψ_f = GridapTopOpt.get_isolated_volumes_mask_v2(cutgeo,["Gamma_f_D"])
 
-ψd_s = GridapTopOpt.diffusion_isolated_volumes_mask(hₕ,cutgeo,IN,["Gamma_s_D"])
-ψf_s = GridapTopOpt.diffusion_isolated_volumes_mask(hₕ,cutgeo,OUT,["Gamma_f_D"])
+# ψd_s = GridapTopOpt.diffusion_isolated_volumes_mask(hₕ,cutgeo,IN,["Gamma_s_D"])
+# ψf_s = GridapTopOpt.diffusion_isolated_volumes_mask(hₕ,cutgeo,OUT,["Gamma_f_D"])
 
-cellfields = ["ψ_s"=>ψ_s,"ψ_f"=>ψ_f,"ψd_s"=>ψd_s,"ψf_s"=>ψf_s]
+cellfields = ["ψ_s"=>ψ_s,"ψ_f"=>ψ_f]#,"ψd_s"=>ψd_s,"ψf_s"=>ψf_s]
 
 writevtk(get_triangulation(model),path*"psih_bg",cellfields=cellfields)
 writevtk(Ωf,path*"psih_physical",cellfields=cellfields)

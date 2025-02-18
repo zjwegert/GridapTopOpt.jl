@@ -76,7 +76,7 @@ end
 function generate_subcell_model(cutgeo)
   topo, cell_to_inout, cell_to_bgcell = GridapTopOpt.generate_subcell_topology(cutgeo)
   grid = UnstructuredGrid(
-    Geometry.get_vertex_coordinates(topo), Geometry.get_faces(topo,2,0), 
+    Geometry.get_vertex_coordinates(topo), Geometry.get_faces(topo,2,0),
     map(p -> Gridap.ReferenceFEs.LagrangianRefFE(Float64,p,1), get_polytopes(topo)),
     get_cell_type(topo)
   )

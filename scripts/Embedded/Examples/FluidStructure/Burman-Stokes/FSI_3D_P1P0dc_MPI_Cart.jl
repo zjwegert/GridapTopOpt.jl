@@ -242,7 +242,7 @@ function main(ranks,mesh_partition)
   a_Γ(u,v,n) = - μ*(n⋅∇(u)) ⋅ v - μ*(n⋅∇(v)) ⋅ u + (γ_Nu ∘ hₕ)*(u⋅v)
   b_Γ(v,p,n) = (n⋅v)*p
   ju(u,v) = mean(γ_u ∘ hₕ)*jump(Ω.n_Γg ⋅ ∇(u)) ⋅ jump(Ω.n_Γg ⋅ ∇(v))
-  jp(p,q) = mean(γ_p ∘ hₕ)*jump(Ω.n_Γi ⋅ ∇(p)) * jump(Ω.n_Γi ⋅ ∇(q))
+  jp(p,q) = mean(γ_p ∘ hₕ)*jump(p) * jump(q)
   v_ψ(p,q) = k_p * Ω.ψ_f*p*q # (Isolated volume term, Eqn. 15, Villanueva and Maute, 2017)
 
   function a_fluid((),(u,p),(v,q),φ)
@@ -337,7 +337,7 @@ function main(ranks,mesh_partition)
   ## Hilbertian extension-regularisation problems
   _α(hₕ) = (α_coeff*hₕ)^2
   a_hilb(p,q) =∫((_α ∘ hₕ)*∇(p)⋅∇(q) + p*q)dΩ_act;
-  vel_ext = VelocityExtension(a_hilb,U_reg,V_reg)
+  vel_ext = VelocityExtension(a_hilb,U_reg,V_reg;solver=CGAMGSolver())
 
   ## Optimiser
   converged(m) = GridapTopOpt.default_al_converged(

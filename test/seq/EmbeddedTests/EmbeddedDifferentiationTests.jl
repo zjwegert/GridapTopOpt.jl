@@ -54,8 +54,11 @@ function main(
   reffe = ReferenceFE(lagrangian,Float64,order)
   V_φ = TestFESpace(model,reffe)
 
+  U = TestFESpace(model,reffe)
+
   φh = interpolate(φ,V_φ)
   fh = interpolate(f,V_φ)
+  uh = interpolate(x->x[1]+x[2],U)
 
   # Correction if level set is on top of a node
   x_φ = get_free_dof_values(φh)
@@ -83,6 +86,26 @@ function main(
   dJ_bulk_exact_vec = assemble_vector(dJ_bulk_exact,V_φ)
 
   @test norm(dJ_bulk_AD_vec - dJ_bulk_exact_vec) < 1e-10
+
+  # A.1.1) Volume integral with another field
+
+  J_bulk_1(u,φ) = ∫(u+fh)dΩ
+  dJ_bulk_1_AD = gradient(φ->J_bulk_1(uh,φ),φh)
+  dJ_bulk_1_AD_vec = assemble_vector(dJ_bulk_1_AD,V_φ)
+
+  dJ_bulk_1_exact(q,u) = ∫(-(u+fh)*q/(norm ∘ (∇(φh))))dΓ
+  dJ_bulk_1_exact_vec = assemble_vector(q->dJ_bulk_1_exact(q,uh),V_φ)
+
+  @test norm(dJ_bulk_1_AD_vec - dJ_bulk_1_exact_vec) < 1e-10
+
+  J_bulk_1(u,φ) = ∫(u+fh)dΩ
+  dJ_bulk_1_AD_in_u = gradient(u->J_bulk_1(u,φh),uh)
+  dJ_bulk_1_AD_in_u_vec = assemble_vector(dJ_bulk_1_AD_in_u,U)
+
+  dJ_bulk_1_exact_in_u(q,u) = ∫(q)dΩ
+  dJ_bulk_1_exact_in_u_vec = assemble_vector(q->dJ_bulk_1_exact_in_u(q,uh),U)
+
+  @test norm(dJ_bulk_1_AD_in_u_vec - dJ_bulk_1_exact_in_u_vec) < 1e-10
 
   # A.2) Volume integral
 
@@ -278,12 +301,19 @@ n = 10
 model = generate_model(D,n)
 φ = level_set(:circle)
 f(x) = 1.0
-main(model,φ,f;vtk=true)
+main(model,φ,f;vtk=false)
 
 D = 2
 n = 10
 model = generate_model(D,n)
 φ = level_set(:circle)
+f(x) = x[1]+x[2]
+main(model,φ,f;vtk=false)
+
+D = 3
+n = 41
+model = generate_model(D,n)
+φ = level_set(:regular_3d)
 f(x) = x[1]+x[2]
 main(model,φ,f;vtk=true)
 
@@ -292,7 +322,7 @@ n = 10
 model = generate_model(D,n)
 φ = level_set(:circle_2)
 fvec((x,y)) = VectorValue((1-x)^2,(1-y)^2)
-main_normal(model,φ,fvec;vtk=true)
+main_normal(model,φ,fvec;vtk=false)
 # main_normal(model,level_set(:circle),fvec;vtk=true) # This will fail as expected
 
 end

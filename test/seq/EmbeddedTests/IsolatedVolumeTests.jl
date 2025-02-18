@@ -2,6 +2,7 @@ module IsolatedVolumeTests
 using Test
 using GridapTopOpt
 using Gridap
+using GridapGmsh
 
 using GridapEmbedded
 using GridapEmbedded.LevelSetCutters
@@ -25,16 +26,23 @@ function main_2d(n;vtk)
     g(x,0.5,0.15,0.05))
   φh = interpolate(f,V_φ)
 
+  φ = get_free_dof_values(φh)
+  idx = findall(isapprox(0.0;atol=1e-10),φ)
+  if length(idx)>0
+    println("    Correcting level values at $(length(idx)) nodes")
+    φ[idx] .+= 1e-10
+  end
+
   geo = DiscreteGeometry(φh,model)
   cutgeo = cut(model,geo)
 
   bgcell_to_inoutcut = compute_bgcell_to_inoutcut(cutgeo,geo)
-  cell_to_color, color_to_group = GridapTopOpt.tag_isolated_volumes(model,bgcell_to_inoutcut;groups=((GridapTopOpt.CUT,IN),OUT))
+  cell_to_color, color_to_group = GridapTopOpt.tag_disconnected_volumes(model,bgcell_to_inoutcut;groups=((GridapTopOpt.CUT,IN),OUT))
 
-  color_to_tagged = GridapTopOpt.find_tagged_volumes(model,["Gamma_D"],cell_to_color,color_to_group)
+  color_to_tagged = GridapTopOpt.find_isolated_volumes(model,["Gamma_D"],cell_to_color,color_to_group)
   cell_to_tagged = map(c -> color_to_tagged[c], cell_to_color)
 
-  μ = GridapTopOpt.get_isolated_volumes_mask(cutgeo,["Gamma_D"])
+  μ,_ = GridapTopOpt.get_isolated_volumes_mask_v2(cutgeo,["Gamma_D"])
 
   # Expected
   f(x) = min(g(x,0.15,0.5,0.1),g(x,0.85,0.5,0.1))
@@ -94,6 +102,13 @@ function main_gmsh(;vtk=false)
   φf2(x) = min(_φf2(x),sqrt((x[1]-0.35)^2+(x[2]-0.26)^2)-0.025)
   φh = interpolate(φf2,V_φ)
 
+  φ = get_free_dof_values(φh)
+  idx = findall(isapprox(0.0;atol=1e-10),φ)
+  if length(idx)>0
+    println("    Correcting level values at $(length(idx)) nodes")
+    φ[idx] .+= 1e-10
+  end
+
   # Setup integration meshes and measures
   geo = DiscreteGeometry(φh,model)
   cutgeo = cut(model,geo)
@@ -101,8 +116,8 @@ function main_gmsh(;vtk=false)
   Ωs = DifferentiableTriangulation(Triangulation(cutgeo,PHYSICAL),V_φ)
   Ωf = DifferentiableTriangulation(Triangulation(cutgeo,PHYSICAL_OUT),V_φ)
 
-  ψ_s =  GridapTopOpt.get_isolated_volumes_mask(cutgeo,["Gamma_s_D"];groups=((GridapTopOpt.CUT,IN),OUT))
-  ψ_f =  GridapTopOpt.get_isolated_volumes_mask(cutgeo,["Gamma_f_D"];groups=((GridapTopOpt.CUT,OUT),IN))
+  ψ_s,_ = GridapTopOpt.get_isolated_volumes_mask_v2(cutgeo,["Gamma_s_D"])
+  _,ψ_f = GridapTopOpt.get_isolated_volumes_mask_v2(cutgeo,["Gamma_f_D"])
 
   if vtk
     writevtk(get_triangulation(φh),path*"initial_islands",cellfields=["φh"=>φh,"ψ_f"=>ψ_f,"ψ_s"=>ψ_s];append=false)
@@ -111,9 +126,8 @@ function main_gmsh(;vtk=false)
   end
 end
 
-main_2d(41;vtk=false)
-main_2d(100;vtk=false)
-
+main_2d(41;vtk=true)
+main_2d(101;vtk=true)
 main_gmsh(;vtk=true)
 
 end

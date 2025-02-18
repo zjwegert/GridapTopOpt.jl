@@ -36,12 +36,22 @@ function main_2d(model,name;vtk=false)
     g(x,0.5,0.15,0.05))
   φh = interpolate(f,V_φ)
 
+  _φ = get_free_dof_values(φh)
+  map(local_views(_φ)) do φ
+    idx = findall(isapprox(0.0;atol=1e-10),φ)
+    if !isempty(idx)
+      i_am_main(ranks) && println("    Correcting level values at $(length(idx)) nodes")
+    end
+    φ[idx] .+= 1e-10
+  end
+  consistent!(_φ) |> wait
+
   geo = DiscreteGeometry(φh,model)
   cutgeo = cut(model,geo)
 
   cell_to_state = map(compute_bgcell_to_inoutcut,local_views(model),local_views(geo))
   cell_to_lcolor, lcolor_to_group = map(local_views(model),cell_to_state) do model, cell_to_state
-    GridapTopOpt.tag_isolated_volumes(model,cell_to_state;groups=((GridapTopOpt.CUT,IN),OUT))
+    GridapTopOpt.tag_disconnected_volumes(model,cell_to_state;groups=((GridapTopOpt.CUT,IN),OUT))
   end |> tuple_of_arrays;
 
   n_lcolor = map(length,lcolor_to_group)
@@ -51,9 +61,9 @@ function main_2d(model,name;vtk=false)
     cell_ids,n_lcolor,cell_to_lcolor
   )
 
-  cell_to_lcolor, lcolor_to_group, color_gids = GridapTopOpt.tag_isolated_volumes(model,cell_to_state;groups=((GridapTopOpt.CUT,IN),OUT));
+  cell_to_lcolor, lcolor_to_group, color_gids = GridapTopOpt.tag_disconnected_volumes(model,cell_to_state;groups=((GridapTopOpt.CUT,IN),OUT));
 
-  μ = GridapTopOpt.get_isolated_volumes_mask(cutgeo,[1,2,5,7])
+  μ,_ = GridapTopOpt.get_isolated_volumes_mask_v2(cutgeo,[1,2,5,7])
 
   cell_to_color = map(cell_to_lcolor,partition(color_gids)) do cell_to_lcolor, colors
     local_to_global(colors)[cell_to_lcolor]
@@ -126,6 +136,16 @@ function main_gmsh(ranks;vtk=false)
   φf2(x) = min(_φf2(x),sqrt((x[1]-0.35)^2+(x[2]-0.26)^2)-0.025)
   φh = interpolate(φf2,V_φ)
 
+  _φ = get_free_dof_values(φh)
+  map(local_views(_φ)) do φ
+    idx = findall(isapprox(0.0;atol=1e-10),φ)
+    if !isempty(idx)
+      i_am_main(ranks) && println("    Correcting level values at $(length(idx)) nodes")
+    end
+    φ[idx] .+= 1e-10
+  end
+  consistent!(_φ) |> wait
+
   # Setup integration meshes and measures
   geo = DiscreteGeometry(φh,model)
   cutgeo = cut(model,geo)
@@ -133,8 +153,8 @@ function main_gmsh(ranks;vtk=false)
   Ωs = DifferentiableTriangulation(Triangulation(cutgeo,PHYSICAL),V_φ)
   Ωf = DifferentiableTriangulation(Triangulation(cutgeo,PHYSICAL_OUT),V_φ)
 
-  ψ_s =  GridapTopOpt.get_isolated_volumes_mask(cutgeo,["Gamma_s_D"];groups=((GridapTopOpt.CUT,IN),OUT))
-  ψ_f =  GridapTopOpt.get_isolated_volumes_mask(cutgeo,["Gamma_f_D"];groups=((GridapTopOpt.CUT,OUT),IN))
+  ψ_s,_ = GridapTopOpt.get_isolated_volumes_mask_v2(cutgeo,["Gamma_s_D"])
+  _,ψ_f = GridapTopOpt.get_isolated_volumes_mask_v2(cutgeo,["Gamma_f_D"])
 
   if vtk
     writevtk(get_triangulation(φh),path*"initial_islands",cellfields=["φh"=>φh,"ψ_f"=>ψ_f,"ψ_s"=>ψ_s];append=false)

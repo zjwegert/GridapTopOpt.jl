@@ -15,4 +15,4 @@ Physical Point("Gamma_D", 14) = {2, 3, 1};
 Physical Curve("Gamma_D", 15) = {4, 3, 1, 2};
 Physical Surface("Gamma_D", 16) = {1};
 //+
-MeshSize {2, 1, 4, 3, 5, 6} = 0.04;
+MeshSize {2, 1, 4, 3, 5, 6} = 0.02;

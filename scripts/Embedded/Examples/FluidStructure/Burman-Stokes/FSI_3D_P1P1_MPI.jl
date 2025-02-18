@@ -297,7 +297,7 @@ function main(ranks)
   ## Hilbertian extension-regularisation problems
   _α(hₕ) = (α_coeff*hₕ)^2
   a_hilb(p,q) =∫((_α ∘ hₕ)*∇(p)⋅∇(q) + p*q)dΩ_act;
-  vel_ext = VelocityExtension(a_hilb,U_reg,V_reg)
+  vel_ext = VelocityExtension(a_hilb,U_reg,V_reg;solver=CGAMGSolver())
 
   ## Optimiser
   converged(m) = GridapTopOpt.default_al_converged(
