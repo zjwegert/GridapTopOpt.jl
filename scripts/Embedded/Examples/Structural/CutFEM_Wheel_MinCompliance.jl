@@ -163,7 +163,7 @@ function main(ranks)
     state_map = AffineFEStateMap(a,l,U,V,V_φ,U_reg,_φh;ls=elast_ls,adjoint_ls=elast_ls)
     (;
       :state_map => state_map,
-      :J => GridapTopOpt.StateParamMap(Obj,state_map),
+      :J => GridapTopOpt.StateParamMap(J_comp,state_map),
       :C => map(Ci -> GridapTopOpt.StateParamMap(Ci,state_map),[Vol,])
     )
   end
