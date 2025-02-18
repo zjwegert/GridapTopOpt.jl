@@ -87,7 +87,7 @@ end
 function CellData.get_cell_points(ttrian::DifferentiableTriangulation)
   pts = get_cell_points(ttrian.trian)
   cell_ref_point = pts.cell_ref_point
-  if isnothing(ttrian.cell_values)
+  if isnothing(ttrian.cell_values) || isempty(ttrian.cell_values)
     cell_phys_point = pts.cell_phys_point
   else
     c = ttrian.caches
@@ -100,7 +100,7 @@ function CellData.get_cell_points(ttrian::DifferentiableTriangulation)
 end
 
 function Geometry.get_cell_map(ttrian::DifferentiableTriangulation)
-  if isnothing(ttrian.cell_values)
+  if isnothing(ttrian.cell_values) || isempty(ttrian.cell_values)
     return get_cell_map(ttrian.trian)
   end
   c = ttrian.caches
@@ -130,7 +130,7 @@ end
 function Geometry.get_facet_normal(
   ttrian::DifferentiableTriangulation{Dc,Dp,<:SubFacetTriangulation}
 ) where {Dc,Dp}
-  if isnothing(ttrian.cell_values)
+  if isnothing(ttrian.cell_values) || isempty(ttrian.cell_values)
     return get_facet_normal(ttrian.trian)
   end
   c = ttrian.caches
@@ -145,7 +145,7 @@ end
 
 function Geometry.get_glue(ttrian::DifferentiableTriangulation,val::Val{D}) where {D}
   glue = get_glue(ttrian.trian,val)
-  if isnothing(glue) || isnothing(ttrian.cell_values)
+  if isnothing(glue) || isnothing(ttrian.cell_values) || isempty(ttrian.cell_values)
     return glue
   end
 
