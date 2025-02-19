@@ -97,8 +97,8 @@ function main(ranks,mesh_partition,n;x0=(0.1,0.1))
 
   writevtk(Ω_IN,path*"Omega_IN",cellfields=["uh"=>uh,"ph"=>ph,"dh"=>dh])
   writevtk(Ω_OUT,path*"Omega_OUT",cellfields=["uh"=>uh,"ph"=>ph,"dh"=>dh])
-  writevtk(Ω_act_OUT,path*"Omega_OUT")
-  writevtk(Ω_act_IN,path*"Omega_IN")
+  writevtk(Ω_act_OUT,path*"Omega_act_OUT")
+  writevtk(Ω_act_IN,path*"Omega_act_IN")
 
   σf_n(u,p,n) = ∇(u) ⋅ n - p*n
   a_Ω(u,v) = ∇(u) ⊙ ∇(v)
