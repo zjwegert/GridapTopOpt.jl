@@ -6,6 +6,12 @@ using GridapTopOpt
 
 using GridapDistributed,PartitionedArrays,GridapPETSc
 
+if isassigned(ARGS,1)
+  global γg_evo =  parse(Float64,ARGS[1])
+else
+  global γg_evo =  0.05
+end
+
 MUMPSSolver() = PETScLinearSolver(petsc_mumps_setup)
 
 function petsc_mumps_setup(ksp)
