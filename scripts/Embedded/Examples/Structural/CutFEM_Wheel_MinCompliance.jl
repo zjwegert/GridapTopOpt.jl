@@ -152,8 +152,8 @@ function main(ranks)
   ## Optimisation functionals
   vol_D = sum(∫(1)dΩ_bg)
   J_comp(d,φ) = ∫(ε(d) ⊙ (σ ∘ ε(d)))Ω_data.dΩ
-  Vol(d,φ) = ∫(vol_D)Ω_data.dΩ - ∫(vf/vol_D)dΩ_bg +
-    ∫(d⋅_g)dΩ_bg # Fix when differentiating wrt to d
+  Vol(d,φ) = ∫(vol_D)Ω_data.dΩ - ∫(vf/vol_D)dΩ_bg
+  ∂Vol∂d(q,d,φ) = ∫(0q⋅d)Ω_data.dΩ
   dVol(q,d,φ) = ∫(-1/vol_D*q/(norm ∘ (∇(φ))))Ω_data.dΓ
 
   ## Setup solver and FE operators
@@ -165,7 +165,7 @@ function main(ranks)
     (;
       :state_map => state_map,
       :J => GridapTopOpt.StateParamMap(J_comp,state_map),
-      :C => map(Ci -> GridapTopOpt.StateParamMap(Ci,state_map),[Vol,])
+      :C => map((Ci,∂Ci∂u) -> GridapTopOpt.StateParamMap(Ci,state_map;∂F∂u=∂Ci∂u),[Vol,],[∂Vol∂d,])
     )
   end
 

@@ -183,8 +183,8 @@ function main_serial_for_last_error(n;x0=(0.1,0.1))
   reffe_scalar = ReferenceFE(lagrangian,Float64,1)
   V_φ = TestFESpace(model,reffe_scalar)
 
-  lsf(x) = sqrt((x[1]-x0[1])^2+(x[2]-x0[2])^2)-0.2 # FAILS
-  # lsf(x) = - cos(4π*x[1])*cos(4π*x[2])-0.4 # WORKS
+  # lsf(x) = sqrt((x[1]-x0[1])^2+(x[2]-x0[2])^2)-0.7 # FAILS
+  lsf(x) = - cos(4π*(x[1]-0.25))*cos(4π*x[2])-0.4 # WORKS
   φh = interpolate(lsf,V_φ)
 
   # Cut
@@ -199,6 +199,7 @@ function main_serial_for_last_error(n;x0=(0.1,0.1))
   # MEAS
   dΩ_bg = Measure(Ω_bg,degree)
   dΩ_IN = Measure(Ω_IN,degree)
+  writevtk(Ω_IN,"./results/Testing AD with empty parts/Omega_IN")
 
   # Some other spaces
   reffe_d = ReferenceFE(lagrangian,VectorValue{2,Float64},order)
