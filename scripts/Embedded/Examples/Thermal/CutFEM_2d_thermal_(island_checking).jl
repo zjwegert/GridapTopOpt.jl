@@ -68,15 +68,15 @@ a(u,v,φ) = ∫(∇(v)⋅∇(u))Ωs.dΩin +
 l(v,φ) = ∫(v)dΓ_N
 
 ## Optimisation functionals
-J(u,φ) = ∫(∇(v)⋅∇(u))Ωs.dΩin
+J(u,φ) = ∫(∇(u)⋅∇(u))Ωs.dΩin
 Vol(u,φ) = ∫(1/vol_D)Ωs.dΩin - ∫(vf/vol_D)dΩ
 dVol(q,u,φ) = ∫(-1/vol_D*q/(1e-20 + norm ∘ (∇(φ))))Ωs.dΓ
 
 ## Setup solver and FE operators
-state_collection = EmbeddedCollection(model,φh) do _,_
+state_collection = GridapTopOpt.EmbeddedCollection_in_φh(model,φh) do _φh
   V = TestFESpace(Ωs.Ωact,reffe_scalar;dirichlet_tags=["Gamma_D"])
   U = TrialFESpace(V,0.0)
-  state_map = AffineFEStateMap(a,l,U,V,V_φ,U_reg,φh)
+  state_map = AffineFEStateMap(a,l,U,V,V_φ,U_reg,_φh)
   (;
     :state_map => state_map,
     :J => StateParamMap(J,state_map),
