@@ -3,7 +3,7 @@
 using GridapTopOpt
 using Gridap, Gridap.MultiField
 using GridapSolvers, GridapSolvers.BlockSolvers, GridapSolvers.NonlinearSolvers
-using FiniteDifferences
+using FiniteDiff
 using Test
 
 using GridapDistributed, PartitionedArrays
@@ -59,11 +59,11 @@ function driver(model,verbose)
   end
 
   ## Below disabled for now, as FiniteDifferences.jl is not compatible with PartitionedArrays
-  # fdm_grad = FiniteDifferences.grad(central_fdm(5, 1), φ_to_j, get_free_dof_values(φh))[1]
+  # fdm_grad = FiniteDiff.finite_difference_gradient(φ_to_j, get_free_dof_values(φh))
   # rel_error = norm(_dF - fdm_grad, Inf)/norm(fdm_grad,Inf)
 
   # verbose && println("Relative error in gradient: $rel_error")
-  # @test rel_error < 1e-10
+  # !isnan(rel_error) && @test rel_error < 1e-10
 end
 
 function main(distribute,parts)

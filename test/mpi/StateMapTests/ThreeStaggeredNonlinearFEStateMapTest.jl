@@ -3,7 +3,7 @@ module ThreeStaggeredNonlinearFEStateMapTestMPI
 using GridapTopOpt
 using Gridap, Gridap.MultiField
 using GridapSolvers, GridapSolvers.BlockSolvers, GridapSolvers.NonlinearSolvers
-using FiniteDifferences
+using FiniteDiff
 using Test
 
 using GridapDistributed, PartitionedArrays, Gridap.Arrays

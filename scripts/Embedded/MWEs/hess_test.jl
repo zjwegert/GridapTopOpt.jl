@@ -3,6 +3,7 @@ using GridapEmbedded, GridapEmbedded.LevelSetCutters
 using GridapSolvers, GridapSolvers.BlockSolvers, GridapSolvers.NonlinearSolvers
 using GridapGmsh
 using GridapTopOpt
+using FiniteDiff
 
 using GridapDistributed,PartitionedArrays,GridapPETSc
 using GridapDistributed: DistributedCellField
@@ -58,7 +59,6 @@ dJ = assemble_vector(grad,V_φ)
 hess = hessian(J,φh)
 d²J = assemble_matrix(hess,V_φ,V_φ)
 
-using FiniteDiff
 x = get_free_dof_values(φh)
 
 dJ_FD = FiniteDiff.finite_difference_gradient(_J,x)

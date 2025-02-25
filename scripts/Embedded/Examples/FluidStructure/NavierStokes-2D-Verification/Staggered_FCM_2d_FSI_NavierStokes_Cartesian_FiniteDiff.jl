@@ -249,6 +249,6 @@ function φ_to_j(φ)
   pcfs.J(u,φ)
 end
 
-using FiniteDifferences
-fdm_grad = FiniteDifferences.grad(central_fdm(5, 1), φ_to_j, get_free_dof_values(φh))[1]
+using FiniteDiff
+fdm_grad = FiniteDiff.finite_difference_gradient(φ_to_j, get_free_dof_values(φh))
 norm(_dF - fdm_grad,Inf)/norm(fdm_grad,Inf)
