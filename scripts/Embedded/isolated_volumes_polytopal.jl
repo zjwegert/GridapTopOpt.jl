@@ -61,17 +61,16 @@ end
 function split_postprocess!(graph,vertices,input_poly,values,(≶))
   complete_graph!(graph,num_vertices(input_poly))
   disconnect_graph!(graph,num_vertices(input_poly),values,(≶))
-  poly = Polyhedron(copy(vertices),graph)
+  poly = GeneralPolytope{num_cell_dims(input_poly)}(copy(vertices),graph)
   compact!(poly)
 end
 
-function split(p::GeneralPolytope{D},vertex_values) where D
-  is_in(v) = v < 0
-  is_out(v) = v > 0
+function split(p::Polyhedron,vertex_values)
   interpolate_values(v1,v2,w1,w2) = v1 + w1/(w1+w2)*(v2-v1)
+  is_in(v) = v < 0
 
   all(is_in, vertex_values) && return p, nothing
-  all(is_out, vertex_values) && return nothing, p
+  all(!is_in, vertex_values) && return nothing, p
 
   graph = get_graph(p)
   edge_nodes = get_faces(p,1,0)
@@ -81,6 +80,7 @@ function split(p::GeneralPolytope{D},vertex_values) where D
   in_graph = deepcopy(graph)
   out_graph = deepcopy(graph)
   
+  D = 3
   n_vertices = num_vertices(p)
   for v in 1:n_vertices
     isactive(p,v) || continue
@@ -109,7 +109,50 @@ function split(p::GeneralPolytope{D},vertex_values) where D
   new_vertices = vertices[num_vertices(p)+1:end]
   p_out = split_postprocess!(out_graph,vertices,p,vertex_values,(>))
   p_in = split_postprocess!(in_graph,vertices,p,vertex_values,(<))
-  p_in, p_out, new_vertices, edges
+  p_out, p_in, new_vertices, edges # TODO: Why are they reversed? 
+end
+
+function split(p::Polygon,vertex_values)
+  interpolate_values(v1,v2,w1,w2) = v1 + (w1/(w1+w2))*(v2-v1)
+  is_in(v) = v < 0
+
+  all(is_in, vertex_values) && return p, nothing
+  all(!is_in, vertex_values) && return nothing, p
+
+  graph = get_graph(p)
+  edge_nodes = get_faces(p,1,0)
+  vertices = copy(get_vertex_coordinates(p))
+  in_nodes = Int[]
+  out_nodes = Int[]
+  edges = Int[]
+
+  start = 1
+  current, next = start, first(graph[start])
+  while true
+    v_current, v_next = vertices[current], vertices[next]
+    w_current, w_next = vertex_values[current], vertex_values[next]
+
+    is_in(w_current) ? push!(in_nodes, current) : push!(out_nodes, current)
+
+    if w_current*w_next < 0
+      vertex = interpolate_values(v_current,v_next,abs(w_current),abs(w_next))
+      
+      push!(vertices, vertex)
+      push!(in_nodes, length(vertices))
+      push!(out_nodes, length(vertices))
+
+      e = findfirst(e -> e == [current,next], edge_nodes)
+      push!(edges, e)
+    end
+
+    current, next = next, first(graph[next])
+    isequal(current,start) && break
+  end
+
+  new_vertices = vertices[num_vertices(p)+1:end]
+  p_in = Polygon(vertices[in_nodes])
+  p_out = Polygon(vertices[out_nodes])
+  return (p_in, in_nodes), (p_out, out_nodes), new_vertices, edges
 end
 
 function cut_conforming(topo::UnstructuredGridTopology{D}, cell_values) where D
@@ -132,7 +175,7 @@ function cut_conforming(topo::UnstructuredGridTopology{D}, cell_values) where D
     iscut = any(v->v<0,values) && any(v->v>0,values)
   
     vertices = vertex_coordinates[nodes]
-    p = Polyhedron(p_ref,vertices)
+    p = GeneralPolytope{D}(p_ref,vertices)
     new_nodes = nodes[node_reindex]
     if !iscut
       push!(subcell_nodes,nodes)
@@ -156,11 +199,11 @@ function cut_conforming(topo::UnstructuredGridTopology{D}, cell_values) where D
   
       push!(subcell_nodes,new_nodes[lnodes_in])
       push!(subcell_polys,p_in)
-      push!(subcell_to_isin,false)
+      push!(subcell_to_isin,true)
   
       push!(subcell_nodes,new_nodes[lnodes_out])
       push!(subcell_polys,p_out)
-      push!(subcell_to_isin,true)
+      push!(subcell_to_isin,false)
     end
   end
   
@@ -181,21 +224,20 @@ function cut_conforming(model::UnstructuredDiscreteModel{D}, cell_values) where 
   return pmodel, subcell_to_isin
 end
 
-n = 32
-model = simplexify(CartesianDiscreteModel((0,1,0,1,0,1),(n,n,n)))
+n = 15
+model = simplexify(CartesianDiscreteModel((0,1,0,1),(n,n)))
+#model = simplexify(CartesianDiscreteModel((0,1,0,1,0,1),(n,n,n)))
 
 reffe = ReferenceFE(lagrangian,Float64,1)
 V = TestFESpace(model,reffe)
-#φh = interpolate(x->sqrt((x[1]-0.5)^2+(x[2]-0.5)^2+(x[3]-0.5)^2)-0.35,V) # Circle
+# φh = interpolate(x->sqrt((x[1]-0.5)^2+(x[2]-0.5)^2+(x[3]-0.5)^2)-0.35,V) # Circle
+# φh = interpolate(x->cos(2π*x[1])*cos(2π*x[2])*cos(2π*x[3])-0.11,V)
+φh = interpolate(x->cos(2π*x[1])*cos(2π*x[2])-0.11,V)
 
-φh = interpolate(x->cos(2π*x[1])*cos(2π*x[2])*cos(2π*x[3])-0.11,V)
 cell_values = get_cell_dof_values(φh)
-
 pmodel, subcell_to_isin = cut_conforming(model,cell_values)
 
 writevtk(pmodel,"results/polymodel";append=false)
 
 in_model = Geometry.restrict(pmodel,findall(subcell_to_isin))
 writevtk(in_model,"results/in_model";append=false)
-
-
