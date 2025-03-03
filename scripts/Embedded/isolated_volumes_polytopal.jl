@@ -7,6 +7,9 @@ using Gridap.ReferenceFEs: get_graph, isactive
 using STLCutters
 using STLCutters: complete_graph!, disconnect_graph!, add_open_vertices!, OPEN
 
+using GridapEmbedded, GridapEmbedded.Interfaces, GridapEmbedded.LevelSetCutters
+using GridapTopOpt
+
 Base.round(a::VectorValue{D,T};kwargs...) where {D,T} = VectorValue{D,T}(round.(a.data;kwargs...))
 
 function get_node_reindex(p::Polytope{D}) where D
@@ -167,7 +170,8 @@ function cut_conforming(topo::UnstructuredGridTopology{D}, cell_values) where D
   subcell_nodes = Vector{Int}[]
   subcell_polys = GeneralPolytope{D,D,Float64,Nothing}[]
   vertex_coordinates = copy(Geometry.get_vertex_coordinates(topo))
-  subcell_to_isin = Bool[]
+  subcell_to_inout = Int8[]
+  subcell_to_cell = Int[]
   
   n_nodes = num_faces(topo,0)
   edge_to_new_node = zeros(Int,num_faces(topo,1))
@@ -180,7 +184,8 @@ function cut_conforming(topo::UnstructuredGridTopology{D}, cell_values) where D
     if !iscut
       push!(subcell_nodes,nodes)
       push!(subcell_polys,p)
-      push!(subcell_to_isin,all(v->v<0,values))
+      push!(subcell_to_inout,ifelse(all(v->v<0,values),IN,OUT))
+      push!(subcell_to_cell,cell)
     else
       (p_in, lnodes_in), (p_out, lnodes_out), extra_vertices, ledges = split(p,values)
       edges = cell_edges[cell][edge_reindex][ledges]
@@ -199,21 +204,23 @@ function cut_conforming(topo::UnstructuredGridTopology{D}, cell_values) where D
   
       push!(subcell_nodes,new_nodes[lnodes_in])
       push!(subcell_polys,p_in)
-      push!(subcell_to_isin,true)
+      push!(subcell_to_inout,IN)
+      push!(subcell_to_cell,cell)
   
       push!(subcell_nodes,new_nodes[lnodes_out])
       push!(subcell_polys,p_out)
-      push!(subcell_to_isin,false)
+      push!(subcell_to_inout,OUT)
+      push!(subcell_to_cell,cell)
     end
   end
   
   subcell_nodes = Table(subcell_nodes)
   ptopo = Geometry.PolytopalGridTopology(vertex_coordinates,subcell_nodes,subcell_polys)
-  return ptopo, subcell_to_isin
+  return ptopo, subcell_to_inout, subcell_to_cell
 end
 
 function cut_conforming(model::UnstructuredDiscreteModel{D}, cell_values) where D
-  ptopo, subcell_to_isin = cut_conforming(get_grid_topology(model),cell_values)
+  ptopo, subcell_to_inout, subcell_to_cell = cut_conforming(get_grid_topology(model),cell_values)
   pgrid = Geometry.PolytopalGrid(
     Geometry.get_vertex_coordinates(ptopo),
     Geometry.get_faces(ptopo,D,0),
@@ -221,10 +228,29 @@ function cut_conforming(model::UnstructuredDiscreteModel{D}, cell_values) where 
   )
   plabels = FaceLabeling(ptopo)
   pmodel = Geometry.PolytopalDiscreteModel(pgrid,ptopo,plabels)
-  return pmodel, subcell_to_isin
+  return pmodel, subcell_to_inout, subcell_to_cell
 end
 
-n = 15
+function get_isolated_volumes_mask_polytopal(
+  model,cell_values,dirichlet_tags
+)
+  scmodel, cell_to_inout, cell_to_bgcell = cut_conforming(model,cell_values)
+  cell_to_color, color_to_group = GridapTopOpt.tag_disconnected_volumes(scmodel,cell_to_inout;groups=(IN,OUT))
+
+  bgcell_to_color_IN = GridapTopOpt.project_colors(model,cell_to_bgcell,cell_to_color,color_to_group,1)
+  color_to_isolated_IN = GridapTopOpt.find_isolated_volumes(model,dirichlet_tags,bgcell_to_color_IN,color_to_group)
+  data_IN = map(c -> color_to_isolated_IN[c] && isone(color_to_group[c]), bgcell_to_color_IN)
+  cf_IN = CellField(collect(Float64,data_IN),Triangulation(model))
+
+  bgcell_to_color_OUT = GridapTopOpt.project_colors(model,cell_to_bgcell,cell_to_color,color_to_group,2)
+  color_to_isolated_OUT = GridapTopOpt.find_isolated_volumes(model,dirichlet_tags,bgcell_to_color_OUT,color_to_group)
+  data_OUT = map(c -> color_to_isolated_OUT[c] && !isone(color_to_group[c]), bgcell_to_color_OUT)
+  cf_OUT = CellField(collect(Float64,data_OUT),Triangulation(model))
+
+  return cf_IN, cf_OUT
+end
+
+n = 52
 model = simplexify(CartesianDiscreteModel((0,1,0,1),(n,n)))
 #model = simplexify(CartesianDiscreteModel((0,1,0,1,0,1),(n,n,n)))
 
@@ -234,10 +260,27 @@ V = TestFESpace(model,reffe)
 # φh = interpolate(x->cos(2π*x[1])*cos(2π*x[2])*cos(2π*x[3])-0.11,V)
 φh = interpolate(x->cos(2π*x[1])*cos(2π*x[2])-0.11,V)
 
+geo = DiscreteGeometry(φh,model)
+cutgeo = cut(model,geo)
+
 cell_values = get_cell_dof_values(φh)
-pmodel, subcell_to_isin = cut_conforming(model,cell_values)
+pmodel, subcell_to_inout, subcell_to_cell = cut_conforming(model,cell_values)
 
-writevtk(pmodel,"results/polymodel";append=false)
+cf_IN, cf_OUT = get_isolated_volumes_mask_polytopal(
+  model,cell_values,["boundary"]
+)
 
-in_model = Geometry.restrict(pmodel,findall(subcell_to_isin))
+writevtk(
+  Triangulation(model),"results/polymodel",
+  cellfields=[
+    "φh"=>φh,
+    "cf_IN"=>cf_IN,
+    "cf_OUT"=>cf_OUT,
+  ],
+  append=false
+)
+
+writevtk(pmodel,"results/in_model";append=false)
+
+in_model = Geometry.restrict(pmodel,findall(subcell_to_inout .== IN))
 writevtk(in_model,"results/in_model";append=false)
