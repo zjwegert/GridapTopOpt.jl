@@ -21,3 +21,4 @@ res((u,p),(v,q),φ) = ∫(u⋅v + φ)dΩ + ∫(jump(n_Λ ⋅ ∇(u)) ⋅ jump(n_
 # res((u,p),(v,q),φ) = ∫(u⋅v + φ)dΩ + ∫(jump(n_Λ ⋅ ∇(u)) ⋅ jump(n_Λ ⋅ ∇(v)) + 0mean(φ))dΛ # workaround
 
 ∇(φ->res(zero(VQ),zero(VQ),φ),φh)
+
