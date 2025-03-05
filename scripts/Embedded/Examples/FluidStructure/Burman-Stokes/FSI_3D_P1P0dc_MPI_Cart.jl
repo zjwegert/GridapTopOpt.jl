@@ -230,7 +230,7 @@ function main(ranks,mesh_partition)
 
   γ_Nu(h) = α_Nu*μ/h
   γ_u(h) = α_u*μ*h
-  γ_p(h) = α_p*h^3/μ
+  γ_p(h) = α_p*h/μ
   k_p    = 1.0 # (Villanueva and Maute, 2017)
 
   # Terms
