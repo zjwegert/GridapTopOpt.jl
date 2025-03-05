@@ -305,7 +305,7 @@ function main(ranks)
   ## Optimiser
   converged(m) = GridapTopOpt.default_al_converged(
     m;
-    L_tol = 0.5hmin,
+    L_tol = 0.01hmin,
     C_tol = 0.01vf
   )
   function has_oscillations(m,os_it)

@@ -9,7 +9,7 @@ using GridapDistributed,PartitionedArrays,GridapPETSc
 if isassigned(ARGS,1)
   global γg_evo =  parse(Float64,ARGS[1])
 else
-  global γg_evo =  0.05
+  global γg_evo =  0.01
 end
 
 MUMPSSolver() = PETScLinearSolver(petsc_mumps_setup)
@@ -203,7 +203,7 @@ function main(ranks)
   ## Optimiser
   converged(m) = GridapTopOpt.default_al_converged(
     m;
-    L_tol = 0.5hmin,
+    L_tol = 0.01hmin,
     C_tol = 0.01
   )
   optimiser = AugmentedLagrangian(pcf,ls_evo,vel_ext,φh;
