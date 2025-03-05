@@ -42,30 +42,31 @@ function get_face_reindex(p::Polytope{D}, d::Int) where D
   return n2o_face
 end
 
-function compact!(p)
-  ids = findall(i->!isactive(p,i),1:num_vertices(p))
-  old_to_new = fill(UNSET,num_vertices(p))
+function compact!(graph)
+  n_old = length(graph)
+  old_to_new = fill(UNSET,n_old)
   new = 0
-  for old in 1:num_vertices(p)
-    isactive(p,old) || continue
+  for old in 1:n_old
+    isempty(graph[old]) && continue
     new += 1
     old_to_new[old] = new
   end
-  vertices = get_vertex_coordinates(p)
-  graph = get_graph(p)
-  deleteat!(vertices,ids)
-  deleteat!(graph,ids)
+  new_to_old = find_inverse_index_map(old_to_new,new)
+
+  keepat!(graph,new_to_old)
   f(i) = ifelse(i ∈ (OPEN,UNSET), i, old_to_new[i])
   map!(i->map!(f,i,i),graph,graph)
-  new_to_old = find_inverse_index_map(old_to_new,new)
-  return p, new_to_old
+
+  return graph, new_to_old
 end
 
 function split_postprocess!(graph,vertices,input_poly,values,(≶))
   complete_graph!(graph,num_vertices(input_poly))
   disconnect_graph!(graph,num_vertices(input_poly),values,(≶))
-  poly = GeneralPolytope{num_cell_dims(input_poly)}(copy(vertices),graph)
-  compact!(poly)
+  graph, new_to_old = compact!(graph)
+  D = num_cell_dims(input_poly)
+  poly = GeneralPolytope{D}(vertices[new_to_old],graph)
+  return poly, new_to_old
 end
 
 function split(p::Polyhedron,vertex_values)
@@ -166,53 +167,76 @@ function cut_conforming(topo::UnstructuredGridTopology{D}, cell_values) where D
   edge_reindex = get_face_reindex(p_ref,1)
   cell_nodes = Geometry.get_faces(topo,D,0)
   cell_edges = Geometry.get_faces(topo,D,1)
+  Tn = eltype(eltype(cell_nodes))
   
-  subcell_nodes = Vector{Int}[]
-  subcell_polys = GeneralPolytope{D,D,Float64,Nothing}[]
-  vertex_coordinates = copy(Geometry.get_vertex_coordinates(topo))
-  subcell_to_inout = Int8[]
-  subcell_to_cell = Int[]
+  is_cut(vals) = any(v->v<0,vals) && any(v->v>0,vals)
+  cell_iscut = map(is_cut,cell_values)
+
+  max_sc = ifelse(is_simplex(p_ref),2,ifelse(D==2,3,5))
+  max_cn = ifelse(is_simplex(p_ref),2*(D-1),ifelse(D==2,4,12))
+  max_subcells = sum(c -> ifelse(!c, 1, max_sc), cell_iscut)
+  max_cutnodes = sum(c -> ifelse(!c, 0, max_cn), cell_iscut)
+  max_nodes = num_faces(topo,0) + max_cutnodes
   
+  subcell_nodes = Vector{Vector{Tn}}(undef,max_subcells)
+  subcell_polys = Vector{GeneralPolytope{D,D,Float64,Nothing}}(undef,max_subcells)
+  subcell_to_inout = Vector{Int8}(undef,max_subcells)
+  subcell_to_cell = Vector{Int}(undef,max_subcells)
+
+  coords = Geometry.get_vertex_coordinates(topo)
+  vertex_coordinates = Vector{eltype(coords)}(undef,max_nodes)
+  vertex_coordinates[1:num_faces(topo,0)] .= coords
+
+  nodes_cache = array_cache(cell_nodes)
+  edges_cache = array_cache(cell_edges)
+  values_cache = array_cache(cell_values)
+  
+  n_subcells = 0
   n_nodes = num_faces(topo,0)
-  edge_to_new_node = zeros(Int,num_faces(topo,1))
-  for (cell,(nodes,values)) in enumerate(zip(cell_nodes,cell_values))
-    iscut = any(v->v<0,values) && any(v->v>0,values)
-  
+  edge_to_new_node = zeros(Tn,num_faces(topo,1))
+  for cell in 1:num_cells(topo)
+    nodes = getindex!(nodes_cache,cell_nodes,cell)
+    values = getindex!(values_cache,cell_values,cell)
     vertices = vertex_coordinates[nodes]
     p = GeneralPolytope{D}(p_ref,vertices)
-    new_nodes = nodes[node_reindex]
-    if !iscut
-      push!(subcell_nodes,nodes)
-      push!(subcell_polys,p)
-      push!(subcell_to_inout,ifelse(all(v->v<0,values),IN,OUT))
-      push!(subcell_to_cell,cell)
+    nodes = nodes[node_reindex]
+    if !cell_iscut[cell]
+      n_subcells += 1
+      subcell_nodes[n_subcells] = nodes
+      subcell_polys[n_subcells] = p
+      subcell_to_inout[n_subcells] = ifelse(all(v->v<0,values),IN,OUT)
+      subcell_to_cell[n_subcells] = cell
     else
-      (p_in, lnodes_in), (p_out, lnodes_out), extra_vertices, ledges = split(p,values)
-      edges = cell_edges[cell][edge_reindex][ledges]
+      (p_in, lnodes_in), (p_out, lnodes_out), new_vertices, ledges = split(p,values)
+      edges = getindex!(edges_cache,cell_edges,cell)
+      edges = edges[edge_reindex][ledges]
       
-      for (e,v) in zip(edges,extra_vertices)
+      for (ie,e) in enumerate(edges)
         if iszero(edge_to_new_node[e])
-          push!(vertex_coordinates,v)
-          edge_to_new_node[e] = n_nodes + 1
-          n_nodes += 1
-        else
-          v_ref = vertex_coordinates[edge_to_new_node[e]]
-          @assert round(v;digits=10) ≈ round(v_ref;digits=10) "v_ref = $v_ref, v = $v"
+          edge_to_new_node[e] = (n_nodes += 1)
+          vertex_coordinates[n_nodes] = new_vertices[ie]
         end
       end
-      new_nodes = [nodes...,edge_to_new_node[edges]...]
-  
-      push!(subcell_nodes,new_nodes[lnodes_in])
-      push!(subcell_polys,p_in)
-      push!(subcell_to_inout,IN)
-      push!(subcell_to_cell,cell)
-  
-      push!(subcell_nodes,new_nodes[lnodes_out])
-      push!(subcell_polys,p_out)
-      push!(subcell_to_inout,OUT)
-      push!(subcell_to_cell,cell)
+      nodes = [nodes...,edge_to_new_node[edges]...]
+
+      n_subcells += 1
+      subcell_nodes[n_subcells] = nodes[lnodes_in]
+      subcell_polys[n_subcells] = p_in
+      subcell_to_inout[n_subcells] = IN
+      subcell_to_cell[n_subcells] = cell
+
+      n_subcells += 1
+      subcell_nodes[n_subcells] = nodes[lnodes_out]
+      subcell_polys[n_subcells] = p_out
+      subcell_to_inout[n_subcells] = OUT
+      subcell_to_cell[n_subcells] = cell
     end
   end
+  resize!(subcell_nodes,n_subcells)
+  resize!(subcell_polys,n_subcells)
+  resize!(subcell_to_inout,n_subcells)
+  resize!(subcell_to_cell,n_subcells)
+  resize!(vertex_coordinates,n_nodes)
   
   subcell_nodes = Table(subcell_nodes)
   ptopo = Geometry.PolytopalGridTopology(vertex_coordinates,subcell_nodes,subcell_polys)
@@ -250,15 +274,15 @@ function get_isolated_volumes_mask_polytopal(
   return cf_IN, cf_OUT
 end
 
-n = 52
-model = simplexify(CartesianDiscreteModel((0,1,0,1),(n,n)))
-#model = simplexify(CartesianDiscreteModel((0,1,0,1,0,1),(n,n,n)))
+n = 20
+#model = simplexify(CartesianDiscreteModel((0,1,0,1),(n,n)))
+model = simplexify(CartesianDiscreteModel((0,1,0,1,0,1),(n,n,n)))
 
 reffe = ReferenceFE(lagrangian,Float64,1)
 V = TestFESpace(model,reffe)
 # φh = interpolate(x->sqrt((x[1]-0.5)^2+(x[2]-0.5)^2+(x[3]-0.5)^2)-0.35,V) # Circle
-# φh = interpolate(x->cos(2π*x[1])*cos(2π*x[2])*cos(2π*x[3])-0.11,V)
-φh = interpolate(x->cos(2π*x[1])*cos(2π*x[2])-0.11,V)
+φh = interpolate(x->cos(2π*x[1])*cos(2π*x[2])*cos(2π*x[3])-0.11,V)
+#φh = interpolate(x->cos(2π*x[1])*cos(2π*x[2])-0.11,V)
 
 geo = DiscreteGeometry(φh,model)
 cutgeo = cut(model,geo)
