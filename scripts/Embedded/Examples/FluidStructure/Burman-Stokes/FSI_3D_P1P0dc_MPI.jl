@@ -38,12 +38,13 @@ function petsc_mumps_setup(ksp)
   @check_error_code GridapPETSc.PETSC.MatMumpsSetIcntl(mumpsmat[],  4, 1)
   @check_error_code GridapPETSc.PETSC.MatMumpsSetIcntl(mumpsmat[], 28, 2)
   @check_error_code GridapPETSc.PETSC.MatMumpsSetIcntl(mumpsmat[], 29, 1)
+  @check_error_code GridapPETSc.PETSC.MatMumpsSetIcntl(mumpsmat[], 14, 50)
   # @check_error_code GridapPETSc.PETSC.MatMumpsSetCntl(mumpsmat[],  1, 0.00001) # relative thresh
   # @check_error_code GridapPETSc.PETSC.MatMumpsSetCntl(mumpsmat[], 3, 1.0e-6) # absolute thresh
   @check_error_code GridapPETSc.PETSC.KSPView(ksp[],C_NULL)
 end
 
-CGAMGSolver() = PETScLinearSolver(gamg_ksp_setup)
+CGAMGSolver(;kwargs...) = PETScLinearSolver(gamg_ksp_setup(;kwargs...))
 
 function gamg_ksp_setup(;rtol=10^-8,maxits=100)
 
@@ -114,11 +115,11 @@ function main(ranks)
 
   _φ = get_free_dof_values(φh)
   map(local_views(_φ)) do φ
-    idx = findall(isapprox(0.0;atol=eps()),φ)
+    idx = findall(isapprox(0.0;atol=1e-10),φ)
     if !isempty(idx)
       i_am_main(ranks) && println("    Correcting level values at $(length(idx)) nodes")
     end
-    φ[idx] .+= 100*eps(eltype(φ))
+    φ[idx] .+= 1e-10
   end
   consistent!(_φ) |> wait
 
@@ -192,7 +193,6 @@ function main(ranks)
   end
 
   ### Weak form
-
   ## Fluid
   # Properties
   Re = 60 # Reynolds number
@@ -209,24 +209,21 @@ function main(ranks)
 
   γ_Nu(h) = α_Nu*μ/h
   γ_u(h) = α_u*μ*h
-  γ_p(h) = α_p*h^3/μ
+  γ_p(h) = α_p*h/μ
   k_p    = 1.0 # (Villanueva and Maute, 2017)
 
   # Terms
-  # _n(∇φ) = ∇φ/(10^-20+norm(∇φ)) # TODO: Currently required as diff through get_normal_vector is broken in distributed
-
   σf_n(u,p,n) = μ*∇(u) ⋅ n - p*n
   a_Ω(u,v) = μ*(∇(u) ⊙ ∇(v))
   b_Ω(v,p) = -p*(∇⋅v)
   a_Γ(u,v,n) = - μ*(n⋅∇(u)) ⋅ v - μ*(n⋅∇(v)) ⋅ u + (γ_Nu ∘ hₕ)*(u⋅v)
   b_Γ(v,p,n) = (n⋅v)*p
-  ju(u,v) = mean(γ_u ∘ hₕ)*jump(Ω.n_Γg ⋅ ∇(u)) ⋅ jump(Ω.n_Γg ⋅ ∇(v))
-  jp(p,q) = mean(γ_p ∘ hₕ)*jump(p) * jump(q)
-  v_ψ(p,q) = k_p * Ω.ψ_f*p*q # (Isolated volume term, Eqn. 15, Villanueva and Maute, 2017)
+  ju(u,v) = mean(γ_u ∘ hₕ)*(jump(Ω.n_Γg ⋅ ∇(u)) ⋅ jump(Ω.n_Γg ⋅ ∇(v)))
+  jp(p,q) = mean(γ_p ∘ hₕ)*(jump(p) * jump(q))
+  v_ψ(p,q) = (k_p * Ω.ψ_f)*(p*q) # (Isolated volume term, Eqn. 15, Villanueva and Maute, 2017)
 
   function a_fluid((),(u,p),(v,q),φ)
     n_Γ = -get_normal_vector(Ω.Γ)
-    # n_Γ = -(_n ∘ ∇(φ))
     return ∫(a_Ω(u,v) + b_Ω(v,p) + b_Ω(u,q) + v_ψ(p,q))Ω.dΩf +
       ∫(a_Γ(u,v,n_Γ) + b_Γ(v,p,n_Γ) + b_Γ(u,q,n_Γ))Ω.dΓ +
       ∫(ju(u,v))Ω.dΓg - ∫(jp(p,q))Ω.dΓi
@@ -249,8 +246,8 @@ function main(ranks)
   # Terms
   σ(ε) = λs*tr(ε)*one(ε) + 2*μs*ε
   a_s_Ω(d,s) = ε(s) ⊙ (σ ∘ ε(d)) # Elasticity
-  j_s_k(d,s) = mean(γ_Gd ∘ hₕ)*jump(Ω.n_Γg ⋅ ∇(s)) ⋅ jump(Ω.n_Γg ⋅ ∇(d))
-  v_s_ψ(d,s) = k_d*Ω.ψ_s*d⋅s # Isolated volume term
+  j_s_k(d,s) = mean(γ_Gd ∘ hₕ)*(jump(Ω.n_Γg ⋅ ∇(s)) ⋅ jump(Ω.n_Γg ⋅ ∇(d)))
+  v_s_ψ(d,s) = (k_d*Ω.ψ_s)*(d⋅s) # Isolated volume term
 
   function a_solid(((u,p),),d,s,φ)
     return ∫(a_s_Ω(d,s))Ω.dΩs +
@@ -259,24 +256,13 @@ function main(ranks)
   end
   function l_solid(((u,p),),s,φ)
     n = -get_normal_vector(Ω.Γ)
-    # n = -(_n ∘ ∇(φ))
     return ∫(-σf_n(u,p,n) ⋅ s)Ω.dΓ
   end
 
-  ∂R2∂xh1((du,dp),((u,p),),d,s,φ) = -1*l_solid(((du,dp),),s,φ)
-  ∂Rk∂xhi = ((∂R2∂xh1,),)
-
   ## Optimisation functionals
   J_comp(((u,p),d),φ) = ∫(ε(d) ⊙ (σ ∘ ε(d)))Ω.dΩs
-  ∂Jcomp∂up((du,dp),((u,p),d),φ) = ∫(0dp)Ω.dΩs
-  ∂Jcomp∂d(dd,((u,p),d),φ) = ∫(2*ε(d) ⊙ (σ ∘ ε(dd)))Ω.dΩs
-  ∂Jpres∂xhi = (∂Jcomp∂up,∂Jcomp∂d)
-
   Vol(((u,p),d),φ) = ∫(vol_D)Ω.dΩs - ∫(vf/vol_D)dΩ_act
   dVol(q,(u,p,d),φ) = ∫(-1/vol_D*q/(norm ∘ (∇(φ))))Ω.dΓ
-  ∂Vol∂up((du,dp),((u,p),d),φ) = ∫(0dp)dΩ_act
-  ∂Vol∂d(dd,((u,p),d),φ) = ∫(0dd ⋅ d)dΩ_act
-  ∂Vol∂xhi = (∂Vol∂up,∂Vol∂d)
 
   ## Staggered operators
   fluid_ls = MUMPSSolver()
@@ -288,11 +274,11 @@ function main(ranks)
     # elast_ls = ElasticitySolver(R;rtol=1.e-8,maxits=200)
     solver = StaggeredFESolver([fluid_ls,elast_ls]);
     op = StaggeredAffineFEOperator([a_fluid,a_solid],[l_fluid,l_solid],[UP,R],[VQ,T])
-    state_map = StaggeredAffineFEStateMap(op,∂Rk∂xhi,V_φ,U_reg,_φh;solver,adjoint_solver=solver)
+    state_map = StaggeredAffineFEStateMap(op,V_φ,U_reg,_φh;solver,adjoint_solver=solver)
     (;
       :state_map => state_map,
-      :J => GridapTopOpt.StaggeredStateParamMap(J_comp,∂Jpres∂xhi,state_map),
-      :C => map(((Ci,∂Ci),) -> GridapTopOpt.StaggeredStateParamMap(Ci,∂Ci,state_map),[(Vol,∂Vol∂xhi),])
+      :J => GridapTopOpt.StaggeredStateParamMap(J_comp,state_map),
+      :C => map(Ci -> GridapTopOpt.StaggeredStateParamMap(Ci,state_map),[Vol,])
     )
   end
 
@@ -319,7 +305,7 @@ function main(ranks)
   ## Optimiser
   converged(m) = GridapTopOpt.default_al_converged(
     m;
-    L_tol = 0.5hmin,
+    L_tol = 0.01hmin,
     C_tol = 0.01vf
   )
   function has_oscillations(m,os_it)

@@ -9,7 +9,7 @@ using GridapDistributed,PartitionedArrays,GridapPETSc
 if isassigned(ARGS,1)
   global γg_evo =  parse(Float64,ARGS[1])
 else
-  global γg_evo =  0.01
+  global γg_evo =  0.05
 end
 
 MUMPSSolver() = PETScLinearSolver(petsc_mumps_setup)
@@ -58,7 +58,7 @@ function gamg_ksp_setup(;rtol=10^-8,maxits=100)
 end
 
 function main(ranks)
-  path = "./results/CutFEM_Wheel_MinCompliance_gammag_$(γg_evo)/"
+  path = "./results/FCM_Wheel_MinCompliance_gammag_$(γg_evo)/"
   files_path = path*"data/"
   i_am_main(ranks) && mkpath(files_path)
 
@@ -74,7 +74,7 @@ function main(ranks)
   hₕ = get_element_diameter_field(model)
   hmin = minimum(get_element_diameters(model))
 
-  max_steps = 10 #0.2/hmin
+  max_steps = 0.2/hmin
   α_coeff = γ_evo*max_steps
 
   # Cut the background model
@@ -101,41 +101,36 @@ function main(ranks)
   order = 1
   degree = 2*(order+1)
 
-  Γ_N = BoundaryTriangulation(model,tags="Gamma_N")
-  dΓ_N = Measure(Γ_N,degree)
   dΩ_bg = Measure(Ω_bg,degree)
   Ω_data = EmbeddedCollection(model,φh) do cutgeo,_
     Ω = DifferentiableTriangulation(Triangulation(cutgeo,PHYSICAL),V_φ)
+    Ω_out = DifferentiableTriangulation(Triangulation(cutgeo,PHYSICAL_OUT),V_φ)
     Γ  = DifferentiableTriangulation(EmbeddedBoundary(cutgeo),V_φ)
     Γg = GhostSkeleton(cutgeo)
     Ω_act = Triangulation(cutgeo,ACTIVE)
     (;
-      :Ω_act => Ω_act,
-      :Ω     => Ω,
-      :dΩ    => Measure(Ω,degree),
-      :Γg    => Γg,
-      :dΓg   => Measure(Γg,degree),
-      :n_Γg  => get_normal_vector(Γg),
-      :Γ     => Γ,
-      :dΓ    => Measure(Γ,degree),
-      # :ψ     => GridapTopOpt.get_isolated_volumes_mask(cutgeo,["Gamma_D","Gamma_N"];groups=((CUT,IN),OUT)),
-      :ψ     => GridapTopOpt.get_isolated_volumes_mask(cutgeo,["Gamma_D"];groups=((CUT,IN),OUT)),
+      :Ω_act  => Ω_act,
+      :Ω      => Ω,
+      :dΩ     => Measure(Ω,degree),
+      :dΩ_out => Measure(Ω_out,degree),
+      :Γg     => Γg,
+      :dΓg    => Measure(Γg,degree),
+      :n_Γg   => get_normal_vector(Γg),
+      :Γ      => Γ,
+      :dΓ     => Measure(Γ,degree),
+      :ψ      => GridapTopOpt.get_isolated_volumes_mask(cutgeo,["Gamma_D","Gamma_N"];groups=((CUT,IN),OUT)),
     )
   end
   writevtk(get_triangulation(φh),path*"initial_islands",cellfields=["φh"=>φh,"ψ"=>Ω_data.ψ])
   writevtk(Ω_data.Ω,path*"Omega_initial")
 
   # Setup spaces
-  uin((x,y,z)) = 100VectorValue(-y,x,0.0)
+  uin((x,y,z)) = 10VectorValue(-y,x,0.0)
 
   reffe_d = ReferenceFE(lagrangian,VectorValue{D,Float64},order)
-  function build_spaces(Ω_act)
-    V = TestFESpace(Ω_act,reffe_d,conformity=:H1,dirichlet_tags=["Gamma_D"])#,"Gamma_N"])
-    U = TrialFESpace(V)#,[VectorValue(0.0,0.0,0.0),uin])
-    return U,V
-  end
-  _U_init = build_spaces(Ω_data.Ω_act)[1]
-  i_am_main(ranks) && println("Number of free dofs: ",num_free_dofs(_U_init))
+  V = TestFESpace(model,reffe_d,conformity=:H1,dirichlet_tags=["Gamma_D","Gamma_N"])
+  U = TrialFESpace(V,[VectorValue(0.0,0.0,0.0),uin])
+  i_am_main(ranks) && println("Number of free dofs: ",num_free_dofs(U))
 
   ### Weak form
   # Material parameters
@@ -145,42 +140,27 @@ function main(ranks)
     (λ, μ)
   end
   λs, μs = lame_parameters(1.0,0.3)
-  # Stabilization
-  α_Gd = 1e-7
-  k_d = 1.0
-  γ_Gd(h) = α_Gd*(λs + μs)*h^3
+  ϵ = (λs + μs)*1e-7
   # Terms
   σ(ε) = λs*tr(ε)*one(ε) + 2*μs*ε
   a_s_Ω(d,s) = ε(s) ⊙ (σ ∘ ε(d)) # Elasticity
-  j_s_k(d,s) = mean(γ_Gd ∘ hₕ)*(jump(Ω_data.n_Γg ⋅ ∇(s)) ⋅ jump(Ω_data.n_Γg ⋅ ∇(d)))
-  v_s_ψ(d,s) = (k_d*Ω_data.ψ)*(d⋅s) # Isolated volume term
+  e_s_Ω(d,s) = ϵ*a_s_Ω(d,s) # Ersatz
 
-  a(d,s,φ) = ∫(a_s_Ω(d,s) + v_s_ψ(d,s))Ω_data.dΩ + ∫(j_s_k(d,s))Ω_data.dΓg
+  a(d,s,φ) = ∫(a_s_Ω(d,s))Ω_data.dΩ + ∫(e_s_Ω(d,s))Ω_data.dΩ_out
 
-  _g = uin#VectorValue(0.0,0.0,0.0)
-  l(s,φ) = ∫(s⋅_g)dΓ_N
+  _g = VectorValue(0.0,0.0,0.0)
+  l(s,φ) = ∫(s⋅_g)dΩ_bg
 
   ## Optimisation functionals
   vol_D = sum(∫(1)dΩ_bg)
-  J_comp(d,φ) = ∫(ε(d) ⊙ (σ ∘ ε(d)))Ω_data.dΩ
+  J_comp(d,φ) = a(d,d,φ)
   Vol(d,φ) = ∫(1/vol_D)Ω_data.dΩ - ∫(vf/vol_D)dΩ_bg
   dVol(q,d,φ) = ∫(-1/vol_D*q/(norm ∘ (∇(φ))))Ω_data.dΓ
 
   ## Setup solver and FE operators
-  elast_ls = MUMPSSolver()
-  state_collection = GridapTopOpt.EmbeddedCollection_in_φh(model,φh) do _φh
-    update_collection!(Ω_data,_φh)
-    U,V = build_spaces(Ω_data.Ω_act)
-    # elast_ls = ElasticitySolver(U;rtol=1.e-8,maxits=200)
-    state_map = AffineFEStateMap(a,l,U,V,V_φ,U_reg,_φh;ls=elast_ls,adjoint_ls=elast_ls)
-    (;
-      :state_map => state_map,
-      :J => GridapTopOpt.StateParamMap(J_comp,state_map),
-      :C => map(Ci -> GridapTopOpt.StateParamMap(Ci,state_map),[Vol,])
-    )
-  end
-
-  pcf = EmbeddedPDEConstrainedFunctionals(state_collection;analytic_dC=(dVol,))
+  elast_ls = ElasticitySolver(U;rtol=1.e-8,maxits=200)
+  state_map = AffineFEStateMap(a,l,U,V,V_φ,U_reg,φh;ls=elast_ls,adjoint_ls=elast_ls)
+  pcf = PDEConstrainedFunctionals(J_comp,[Vol],state_map;analytic_dC=(dVol,))
 
   ## Evolution Method
   evolve_ls = MUMPSSolver()
@@ -194,11 +174,9 @@ function main(ranks)
   ls_evo = UnfittedFEEvolution(evo,reinit)
 
   ## Hilbertian extension-regularisation problems
-  # hilb_ls = MUMPSSolver()
-  hilb_ls = CGAMGSolver()
   _α(hₕ) = (α_coeff*hₕ)^2
   a_hilb(p,q) =∫((_α ∘ hₕ)*∇(p)⋅∇(q) + p*q)dΩ_bg;
-  vel_ext = VelocityExtension(a_hilb,U_reg,V_reg;ls=hilb_ls)
+  vel_ext = VelocityExtension(a_hilb,U_reg,V_reg;ls=CGAMGSolver())
 
   ## Optimiser
   converged(m) = GridapTopOpt.default_al_converged(
