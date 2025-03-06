@@ -74,7 +74,7 @@ function split(p::Polyhedron,vertex_values)
   edges = Int[]
   in_graph = deepcopy(graph)
   out_graph = deepcopy(graph)
-  
+
   D = 3
   n_vertices = num_vertices(p)
   for v in 1:n_vertices
@@ -83,7 +83,7 @@ function split(p::Polyhedron,vertex_values)
     for (i,vneig) in enumerate(graph[v])
       w, wneig = vertex_values[v], vertex_values[vneig]
       w*wneig > 0 && continue
-      
+
       vertex = interpolate_values(vertices[v],vertices[vneig],abs(w),abs(wneig))
       push!(vertices, vertex)
 
@@ -93,7 +93,7 @@ function split(p::Polyhedron,vertex_values)
       push!(in_graph, fill(UNSET,D))
       in_graph[v][i] = length(vertices)
       in_graph[end][1] = v
-      
+
       push!(out_graph, fill(UNSET,D))
       ineig = findfirst(isequal(v), graph[vneig])
       out_graph[vneig][ineig] = length(vertices)
@@ -104,7 +104,7 @@ function split(p::Polyhedron,vertex_values)
   new_vertices = vertices[num_vertices(p)+1:end]
   p_out = split_postprocess!(out_graph,vertices,p,vertex_values,(>))
   p_in = split_postprocess!(in_graph,vertices,p,vertex_values,(<))
-  p_out, p_in, new_vertices, edges # TODO: Why are they reversed? 
+  p_out, p_in, new_vertices, edges # TODO: Why are they reversed?
 end
 
 function split(p::Polygon,vertex_values)
@@ -131,7 +131,7 @@ function split(p::Polygon,vertex_values)
 
     if w_current*w_next < 0
       vertex = interpolate_values(v_current,v_next,abs(w_current),abs(w_next))
-      
+
       push!(vertices, vertex)
       push!(in_nodes, length(vertices))
       push!(out_nodes, length(vertices))
@@ -159,7 +159,7 @@ function cut_conforming(topo::UnstructuredGridTopology{D}, cell_values) where D
   cell_nodes = Geometry.get_faces(topo,D,0)
   cell_edges = Geometry.get_faces(topo,D,1)
   Tn = eltype(eltype(cell_nodes))
-  
+
   is_cut(vals) = any(v->v<0,vals) && any(v->v>0,vals)
   cell_iscut = map(is_cut,cell_values)
 
@@ -168,7 +168,7 @@ function cut_conforming(topo::UnstructuredGridTopology{D}, cell_values) where D
   max_subcells = sum(c -> ifelse(!c, 1, max_sc), cell_iscut)
   max_cutnodes = sum(c -> ifelse(!c, 0, max_cn), cell_iscut)
   max_nodes = num_faces(topo,0) + max_cutnodes
-  
+
   subcell_nodes = Vector{Vector{Tn}}(undef,max_subcells)
   subcell_polys = Vector{GeneralPolytope{D,D,Float64,Nothing}}(undef,max_subcells)
   subcell_to_inout = Vector{Int8}(undef,max_subcells)
@@ -181,7 +181,7 @@ function cut_conforming(topo::UnstructuredGridTopology{D}, cell_values) where D
   nodes_cache = array_cache(cell_nodes)
   edges_cache = array_cache(cell_edges)
   values_cache = array_cache(cell_values)
-  
+
   n_subcells = 0
   n_nodes = num_faces(topo,0)
   edge_to_new_node = zeros(Tn,num_faces(topo,1))
@@ -201,7 +201,7 @@ function cut_conforming(topo::UnstructuredGridTopology{D}, cell_values) where D
       (p_in, lnodes_in), (p_out, lnodes_out), new_vertices, ledges = split(p,values)
       edges = getindex!(edges_cache,cell_edges,cell)
       edges = edges[edge_reindex][ledges]
-      
+
       for (ie,e) in enumerate(edges)
         if iszero(edge_to_new_node[e])
           edge_to_new_node[e] = (n_nodes += 1)
@@ -228,17 +228,29 @@ function cut_conforming(topo::UnstructuredGridTopology{D}, cell_values) where D
   resize!(subcell_to_inout,n_subcells)
   resize!(subcell_to_cell,n_subcells)
   resize!(vertex_coordinates,n_nodes)
-  
+
   subcell_nodes = Table(subcell_nodes)
   ptopo = Geometry.PolytopalGridTopology(vertex_coordinates,subcell_nodes,subcell_polys)
   return ptopo, subcell_to_inout, subcell_to_cell
 end
 
-function cut_conforming(model::UnstructuredDiscreteModel{D}, cell_values) where D
+# function cut_conforming(model::UnstructuredDiscreteModel{D}, cell_values) where D
+#   ptopo, subcell_to_inout, subcell_to_cell = cut_conforming(get_grid_topology(model),cell_values)
+#   pgrid = Geometry.PolytopalGrid(
+#     Geometry.get_vertex_coordinates(ptopo),
+#     Geometry.get_faces(ptopo,D,0),
+#     get_polytopes(ptopo)
+#   )
+#   plabels = FaceLabeling(ptopo)
+#   pmodel = Geometry.PolytopalDiscreteModel(pgrid,ptopo,plabels)
+#   return pmodel, subcell_to_inout, subcell_to_cell
+# end
+
+function cut_conforming(model, cell_values)
   ptopo, subcell_to_inout, subcell_to_cell = cut_conforming(get_grid_topology(model),cell_values)
   pgrid = Geometry.PolytopalGrid(
     Geometry.get_vertex_coordinates(ptopo),
-    Geometry.get_faces(ptopo,D,0),
+    Geometry.get_faces(ptopo,num_dims(model),0),
     get_polytopes(ptopo)
   )
   plabels = FaceLabeling(ptopo)
@@ -246,14 +258,14 @@ function cut_conforming(model::UnstructuredDiscreteModel{D}, cell_values) where 
   return pmodel, subcell_to_inout, subcell_to_cell
 end
 
-# The idea here is that we want to reuse the existing machinery we have for Adaptivity to 
-# create the new gids for the polytopal model. 
+# The idea here is that we want to reuse the existing machinery we have for Adaptivity to
+# create the new gids for the polytopal model.
 function cut_conforming(
   model::GridapDistributed.DistributedDiscreteModel,cell_values
 )
   pmodels, amodels, fcell_to_inout, fcell_to_ccell = map(local_views(model),cell_values) do model, cvals
     pmodel, fcell_to_inout, fcell_to_ccell = cut_conforming(model,cvals)
-    
+
     ccell_to_nchildren = fill(zero(Int8),num_cells(model))
     fcell_to_child_id = Vector{Int8}(undef,length(fcell_to_ccell))
     for (fcell,ccell) in enumerate(fcell_to_ccell)
