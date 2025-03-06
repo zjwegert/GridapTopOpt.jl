@@ -48,7 +48,7 @@ function update_collection!(c::EmbeddedCollection,φh)
   cutgeo = cut(c.bgmodel,geo)
   cutgeo_facet = cut_facets(c.bgmodel,geo)
   for r in c.recipes
-    merge!(c.objects,pairs(r(cutgeo,cutgeo_facet)))
+    merge!(c.objects,pairs(r(cutgeo,cutgeo_facet,φh)))
   end
   return c
 end

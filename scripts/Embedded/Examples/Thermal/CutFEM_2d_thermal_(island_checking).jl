@@ -42,7 +42,7 @@ V_φ = TestFESpace(model,reffe_scalar)
 
 ## Levet-set function
 φh = interpolate(x->-cos(4π*x[1])*cos(4π*x[2])-0.4,V_φ)
-Ωs = EmbeddedCollection(model,φh) do cutgeo,_
+Ωs = EmbeddedCollection(model,φh) do cutgeo,_,_
   Ωin = DifferentiableTriangulation(Triangulation(cutgeo,PHYSICAL),V_φ)
   Γ = DifferentiableTriangulation(EmbeddedBoundary(cutgeo),V_φ)
   Γg = GhostSkeleton(cutgeo)

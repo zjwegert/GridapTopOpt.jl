@@ -92,7 +92,7 @@ function main(
   abs_error = norm(dJ_bulk_AD_vec - dJ_bulk_exact_vec,Inf)
 
   if fdm
-    Ω_data = EmbeddedCollection(model,φh) do cutgeo,_
+    Ω_data = EmbeddedCollection(model,φh) do cutgeo,_,_
       Ω = DifferentiableTriangulation(Triangulation(cutgeo,PHYSICAL_IN),V_φ)
       (;:dΩ_AD => Measure(Ω,2*order))
     end
@@ -193,7 +193,7 @@ function main(
   abs_error = norm(dJ_int_AD_vec - dJ_int_exact_vec,Inf)
 
   if fdm
-    Ω_data = EmbeddedCollection(model,φh) do cutgeo,_
+    Ω_data = EmbeddedCollection(model,φh) do cutgeo,_,_
       Γ_AD = DifferentiableTriangulation(EmbeddedBoundary(cutgeo),V_φ)
       (;:dΓ_AD => Measure(Γ_AD,2*order))
     end
@@ -361,7 +361,7 @@ function main_normal(
 
   # Finite diff
   if fdm
-    Ω_data = EmbeddedCollection(model,φh) do cutgeo,_
+    Ω_data = EmbeddedCollection(model,φh) do cutgeo,_,_
       Ω = DifferentiableTriangulation(EmbeddedBoundary(cutgeo),V_φ)
       (;:Γ=>Ω,:dΓ_AD => Measure(Ω,2*order),:f=> CellField(f_vec,Ω))
     end
@@ -441,7 +441,7 @@ function main_fdm_only_verif(model,φ::Function;
 
   # Finite diff
   if fdm
-    Ω_data = EmbeddedCollection(model,φh) do cutgeo,_
+    Ω_data = EmbeddedCollection(model,φh) do cutgeo,_,_
       Ω = DifferentiableTriangulation(EmbeddedBoundary(cutgeo),V_φ)
       (;:Γ=>Ω,:dΓ_AD => Measure(Ω,2*order))
     end

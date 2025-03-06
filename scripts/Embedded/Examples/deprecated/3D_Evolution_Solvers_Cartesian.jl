@@ -114,7 +114,7 @@ function main(ranks,mesh_partition)
   degree = 2*(order+1)
 
   dΩ_act = Measure(Ω_act,degree)
-  Ω = EmbeddedCollection(model,φh) do cutgeo,_
+  Ω = EmbeddedCollection(model,φh) do cutgeo,_,_
     Ωs = DifferentiableTriangulation(Triangulation(cutgeo,PHYSICAL),V_φ)
     Ωf = DifferentiableTriangulation(Triangulation(cutgeo,PHYSICAL_OUT),V_φ)
     Γ  = DifferentiableTriangulation(EmbeddedBoundary(cutgeo),V_φ)

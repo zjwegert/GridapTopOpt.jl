@@ -147,7 +147,7 @@ function main_cutfem(data,params;R=0.1,c=(0.5,0.2))
   dΩ_act = Measure(Ω_act,degree)
   Γ_N = BoundaryTriangulation(model,tags="Gamma_f_N")
   dΓ_N = Measure(Γ_N,degree)
-  Ω = EmbeddedCollection(model,φh) do cutgeo,cutgeo_facets
+  Ω = EmbeddedCollection(model,φh) do cutgeo,cutgeo_facets,_
     Ωs = DifferentiableTriangulation(Triangulation(cutgeo,PHYSICAL),V_φ)
     Ωf = DifferentiableTriangulation(Triangulation(cutgeo,PHYSICAL_OUT),V_φ)
     Γ  = DifferentiableTriangulation(EmbeddedBoundary(cutgeo),V_φ)

@@ -74,7 +74,7 @@ dΩ_act = Measure(Ω_act,degree)
 Γf_N = BoundaryTriangulation(model,tags="Gamma_f_N")
 dΓf_D = Measure(Γf_D,degree)
 dΓf_N = Measure(Γf_N,degree)
-Ω = EmbeddedCollection(model,φh) do cutgeo,cutgeo_facets
+Ω = EmbeddedCollection(model,φh) do cutgeo,cutgeo_facets,_φh
   Ωs = DifferentiableTriangulation(Triangulation(cutgeo,PHYSICAL),V_φ)
   Ωf = DifferentiableTriangulation(Triangulation(cutgeo,PHYSICAL_OUT),V_φ)
   Γ  = DifferentiableTriangulation(EmbeddedBoundary(cutgeo),V_φ)
@@ -82,8 +82,10 @@ dΓf_N = Measure(Γf_N,degree)
   Ω_act_s = Triangulation(cutgeo,ACTIVE)
   Ω_act_f = Triangulation(cutgeo,ACTIVE_OUT)
   Γi = SkeletonTriangulation(cutgeo_facets,ACTIVE_OUT)
-  ψ_s,_ = GridapTopOpt.get_isolated_volumes_mask_v2(cutgeo,["Gamma_s_D"])
-  _,ψ_f = GridapTopOpt.get_isolated_volumes_mask_v2(cutgeo,["Gamma_f_D"])
+  # Isolated volumes
+  φ_cell_values = get_cell_dof_values(_φh)
+  ψ_s,_ = GridapTopOpt.get_isolated_volumes_mask_polytopal(model,φ_cell_values,["Gamma_s_D"])
+  _,ψ_f = GridapTopOpt.get_isolated_volumes_mask_polytopal(model,φ_cell_values,["Gamma_f_D"])
 
   (;
     :Ωs      => Ωs,

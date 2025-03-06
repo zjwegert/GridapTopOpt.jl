@@ -102,7 +102,7 @@ function main(ranks)
   degree = 2*(order+1)
 
   dΩ_bg = Measure(Ω_bg,degree)
-  Ω_data = EmbeddedCollection(model,φh) do cutgeo,_
+  Ω_data = EmbeddedCollection(model,φh) do cutgeo,_,_
     Ω = DifferentiableTriangulation(Triangulation(cutgeo,PHYSICAL),V_φ)
     Ω_out = DifferentiableTriangulation(Triangulation(cutgeo,PHYSICAL_OUT),V_φ)
     Γ  = DifferentiableTriangulation(EmbeddedBoundary(cutgeo),V_φ)

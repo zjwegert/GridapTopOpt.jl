@@ -35,33 +35,11 @@ function petsc_mumps_setup(ksp)
   @check_error_code GridapPETSc.PETSC.PCFactorSetMatSolverType(pc[],GridapPETSc.PETSC.MATSOLVERMUMPS)
   @check_error_code GridapPETSc.PETSC.PCFactorSetUpMatSolverType(pc[])
   @check_error_code GridapPETSc.PETSC.PCFactorGetMatrix(pc[],mumpsmat)
-  @check_error_code GridapPETSc.PETSC.MatMumpsSetIcntl(mumpsmat[],  4, 4)# 1)
+  @check_error_code GridapPETSc.PETSC.MatMumpsSetIcntl(mumpsmat[],  4, 1)
   @check_error_code GridapPETSc.PETSC.MatMumpsSetIcntl(mumpsmat[], 28, 2)
   @check_error_code GridapPETSc.PETSC.MatMumpsSetIcntl(mumpsmat[], 29, 1)
-  @check_error_code GridapPETSc.PETSC.MatMumpsSetIcntl(mumpsmat[], 14, 30)
-  @check_error_code GridapPETSc.PETSC.MatMumpsSetCntl(mumpsmat[],  1, 0.00001) # relative thresh
-  @check_error_code GridapPETSc.PETSC.KSPView(ksp[],C_NULL)
-end
-
-SymMUMPSSolver() = PETScLinearSolver(petsc_symmumps_setup)
-
-function petsc_symmumps_setup(ksp)
-  pc       = Ref{GridapPETSc.PETSC.PC}()
-  mumpsmat = Ref{GridapPETSc.PETSC.Mat}()
-
-  @check_error_code GridapPETSc.PETSC.KSPSetFromOptions(ksp[])
-
-  @check_error_code GridapPETSc.PETSC.KSPSetType(ksp[],GridapPETSc.PETSC.KSPPREONLY)
-  @check_error_code GridapPETSc.PETSC.KSPGetPC(ksp[],pc)
-  @check_error_code GridapPETSc.PETSC.PCSetType(pc[],GridapPETSc.PETSC.PCCHOLESKY)
-  @check_error_code GridapPETSc.PETSC.PCFactorSetMatSolverType(pc[],GridapPETSc.PETSC.MATSOLVERMUMPS)
-  @check_error_code GridapPETSc.PETSC.PCFactorSetUpMatSolverType(pc[])
-  @check_error_code GridapPETSc.PETSC.PCFactorGetMatrix(pc[],mumpsmat)
-  @check_error_code GridapPETSc.PETSC.MatMumpsSetIcntl(mumpsmat[],  4, 4)# 1)
-  @check_error_code GridapPETSc.PETSC.MatMumpsSetIcntl(mumpsmat[], 28, 2)
-  @check_error_code GridapPETSc.PETSC.MatMumpsSetIcntl(mumpsmat[], 29, 1)
-  @check_error_code GridapPETSc.PETSC.MatMumpsSetIcntl(mumpsmat[], 14, 30)
-  @check_error_code GridapPETSc.PETSC.MatMumpsSetCntl(mumpsmat[],  1, 0.00001) # relative thresh
+  @check_error_code GridapPETSc.PETSC.MatMumpsSetIcntl(mumpsmat[], 14, 50)
+  @check_error_code GridapPETSc.PETSC.MatMumpsSetCntl(mumpsmat[],  1, 0.00001)
   @check_error_code GridapPETSc.PETSC.KSPView(ksp[],C_NULL)
 end
 
@@ -87,8 +65,24 @@ function gamg_ksp_setup(;rtol=10^-8,maxits=100)
   return ksp_setup
 end
 
+ASMSolver() = PETScLinearSolver(petsc_asm_setup)
+
+function petsc_asm_setup(ksp)
+  rtol = PetscScalar(1.e-9)
+  atol = GridapPETSc.PETSC.PETSC_DEFAULT
+  dtol = GridapPETSc.PETSC.PETSC_DEFAULT
+  maxits = GridapPETSc.PETSC.PETSC_DEFAULT
+
+  pc = Ref{GridapPETSc.PETSC.PC}()
+  @check_error_code GridapPETSc.PETSC.KSPSetType(ksp[],GridapPETSc.PETSC.KSPCG)
+  @check_error_code GridapPETSc.PETSC.KSPSetTolerances(ksp[], rtol, atol, dtol, maxits)
+  @check_error_code GridapPETSc.PETSC.KSPGetPC(ksp[],pc)
+  @check_error_code GridapPETSc.PETSC.PCSetType(pc[],GridapPETSc.PETSC.PCASM)
+  @check_error_code GridapPETSc.PETSC.KSPView(ksp[],C_NULL)
+end
+
 function main(ranks)
-  path = "./results/FSI_3D_Burman_P1P0dc_MPI/"
+  path = "./results/FSI_3D_Burman_P1P0dc_MPI_Iterative/"
   files_path = path*"data/"
   i_am_main(ranks) && mkpath(files_path)
 
@@ -212,8 +206,9 @@ function main(ranks)
     R = TrialFESpace(T)
 
     # Multifield spaces
-    UP = MultiFieldFESpace([U,P])
-    VQ = MultiFieldFESpace([V,Q])
+    mfs = Gridap.MultiField.BlockMultiFieldStyle()
+    UP = MultiFieldFESpace([U,P];style=mfs)
+    VQ = MultiFieldFESpace([V,Q];style=mfs)
     return (UP,VQ),(R,T)
   end
 
@@ -290,13 +285,20 @@ function main(ranks)
   dVol(q,(u,p,d),φ) = ∫(-1/vol_D*q/(norm ∘ (∇(φ))))Ω.dΓ
 
   ## Staggered operators
-  fluid_ls = SymMUMPSSolver()
-  elast_ls = SymMUMPSSolver()
+  solver_u = ASMSolver()
+  solver_p = CGSolver(JacobiLinearSolver();maxiter=20,atol=1e-14,rtol=1.e-10,verbose=i_am_main(parts))
+  solver_p.log.depth = 4
 
   state_collection = GridapTopOpt.EmbeddedCollection_in_φh(model,φh) do _φh
     update_collection!(Ω,_φh)
     (UP,VQ),(R,T) = build_spaces(Ω.Ω_act_s,Ω.Ω_act_f)
-    # elast_ls = ElasticitySolver(R;rtol=1.e-8,maxits=200)
+    # Fluid solver
+    blocks = [LinearSystemBlock() LinearSystemBlock();
+              LinearSystemBlock() BiformBlock((p,q) -> ∫(p*q)dΩ,VQ[2],VQ[2])]
+    P = BlockTriangularSolver(blocks,[solver_u,solver_p])
+    fluid_ls = FGMRESSolver(30,P;rtol=1.e-8,verbose=i_am_main(parts))
+    # Elast solver
+    elast_ls = ElasticitySolver(R;rtol=1.e-8,maxits=200)
     solver = StaggeredFESolver([fluid_ls,elast_ls]);
     op = StaggeredAffineFEOperator([a_fluid,a_solid],[l_fluid,l_solid],[UP,R],[VQ,T])
     state_map = StaggeredAffineFEStateMap(op,V_φ,U_reg,_φh;solver,adjoint_solver=solver)

@@ -42,7 +42,7 @@ V_φ = TestFESpace(model,reffe_scalar)
 
 ## Levet-set function
 φh = interpolate(x->-cos(8π*x[1])*cos(8π*x[2])-0.2,V_φ)
-Ωs = EmbeddedCollection(model,φh) do cutgeo,_
+Ωs = EmbeddedCollection(model,φh) do cutgeo,_,_
   Ωin = DifferentiableTriangulation(Triangulation(cutgeo,PHYSICAL))
   Γ = DifferentiableTriangulation(EmbeddedBoundary(cutgeo),V_φ)
   Γg = GhostSkeleton(cutgeo)
@@ -74,7 +74,7 @@ Pl = JacobiLinearSolver()
 ls = CGSolver(Pl;maxiter=1000,verbose=1,name="CG")
 
 strategy = AggregateCutCellsByThreshold(1)
-state_collection = EmbeddedCollection(model,φh) do cutgeo,_
+state_collection = EmbeddedCollection(model,φh) do cutgeo,_,_
   aggregates = aggregate(strategy,cutgeo)
   Vstd = TestFESpace(Ωs.Ωact,reffe_scalar;dirichlet_tags=["Gamma_D"])
   V = AgFEMSpace(Vstd,aggregates)

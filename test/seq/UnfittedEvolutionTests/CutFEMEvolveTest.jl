@@ -21,7 +21,7 @@ V_φ = TestFESpace(model,reffe_scalar)
 
 φh = interpolate(x->-sqrt((x[1]-0.5)^2+(x[2]-0.5)^2)+0.25,V_φ)
 
-Ωs = EmbeddedCollection(model,φh) do cutgeo,_
+Ωs = EmbeddedCollection(model,φh) do cutgeo,_,_
   Γ = EmbeddedBoundary(cutgeo)
   Γg = GhostSkeleton(cutgeo)
   (;

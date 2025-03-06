@@ -27,7 +27,7 @@ lsf(x) = sqrt((x[1]-0.5)^2+(x[2]-0.5)^2)-0.35
 order = 1
 degree = 2*(order+1)
 
-Ω_data = EmbeddedCollection(model,φh) do cutgeo,_
+Ω_data = EmbeddedCollection(model,φh) do cutgeo,_,_
   Ω_IN = DifferentiableTriangulation(Triangulation(cutgeo,PHYSICAL),V_φ)
   Ω_OUT = Triangulation(cutgeo,PHYSICAL_OUT)
   Ω_CUTIN = Triangulation(cutgeo,CUT_IN)

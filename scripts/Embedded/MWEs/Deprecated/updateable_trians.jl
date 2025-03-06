@@ -26,7 +26,7 @@ reffe = ReferenceFE(lagrangian,Float64,order)
 V_φ = TestFESpace(model,reffe)
 
 φ0 = φ(0.2)
-Ωs = EmbeddedCollection(model,φ0) do cutgeo,_
+Ωs = EmbeddedCollection(model,φ0) do cutgeo,_,_
   Ω = Triangulation(cutgeo,PHYSICAL_IN)
   Γ = EmbeddedBoundary(cutgeo)
   (;

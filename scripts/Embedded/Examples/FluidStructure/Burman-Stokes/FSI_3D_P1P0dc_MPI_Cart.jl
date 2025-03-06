@@ -152,7 +152,7 @@ function main(ranks,mesh_partition)
   dΩ_act = Measure(Ω_act,degree)
   Γf_D = BoundaryTriangulation(model,tags="Gamma_f_D")
   dΓf_D = Measure(Γf_D,degree)
-  Ω = EmbeddedCollection(model,φh) do cutgeo,cutgeo_facets
+  Ω = EmbeddedCollection(model,φh) do cutgeo,cutgeo_facets,_φh
     Ωs = DifferentiableTriangulation(Triangulation(cutgeo,PHYSICAL),V_φ)
     Ωf = DifferentiableTriangulation(Triangulation(cutgeo,PHYSICAL_OUT),V_φ)
     Γ  = DifferentiableTriangulation(EmbeddedBoundary(cutgeo),V_φ)
@@ -160,25 +160,29 @@ function main(ranks,mesh_partition)
     Ω_act_s = Triangulation(cutgeo,ACTIVE)
     Ω_act_f = Triangulation(cutgeo,ACTIVE_OUT)
     Γi = SkeletonTriangulation(cutgeo_facets,ACTIVE_OUT)
+    # Isolated volumes
+    φ_cell_values = map(get_cell_dof_values,local_views(_φh))
+    ψ_s,_ = GridapTopOpt.get_isolated_volumes_mask_polytopal(model,φ_cell_values,["Gamma_s_D"])
+    _,ψ_f = GridapTopOpt.get_isolated_volumes_mask_polytopal(model,φ_cell_values,["Gamma_f_D"])
     (;
-      :Ωs      => Ωs,
-      :dΩs     => Measure(Ωs,degree),
-      :Ωf      => Ωf,
-      :dΩf     => Measure(Ωf,degree),
-      :Γg      => Γg,
-      :dΓg     => Measure(Γg,degree),
-      :n_Γg    => get_normal_vector(Γg),
-      :Γ       => Γ,
-      :dΓ      => Measure(Γ,degree),
-      :Ω_act_s => Ω_act_s,
+      :Ωs       => Ωs,
+      :dΩs      => Measure(Ωs,degree),
+      :Ωf       => Ωf,
+      :dΩf      => Measure(Ωf,degree),
+      :Γg       => Γg,
+      :dΓg      => Measure(Γg,degree),
+      :n_Γg     => get_normal_vector(Γg),
+      :Γ        => Γ,
+      :dΓ       => Measure(Γ,degree),
+      :Ω_act_s  => Ω_act_s,
       :dΩ_act_s => Measure(Ω_act_s,degree),
-      :Ω_act_f => Ω_act_f,
+      :Ω_act_f  => Ω_act_f,
       :dΩ_act_f => Measure(Ω_act_f,degree),
-      :Γi => Γi,
-      :dΓi => Measure(Γi,degree),
-      :n_Γi    => get_normal_vector(Γi),
-      :ψ_s     => GridapTopOpt.get_isolated_volumes_mask(cutgeo,["Gamma_s_D"];groups=((GridapTopOpt.CUT,IN),OUT)),
-      :ψ_f     => GridapTopOpt.get_isolated_volumes_mask(cutgeo,["Gamma_f_D"];groups=((GridapTopOpt.CUT,OUT),IN)),
+      :Γi       => Γi,
+      :dΓi      => Measure(Γi,degree),
+      :n_Γi     => get_normal_vector(Γi),
+      :ψ_s      => ψ_s,
+      :ψ_f      => ψ_f,
     )
   end
   writevtk(get_triangulation(φh),path*"initial_islands",cellfields=["ψ_s"=>Ω.ψ_s,"ψ_f"=>Ω.ψ_f])

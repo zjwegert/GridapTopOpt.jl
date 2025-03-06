@@ -55,7 +55,7 @@ function main()
   Γ_N = BoundaryTriangulation(model,tags="Gamma_N")
   dΓ_N = Measure(Γ_N,degree)
   dΩ_bg = Measure(Ω_bg,degree)
-  Ω_data = EmbeddedCollection(model,φh) do cutgeo,_
+  Ω_data = EmbeddedCollection(model,φh) do cutgeo,_,_
     Ω = DifferentiableTriangulation(Triangulation(cutgeo,PHYSICAL),V_φ)
     Γ  = DifferentiableTriangulation(EmbeddedBoundary(cutgeo),V_φ)
     Γg = GhostSkeleton(cutgeo)

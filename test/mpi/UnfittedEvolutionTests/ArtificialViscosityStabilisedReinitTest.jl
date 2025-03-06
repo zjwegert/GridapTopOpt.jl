@@ -28,7 +28,7 @@ function main(distribute,mesh_partition)
   φh = interpolate(x->-(x[1]-0.5)^2-(x[2]-0.5)^2+0.25^2,V_φ)
   φh0 = interpolate(x->-sqrt((x[1]-0.5)^2+(x[2]-0.5)^2)+0.25,V_φ)
 
-  Ωs = EmbeddedCollection(model,φh) do cutgeo,_
+  Ωs = EmbeddedCollection(model,φh) do cutgeo,_,_
     Γ = EmbeddedBoundary(cutgeo)
     (;
       :Γ => Γ,

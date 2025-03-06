@@ -107,7 +107,7 @@ function main_lin_elast(n,path="./results/CutFEM_hyperelastic_compliance_neohook
 
   ## Create FE functions
   φh = interpolate(initial_lsf(4,0.1),V_φ)
-  Ωs = EmbeddedCollection(model,φh) do cutgeo,_
+  Ωs = EmbeddedCollection(model,φh) do cutgeo,_,_
     Ωin = DifferentiableTriangulation(Triangulation(cutgeo,PHYSICAL_IN),V_φ)
     Ωout = DifferentiableTriangulation(Triangulation(cutgeo,PHYSICAL_OUT),V_φ)
     Γ = DifferentiableTriangulation(EmbeddedBoundary(cutgeo),V_φ)
@@ -259,7 +259,7 @@ function main_neo(n,φ=nothing,λelast=nothing,Λelast=nothing;path="./results/C
   else
     φh = FEFunction(V_φ,φ)
   end
-  Ωs = EmbeddedCollection(model,φh) do cutgeo,_
+  Ωs = EmbeddedCollection(model,φh) do cutgeo,_,_
     Ωin = DifferentiableTriangulation(Triangulation(cutgeo,PHYSICAL_IN),V_φ)
     Ωout = DifferentiableTriangulation(Triangulation(cutgeo,PHYSICAL_OUT),V_φ)
     Γ = DifferentiableTriangulation(EmbeddedBoundary(cutgeo),V_φ)

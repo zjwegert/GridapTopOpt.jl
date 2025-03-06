@@ -22,16 +22,15 @@ function petsc_mumps_setup(ksp)
 
   @check_error_code GridapPETSc.PETSC.KSPSetType(ksp[],GridapPETSc.PETSC.KSPPREONLY)
   @check_error_code GridapPETSc.PETSC.KSPGetPC(ksp[],pc)
-  @check_error_code GridapPETSc.PETSC.PCSetType(pc[],GridapPETSc.PETSC.PCLU)
+  @check_error_code GridapPETSc.PETSC.PCSetType(pc[],GridapPETSc.PETSC.PCCHOLESKY)
   @check_error_code GridapPETSc.PETSC.PCFactorSetMatSolverType(pc[],GridapPETSc.PETSC.MATSOLVERMUMPS)
   @check_error_code GridapPETSc.PETSC.PCFactorSetUpMatSolverType(pc[])
   @check_error_code GridapPETSc.PETSC.PCFactorGetMatrix(pc[],mumpsmat)
   @check_error_code GridapPETSc.PETSC.MatMumpsSetIcntl(mumpsmat[],  4, 1)
   @check_error_code GridapPETSc.PETSC.MatMumpsSetIcntl(mumpsmat[], 28, 2)
   @check_error_code GridapPETSc.PETSC.MatMumpsSetIcntl(mumpsmat[], 29, 2)
-  @check_error_code GridapPETSc.PETSC.MatMumpsSetIcntl(mumpsmat[], 14, 50)
-  # @check_error_code GridapPETSc.PETSC.MatMumpsSetCntl(mumpsmat[],  1, 0.00001) # relative thresh
-  # @check_error_code GridapPETSc.PETSC.MatMumpsSetCntl(mumpsmat[], 3, 1.0e-6) # absolute thresh
+  @check_error_code GridapPETSc.PETSC.MatMumpsSetIcntl(mumpsmat[], 14, 70)
+  @check_error_code GridapPETSc.PETSC.MatMumpsSetCntl(mumpsmat[],  1, 0.00001) # relative thresh
   @check_error_code GridapPETSc.PETSC.KSPView(ksp[],C_NULL)
 end
 
@@ -104,11 +103,14 @@ function main(ranks)
   Γ_N = BoundaryTriangulation(model,tags="Gamma_N")
   dΓ_N = Measure(Γ_N,degree)
   dΩ_bg = Measure(Ω_bg,degree)
-  Ω_data = EmbeddedCollection(model,φh) do cutgeo,_
+  Ω_data = EmbeddedCollection(model,φh) do cutgeo,cutgeo_facets,_φh
     Ω = DifferentiableTriangulation(Triangulation(cutgeo,PHYSICAL),V_φ)
     Γ  = DifferentiableTriangulation(EmbeddedBoundary(cutgeo),V_φ)
     Γg = GhostSkeleton(cutgeo)
     Ω_act = Triangulation(cutgeo,ACTIVE)
+    # Isolated volumes
+    φ_cell_values = map(get_cell_dof_values,local_views(_φh))
+    ψ,_ = GridapTopOpt.get_isolated_volumes_mask_polytopal(model,φ_cell_values,["Gamma_D"])
     (;
       :Ω_act => Ω_act,
       :Ω     => Ω,
@@ -118,8 +120,7 @@ function main(ranks)
       :n_Γg  => get_normal_vector(Γg),
       :Γ     => Γ,
       :dΓ    => Measure(Γ,degree),
-      # :ψ     => GridapTopOpt.get_isolated_volumes_mask(cutgeo,["Gamma_D","Gamma_N"];groups=((CUT,IN),OUT)),
-      :ψ     => GridapTopOpt.get_isolated_volumes_mask(cutgeo,["Gamma_D"];groups=((CUT,IN),OUT)),
+      :ψ     => ψ
     )
   end
   writevtk(get_triangulation(φh),path*"initial_islands",cellfields=["φh"=>φh,"ψ"=>Ω_data.ψ])

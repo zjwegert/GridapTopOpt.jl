@@ -74,7 +74,7 @@ function main_cutfem(data,params;R=0.1,c=(0.5,0.2))
   Γf_N = BoundaryTriangulation(model,tags="Gamma_f_N")
   dΓf_D = Measure(Γf_D,degree)
   dΓf_N = Measure(Γf_N,degree)
-  Ω = EmbeddedCollection(model,φh) do cutgeo,_
+  Ω = EmbeddedCollection(model,φh) do cutgeo,_,_
     Ωf = DifferentiableTriangulation(Triangulation(cutgeo,PHYSICAL_OUT),V_φ)
     Γ  = DifferentiableTriangulation(EmbeddedBoundary(cutgeo),V_φ)
     Γg = GhostSkeleton(cutgeo)
@@ -239,7 +239,7 @@ function main_fcm(data,params;R=0.1,c=(0.5,0.2))
   Γf_N = BoundaryTriangulation(model,tags="Gamma_f_N")
   dΓf_D = Measure(Γf_D,degree)
   dΓf_N = Measure(Γf_N,degree)
-  Ω = EmbeddedCollection(model,φh) do cutgeo,_
+  Ω = EmbeddedCollection(model,φh) do cutgeo,_,_
     Ωs = DifferentiableTriangulation(Triangulation(cutgeo,PHYSICAL),V_φ)
     Ωf = DifferentiableTriangulation(Triangulation(cutgeo,PHYSICAL_OUT),V_φ)
     Γ  = DifferentiableTriangulation(EmbeddedBoundary(cutgeo),V_φ)

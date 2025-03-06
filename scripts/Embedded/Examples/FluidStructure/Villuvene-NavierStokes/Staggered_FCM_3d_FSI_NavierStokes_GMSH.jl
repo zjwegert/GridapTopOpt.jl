@@ -147,7 +147,7 @@ function main(ranks)
   dΩ_act = Measure(Ω_act,degree)
   Γf_D = BoundaryTriangulation(model,tags="Gamma_f_D")
   dΓf_D = Measure(Γf_D,degree)
-  Ω = EmbeddedCollection(model,φh) do cutgeo,_
+  Ω = EmbeddedCollection(model,φh) do cutgeo,_,_
     Ωs = DifferentiableTriangulation(Triangulation(cutgeo,PHYSICAL),V_φ)
     Ωf = DifferentiableTriangulation(Triangulation(cutgeo,PHYSICAL_OUT),V_φ)
     Γ  = DifferentiableTriangulation(EmbeddedBoundary(cutgeo),V_φ)
