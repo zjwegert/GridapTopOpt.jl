@@ -12,7 +12,7 @@ else
   global γg_evo =  0.01
 end
 
-MUMPSSolver() = PETScLinearSolver(petsc_cholmumps_setup) #PETScLinearSolver(petsc_mumps_setup)
+MUMPSSolver() = PETScLinearSolver(petsc_mumps_setup)
 
 function petsc_mumps_setup(ksp)
   pc       = Ref{GridapPETSc.PETSC.PC}()
@@ -29,9 +29,8 @@ function petsc_mumps_setup(ksp)
   @check_error_code GridapPETSc.PETSC.MatMumpsSetIcntl(mumpsmat[],  4, 4)# 1)
   @check_error_code GridapPETSc.PETSC.MatMumpsSetIcntl(mumpsmat[], 28, 2)
   @check_error_code GridapPETSc.PETSC.MatMumpsSetIcntl(mumpsmat[], 29, 2)
-  @check_error_code GridapPETSc.PETSC.MatMumpsSetIcntl(mumpsmat[], 14, 90)
-  # @check_error_code GridapPETSc.PETSC.MatMumpsSetCntl(mumpsmat[],  1, 0.00001) # relative thresh
-  @check_error_code GridapPETSc.PETSC.MatMumpsSetCntl(mumpsmat[],  1, 0.0)
+  @check_error_code GridapPETSc.PETSC.MatMumpsSetIcntl(mumpsmat[], 14, 150)
+  @check_error_code GridapPETSc.PETSC.MatMumpsSetCntl(mumpsmat[],  1, -1)
   @check_error_code GridapPETSc.PETSC.KSPView(ksp[],C_NULL)
 end
 
@@ -52,9 +51,8 @@ function petsc_cholmumps_setup(ksp)
   @check_error_code GridapPETSc.PETSC.MatMumpsSetIcntl(mumpsmat[],  4, 4)# 1)
   @check_error_code GridapPETSc.PETSC.MatMumpsSetIcntl(mumpsmat[], 28, 2)
   @check_error_code GridapPETSc.PETSC.MatMumpsSetIcntl(mumpsmat[], 29, 2)
-  @check_error_code GridapPETSc.PETSC.MatMumpsSetIcntl(mumpsmat[], 14, 90)
-  # @check_error_code GridapPETSc.PETSC.MatMumpsSetCntl(mumpsmat[],  1, 0.00001) # relative thresh
-  @check_error_code GridapPETSc.PETSC.MatMumpsSetCntl(mumpsmat[],  1, 0.0)
+  @check_error_code GridapPETSc.PETSC.MatMumpsSetIcntl(mumpsmat[], 14, 150)
+  @check_error_code GridapPETSc.PETSC.MatMumpsSetCntl(mumpsmat[],  1, -1)
   @check_error_code GridapPETSc.PETSC.KSPView(ksp[],C_NULL)
 end
 
@@ -209,9 +207,9 @@ function main(ranks)
   pcf = EmbeddedPDEConstrainedFunctionals(state_collection;analytic_dC=(dVol,))
 
   ## Evolution Method
-  evolve_ls = MUMPSSolver()
+  evolve_ls = CholMUMPSSolver()
   evolve_nls = NewtonSolver(evolve_ls;maxiter=1,verbose=i_am_main(ranks))
-  reinit_nls = NewtonSolver(MUMPSSolver();maxiter=20,rtol=1.e-14,verbose=i_am_main(ranks))
+  reinit_nls = NewtonSolver(CholMUMPSSolver();maxiter=20,rtol=1.e-14,verbose=i_am_main(ranks))
 
   evo = CutFEMEvolve(V_φ,Ω_data,dΩ_bg,hₕ;max_steps,γg=γg_evo,ode_ls=evolve_ls,ode_nl=evolve_nls)
   reinit1 = StabilisedReinit(V_φ,Ω_data,dΩ_bg,hₕ;stabilisation_method=ArtificialViscosity(0.5),nls=reinit_nls)

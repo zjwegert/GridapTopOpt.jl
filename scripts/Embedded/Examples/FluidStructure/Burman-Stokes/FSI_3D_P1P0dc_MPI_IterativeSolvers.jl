@@ -86,7 +86,7 @@ function main(ranks)
   files_path = path*"data/"
   i_am_main(ranks) && mkpath(files_path)
 
-  γ_evo = 0.2
+  γ_evo = 0.1
   max_steps = 10 # Based on number of elements in vertical direction divided by 10
   vf = 0.025
   α_coeff = γ_evo*max_steps
@@ -104,7 +104,7 @@ function main(ranks)
   cw = 0.1;
   vol_D = L*H
 
-  model = GmshDiscreteModel(ranks,(@__DIR__)*"/../Meshes/mesh_3d_finer.msh")
+  model = GmshDiscreteModel(ranks,(@__DIR__)*"/../Meshes/mesh_low_res_3d.msh")
   map(test_mesh,local_views(model))
   writevtk(model,path*"model")
 
@@ -122,11 +122,8 @@ function main(ranks)
   f0((x,y,z),a,b) = max(2/a*abs(x-x0),1/(b/2+1)*abs(y-b/2+1),2/(H-2cw)*abs(z-H/2))-1
   f1((x,y,z),q,r) = - cos(q*π*x)*cos(q*π*y)*cos(q*π*z)/q - r/q
   fin(x) = f0(x,l*(1+_e),a*(1+_e))
-  fsolid(x) = min(f0(x,l*(1+_e),b*(1+_e)),f0(x,w*(1+_e),a*(1+_e)))
-  fholes((x,y,z),q,r) = max(f1((x,y,z),q,r),f1((x-1/q,y,z),q,r))
-  lsf(x) = min(max(fin(x),fholes(x,5,0.5)),fsolid(x))
+  lsf(x) = fin(x)
   φh = interpolate(lsf,V_φ)
-  φh_nondesign = interpolate(fsolid,V_φ)
 
   _φ = get_free_dof_values(φh)
   map(local_views(_φ)) do φ
@@ -312,17 +309,17 @@ function main(ranks)
   pcf = EmbeddedPDEConstrainedFunctionals(state_collection;analytic_dC=[dVol])
 
   ## Evolution Method
-  evolve_ls = MUMPSSolver()
+  evolve_ls = CGAMGSolver() # MUMPSSolver()
+  reinit_ls = CGAMGSolver() # MUMPSSolver()
+
   evolve_nls = NewtonSolver(evolve_ls;maxiter=1,verbose=i_am_main(ranks))
-  reinit_nls = NewtonSolver(MUMPSSolver();maxiter=20,rtol=1.e-14,verbose=i_am_main(ranks))
+  reinit_nls = NewtonSolver(reinit_ls;maxiter=20,rtol=1.e-14,verbose=i_am_main(ranks))
 
   evo = CutFEMEvolve(V_φ,Ω,dΩ_act,hₕ;max_steps,γg=γg_evo,ode_ls=evolve_ls,ode_nl=evolve_nls)
   reinit1 = StabilisedReinit(V_φ,Ω,dΩ_act,hₕ;stabilisation_method=ArtificialViscosity(0.5),nls=reinit_nls)
   reinit2 = StabilisedReinit(V_φ,Ω,dΩ_act,hₕ;stabilisation_method=GridapTopOpt.InteriorPenalty(V_φ,γg=0.1),nls=reinit_nls)
   reinit = GridapTopOpt.MultiStageStabilisedReinit([reinit1,reinit2])
   ls_evo = UnfittedFEEvolution(evo,reinit)
-
-  reinit!(ls_evo,φh_nondesign)
 
   ## Hilbertian extension-regularisation problems
   _α(hₕ) = (α_coeff*hₕ)^2
@@ -354,15 +351,6 @@ function main(ranks)
         cellfields=["uh"=>uh,"ph"=>ph,"dh"=>dh])
     end
     write_history(path*"/history.txt",optimiser.history;ranks)
-
-    # Geometric operation to re-add the non-designable region # TODO: Move to a function
-    _φ = get_free_dof_values(φh)
-    _φ_nondesign = get_free_dof_values(φh_nondesign)
-    map(local_views(_φ),local_views(_φ_nondesign)) do φ,φ_nondesign
-      φ .= min.(φ,φ_nondesign)
-    end
-    consistent!(_φ) |> wait
-    reinit!(ls_evo,φh)
   end
   it = get_history(optimiser).niter; uh,ph,dh = get_state(pcf)
   writevtk(Ω_act,path*"Omega_act_$it",
@@ -374,7 +362,7 @@ function main(ranks)
 end
 
 with_mpi() do distribute
-  ncpus = 96
+  ncpus = 8
   ranks = distribute(LinearIndices((ncpus,)))
   petsc_options = "-ksp_converged_reason -ksp_error_if_not_converged true"
   GridapPETSc.with(;args=split(petsc_options)) do
