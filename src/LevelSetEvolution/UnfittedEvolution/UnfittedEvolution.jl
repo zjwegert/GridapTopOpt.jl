@@ -95,14 +95,14 @@ function get_dof_Δ(s::UnfittedFEEvolution)
 end
 
 ## Helpers
-function correct_ls!(φh;tol = 10*eps(Float64))
+function correct_ls!(φh;tol = 1e-10)
   x = get_free_dof_values(φh)
   for i in eachindex(x)
     abs(x[i]) < tol && (x[i] = tol)
   end
 end
 
-function correct_ls!(φh::GridapDistributed.DistributedCellField; tol = 10*eps(Float64))
+function correct_ls!(φh::GridapDistributed.DistributedCellField; tol = 1e-10)
   map(local_views(φh)) do φh
     correct_ls!(φh,tol=tol)
   end
