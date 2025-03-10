@@ -84,6 +84,8 @@ function solve!(s::StabilisedReinit,φh,cache::Nothing)
     copy!(get_free_dof_values(φh),φ_tmp)
     update_collection!(s.Ωs,φh)
   end
+  # Check LS
+  correct_ls!(φh)
   return φh
 end
 
@@ -102,31 +104,14 @@ function solve!(s::StabilisedReinit,φh,cache)
     copy!(get_free_dof_values(φh),φ_tmp)
     update_collection!(s.Ωs,φh)
   end
+  # Check LS
+  correct_ls!(φh)
   return φh
 end
 
 struct ArtificialViscosity <: StabilisationMethod
   stabilisation_coefficent::Number
 end
-
-# function get_residual_and_jacobian(s::StabilisedReinit{ArtificialViscosity},φh,φh0)
-#   Ωs, dΩ_bg, = s.Ωs, s.dΩ_bg
-#   γd, h = s.params
-#   ca = s.stabilisation_method.stabilisation_coefficent
-#   ϵ = 1e-20
-
-#   update_collection!(Ωs,φh)
-#   dΓ = Ωs.dΓ
-
-#   W(u,∇u) = sign(u) * ∇u / (ϵ + norm(∇u))
-#   V(w) = ca*h*(sqrt ∘ ( w ⋅ w ))
-#   a(w,u,v) = ∫(v*(W ∘ (w,∇(w))) ⋅ ∇(u) + V(W ∘ (w,∇(w)))*∇(u) ⋅ ∇(v))dΩ_bg + ∫((γd/h)*v*u)dΓ
-#   b(w,v) = ∫((sign ∘ w)*v)dΩ_bg
-#   res(u,v) = a(u,u,v) - b(u,v)
-#   jac(u,du,v) = a(u,du,v)
-#   # jac(u,du,v) = jacobian(res,[u,v],1)
-#   return res,jac
-# end
 
 function get_residual_and_jacobian(s::StabilisedReinit{ArtificialViscosity},φh,φh0)
   Ωs, dΩ_bg, = s.Ωs, s.dΩ_bg
@@ -162,29 +147,6 @@ function InteriorPenalty(V_φ::FESpace;γg=1.0)
   dΛ = Measure(Λ,2get_order(V_φ))
   return InteriorPenalty(dΛ,γg)
 end
-
-# function get_residual_and_jacobian(s::StabilisedReinit{InteriorPenalty},φh,φh0)
-#   Ωs, dΩ_bg, = s.Ωs, s.dΩ_bg
-#   γd, h = s.params
-#   ϵ = 1e-20
-#   dΛ = s.stabilisation_method.dΛ
-#   γg = s.stabilisation_method.γg
-
-#   update_collection!(Ωs,φh)
-#   dΓ = Ωs.dΓ
-#   γ(h) = γg*h^2
-
-#   aₛ(u,v,h::CellField) = ∫(mean(γ ∘ h)*jump(∇(u)) ⋅ jump(∇(v)))dΛ
-#   aₛ(u,v,h::Real) = ∫(γ(h)*jump(∇(u)) ⋅ jump(∇(v)))dΛ
-
-#   W(u,∇u) = sign(u) * ∇u / (ϵ + norm(∇u))
-#   a(w,u,v) = ∫(v*(W ∘ (w,∇(w))) ⋅ ∇(u))dΩ_bg + aₛ(u,v,h) + ∫((γd/h)*v*u)dΓ
-#   b(w,v) = ∫((sign ∘ w)*v)dΩ_bg
-#   res(u,v) = a(u,u,v) - b(u,v)
-#   jac(u,du,v) = a(u,du,v)
-#   # jac(u,du,v) = jacobian(res,[u,v],1)
-#   return res,jac
-# end
 
 function get_residual_and_jacobian(s::StabilisedReinit{InteriorPenalty},φh,φh0)
   Ωs, dΩ_bg, = s.Ωs, s.dΩ_bg

@@ -135,15 +135,8 @@ function main(ranks)
   φh = interpolate(lsf,V_φ)
   φh_nondesign = interpolate(fsolid,V_φ)
 
-  _φ = get_free_dof_values(φh)
-  map(local_views(_φ)) do φ
-    idx = findall(isapprox(0.0;atol=1e-10),φ)
-    if !isempty(idx)
-      i_am_main(ranks) && println("    Correcting level values at $(length(idx)) nodes")
-    end
-    φ[idx] .+= 1e-10
-  end
-  consistent!(_φ) |> wait
+  # Check LS
+  GridapTopOpt.correct_ls!(φh)
 
   writevtk(get_triangulation(φh),path*"initial_lsf",cellfields=["φh"=>φh])
 

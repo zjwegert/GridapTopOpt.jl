@@ -95,24 +95,18 @@ function get_dof_Δ(s::UnfittedFEEvolution)
 end
 
 ## Helpers
-# function _get_minimum_element_diameter(h::CellField)
-#   h_data = lazy_map(_get_value,get_data(h))
-#   return minimum(h_data)
-# end
+function correct_ls!(φh;tol = 10*eps(Float64))
+  x = get_free_dof_values(φh)
+  for i in eachindex(x)
+    abs(x[i]) < tol && (x[i] = tol)
+  end
+end
 
-# _get_minimum_element_diameter(h::Real) = h
-
-# function _get_minimum_element_diameter(h)
-#   @notimplemented
-# end
-
-# function _get_value(t::Gridap.CellData.ConstantField)
-#   return t.value
-# end
-
-# function _get_value(::Gridap.Fields.Field)
-#   Gridap.Helpers.@notimplemented "Only ConstantField is currently supported"
-# end
+function correct_ls!(φh::GridapDistributed.DistributedCellField; tol = 10*eps(Float64))
+  map(local_views(φh)) do φh
+    correct_ls!(φh,tol=tol)
+  end
+end
 
 ##
 include("CutFEMEvolve.jl")

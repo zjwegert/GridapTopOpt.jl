@@ -108,16 +108,8 @@ function main(ranks)
   f((x,y,z),q,r) = - cos(q*π*x)*cos(q*π*y)*cos(q*π*z)/q - r/q
   φh = interpolate(x->f(x,4,0.1),V_φ)
 
-  # Ensure values at DoFs are non-zero to satify assumptions for derivatives
-  _φ = get_free_dof_values(φh)
-  map(local_views(_φ)) do φ
-    idx = findall(isapprox(0.0;atol=1e-10),φ)
-    if !isempty(idx)
-      i_am_main(ranks) && println("    Correcting level values at $(length(idx)) nodes")
-    end
-    φ[idx] .+= 1e-10
-  end
-  consistent!(_φ) |> wait
+  # Check LS
+  GridapTopOpt.correct_ls!(φh)
 
   # Setup integration meshes and measures
   order = 1

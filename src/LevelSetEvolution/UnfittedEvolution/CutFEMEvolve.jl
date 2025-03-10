@@ -164,6 +164,7 @@ function solve!(s::CutFEMEvolve,φh,velh,γ,cache::Nothing)
   #   would update the stiffness matrix. However, this does not appear to be the case.
   #   See `scripts/Embedded/Bugs/odes_reassemble_stiffness.jl` for a minimal example.
   # s.cache = state_new
+  correct_ls!(φh)
   update_collection!(s.Ωs,φh)
   return φh
 end
@@ -202,6 +203,8 @@ function solve!(s::CutFEMEvolve,φh,velh,γ,cache)
   _, φhF = data
   copy!(get_free_dof_values(φh),get_free_dof_values(φhF))
   s.cache = state_updated
+
+  correct_ls!(φh)
   update_collection!(s.Ωs,φh) # TODO: remove?
   return φh
 end
