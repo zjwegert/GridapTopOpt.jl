@@ -75,7 +75,6 @@ function split(p::Polyhedron,vertex_values)
   in_graph = deepcopy(graph)
   out_graph = deepcopy(graph)
 
-  D = 3
   n_vertices = num_vertices(p)
   for v in 1:n_vertices
     isactive(p,v) || continue
@@ -90,11 +89,11 @@ function split(p::Polyhedron,vertex_values)
       e = findfirst(e -> e == [v,vneig] || e == [vneig,v], edge_nodes)
       push!(edges, e)
 
-      push!(in_graph, fill(UNSET,D))
+      push!(in_graph, fill(UNSET,3))
       in_graph[v][i] = length(vertices)
       in_graph[end][1] = v
 
-      push!(out_graph, fill(UNSET,D))
+      push!(out_graph, fill(UNSET,3))
       ineig = findfirst(isequal(v), graph[vneig])
       out_graph[vneig][ineig] = length(vertices)
       out_graph[end][1] = vneig
@@ -188,9 +187,12 @@ function cut_conforming(topo::UnstructuredGridTopology{D}, cell_values) where D
   for cell in 1:num_cells(topo)
     nodes = getindex!(nodes_cache,cell_nodes,cell)
     values = getindex!(values_cache,cell_values,cell)
-    vertices = vertex_coordinates[nodes]
-    p = GeneralPolytope{D}(p_ref,vertices)
+    p = GeneralPolytope{D}(p_ref,vertex_coordinates[nodes])
+
     nodes = nodes[node_reindex]
+    values = values[node_reindex]
+    @assert !any(iszero,values) "Zero node value detected!"
+
     if !cell_iscut[cell]
       n_subcells += 1
       subcell_nodes[n_subcells] = nodes
