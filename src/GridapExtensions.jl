@@ -252,8 +252,8 @@ struct StaggeredAdjointAffineFEOperator{NB,SB} <: StaggeredFEOperator{NB,SB}
       liforms :: Vector{<:Function},
       trial   :: BlockFESpaceTypes{NB,SB,P},
       test    :: BlockFESpaceTypes{NB,SB,P},
-      [assem  :: BlockSparseMatrixAssembler{NB,NV,SB,P}]
-    ) where {NB,NV,SB,P}
+      [assem  :: BlockSparseMatrixAssembler]
+    ) where {NB,SB,P}
 
   Constructor for a `StaggeredAdjointAffineFEOperator` operator, taking in each
   equation as a pair of bilinear/linear forms and the global trial/test spaces.
@@ -263,8 +263,8 @@ struct StaggeredAdjointAffineFEOperator{NB,SB} <: StaggeredFEOperator{NB,SB}
     liforms :: Vector{<:Function},
     trial   :: BlockFESpaceTypes{NB,SB,P},
     test    :: BlockFESpaceTypes{NB,SB,P},
-    assem   :: BlockSparseMatrixAssembler{NB,NV,SB,P} = SparseMatrixAssembler(trial,test)
-  ) where {NB,NV,SB,P}
+    assem   :: BlockSparseMatrixAssembler = SparseMatrixAssembler(trial,test)
+  ) where {NB,SB,P}
     @assert length(biforms) == length(liforms) == NB
     @assert P == Tuple(1:sum(SB)) "Permutations not supported"
     trials = blocks(trial)
