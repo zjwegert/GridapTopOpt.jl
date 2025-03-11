@@ -30,7 +30,7 @@ function petsc_mumps_setup(ksp)
   @check_error_code GridapPETSc.PETSC.MatMumpsSetIcntl(mumpsmat[], 28, 2)
   @check_error_code GridapPETSc.PETSC.MatMumpsSetIcntl(mumpsmat[], 29, 2)
   @check_error_code GridapPETSc.PETSC.MatMumpsSetIcntl(mumpsmat[], 14, 150)
-  @check_error_code GridapPETSc.PETSC.MatMumpsSetCntl(mumpsmat[],  1, -1)
+  # @check_error_code GridapPETSc.PETSC.MatMumpsSetCntl(mumpsmat[],  1, -1)
   @check_error_code GridapPETSc.PETSC.KSPView(ksp[],C_NULL)
 end
 
@@ -51,8 +51,8 @@ function petsc_cholmumps_setup(ksp)
   @check_error_code GridapPETSc.PETSC.MatMumpsSetIcntl(mumpsmat[],  4, 4)# 1)
   @check_error_code GridapPETSc.PETSC.MatMumpsSetIcntl(mumpsmat[], 28, 2)
   @check_error_code GridapPETSc.PETSC.MatMumpsSetIcntl(mumpsmat[], 29, 2)
-  @check_error_code GridapPETSc.PETSC.MatMumpsSetIcntl(mumpsmat[], 14, 150)
-  @check_error_code GridapPETSc.PETSC.MatMumpsSetCntl(mumpsmat[],  1, -1)
+  @check_error_code GridapPETSc.PETSC.MatMumpsSetIcntl(mumpsmat[], 14, 1000)
+  @check_error_code GridapPETSc.PETSC.MatMumpsSetCntl(mumpsmat[],  1, 0.00001)
   @check_error_code GridapPETSc.PETSC.KSPView(ksp[],C_NULL)
 end
 
