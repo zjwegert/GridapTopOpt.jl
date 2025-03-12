@@ -6,7 +6,7 @@ using GridapSolvers, GridapSolvers.BlockSolvers, GridapSolvers.NonlinearSolvers
 using FiniteDiff
 using Test
 
-function main(;verbose)
+function main(;verbose,analytic_partials)
   model = CartesianDiscreteModel((0,1,0,1),(4,4))
   order = 1
   reffe = ReferenceFE(lagrangian,Float64,order)
@@ -46,19 +46,13 @@ function main(;verbose)
   # Create operator from components
   op = StaggeredAffineFEOperator([a1,a2],[l1,l2],[UB1,UB2],[VB1,VB2])
 
-  ## This fails due to Gridap#1062
-  # op_at_φ = GridapTopOpt.get_staggered_operator_at_φ(op,φh)
-  # _solver = StaggeredFESolver([LUSolver(),LUSolver()])
-  # xh = solve(_solver,op_at_φ);
-  # ubh1 = GridapSolvers.BlockSolvers.get_solution(op,xh,1)
-  # ub2h = GridapSolvers.BlockSolvers.get_solution(op,xh,2)
-  # ∂a2∂ub1(v3) = ∇(ub1->a2((ub1,),ub2h,v3,φh),ubh1)
-  # ∂a2∂ub1(ub2h)
-  ## Alternate
-  ∂R2∂xh1((du1,du2),((u1,u2),),u3,v3,φ) = ∫(φ * (du1 + du2) * u3 * v3)dΩ2 - ∫(φ * φ * rhs[3] * (du1 + du2) * v3)dΩ2
-  ∂Rk∂xhi = ((∂R2∂xh1,),)
-
-  φ_to_u = StaggeredAffineFEStateMap(op,∂Rk∂xhi,V_φ,U_reg,φh)
+  if analytic_partials
+    ∂R2∂xh1((du1,du2),((u1,u2),),u3,v3,φ) = ∫(φ * (du1 + du2) * u3 * v3)dΩ2 - ∫(φ * φ * rhs[3] * (du1 + du2) * v3)dΩ2
+    ∂Rk∂xhi = ((∂R2∂xh1,),)
+    φ_to_u = StaggeredAffineFEStateMap(op,∂Rk∂xhi,V_φ,U_reg,φh)
+  else
+    φ_to_u = StaggeredAffineFEStateMap(op,V_φ,U_reg,φh)
+  end
 
   # Test solution
   GridapTopOpt.forward_solve!(φ_to_u,φh)
@@ -75,10 +69,14 @@ function main(;verbose)
 
   # Test derivative
   F(((u1,u2),u3),φ) = ∫(u1 + u2 + u3 + φ)dΩ
-  ∂F∂u12((du1,du2),((u1,u2),u3),φ) = ∫(du1 + du2)dΩ
-  ∂F∂u3(du3,((u1,u2),u3),φ) = ∫(du3)dΩ
 
-  pcf = PDEConstrainedFunctionals(F,(∂F∂u12,∂F∂u3),φ_to_u)
+  if analytic_partials
+    ∂F∂u12((du1,du2),((u1,u2),u3),φ) = ∫(du1 + du2)dΩ
+    ∂F∂u3(du3,((u1,u2),u3),φ) = ∫(du3)dΩ
+    pcf = PDEConstrainedFunctionals(F,(∂F∂u12,∂F∂u3),φ_to_u)
+  else
+    pcf = PDEConstrainedFunctionals(F,φ_to_u)
+  end
   _,_,_dF,_ = evaluate!(pcf,φh)
 
   function φ_to_j(φ)
@@ -93,5 +91,6 @@ function main(;verbose)
   @test rel_error < 1e-8
 end
 
-main(verbose=false)
+main(verbose = false, analytic_partials = true)
+main(verbose = false, analytic_partials = false)
 end

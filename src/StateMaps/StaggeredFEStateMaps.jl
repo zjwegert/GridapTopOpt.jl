@@ -69,12 +69,12 @@ struct StaggeredAffineFEStateMap{NB,SB,A,B,C,D,E,F} <: AbstractFEStateMap
 
     ## Forward cache
     op_at_φ = get_staggered_operator_at_φ(op,φh)
-    xh = zero(op.trial)
+    xh = one(op.trial)
     op_cache = _instantiate_caches(xh,solver,op_at_φ)
     fwd_caches = (zero_free_values(op.trial),op.trial,op_cache,op_at_φ)
 
     ## Adjoint cache
-    xh_adj = zero(op.trial)
+    xh_adj = one(op.trial)
     op_adjoint = dummy_generate_adjoint_operator(op_at_φ,assems_adjoint,φh,xh_adj,∂Rk∂xhi)
     op_cache = _instantiate_caches(xh_adj,adjoint_solver,op_adjoint)
     adj_caches = (zero_free_values(op_adjoint.trial),op_adjoint.trial,op_cache,op_adjoint)
@@ -237,12 +237,12 @@ mutable struct StaggeredNonlinearFEStateMap{NB,SB,A,B,C,D,E,F} <: AbstractFEStat
 
     ## Forward cache
     op_at_φ = get_staggered_operator_at_φ(op,φh)
-    xh = zero(op.trial)
+    xh = one(op.trial)
     op_cache = _instantiate_caches(xh,solver,op_at_φ)
     fwd_caches = (zero_free_values(op.trial),op.trial,op_cache,op_at_φ)
 
     ## Adjoint cache
-    xh_adj = zero(op.trial)
+    xh_adj = one(op.trial)
     op_adjoint = dummy_generate_adjoint_operator(op_at_φ,assems_adjoint,φh,xh_adj,∂Rk∂xhi)
     op_cache = _instantiate_caches(xh_adj,adjoint_solver,op_adjoint)
     adj_caches = (zero_free_values(op_adjoint.trial),op_adjoint.trial,op_cache,op_adjoint)
