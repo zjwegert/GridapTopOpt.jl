@@ -65,13 +65,17 @@ function main(ranks)
   D = 3
 
   # Output path
-  path = "./results/CutFEM_Wheel_MinCompliance_Neumann_gammag_$(γg_evo)_vf_$(vf)/"
+  path = "./results/CutFEM_Wheel_MinCompliance_Dirichlet_gammag_$(γg_evo)_vf_$(vf)/"
   files_path = path*"data/"
   i_am_main(ranks) && mkpath(files_path)
 
   # Load mesh
   model = GmshDiscreteModel(ranks,(@__DIR__)*"/Meshes/wheel.msh")
   model = UnstructuredDiscreteModel(model)
+
+  # Add non-designable region
+  f_NonDesign(x) = 0.1 < sqrt(x[1]^2+x[2]^2) <= 0.2 + eps()
+  update_labels!(1,model,f_NonDesign,"Omega_NonDesign")
   writevtk(model,path*"model")
 
   # Get triangulation and element size
@@ -82,11 +86,14 @@ function main(ranks)
   # Cut the background model
   reffe_scalar = ReferenceFE(lagrangian,Float64,1)
   V_φ = TestFESpace(model,reffe_scalar)
-  V_reg = TestFESpace(model,reffe_scalar;dirichlet_tags=["Gamma_N",])
+  V_reg = TestFESpace(model,reffe_scalar;dirichlet_tags=["Gamma_N","Omega_NonDesign"])
   U_reg = TrialFESpace(V_reg)
 
   f((x,y,z),q,r) = - cos(q*π*x)*cos(q*π*y)*cos(q*π*z)/q - r/q
-  φh = interpolate(x->f(x,4,0.1),V_φ)
+  g((x,y,z)) = sqrt(x^2 + y^2) - 0.2
+  lsf(x) = min(f(x,4,0.1),g(x))
+  φh = interpolate(lsf,V_φ)
+  φh_nondesign = interpolate(g,V_φ)
 
   # Check LS
   GridapTopOpt.correct_ls!(φh)
@@ -121,10 +128,12 @@ function main(ranks)
   writevtk(Ω_data.Ω,path*"Omega_initial")
 
   # Setup spaces
+  uin((x,y,z)) = 10VectorValue(-y,x,0.0)
+
   reffe_d = ReferenceFE(lagrangian,VectorValue{D,Float64},order)
   function build_spaces(Ω_act)
-    V = TestFESpace(Ω_act,reffe_d,conformity=:H1,dirichlet_tags=["Gamma_D"])
-    U = TrialFESpace(V)
+    V = TestFESpace(Ω_act,reffe_d,conformity=:H1,dirichlet_tags=["Gamma_D","Gamma_N"])
+    U = TrialFESpace(V,[VectorValue(0.0,0.0,0.0),uin])
     return U,V
   end
   _U_init = build_spaces(Ω_data.Ω_act)[1]
@@ -147,10 +156,10 @@ function main(ranks)
   a_s_Ω(d,s) = ε(s) ⊙ (σ ∘ ε(d)) # Elasticity
   j_s_k(d,s) = mean(γ_Gd ∘ hₕ)*(jump(Ω_data.n_Γg ⋅ ∇(s)) ⋅ jump(Ω_data.n_Γg ⋅ ∇(d)))
   v_s_ψ(d,s) = (k_d*Ω_data.ψ)*(d⋅s) # Isolated volume term
-  g((x,y,z)) = 100VectorValue(-y,x,0.0)
+  _g = VectorValue(0.0,0.0,0.0)
 
   a(d,s,φ) = ∫(a_s_Ω(d,s) + v_s_ψ(d,s))Ω_data.dΩ + ∫(j_s_k(d,s))Ω_data.dΓg
-  l(s,φ) = ∫(s⋅g)dΓ_N
+  l(s,φ) = ∫(s⋅_g)dΓ_N
 
   ## Optimisation functionals
   vol_D = sum(∫(1)dΩ_bg)
@@ -207,6 +216,15 @@ function main(ranks)
       writevtk(Ω_data.Ω,path*"Omega_in_$it",cellfields=["uh"=>uh])
     end
     write_history(path*"/history.txt",optimiser.history;ranks)
+
+    # Geometric operation to re-add the non-designable region # TODO: Move to a function
+    _φ = get_free_dof_values(φh)
+    _φ_nondesign = get_free_dof_values(φh_nondesign)
+    map(local_views(_φ),local_views(_φ_nondesign)) do φ,φ_nondesign
+      φ .= min.(φ,φ_nondesign)
+    end
+    consistent!(_φ) |> wait
+    reinit!(ls_evo,φh)
   end
   it = get_history(optimiser).niter; uh = get_state(pcf)
   writevtk(Ω_bg,path*"Omega_act_$it",cellfields=["φ"=>φh,"|∇(φ)|"=>(norm ∘ ∇(φh)),"uh"=>uh,"ψ"=>Ω_data.ψ])
