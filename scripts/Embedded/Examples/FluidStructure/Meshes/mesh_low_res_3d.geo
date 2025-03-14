@@ -12,7 +12,7 @@ b = 0.05;
 cw = 0.1; //+ Width between wall and non-designable domain
 
 //+ Mesh sizes
-size_f = 0.2;
+size_f = 0.1;
 size_s = 0.1;
 
 //+ Main area

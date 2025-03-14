@@ -56,12 +56,13 @@ function gamg_ksp_setup(;rtol=10^-8,maxits=100)
 end
 
 function main(ranks)
-  path = "./results/CutFEM_Wheel_MinCompliance_gammag_$(γg_evo)/"
+  vf = 0.3
+
+  path = "./results/CutFEM_Wheel_MinCompliance_gammag_$(γg_evo)_vf_$(vf)/"
   files_path = path*"data/"
   i_am_main(ranks) && mkpath(files_path)
 
   γ_evo = 0.1
-  vf = 0.3
   iter_mod = 1
   D = 3
 
