@@ -4,6 +4,8 @@ using GridapSolvers, GridapSolvers.BlockSolvers, GridapSolvers.NonlinearSolvers
 using GridapGmsh
 using GridapTopOpt
 
+using Gridap.FESpaces, Gridap.CellData
+
 using GridapDistributed,PartitionedArrays,GridapPETSc
 
 using Gridap.Arrays, Gridap.Helpers
@@ -26,6 +28,25 @@ function Gridap.Arrays.lazy_map(k,a::AppendedArray,b::AbstractArray)
   n = length(a.a)
   c = lazy_append(lazy_split(b,n)...)
   lazy_map(k,a,c)
+end
+
+function FESpaces._gradient(f,uh,fuh::GridapDistributed.DistributedDomainContribution)
+  println(" --- Compute gradient")
+  local_terms = map(r -> DomainContribution(), GridapDistributed.get_parts(fuh))
+  local_domains = tuple_of_arrays(map(Tuple∘get_domains,local_views(fuh)))
+  for local_trians in local_domains
+    println("     --- Compute gradient for trian")
+    display(local_trians)
+    g = FESpaces._change_argument(gradient,f,local_trians,uh)
+    println("         --- flag 1")
+    cell_u = map(FESpaces.get_cell_dof_values,local_views(uh))
+    cell_id = map(FESpaces._compute_cell_ids,local_views(uh),local_trians)
+    println("         --- flag 2")
+    cell_grad = GridapDistributed.distributed_autodiff_array_gradient(g,cell_u,cell_id)
+    println("         --- flag 3")
+    map(add_contribution!,local_terms,local_trians,cell_grad)
+  end
+  GridapDistributed.DistributedDomainContribution(local_terms)
 end
 
 if isassigned(ARGS,1)
@@ -199,6 +220,7 @@ function main(ranks)
   reffe_d = ReferenceFE(lagrangian,VectorValue{D,Float64},order)
 
   function build_spaces(Ω_act_s,Ω_act_f)
+    println(" --- Build spaces")
     # Test spaces
     V = TestFESpace(Ω_act_f,reffe_u,conformity=:H1,
       dirichlet_tags=["Gamma_f_D","Gamma_s_D","Gamma_Bottom","Gamma_Top",
@@ -251,9 +273,10 @@ function main(ranks)
 
   function a_fluid((),(u,p),(v,q),φ)
     n_Γ = -get_normal_vector(Ω.Γ)
-    return ∫(a_Ω(u,v) + b_Ω(v,p) + b_Ω(u,q) + v_ψ(p,q))Ω.dΩf +
-      ∫(a_Γ(u,v,n_Γ) + b_Γ(v,p,n_Γ) + b_Γ(u,q,n_Γ))Ω.dΓ +
-      ∫(ju(u,v))Ω.dΓg - ∫(jp(p,q))Ω.dΓi
+    return ∫(a_Ω(u,v))Ω.dΩf
+    # return ∫(a_Ω(u,v) + b_Ω(v,p) + b_Ω(u,q))Ω.dΩf + #v_ψ(p,q))Ω.dΩf +
+    #   ∫(a_Γ(u,v,n_Γ) + b_Γ(v,p,n_Γ) + b_Γ(u,q,n_Γ))Ω.dΓ +
+    #   ∫(ju(u,v))Ω.dΓg - ∫(jp(p,q))Ω.dΓi
   end
 
   l_fluid((),(v,q),φ) =  ∫(0q)Ω.dΩf
@@ -277,13 +300,14 @@ function main(ranks)
   v_s_ψ(d,s) = (k_d*Ω.ψ_s)*(d⋅s) # Isolated volume term
 
   function a_solid(((u,p),),d,s,φ)
-    return ∫(a_s_Ω(d,s))Ω.dΩs +
-      ∫(j_s_k(d,s))Ω.dΓg +
-      ∫(v_s_ψ(d,s))Ω.dΩs
+    return ∫(a_s_Ω(d,s))Ω.dΩs# +
+      #∫(j_s_k(d,s))Ω.dΓg# +
+      #∫(v_s_ψ(d,s))Ω.dΩs
   end
   function l_solid(((u,p),),s,φ)
     n = -get_normal_vector(Ω.Γ)
-    return ∫(-σf_n(u,p,n) ⋅ s)Ω.dΓ
+    #return ∫(-σf_n(u,p,n) ⋅ s)Ω.dΓ
+    return ∫(0s)Ω.dΩs
   end
 
   ## Optimisation functionals
@@ -293,22 +317,24 @@ function main(ranks)
 
   ## Staggered operators
   i_am_main(ranks) && println(" --- Setup staggered operators")
-  fluid_ls = MUMPSSolver()
-  elast_ls = MUMPSSolver()
+  fluid_ls = LUSolver() # MUMPSSolver()
+  elast_ls = LUSolver() # MUMPSSolver()
 
-  state_collection = GridapTopOpt.EmbeddedCollection_in_φh(model,φh) do _φh
-    update_collection!(Ω,_φh)
+  #state_collection = GridapTopOpt.EmbeddedCollection_in_φh(model,φh) do _φh
+  #  update_collection!(Ω,_φh)
+  _φh = φh
     (UP,VQ),(R,T) = build_spaces(Ω.Ω_act_s,Ω.Ω_act_f)
+
     # elast_ls = ElasticitySolver(R;rtol=1.e-8,maxits=200)
     solver = StaggeredFESolver([fluid_ls,elast_ls]);
     op = StaggeredAffineFEOperator([a_fluid,a_solid],[l_fluid,l_solid],[UP,R],[VQ,T])
     state_map = StaggeredAffineFEStateMap(op,V_φ,U_reg,_φh;solver,adjoint_solver=solver)
-    (;
-      :state_map => state_map,
-      :J => GridapTopOpt.StaggeredStateParamMap(J_comp,state_map),
-      :C => map(Ci -> GridapTopOpt.StaggeredStateParamMap(Ci,state_map),[Vol,])
-    )
-  end
+  #  (;
+  #    :state_map => state_map,
+  #    :J => GridapTopOpt.StaggeredStateParamMap(J_comp,state_map),
+  #    :C => map(Ci -> GridapTopOpt.StaggeredStateParamMap(Ci,state_map),[Vol,])
+  #  )
+  #end
 
   i_am_main(ranks) && println(" --- Setup PCF")
   pcf = EmbeddedPDEConstrainedFunctionals(state_collection;analytic_dC=[dVol])
@@ -382,7 +408,7 @@ with_debug() do distribute
   ncpus = 2
   ranks = distribute(LinearIndices((ncpus,)))
   petsc_options = "-ksp_converged_reason -ksp_error_if_not_converged true"
-  GridapPETSc.with(;args=split(petsc_options)) do
+  #GridapPETSc.with(;args=split(petsc_options)) do
     main(ranks)
-  end
+  #end
 end

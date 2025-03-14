@@ -54,32 +54,32 @@ struct StaggeredAffineFEStateMap{NB,SB,A,B,C,D,E,F} <: AbstractFEStateMap
     """
 
     ## Pullback cache (this is a temporary solution before we refactor ChainRules)
-    # println("	      --- Setup Pullback cache")
+    println("	      --- Setup Pullback cache")
     uhd = zero(op.trial)
     xhs, λᵀs_∂Rs∂φ = (), ()
     for k in 1:NB
       xh_k = get_solution(op,uhd,k)
       _a(uk,vk,φ) = op.biforms[k](xhs,uk,vk,φ)
       _l(vk,φ) = op.liforms[k](xhs,vk,φ)
-      # println("	        --- Compute λᵀ$(k)_∂R$(k)∂φ")
+      println("	        --- Compute λᵀ$(k)_∂R$(k)∂φ")
       λᵀk_∂Rk∂φ = ∇((uk,vk,φ) -> _a(uk,vk,φ) - _l(vk,φ),[xh_k,xh_k,φh],3)
       xhs, λᵀs_∂Rs∂φ = (xhs...,xh_k), (λᵀs_∂Rs∂φ...,λᵀk_∂Rk∂φ)
     end
-    # println("	      --- Collect cell vecs")
+    println("	      --- Collect cell vecs")
     vecdata = collect_cell_vector(U_reg,sum(λᵀs_∂Rs∂φ))
-    # println("	      --- Alloc vector")
+    println("	      --- Alloc vector")
     Σ_λᵀs_∂Rs∂φ = allocate_vector(assem_deriv,vecdata)
     plb_caches = (Σ_λᵀs_∂Rs∂φ,assem_deriv)
 
     ## Forward cache
-    # println("	      --- Setup forward cache")
+    println("	      --- Setup forward cache")
     op_at_φ = get_staggered_operator_at_φ(op,φh)
     xh = one(op.trial)
     op_cache = _instantiate_caches(xh,solver,op_at_φ)
     fwd_caches = (zero_free_values(op.trial),op.trial,op_cache,op_at_φ)
 
     ## Adjoint cache
-    # println("	      --- Setup adjoint cache")
+    println("	      --- Setup adjoint cache")
     xh_adj = one(op.trial)
     op_adjoint = dummy_generate_adjoint_operator(op_at_φ,assems_adjoint,φh,xh_adj,∂Rk∂xhi)
     op_cache = _instantiate_caches(xh_adj,adjoint_solver,op_adjoint)
