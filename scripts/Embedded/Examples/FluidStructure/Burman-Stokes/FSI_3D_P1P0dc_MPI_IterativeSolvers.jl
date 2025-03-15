@@ -166,6 +166,7 @@ function main(ranks)
       :n_Γg     => get_normal_vector(Γg),
       :Γ        => Γ,
       :dΓ       => Measure(Γ,degree),
+      :n_Γ        => get_normal_vector(Γ), # Note, need to recompute inside obj/constraints to compute derivs
       :Ω_act_s  => Ω_act_s,
       :dΩ_act_s => Measure(Ω_act_s,degree),
       :Ω_act_f  => Ω_act_f,
@@ -279,7 +280,7 @@ function main(ranks)
   ## Optimisation functionals
   J_comp(((u,p),d),φ) = ∫(ε(d) ⊙ (σ ∘ ε(d)))Ω.dΩs
   Vol(((u,p),d),φ) = ∫(vol_D)Ω.dΩs - ∫(vf/vol_D)dΩ_act
-  dVol(q,(u,p,d),φ) = ∫(-1/vol_D*q/(norm ∘ (∇(φ))))Ω.dΓ
+  dVol(q,(u,p,d),φ) = ∫(-1/vol_D*q/(abs(Ω.n_Γ ⋅ ∇(φ))))Ω.dΓ
 
   ## Staggered operators
   solver_u = ASMSolver()

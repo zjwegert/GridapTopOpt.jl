@@ -55,6 +55,7 @@ V_φ = TestFESpace(model,reffe_scalar)
     :n_Γg => get_normal_vector(Γg),
     :Γ    => Γ,
     :dΓ   => Measure(Γ,2*order),
+    :n_Γ  => get_normal_vector(Γ), # Note, need to recompute inside obj/constraints to compute derivs
     :Ωact => Ωact
   )
 end
@@ -67,7 +68,7 @@ l(v,φ) = ∫(v)dΓ_N
 ## Optimisation functionals
 J(u,φ) = a(u,u,φ)
 Vol(u,φ) = ∫(1/vol_D)Ωs.dΩin - ∫(vf/vol_D)dΩ
-dVol(q,u,φ) = ∫(-1/vol_D*q/(1e-20 + norm ∘ (∇(φ))))Ωs.dΓ
+dVol(q,u,φ) = ∫(-1/vol_D*q/(abs(Ωs.n_Γ ⋅ ∇(φ))))Ωs.dΓ
 
 ## Setup solver and FE operators
 Pl = JacobiLinearSolver()

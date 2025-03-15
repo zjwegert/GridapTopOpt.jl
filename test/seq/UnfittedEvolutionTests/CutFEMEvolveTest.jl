@@ -27,6 +27,7 @@ V_φ = TestFESpace(model,reffe_scalar)
   (;
     :Γ  => Γ,
     :dΓ => Measure(Γ,2*order),
+    :n_Γ  => get_normal_vector(Γ), # Note, need to recompute inside obj/constraints to compute derivs
     :Γg => Γg,
     :dΓg => Measure(Γg,2*order),
     :n_Γg => get_normal_vector(Γg)

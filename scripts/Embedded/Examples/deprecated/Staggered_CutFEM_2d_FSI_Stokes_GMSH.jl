@@ -76,6 +76,7 @@ dΓf_N = Measure(Γf_N,degree)
     :n_Γg    => get_normal_vector(Γg),
     :Γ       => Γ,
     :dΓ      => Measure(Γ,degree),
+      :n_Γ        => get_normal_vector(Γ), # Note, need to recompute inside obj/constraints to compute derivs
     :Ω_act_s => Triangulation(cutgeo,ACTIVE),
     :Ω_act_f => Triangulation(cutgeo,ACTIVE_OUT),
     :χ_s     => GridapTopOpt.get_isolated_volumes_mask(cutgeo,["Gamma_s_D"];groups=((GridapTopOpt.CUT,IN),OUT)),
@@ -192,7 +193,7 @@ J_comp(((u,p),d),φ) = ∫(ε(d) ⊙ (σ ∘ ε(d)))Ω.dΩs
 ∂Jpres∂xhi = (∂Jcomp∂up,∂Jcomp∂d)
 
 Vol(((u,p),d),φ) = ∫(vol_D)Ω.dΩs - ∫(vf/vol_D)dΩ_act
-dVol(q,(u,p,d),φ) = ∫(-1/vol_D*q/(norm ∘ (∇(φ))))Ω.dΓ
+dVol(q,(u,p,d),φ) = ∫(-1/vol_D*q/(abs(Ω.n_Γ ⋅ ∇(φ))))Ω.dΓ
 ∂Vol∂up((du,dp),((u,p),d),φ) = ∫(0dp)dΩ_act
 ∂Vol∂d(dd,((u,p),d),φ) = ∫(0dd ⋅ d)dΩ_act
 ∂Vol∂xhi = (∂Vol∂up,∂Vol∂d)

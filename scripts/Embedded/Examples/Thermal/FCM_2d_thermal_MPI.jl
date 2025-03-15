@@ -67,6 +67,7 @@ function main(mesh_partition,distribute,el_size,path)
       :n_Γg => get_normal_vector(Γg),
       :Γ    => Γ,
       :dΓ   => Measure(Γ,2*order),
+    :n_Γ  => get_normal_vector(Γ), # Note, need to recompute inside obj/constraints to compute derivs
       :Ωact => Ωact
     )
   end
@@ -79,7 +80,7 @@ function main(mesh_partition,distribute,el_size,path)
   ## Optimisation functionals
   J(u,φ) = ∫(∇(u)⋅∇(u))Ωs.dΩin
   Vol(u,φ) = ∫(1/vol_D)Ωs.dΩin - ∫(vf/vol_D)dΩ
-  dVol(q,u,φ) = ∫(-1/vol_D*q/(norm ∘ (∇(φ))))Ωs.dΓ
+  dVol(q,u,φ) = ∫(-1/vol_D*q/(abs(Ωs.n_Γ ⋅ ∇(φ))))Ωs.dΓ
 
   ## Setup solver and FE operators
   Tm = SparseMatrixCSR{0,PetscScalar,PetscInt}
