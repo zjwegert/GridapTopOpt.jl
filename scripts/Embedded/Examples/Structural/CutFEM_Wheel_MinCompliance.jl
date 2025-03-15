@@ -29,7 +29,7 @@ function petsc_mumps_setup(ksp)
   @check_error_code GridapPETSc.PETSC.MatMumpsSetIcntl(mumpsmat[],  4, 1)
   @check_error_code GridapPETSc.PETSC.MatMumpsSetIcntl(mumpsmat[], 28, 2)
   @check_error_code GridapPETSc.PETSC.MatMumpsSetIcntl(mumpsmat[], 29, 2)
-  @check_error_code GridapPETSc.PETSC.MatMumpsSetIcntl(mumpsmat[], 14, 20000)
+  @check_error_code GridapPETSc.PETSC.MatMumpsSetIcntl(mumpsmat[], 14, 50000)
   @check_error_code GridapPETSc.PETSC.KSPView(ksp[],C_NULL)
 end
 
@@ -154,7 +154,8 @@ function main(ranks)
 
   ## Optimisation functionals
   vol_D = sum(∫(1)dΩ_bg)
-  J_comp(d,φ) = ∫(ε(d) ⊙ (σ ∘ ε(d)))Ω_data.dΩ
+  iso_vol_frac(φ) = ∫(Ω_data.ψ/vol_D)Ω_data.dΩ
+  J_comp(d,φ) = ∫(ε(d) ⊙ (σ ∘ ε(d)))Ω_data.dΩ + iso_vol_frac(φ)
   Vol(d,φ) = ∫(1/vol_D)Ω_data.dΩ - ∫(vf/vol_D)dΩ_bg
   dVol(q,d,φ) = ∫(-1/vol_D*q/(norm ∘ (∇(φ))))Ω_data.dΓ
 
@@ -207,6 +208,9 @@ function main(ranks)
       writevtk(Ω_data.Ω,path*"Omega_in_$it",cellfields=["uh"=>uh])
     end
     write_history(path*"/history.txt",optimiser.history;ranks)
+
+    isolated_vol = sum(iso_vol_frac(φ))
+    i_am_main(ranks) && println(" --- Isolated volume: ",isolated_vol)
   end
   it = get_history(optimiser).niter; uh = get_state(pcf)
   writevtk(Ω_bg,path*"Omega_act_$it",cellfields=["φ"=>φh,"|∇(φ)|"=>(norm ∘ ∇(φh)),"uh"=>uh,"ψ"=>Ω_data.ψ])
