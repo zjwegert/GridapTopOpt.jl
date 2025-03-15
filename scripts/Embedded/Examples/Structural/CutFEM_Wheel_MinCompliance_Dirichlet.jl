@@ -219,7 +219,7 @@ function main(ranks)
     end
     write_history(path*"/history.txt",optimiser.history;ranks)
 
-    isolated_vol = sum(iso_vol_frac(φ))
+    isolated_vol = sum(iso_vol_frac(φh))
     i_am_main(ranks) && println(" --- Isolated volume: ",isolated_vol)
 
     # Geometric operation to re-add the non-designable region # TODO: Move to a function

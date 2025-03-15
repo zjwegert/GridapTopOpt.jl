@@ -210,7 +210,7 @@ function main(ranks)
     end
     write_history(path*"/history.txt",optimiser.history;ranks)
 
-    isolated_vol = sum(iso_vol_frac(φ))
+    isolated_vol = sum(iso_vol_frac(φh))
     i_am_main(ranks) && println(" --- Isolated volume: ",isolated_vol)
   end
   it = get_history(optimiser).niter; uh = get_state(pcf)
