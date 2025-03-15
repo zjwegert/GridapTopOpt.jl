@@ -129,7 +129,7 @@ function main(ranks)
   writevtk(Ω_data.Ω,path*"Omega_initial")
 
   # Setup spaces
-  uin((x,y,z)) = 10VectorValue(-y,x,0.0)
+  uin((x,y,z)) = 0.1VectorValue(-y,x,0.0)
 
   reffe_d = ReferenceFE(lagrangian,VectorValue{D,Float64},order)
   function build_spaces(Ω_act)
@@ -147,7 +147,7 @@ function main(ranks)
     μ = E/(2*(1+ν))
     (λ, μ)
   end
-  λs, μs = lame_parameters(1.0,0.3)
+  λs, μs = lame_parameters(10^4,0.3)
   # Stabilization
   α_Gd = 1e-7
   k_d = 1.0
@@ -167,7 +167,7 @@ function main(ranks)
   iso_vol_frac(φ) = ∫(Ω_data.ψ/vol_D)Ω_data.dΩ
   J_comp(d,φ) = ∫(ε(d) ⊙ (σ ∘ ε(d)))Ω_data.dΩ + iso_vol_frac(φ)
   Vol(d,φ) = ∫(1/vol_D)Ω_data.dΩ - ∫(vf/vol_D)dΩ_bg
-  dVol(q,d,φ) = ∫(-10/vol_D*q/(abs(Ω_data.n_Γ ⋅ ∇(φ))))Ω_data.dΓ
+  dVol(q,d,φ) = ∫(-1/vol_D*q/(abs(Ω_data.n_Γ ⋅ ∇(φ))))Ω_data.dΓ
 
   ## Setup solver and FE operators
   elast_ls = MUMPSSolver()
