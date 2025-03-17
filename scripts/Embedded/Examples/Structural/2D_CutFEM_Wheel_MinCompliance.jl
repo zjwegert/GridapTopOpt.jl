@@ -69,6 +69,7 @@ function main()
       :n_Γg  => get_normal_vector(Γg),
       :Γ     => Γ,
       :dΓ    => Measure(Γ,degree),
+      :n_Γ        => get_normal_vector(Γ), # Note, need to recompute inside obj/constraints to compute derivs
       # :ψ     => GridapTopOpt.get_isolated_volumes_mask(cutgeo,["Gamma_D","Gamma_N"];groups=((CUT,IN),OUT)),
       :ψ     => GridapTopOpt.get_isolated_volumes_mask(cutgeo,["Gamma_D"];groups=((CUT,IN),OUT)),
     )
@@ -115,7 +116,7 @@ function main()
   vol_D = sum(∫(1)dΩ_bg)
   J_comp(d,φ) = ∫(ε(d) ⊙ (σ ∘ ε(d)))Ω_data.dΩ
   Vol(d,φ) = ∫(1/vol_D)Ω_data.dΩ - ∫(vf/vol_D)dΩ_bg
-  dVol(q,d,φ) = ∫(-1/vol_D*q/(norm ∘ (∇(φ))))Ω_data.dΓ
+  dVol(q,d,φ) = ∫(-1/vol_D*q/(abs(Ω_data.n_Γ ⋅ ∇(φ))))Ω_data.dΓ
 
   ## Setup solver and FE operators
   state_collection = GridapTopOpt.EmbeddedCollection_in_φh(model,φh) do _φh

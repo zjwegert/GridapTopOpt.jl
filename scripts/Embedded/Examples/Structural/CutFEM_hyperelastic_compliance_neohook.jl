@@ -123,6 +123,7 @@ function main_lin_elast(n,path="./results/CutFEM_hyperelastic_compliance_neohook
       :n_Γg  => get_normal_vector(Γg),
       :Γ     => Γ,
       :dΓ    => Measure(Γ,2*order),
+    :n_Γ  => get_normal_vector(Γ), # Note, need to recompute inside obj/constraints to compute derivs
       :Ω_act => Ω_act,
       :χ   => GridapTopOpt.get_isolated_volumes_mask(cutgeo,["Gamma_D"])
     )
@@ -153,7 +154,7 @@ function main_lin_elast(n,path="./results/CutFEM_hyperelastic_compliance_neohook
   ## Optimisation functionals
   Obj(u,φ) = ∫(a_Ω(u,u))Ωs.dΩin
   Vol(u,φ) = ∫(1/vol_D)Ωs.dΩin - ∫(vf/vol_D)dΩ
-  dVol(q,u,φ) = ∫(-1/vol_D*q/(norm ∘ (∇(φ))))Ωs.dΓ
+  dVol(q,u,φ) = ∫(-1/vol_D*q/(abs(Ωs.n_Γ ⋅ ∇(φ))))Ωs.dΓ
 
   ## Finite difference solver and level set function
   evo = CutFEMEvolve(V_φ,Ωs,dΩ,hmin;max_steps,γg=0.01)
@@ -275,6 +276,7 @@ function main_neo(n,φ=nothing,λelast=nothing,Λelast=nothing;path="./results/C
       :n_Γg  => get_normal_vector(Γg),
       :Γ     => Γ,
       :dΓ    => Measure(Γ,2*order),
+    :n_Γ  => get_normal_vector(Γ), # Note, need to recompute inside obj/constraints to compute derivs
       :Ω_act => Ω_act,
       :χ   => GridapTopOpt.get_isolated_volumes_mask(cutgeo,["Gamma_D"])
     )
@@ -323,7 +325,7 @@ function main_neo(n,φ=nothing,λelast=nothing,Λelast=nothing;path="./results/C
   ## Optimisation functionals
   Obj(u,φ) = ∫((dE∘(∇(u),∇(u))) ⊙ (S∘∇(u)))Ωs.dΩin
   Vol(u,φ) = ∫(1/vol_D)Ωs.dΩin - ∫(vf/vol_D)dΩ
-  dVol(q,u,φ) = ∫(-1/vol_D*q/(norm ∘ (∇(φ))))Ωs.dΓ
+  dVol(q,u,φ) = ∫(-1/vol_D*q/(abs(Ωs.n_Γ ⋅ ∇(φ))))Ωs.dΓ
 
   ## Finite difference solver and level set function
   evo = CutFEMEvolve(V_φ,Ωs,dΩ,hmin;max_steps,γg=0.01)

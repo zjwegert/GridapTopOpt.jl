@@ -183,6 +183,7 @@ function main(ranks,mesh_partition)
       :dΓg     => Measure(Γg,degree),
       :n_Γg    => get_normal_vector(Γg),
       :Γ       => Γ,
+      :n_Γ        => get_normal_vector(Γ), # Note, need to recompute inside obj/constraints to compute derivs
       :dΓ      => Measure(Γ,degree)
     )
   end
@@ -308,7 +309,7 @@ function main(ranks,mesh_partition)
   ∂Jcomp∂xhi = (∂Jcomp∂up,∂Jcomp∂d)
 
   Vol(((u,p),d),φ) = ∫(vol_D)Ω.dΩs - ∫(vf/vol_D)dΩ_act
-  dVol(q,(u,p,d),φ) = ∫(-1/vol_D*q/(norm ∘ (∇(φ))))Ω.dΓ
+  dVol(q,(u,p,d),φ) = ∫(-1/vol_D*q/(abs(Ω.n_Γ ⋅ ∇(φ))))Ω.dΓ
   ∂Vol∂up((du,dp),((u,p),d),φ) = ∫(0dp)dΩ_act
   ∂Vol∂d(dd,((u,p),d),φ) = ∫(0dd ⋅ d)dΩ_act
   ∂Vol∂xhi = (∂Vol∂up,∂Vol∂d)

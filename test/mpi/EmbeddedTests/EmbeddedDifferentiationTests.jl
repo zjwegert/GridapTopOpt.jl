@@ -70,13 +70,14 @@ function main(
   dΩ = Measure(Ω_AD,2*order)
 
   Γ = EmbeddedBoundary(cutgeo)
+  n_Γ = get_normal_vector(Γ)
   dΓ = Measure(Γ,2*order)
 
   J_bulk(φ) = ∫(fh)dΩ
   dJ_bulk_AD = gradient(J_bulk,φh)
   dJ_bulk_AD_vec = assemble_vector(dJ_bulk_AD,V_φ)
 
-  dJ_bulk_exact(q) = ∫(-fh*q/(norm ∘ (∇(φh))))dΓ
+  dJ_bulk_exact(q) = ∫(-fh*q/(abs(n_Γ ⋅ ∇(φh))))dΓ
   dJ_bulk_exact_vec = assemble_vector(dJ_bulk_exact,V_φ)
 
   @test norm(dJ_bulk_AD_vec - dJ_bulk_exact_vec) < 1e-10
@@ -87,7 +88,7 @@ function main(
   dJ_bulk_1_AD = gradient(φ->J_bulk_1(uh,φ),φh)
   dJ_bulk_1_AD_vec = assemble_vector(dJ_bulk_1_AD,V_φ)
 
-  dJ_bulk_1_exact(q,u) = ∫(-(u+fh)*q/(norm ∘ (∇(φh))))dΓ
+  dJ_bulk_1_exact(q,u) = ∫(-(u+fh)*q/(abs(n_Γ ⋅ ∇(φh))))dΓ
   dJ_bulk_1_exact_vec = assemble_vector(q->dJ_bulk_1_exact(q,uh),V_φ)
 
   @test norm(dJ_bulk_1_AD_vec - dJ_bulk_1_exact_vec) < 1e-10
@@ -108,7 +109,7 @@ function main(
   dJ_bulk_AD2 = gradient(J_bulk2,φh)
   dJ_bulk_AD_vec2 = assemble_vector(dJ_bulk_AD2,V_φ)
 
-  dJ_bulk_exact2(q) = ∫(-g(fh)*q/(norm ∘ (∇(φh))))dΓ
+  dJ_bulk_exact2(q) = ∫(-g(fh)*q/(abs(n_Γ ⋅ ∇(φh))))dΓ
   dJ_bulk_exact_vec2 = assemble_vector(dJ_bulk_exact2,V_φ)
 
   @test norm(dJ_bulk_AD_vec2 - dJ_bulk_exact_vec2) < 1e-10
@@ -116,6 +117,7 @@ function main(
   # B.1) Facet integral
 
   Γ = EmbeddedBoundary(cutgeo)
+  n_Γ = get_normal_vector(Γ)
   Γ_AD = DifferentiableTriangulation(Γ,V_φ)
   Λ = Skeleton(Γ)
   Σ = Boundary(Γ)
@@ -139,7 +141,7 @@ function main(
   dJ_int_AD = gradient(J_int,φh)
   dJ_int_AD_vec = assemble_vector(dJ_int_AD,V_φ)
 
-  dJ_int_exact(w) = ∫((-n_Γ⋅∇(fh))*w/(norm ∘ (∇(φh))))dΓ +
+  dJ_int_exact(w) = ∫((-n_Γ⋅∇(fh))*w/(abs(n_Γ ⋅ ∇(φh))))dΓ +
                     ∫(-n_S_Λ ⋅ (jump(fh*m_k_Λ) * mean(w) / ∇ˢφ_Λ))dΛ +
                     ∫(-n_S_Σ ⋅ (fh*m_k_Σ * w / ∇ˢφ_Σ))dΣ
   dJ_int_exact_vec = assemble_vector(dJ_int_exact,V_φ)
@@ -154,7 +156,7 @@ function main(
   dJ_int_AD_vec2 = assemble_vector(dJ_int_AD2,V_φ)
 
   ∇g(∇∇f,∇f) = ∇∇f⋅∇f + ∇f⋅∇∇f
-  dJ_int_exact2(w) = ∫((-n_Γ⋅ (∇g ∘ (∇∇(fh),∇(fh))))*w/(norm ∘ (∇(φh))))dΓ +
+  dJ_int_exact2(w) = ∫((-n_Γ⋅ (∇g ∘ (∇∇(fh),∇(fh))))*w/(abs(n_Γ ⋅ ∇(φh))))dΓ +
                     ∫(-n_S_Λ ⋅ (jump(g(fh)*m_k_Λ) * mean(w) / ∇ˢφ_Λ))dΛ +
                     ∫(-n_S_Σ ⋅ (g(fh)*m_k_Σ * w / ∇ˢφ_Σ))dΣ
   dJ_int_exact_vec2 = assemble_vector(dJ_int_exact2,V_φ)
@@ -180,6 +182,7 @@ function main_normal(
   cutgeo = cut(model,geo)
 
   Γ = EmbeddedBoundary(cutgeo)
+  n_Γ = get_normal_vector(Γ)
   Γ_AD = DifferentiableTriangulation(Γ,V_φ)
   dΓ_AD = Measure(Γ_AD,2*order)
   dΓ = Measure(Γ,2*order)
@@ -216,7 +219,7 @@ function main_normal(
 
   # Note: this comes from rewriting via the divergence theorem:
   #         ∫(f ⋅ n(φ))dΓ(φ) = ∫(∇⋅f)dΩ(φ)
-  dJ_int_exact3(w) = ∫(-(∇⋅(fh_Γ))*w/(norm ∘ (∇(φh))))dΓ
+  dJ_int_exact3(w) = ∫(-(∇⋅(fh_Γ))*w/(abs(n_Γ ⋅ ∇(φh))))dΓ
   dJh_int_exact3 = assemble_vector(dJ_int_exact3,V_φ)
 
   run_test && @test norm(dJh_int_exact3 - dJ_int_AD_vec) < 1e-10

@@ -89,6 +89,7 @@ dΓf_N = Measure(Γf_N,degree)
     :n_Γg => get_normal_vector(Γg),
     :Γ    => Γ,
     :dΓ   => Measure(Γ,degree),
+      :n_Γ        => get_normal_vector(Γ), # Note, need to recompute inside obj/constraints to compute derivs
     :n_Γ  => get_normal_vector(Γ.trian),
     :Ωact => Ωact
   )

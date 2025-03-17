@@ -74,6 +74,7 @@ dΓf_N = Measure(Γf_N,degree)
     :n_Γg => get_normal_vector(Γg),
     :Γ    => Γ,
     :dΓ   => Measure(Γ,degree),
+      :n_Γ        => get_normal_vector(Γ), # Note, need to recompute inside obj/constraints to compute derivs
     :n_Γ  => get_normal_vector(Γ.trian),
   )
 end
@@ -146,7 +147,7 @@ l_coupled((v,q,s),φ) = ∫(0.0q)dΩ_act
 J_pres((u,p,d),φ) = ∫(p)dΓf_D - ∫(p)dΓf_N
 J_comp((u,p,d),φ) = ∫(ε(d) ⊙ (σ ∘ ε(d)))Ω.dΩs
 Vol((u,p,d),φ) = ∫(vol_D)Ω.dΩs - ∫(vf/vol_D)dΩ_act
-dVol(q,(u,p,d),φ) = ∫(-1/vol_D*q/(norm ∘ (∇(φ))))Ω.dΓ
+dVol(q,(u,p,d),φ) = ∫(-1/vol_D*q/(abs(Ω.n_Γ ⋅ ∇(φ))))Ω.dΓ
 
 ## Setup solver and FE operators
 state_map = AffineFEStateMap(a_coupled,l_coupled,X,Y,V_φ,U_reg,φh)

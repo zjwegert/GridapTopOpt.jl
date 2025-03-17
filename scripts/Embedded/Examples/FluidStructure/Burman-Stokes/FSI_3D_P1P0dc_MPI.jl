@@ -6,6 +6,28 @@ using GridapTopOpt
 
 using GridapDistributed,PartitionedArrays,GridapPETSc
 
+using Gridap.Arrays, Gridap.Helpers
+function Gridap.Arrays.lazy_map(k::Broadcasting{typeof(∘)},a::AppendedArray...)
+  @check all(map(i->length(i)==length(a[1]),a))
+  la = map(ai->length(ai.a),a)
+  if all(la .== first(la))
+    c_a = lazy_map(k,map(ai->ai.a,a)...)
+    c_b = lazy_map(k,map(ai->ai.b,a)...)
+    lazy_append(c_a,c_b)
+  else
+    ai = map(testitem,a)
+    T = return_type(k, ai...)
+    lazy_map(k,T,a...)
+  end
+end
+
+function Gridap.Arrays.lazy_map(k,a::AppendedArray,b::AbstractArray)
+  @assert length(a) == length(b)
+  n = length(a.a)
+  c = lazy_append(lazy_split(b,n)...)
+  lazy_map(k,a,c)
+end
+
 if isassigned(ARGS,1)
   global γg_evo =  parse(Float64,ARGS[1])
 else
@@ -35,33 +57,10 @@ function petsc_mumps_setup(ksp)
   @check_error_code GridapPETSc.PETSC.PCFactorSetMatSolverType(pc[],GridapPETSc.PETSC.MATSOLVERMUMPS)
   @check_error_code GridapPETSc.PETSC.PCFactorSetUpMatSolverType(pc[])
   @check_error_code GridapPETSc.PETSC.PCFactorGetMatrix(pc[],mumpsmat)
-  @check_error_code GridapPETSc.PETSC.MatMumpsSetIcntl(mumpsmat[],  4, 4)# 1)
+  @check_error_code GridapPETSc.PETSC.MatMumpsSetIcntl(mumpsmat[],  4, 1)
   @check_error_code GridapPETSc.PETSC.MatMumpsSetIcntl(mumpsmat[], 28, 2)
   @check_error_code GridapPETSc.PETSC.MatMumpsSetIcntl(mumpsmat[], 29, 2)
-  @check_error_code GridapPETSc.PETSC.MatMumpsSetIcntl(mumpsmat[], 14, 150)
-  @check_error_code GridapPETSc.PETSC.MatMumpsSetCntl(mumpsmat[],  1, -1)
-  @check_error_code GridapPETSc.PETSC.KSPView(ksp[],C_NULL)
-end
-
-CholMUMPSSolver() = PETScLinearSolver(petsc_cholmumps_setup)
-
-function petsc_cholmumps_setup(ksp)
-  pc       = Ref{GridapPETSc.PETSC.PC}()
-  mumpsmat = Ref{GridapPETSc.PETSC.Mat}()
-
-  @check_error_code GridapPETSc.PETSC.KSPSetFromOptions(ksp[])
-
-  @check_error_code GridapPETSc.PETSC.KSPSetType(ksp[],GridapPETSc.PETSC.KSPPREONLY)
-  @check_error_code GridapPETSc.PETSC.KSPGetPC(ksp[],pc)
-  @check_error_code GridapPETSc.PETSC.PCSetType(pc[],GridapPETSc.PETSC.PCCHOLESKY)
-  @check_error_code GridapPETSc.PETSC.PCFactorSetMatSolverType(pc[],GridapPETSc.PETSC.MATSOLVERMUMPS)
-  @check_error_code GridapPETSc.PETSC.PCFactorSetUpMatSolverType(pc[])
-  @check_error_code GridapPETSc.PETSC.PCFactorGetMatrix(pc[],mumpsmat)
-  @check_error_code GridapPETSc.PETSC.MatMumpsSetIcntl(mumpsmat[],  4, 4)# 1)
-  @check_error_code GridapPETSc.PETSC.MatMumpsSetIcntl(mumpsmat[], 28, 2)
-  @check_error_code GridapPETSc.PETSC.MatMumpsSetIcntl(mumpsmat[], 29, 2)
-  @check_error_code GridapPETSc.PETSC.MatMumpsSetIcntl(mumpsmat[], 14, 150)
-  @check_error_code GridapPETSc.PETSC.MatMumpsSetCntl(mumpsmat[],  1, -1)
+  @check_error_code GridapPETSc.PETSC.MatMumpsSetIcntl(mumpsmat[], 14, 20000)
   @check_error_code GridapPETSc.PETSC.KSPView(ksp[],C_NULL)
 end
 
@@ -169,6 +168,7 @@ function main(ranks)
       :n_Γg     => get_normal_vector(Γg),
       :Γ        => Γ,
       :dΓ       => Measure(Γ,degree),
+      :n_Γ        => get_normal_vector(Γ), # Note, need to recompute inside obj/constraints to compute derivs
       :Ω_act_s  => Ω_act_s,
       :dΩ_act_s => Measure(Ω_act_s,degree),
       :Ω_act_f  => Ω_act_f,
@@ -281,11 +281,11 @@ function main(ranks)
   ## Optimisation functionals
   J_comp(((u,p),d),φ) = ∫(ε(d) ⊙ (σ ∘ ε(d)))Ω.dΩs
   Vol(((u,p),d),φ) = ∫(vol_D)Ω.dΩs - ∫(vf/vol_D)dΩ_act
-  dVol(q,(u,p,d),φ) = ∫(-1/vol_D*q/(norm ∘ (∇(φ))))Ω.dΓ
+  dVol(q,(u,p,d),φ) = ∫(-1/vol_D*q/(abs(Ω.n_Γ ⋅ ∇(φ))))Ω.dΓ
 
   ## Staggered operators
-  fluid_ls = CholMUMPSSolver()
-  elast_ls = CholMUMPSSolver()
+  fluid_ls = MUMPSSolver()
+  elast_ls = MUMPSSolver()
 
   state_collection = GridapTopOpt.EmbeddedCollection_in_φh(model,φh) do _φh
     update_collection!(Ω,_φh)

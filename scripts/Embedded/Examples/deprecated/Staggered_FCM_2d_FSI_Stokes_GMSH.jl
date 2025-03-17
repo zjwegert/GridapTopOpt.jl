@@ -74,6 +74,7 @@ dΓf_N = Measure(Γf_N,degree)
     :n_Γg    => get_normal_vector(Γg),
     :Γ       => Γ,
     :dΓ      => Measure(Γ,degree),
+      :n_Γ        => get_normal_vector(Γ), # Note, need to recompute inside obj/constraints to compute derivs
     :χ_s     => GridapTopOpt.get_isolated_volumes_mask(cutgeo,["Gamma_s_D"];groups=((GridapTopOpt.CUT,IN),OUT)),
     :χ_f     => GridapTopOpt.get_isolated_volumes_mask(cutgeo,["Gamma_f_D"];groups=((GridapTopOpt.CUT,OUT),IN))
   )

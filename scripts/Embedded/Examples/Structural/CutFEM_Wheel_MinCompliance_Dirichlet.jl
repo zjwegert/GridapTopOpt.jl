@@ -29,7 +29,7 @@ function petsc_mumps_setup(ksp)
   @check_error_code GridapPETSc.PETSC.MatMumpsSetIcntl(mumpsmat[],  4, 1)
   @check_error_code GridapPETSc.PETSC.MatMumpsSetIcntl(mumpsmat[], 28, 2)
   @check_error_code GridapPETSc.PETSC.MatMumpsSetIcntl(mumpsmat[], 29, 2)
-  @check_error_code GridapPETSc.PETSC.MatMumpsSetIcntl(mumpsmat[], 14, 20000)
+  @check_error_code GridapPETSc.PETSC.MatMumpsSetIcntl(mumpsmat[], 14, 50000)
   @check_error_code GridapPETSc.PETSC.KSPView(ksp[],C_NULL)
 end
 
@@ -121,6 +121,7 @@ function main(ranks)
       :n_Γg  => get_normal_vector(Γg),
       :Γ     => Γ,
       :dΓ    => Measure(Γ,degree),
+      :n_Γ        => get_normal_vector(Γ), # Note, need to recompute inside obj/constraints to compute derivs
       :ψ     => ψ
     )
   end
@@ -128,7 +129,7 @@ function main(ranks)
   writevtk(Ω_data.Ω,path*"Omega_initial")
 
   # Setup spaces
-  uin((x,y,z)) = 10VectorValue(-y,x,0.0)
+  uin((x,y,z)) = 0.1VectorValue(-y,x,0.0)
 
   reffe_d = ReferenceFE(lagrangian,VectorValue{D,Float64},order)
   function build_spaces(Ω_act)
@@ -146,7 +147,7 @@ function main(ranks)
     μ = E/(2*(1+ν))
     (λ, μ)
   end
-  λs, μs = lame_parameters(1.0,0.3)
+  λs, μs = lame_parameters(10^4,0.3)
   # Stabilization
   α_Gd = 1e-7
   k_d = 1.0
@@ -163,9 +164,10 @@ function main(ranks)
 
   ## Optimisation functionals
   vol_D = sum(∫(1)dΩ_bg)
-  J_comp(d,φ) = ∫(ε(d) ⊙ (σ ∘ ε(d)))Ω_data.dΩ
+  iso_vol_frac(φ) = ∫(Ω_data.ψ/vol_D)Ω_data.dΩ
+  J_comp(d,φ) = ∫(ε(d) ⊙ (σ ∘ ε(d)))Ω_data.dΩ + iso_vol_frac(φ)
   Vol(d,φ) = ∫(1/vol_D)Ω_data.dΩ - ∫(vf/vol_D)dΩ_bg
-  dVol(q,d,φ) = ∫(-1/vol_D*q/(norm ∘ (∇(φ))))Ω_data.dΓ
+  dVol(q,d,φ) = ∫(-1/vol_D*q/(abs(Ω_data.n_Γ ⋅ ∇(φ))))Ω_data.dΓ
 
   ## Setup solver and FE operators
   elast_ls = MUMPSSolver()
@@ -216,6 +218,9 @@ function main(ranks)
       writevtk(Ω_data.Ω,path*"Omega_in_$it",cellfields=["uh"=>uh])
     end
     write_history(path*"/history.txt",optimiser.history;ranks)
+
+    isolated_vol = sum(iso_vol_frac(φh))
+    i_am_main(ranks) && println(" --- Isolated volume: ",isolated_vol)
 
     # Geometric operation to re-add the non-designable region # TODO: Move to a function
     _φ = get_free_dof_values(φh)

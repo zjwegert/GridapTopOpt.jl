@@ -161,6 +161,7 @@ function main(ranks)
       :dΓg     => Measure(Γg,degree),
       :n_Γg    => get_normal_vector(Γg),
       :Γ       => Γ,
+      :n_Γ        => get_normal_vector(Γ), # Note, need to recompute inside obj/constraints to compute derivs
       :dΓ      => Measure(Γ,degree)
     )
   end
@@ -295,7 +296,7 @@ function main(ranks)
   # ## Optimisation functionals
   J_comp(((u,p),d),φ) = ∫(ε(d) ⊙ (σ ∘ ε(d)))Ω.dΩs
   Vol(((u,p),d),φ) = ∫(vol_D)Ω.dΩs - ∫(vf/vol_D)dΩ_act
-  dVol(q,(u,p,d),φ) = ∫(-1/vol_D*q/(norm ∘ (∇(φ))))Ω.dΓ
+  dVol(q,(u,p,d),φ) = ∫(-1/vol_D*q/(abs(Ω.n_Γ ⋅ ∇(φ))))Ω.dΓ
 
   ## Staggered operators
   fluid_nls = NewtonSolver(MUMPSSolver();maxiter=10,rtol=1.e-8,verbose=i_am_main(ranks))
