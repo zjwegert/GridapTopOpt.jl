@@ -23,15 +23,21 @@ function Gridap.Arrays.lazy_map(k::Broadcasting{typeof(∘)},a::AppendedArray...
   end
 end
 
-function Gridap.Arrays.lazy_map(k,a::AppendedArray,b::AbstractArray)
+function Gridap.Arrays.lazy_map(k::Broadcasting{typeof(∘)},a::AppendedArray,b::AbstractArray)
   @assert length(a) == length(b)
   n = length(a.a)
   c = lazy_append(lazy_split(b,n)...)
   lazy_map(k,a,c)
 end
 
-function FESpaces._gradient(f,uh,fuh::GridapDistributed.DistributedDomainContribution)
+function Gridap.Fields.gradient(f::Function,uh::GridapDistributed.DistributedADTypes)
   println(" --- Compute gradient")
+  fuh = f(uh)
+  FESpaces._gradient(f,uh,fuh)
+end
+
+function FESpaces._gradient(f,uh,fuh::GridapDistributed.DistributedDomainContribution)
+  println(" --- Compute _gradient")
   local_terms = map(r -> DomainContribution(), GridapDistributed.get_parts(fuh))
   local_domains = tuple_of_arrays(map(Tuple∘get_domains,local_views(fuh)))
   for local_trians in local_domains
@@ -107,8 +113,11 @@ function gamg_ksp_setup(;rtol=10^-8,maxits=100)
   return ksp_setup
 end
 
-function main(ranks)
-  path = "./results/FSI_3D_Burman_P1P0dc_MPI/"
+# function main(ranks)
+
+ranks = DebugArray(LinearIndices((2,)))
+
+path = "./results/FSI_3D_Burman_P1P0dc_MPI/"
   files_path = path*"data/"
   i_am_main(ranks) && mkpath(files_path)
 
@@ -272,7 +281,7 @@ function main(ranks)
   v_ψ(p,q) = (k_p * Ω.ψ_f)*(p*q) # (Isolated volume term, Eqn. 15, Villanueva and Maute, 2017)
 
   function a_fluid((),(u,p),(v,q),φ)
-    n_Γ = -get_normal_vector(Ω.Γ)
+    #n_Γ = -get_normal_vector(Ω.Γ)
     return ∫(a_Ω(u,v))Ω.dΩf
     # return ∫(a_Ω(u,v) + b_Ω(v,p) + b_Ω(u,q))Ω.dΩf + #v_ψ(p,q))Ω.dΩf +
     #   ∫(a_Γ(u,v,n_Γ) + b_Γ(v,p,n_Γ) + b_Γ(u,q,n_Γ))Ω.dΓ +
@@ -305,9 +314,9 @@ function main(ranks)
       #∫(v_s_ψ(d,s))Ω.dΩs
   end
   function l_solid(((u,p),),s,φ)
-    n = -get_normal_vector(Ω.Γ)
+    #n = -get_normal_vector(Ω.Γ)
     #return ∫(-σf_n(u,p,n) ⋅ s)Ω.dΓ
-    return ∫(0s)Ω.dΩs
+    return ∫(zero(VectorValue{D,Float64})*s)Ω.dΩs
   end
 
   ## Optimisation functionals
@@ -328,6 +337,17 @@ function main(ranks)
     # elast_ls = ElasticitySolver(R;rtol=1.e-8,maxits=200)
     solver = StaggeredFESolver([fluid_ls,elast_ls]);
     op = StaggeredAffineFEOperator([a_fluid,a_solid],[l_fluid,l_solid],[UP,R],[VQ,T])
+    
+    x_f = zero(UP)
+    x_s = zero(R)
+
+    a1((u,p),(v,q)) = ∫(μ*(∇(u) ⊙ ∇(v)))*Ω.dΩf
+    a1(x_f,x_f) # OK 
+    a_fluid((),x_f,x_f,φh) # OK
+    l_fluid((),x_f,φh) # OK
+    a_solid((x_f,),x_s,x_s,φh) # OK
+    l_solid((x_f,),x_s,φh) # OK
+
     state_map = StaggeredAffineFEStateMap(op,V_φ,U_reg,_φh;solver,adjoint_solver=solver)
   #  (;
   #    :state_map => state_map,
@@ -402,13 +422,13 @@ function main(ranks)
     cellfields=["uh"=>uh,"ph"=>ph,"dh"=>dh])
   writevtk(Ω.Ωs,path*"Omega_s_$it",
     cellfields=["uh"=>uh,"ph"=>ph,"dh"=>dh])
-end
+# end
 
-with_debug() do distribute
-  ncpus = 2
-  ranks = distribute(LinearIndices((ncpus,)))
-  petsc_options = "-ksp_converged_reason -ksp_error_if_not_converged true"
-  #GridapPETSc.with(;args=split(petsc_options)) do
-    main(ranks)
-  #end
-end
+# with_debug() do distribute
+#   ncpus = 2
+#   
+#   petsc_options = "-ksp_converged_reason -ksp_error_if_not_converged true"
+#   #GridapPETSc.with(;args=split(petsc_options)) do
+#     main(ranks)
+#   #end
+# end
