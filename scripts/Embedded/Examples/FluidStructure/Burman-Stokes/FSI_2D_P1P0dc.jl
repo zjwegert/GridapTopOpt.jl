@@ -209,7 +209,9 @@ end
 ∂Rk∂xhi = ((∂R2∂xh1,),)
 
 ## Optimisation functionals
-J_comp(((u,p),d),φ) = ∫(ε(d) ⊙ (σ ∘ ε(d)))Ω.dΩs
+iso_vol_frac(φ) = ∫(Ω.ψ_s/vol_D)Ω.dΩs
+
+J_comp(((u,p),d),φ) = ∫(ε(d) ⊙ (σ ∘ ε(d)))Ω.dΩs + iso_vol_frac(φ)
 ∂Jcomp∂up((du,dp),((u,p),d),φ) = ∫(0dp)Ω.dΩs
 ∂Jcomp∂d(dd,((u,p),d),φ) = ∫(2*ε(d) ⊙ (σ ∘ ε(dd)))Ω.dΩs
 ∂Jpres∂xhi = (∂Jcomp∂up,∂Jcomp∂d)
@@ -276,16 +278,12 @@ try
     end
     write_history(path*"/history.txt",optimiser.history)
 
-    φ = get_free_dof_values(φh)
-    φ .= min.(φ,get_free_dof_values(φh_nondesign))
-    reinit!(ls_evo,φh)
+    isolated_vol = sum(iso_vol_frac(φh))
+    println(" --- Isolated volume: ",isolated_vol)
 
-    φ = get_free_dof_values(φh)
-    idx = findall(isapprox(0.0;atol=eps()),φ)
-    if length(idx)>0
-      println("    Correcting level values at $(length(idx)) nodes")
-      φ[idx] .+= 100*eps(eltype(φ))
-    end
+    _φ = get_free_dof_values(φh)
+    _φ .= min.(_φ,get_free_dof_values(φh_nondesign))
+    reinit!(ls_evo,φh)
   end
 catch e
   println("Error: $e\nPrinting history and exiting...")
