@@ -13,7 +13,7 @@ else
   global γg_evo =  0.05
 end
 
-path = "./results/FSI_2D_Burman_P1P0dc/"
+path = "./results/FSI_2D_Burman_P1P0dc_gammag_$(γg_evo)/"
 mkpath(path)
 
 γ_evo = 0.2
