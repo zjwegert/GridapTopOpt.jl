@@ -195,7 +195,7 @@ function a_solid(((u,p),),d,s,φ)
 end
 function l_solid(((u,p),),s,φ)
   n = -get_normal_vector(Ω.Γ)
-  return ∫(-σf_n(u,p,n) ⋅ s)Ω.dΓ
+  return ∫(-(1-Ω.ψ_s)*σf_n(u,p,n) ⋅ s)Ω.dΓ
 end
 
 ∂R2∂xh1((du,dp),((u,p),),d,s,φ) = -1*l_solid(((du,dp),),s,φ)
