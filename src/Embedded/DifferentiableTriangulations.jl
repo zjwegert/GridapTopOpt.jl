@@ -37,8 +37,8 @@ end
 
 (t::DifferentiableTriangulation)(φh) = update_trian!(t,get_fe_space(φh),φh)
 
-function update_trian!(trian::DifferentiableTriangulation,U::FESpace,φh)
-  ~(U === trian.fe_space) && return trian
+function update_trian!(trian::DifferentiableTriangulation,space::FESpace,φh)
+  (trian.fe_space !== space) && return trian
   trian.cell_values = extract_dualized_cell_values(trian.trian,φh)
   return trian
 end
@@ -49,7 +49,7 @@ function update_trian!(trian::DifferentiableTriangulation,::FESpace,::Nothing)
 end
 
 function FESpaces._change_argument(
-  op,f,trian::DifferentiableTriangulation,uh::SingleFieldFEFunction
+  op,f,trian::DifferentiableTriangulation,uh
 )
   U = get_fe_space(uh)
   function g(cell_u)
@@ -421,8 +421,7 @@ end
 DifferentiableTriangulation(trian::Triangulation,fe_space) = trian
 
 function DifferentiableTriangulation(
-  trian::AppendedTriangulation,
-  fe_space :: FESpace
+  trian::AppendedTriangulation, fe_space::FESpace
 )
   a = DifferentiableTriangulation(trian.a,fe_space)
   b = DifferentiableTriangulation(trian.b,fe_space)
@@ -438,7 +437,7 @@ function update_trian!(trian::AppendedTriangulation,U,φh)
 end
 
 function FESpaces._change_argument(
-  op,f,trian::AppendedTriangulation,uh::SingleFieldFEFunction
+  op,f,trian::AppendedTriangulation,uh
 )
   U = get_fe_space(uh)
   function g(cell_u)
@@ -457,38 +456,57 @@ function FESpaces._compute_cell_ids(uh,ttrian::AppendedTriangulation)
   lazy_append(ids_a,ids_b)
 end
 
-#### DistributedTriangulations
+# TriangulationView
 
-function DifferentiableTriangulation(trian::DistributedTriangulation,fe_space)
-  bg_model = get_background_model(trian)
-  trians = map(DifferentiableTriangulation,local_views(trian),local_views(fe_space))
-  return DistributedTriangulation(trians,bg_model)
+function DifferentiableTriangulation(
+  trian::Geometry.TriangulationView,
+  fe_space :: FESpace
+)
+  parent = DifferentiableTriangulation(trian.parent,fe_space)
+  return Geometry.TriangulationView(parent,trian.cell_to_parent_cell)
 end
 
-# Fix ambiguity with DistributedADTypes
-function FESpaces._change_argument(op,f,local_trians::AbstractArray{<:SkeletonTriangulation},uh::DistributedCellField)
-  function dist_cf(uh::DistributedCellField,cfs)
-    DistributedCellField(cfs, get_triangulation(uh))
-  end
+function update_trian!(trian::Geometry.TriangulationView,U,φh)
+  update_trian!(trian.parent,U,φh)
+  return trian
+end
 
-  uhs = local_views(uh)
-  spaces = map(get_fe_space,uhs)
+function FESpaces._change_argument(
+  op,f,trian::TriangulationView,uh
+)
+  U = get_fe_space(uh)
   function g(cell_u)
-    uhs_dual = map(CellField,spaces,cell_u)
-    cf_plus  = dist_cf(uh,map(SkeletonCellFieldPair,uhs_dual,uhs))
-    cf_minus = dist_cf(uh,map(SkeletonCellFieldPair,uhs,uhs_dual))
-    cg_plus  = f(cf_plus)
-    cg_minus = f(cf_minus)
-    plus  = map(get_contribution,local_views(cg_plus),local_trians)
-    minus = map(get_contribution,local_views(cg_minus),local_trians)
-    plus, minus
+    cf = CellField(U,cell_u)
+    update_trian!(trian,U,cf)
+    cell_grad = f(cf)
+    update_trian!(trian,U,nothing)
+    get_contribution(cell_grad,trian)
   end
   g
 end
 
-function FESpaces._change_argument(op,f,local_trians,uh::DistributedCellField)
+#### DistributedTriangulations
+
+function DifferentiableTriangulation(trian::DistributedTriangulation,fe_space)
+  model = get_background_model(trian)
+  trians = map(DifferentiableTriangulation,local_views(trian),local_views(fe_space))
+  return DistributedTriangulation(trians,model)
+end
+
+function FESpaces._change_argument(
+  op,f,
+  local_trians::AbstractArray{<:Union{<:DifferentiableTriangulation,<:AppendedTriangulation,<:TriangulationView}},
+  uh::GridapDistributed.DistributedADTypes
+)
   function dist_cf(uh::DistributedCellField,cfs)
     DistributedCellField(cfs,get_triangulation(uh))
+  end
+  function dist_cf(uh::DistributedMultiFieldCellField,cfs)
+    sf_cfs = map(DistributedCellField,
+      [tuple_of_arrays(map(cf -> Tuple(cf.single_fields),cfs))...],
+      map(get_triangulation,uh)
+    )
+    DistributedMultiFieldCellField(sf_cfs,cfs)
   end
 
   uhs = local_views(uh)
@@ -506,16 +524,11 @@ function FESpaces._change_argument(op,f,local_trians,uh::DistributedCellField)
   g
 end
 
-# TriangulationView
-function DifferentiableTriangulation(
-  trian::Geometry.TriangulationView,
-  fe_space :: FESpace
-)
-  parent = DifferentiableTriangulation(trian.parent,fe_space)
-  return Geometry.TriangulationView(parent,trian.cell_to_parent_cell)
-end
-
-function update_trian!(trian::Geometry.TriangulationView,U,φh)
-  update_trian!(trian.parent,U,φh)
-  return trian
+function GridapDistributed.remove_ghost_cells(
+  trian::AppendedTriangulation{Dc,Dp,<:Union{<:SubCellTriangulation,<:TriangulationView{Dc,Dp,<:SubCellTriangulation}}},
+  gids
+) where {Dc,Dp}
+  a = GridapDistributed.remove_ghost_cells(trian.a,gids)
+  b = GridapDistributed.remove_ghost_cells(trian.b,gids)
+  return iszero(num_cells(a)) ? b : lazy_append(a,b)
 end
