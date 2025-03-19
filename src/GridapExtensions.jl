@@ -372,6 +372,28 @@ function FESpaces._compute_cell_ids(
   CellData.SkeletonPair(tcells_plus,tcells_minus)
 end
 
+# Fix for compositions
+function Arrays.lazy_map(k::Broadcasting{typeof(∘)},a::AppendedArray...)
+  @check all(map(i->length(i)==length(a[1]),a))
+  la = map(ai->length(ai.a),a)
+  if all(la .== first(la))
+    c_a = lazy_map(k,map(ai->ai.a,a)...)
+    c_b = lazy_map(k,map(ai->ai.b,a)...)
+    lazy_append(c_a,c_b)
+  else
+    ai = map(testitem,a)
+    T = return_type(k, ai...)
+    lazy_map(k,T,a...)
+  end
+end
+
+function Arrays.lazy_map(k::Broadcasting{typeof(∘)},a::AppendedArray,b::AbstractArray)
+  @assert length(a) == length(b)
+  n = length(a.a)
+  c = lazy_append(lazy_split(b,n)...)
+  lazy_map(k,a,c)
+end
+
 # # TODO: Below is dangerous, as it may break other Gridap methods,
 # #   it is neccessary for now - see thermal_2d.jl problem
 # function FESpaces._compute_cell_ids(uh,ttrian)

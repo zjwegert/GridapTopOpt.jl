@@ -4,13 +4,16 @@ using GridapSolvers, GridapSolvers.BlockSolvers, GridapSolvers.NonlinearSolvers
 using GridapGmsh
 using GridapTopOpt
 
+using LinearAlgebra
+LinearAlgebra.norm(x::VectorValue,p::Real) = norm(x.data,p)
+
 if isassigned(ARGS,1)
   global γg_evo =  parse(Float64,ARGS[1])
 else
   global γg_evo =  0.05
 end
 
-path = "./results/FSI_2D_Burman_P1P1/"
+path = "./results/FSI_2D_Burman_P1P1_gammag_$(γg_evo)/"
 mkpath(path)
 
 γ_evo = 0.2
@@ -50,7 +53,6 @@ fin(x) = f0(x,l*(1+5_e),a*(1+5_e))
 fsolid(x) = min(f0(x,l*(1+_e),b*(1+_e)),f0(x,w*(1+_e),a*(1+_e)))
 fholes((x,y),q,r) = max(f1((x,y),q,r),f1((x-1/q,y),q,r))
 φf(x) = min(max(fin(x),fholes(x,25,0.2)),fsolid(x))
-# φf(x) = min(max(fin(x),fholes(x,22,0.6)),fsolid(x))
 φh = interpolate(φf,V_φ)
 writevtk(get_triangulation(φh),path*"initial_lsf",cellfields=["φ"=>φh,"h"=>hₕ])
 
@@ -193,14 +195,16 @@ function a_solid(((u,p),),d,s,φ)
 end
 function l_solid(((u,p),),s,φ)
   n = -get_normal_vector(Ω.Γ)
-  return ∫(-σf_n(u,p,n) ⋅ s)Ω.dΓ
+  return ∫(-(1-Ω.ψ_s)*σf_n(u,p,n) ⋅ s)Ω.dΓ
 end
 
 ∂R2∂xh1((du,dp),((u,p),),d,s,φ) = -1*l_solid(((du,dp),),s,φ)
 ∂Rk∂xhi = ((∂R2∂xh1,),)
 
 ## Optimisation functionals
-J_comp(((u,p),d),φ) = ∫(ε(d) ⊙ (σ ∘ ε(d)))Ω.dΩs
+iso_vol_frac(φ) = ∫(Ω.ψ_s/vol_D)Ω.dΩs
+
+J_comp(((u,p),d),φ) = ∫(ε(d) ⊙ (σ ∘ ε(d)))Ω.dΩs + iso_vol_frac(φ)
 ∂Jcomp∂up((du,dp),((u,p),d),φ) = ∫(0dp)Ω.dΩs
 ∂Jcomp∂d(dd,((u,p),d),φ) = ∫(2*ε(d) ⊙ (σ ∘ ε(dd)))Ω.dΩs
 ∂Jpres∂xhi = (∂Jcomp∂up,∂Jcomp∂d)
@@ -244,13 +248,13 @@ vel_ext = VelocityExtension(a_hilb,U_reg,V_reg)
 converged(m) = GridapTopOpt.default_al_converged(
   m;
   L_tol = 0.5hmin,
-  C_tol = 0.01#vf
+  C_tol = 0.01vf #0.01
 )
 function has_oscillations(m,os_it)
   history = GridapTopOpt.get_history(m)
   it = GridapTopOpt.get_last_iteration(history)
-  # all(@.(abs(history[:C,it]) < 0.05vf)) && GridapTopOpt.default_has_oscillations(m,os_it)
-  all(@.(abs(history[:C,it]) < 0.05)) && GridapTopOpt.default_has_oscillations(m,os_it)
+  all(@.(abs(history[:C,it]) < 0.05vf)) && GridapTopOpt.default_has_oscillations(m,os_it)
+  # all(@.(abs(history[:C,it]) < 0.05)) && GridapTopOpt.default_has_oscillations(m,os_it)
 end
 optimiser = AugmentedLagrangian(pcf,ls_evo,vel_ext,φh;
   γ=γ_evo,verbose=true,constraint_names=[:Vol],converged,has_oscillations)
@@ -267,6 +271,9 @@ for (it,(uh,ph,dh),φh) in optimiser
   end
   write_history(path*"/history.txt",optimiser.history)
 
+  isolated_vol = sum(iso_vol_frac(φh))
+  println(" --- Isolated volume: ",isolated_vol)
+
   φ = get_free_dof_values(φh)
   φ .= min.(φ,get_free_dof_values(φh_nondesign))
   reinit!(ls_evo,φh)
@@ -277,4 +284,4 @@ writevtk(Ω_act,path*"Omega_act_$it",
 writevtk(Ω.Ωf,path*"Omega_f_$it",
   cellfields=["uh"=>uh,"ph"=>ph,"dh"=>dh])
 writevtk(Ω.Ωs,path*"Omega_s_$it",
-  cellfields=["uh"=>uh,"ph"=>ph,"dh"=>dh,"EnergyDensity"=>ε(dh) ⊙ (σ ∘ ε(dh))])
+  cellfields=["uh"=>uh,"ph"=>ph,"dh"=>dh])
