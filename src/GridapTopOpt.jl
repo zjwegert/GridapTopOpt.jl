@@ -45,7 +45,11 @@ using JLD2: save_object, load_object, jldsave
 import Base: +
 import Gridap: solve!
 
-include("GridapExtensions.jl")
+__init__() = begin
+  include((@__DIR__)*"/GridapExtensions.jl")
+  include((@__DIR__)*"/Embedded/SubFacetBoundaryTriangulations.jl") # <- commented out in "Embedded/Embedded.jl"
+  include((@__DIR__)*"/LevelSetEvolution/UnfittedEvolution/MutableRungeKutta.jl") # <- commented out in "LevelSetEvolution/LevelSetEvolution.jl"
+end
 
 include("Embedded/Embedded.jl")
 export DifferentiableTriangulation
