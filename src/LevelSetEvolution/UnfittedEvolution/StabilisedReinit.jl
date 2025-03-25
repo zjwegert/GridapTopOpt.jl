@@ -119,7 +119,8 @@ function get_residual_and_jacobian(s::StabilisedReinit{ArtificialViscosity},φh,
   ca = s.stabilisation_method.stabilisation_coefficent
   ϵ = 1e-20
 
-  update_collection!(Ωs,φh)
+  # correct_ls!(φh)
+  # update_collection!(Ωs,φh)
   dΓ = Ωs.dΓ
 
   S(φ,∇φ,h) = φ/sqrt(φ^2 + h^2*(∇φ ⋅ ∇φ))
@@ -155,7 +156,8 @@ function get_residual_and_jacobian(s::StabilisedReinit{InteriorPenalty},φh,φh0
   dΛ = s.stabilisation_method.dΛ
   γg = s.stabilisation_method.γg
 
-  update_collection!(Ωs,φh)
+  # correct_ls!(φh)
+  # update_collection!(Ωs,φh)
   dΓ = Ωs.dΓ
   γ(h) = γg*h^2
 

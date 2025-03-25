@@ -35,10 +35,10 @@ function petsc_mumps_setup(ksp)
   @check_error_code GridapPETSc.PETSC.PCFactorSetMatSolverType(pc[],GridapPETSc.PETSC.MATSOLVERMUMPS)
   @check_error_code GridapPETSc.PETSC.PCFactorSetUpMatSolverType(pc[])
   @check_error_code GridapPETSc.PETSC.PCFactorGetMatrix(pc[],mumpsmat)
-  @check_error_code GridapPETSc.PETSC.MatMumpsSetIcntl(mumpsmat[],  4, 3)
+  @check_error_code GridapPETSc.PETSC.MatMumpsSetIcntl(mumpsmat[],  4, 1)
   @check_error_code GridapPETSc.PETSC.MatMumpsSetIcntl(mumpsmat[], 28, 2)
   @check_error_code GridapPETSc.PETSC.MatMumpsSetIcntl(mumpsmat[], 29, 2)
-  #@check_error_code GridapPETSc.PETSC.MatMumpsSetIcntl(mumpsmat[], 14, 200000)
+  @check_error_code GridapPETSc.PETSC.MatMumpsSetIcntl(mumpsmat[], 14, 10000)
   @check_error_code GridapPETSc.PETSC.MatMumpsSetCntl(mumpsmat[], 3, 1.0e-6)
   @check_error_code GridapPETSc.PETSC.KSPView(ksp[],C_NULL)
 end
@@ -66,7 +66,7 @@ function gamg_ksp_setup(;rtol=10^-8,maxits=100)
 end
 
 function main(ranks)
-  path = "./results/FSI_3D_Burman_P1P0dc_MPI/"
+  path = "./results/FSI_3D_Burman_P1P0dc_MPI_lower_res/"
   files_path = path*"data/"
   i_am_main(ranks) && mkpath(files_path)
 
@@ -88,7 +88,7 @@ function main(ranks)
   cw = 0.1;
   vol_D = L*H
 
-  model = GmshDiscreteModel(ranks,(@__DIR__)*"/../Meshes/mesh_3d_finer.msh")
+  model = GmshDiscreteModel(ranks,(@__DIR__)*"/../Meshes/mesh_3d.msh")
   model = UnstructuredDiscreteModel(model)
   # map(test_mesh,local_views(model))
   writevtk(model,path*"model")
@@ -351,7 +351,7 @@ function main(ranks)
 end
 
 with_mpi() do distribute
-  ncpus = 176
+  ncpus = 96
   ranks = distribute(LinearIndices((ncpus,)))
   petsc_options = "-ksp_converged_reason -ksp_error_if_not_converged true"
   GridapPETSc.with(;args=split(petsc_options)) do
