@@ -21,28 +21,6 @@ function test_mesh(model)
   @assert isempty(bad_vertices) "Bad vertices detected: re-generate your mesh with a different resolution"
 end
 
-MUMPSSolver() = PETScLinearSolver(petsc_mumps_setup)
-
-function petsc_mumps_setup(ksp)
-  pc       = Ref{GridapPETSc.PETSC.PC}()
-  mumpsmat = Ref{GridapPETSc.PETSC.Mat}()
-
-  @check_error_code GridapPETSc.PETSC.KSPSetFromOptions(ksp[])
-
-  @check_error_code GridapPETSc.PETSC.KSPSetType(ksp[],GridapPETSc.PETSC.KSPPREONLY)
-  @check_error_code GridapPETSc.PETSC.KSPGetPC(ksp[],pc)
-  @check_error_code GridapPETSc.PETSC.PCSetType(pc[],GridapPETSc.PETSC.PCLU)
-  @check_error_code GridapPETSc.PETSC.PCFactorSetMatSolverType(pc[],GridapPETSc.PETSC.MATSOLVERMUMPS)
-  @check_error_code GridapPETSc.PETSC.PCFactorSetUpMatSolverType(pc[])
-  @check_error_code GridapPETSc.PETSC.PCFactorGetMatrix(pc[],mumpsmat)
-  @check_error_code GridapPETSc.PETSC.MatMumpsSetIcntl(mumpsmat[],  4, 1)
-  @check_error_code GridapPETSc.PETSC.MatMumpsSetIcntl(mumpsmat[], 28, 2)
-  @check_error_code GridapPETSc.PETSC.MatMumpsSetIcntl(mumpsmat[], 29, 2)
-  @check_error_code GridapPETSc.PETSC.MatMumpsSetIcntl(mumpsmat[], 14, 10000)
-  @check_error_code GridapPETSc.PETSC.MatMumpsSetCntl(mumpsmat[], 3, 1.0e-6)
-  @check_error_code GridapPETSc.PETSC.KSPView(ksp[],C_NULL)
-end
-
 CGAMGSolver(;kwargs...) = PETScLinearSolver(gamg_ksp_setup(;kwargs...))
 
 function gamg_ksp_setup(;rtol=10^-8,maxits=100)
@@ -66,7 +44,7 @@ function gamg_ksp_setup(;rtol=10^-8,maxits=100)
 end
 
 function main(ranks)
-  path = "./results/FSI_3D_Burman_P1P0dc_MPI_lower_res/"
+  path = "./results/FSI_3D_Burman_P1P0dc_MPI_superlu/"
   files_path = path*"data/"
   i_am_main(ranks) && mkpath(files_path)
 
@@ -74,7 +52,7 @@ function main(ranks)
   max_steps = 10 # Based on number of elements in vertical direction divided by 10
   vf = 0.025
   α_coeff = γ_evo*max_steps
-  iter_mod = 10
+  iter_mod = 1
   D = 3
 
   # Load gmsh mesh (Currently need to update mesh.geo and these values concurrently)
@@ -88,7 +66,7 @@ function main(ranks)
   cw = 0.1;
   vol_D = L*H
 
-  model = GmshDiscreteModel(ranks,(@__DIR__)*"/../Meshes/mesh_3d.msh")
+  model = GmshDiscreteModel(ranks,(@__DIR__)*"/../Meshes/mesh_3d_finer.msh")
   model = UnstructuredDiscreteModel(model)
   # map(test_mesh,local_views(model))
   writevtk(model,path*"model")
@@ -269,8 +247,8 @@ function main(ranks)
   dVol(q,(u,p,d),φ) = ∫(-1/vol_D*q/(abs(Ω.n_Γ ⋅ ∇(φ))))Ω.dΓ
 
   ## Staggered operators
-  fluid_ls = MUMPSSolver()
-  elast_ls = MUMPSSolver()
+  fluid_ls = PETScLinearSolver()
+  elast_ls = PETScLinearSolver()
 
   state_collection = GridapTopOpt.EmbeddedCollection_in_φh(model,φh) do _φh
     update_collection!(Ω,_φh)
@@ -289,9 +267,9 @@ function main(ranks)
   pcf = EmbeddedPDEConstrainedFunctionals(state_collection;analytic_dC=[dVol])
 
   ## Evolution Method
-  evolve_ls = MUMPSSolver()
+  evolve_ls = PETScLinearSolver()
   evolve_nls = NewtonSolver(evolve_ls;maxiter=1,verbose=i_am_main(ranks))
-  reinit_nls = NewtonSolver(MUMPSSolver();maxiter=20,rtol=1.e-14,verbose=i_am_main(ranks))
+  reinit_nls = NewtonSolver(PETScLinearSolver();maxiter=20,rtol=1.e-14,verbose=i_am_main(ranks))
 
   evo = CutFEMEvolve(V_φ,Ω,dΩ_act,hₕ;max_steps,γg=γg_evo,ode_ls=evolve_ls,ode_nl=evolve_nls)
   reinit1 = StabilisedReinit(V_φ,Ω,dΩ_act,hₕ;stabilisation_method=ArtificialViscosity(0.5),nls=reinit_nls)
@@ -352,9 +330,9 @@ function main(ranks)
 end
 
 with_mpi() do distribute
-  ncpus = 96
+  ncpus = 192
   ranks = distribute(LinearIndices((ncpus,)))
-  petsc_options = "-ksp_converged_reason -ksp_error_if_not_converged true"
+  petsc_options = "-ksp_converged_reason -ksp_error_if_not_converged true -pc_type lu -pc_factor_mat_solver_type superlu_dist -mat_superlu_dist_printstat"
   GridapPETSc.with(;args=split(petsc_options)) do
     main(ranks)
   end

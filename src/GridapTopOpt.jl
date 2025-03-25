@@ -44,11 +44,16 @@ using JLD2: save_object, load_object, jldsave
 
 import Base: +
 import Gridap: solve!
+import PartitionedArrays: default_find_rcv_ids
 
 __init__() = begin
   include((@__DIR__)*"/GridapExtensions.jl")
   include((@__DIR__)*"/Embedded/SubFacetBoundaryTriangulations.jl") # <- commented out in "Embedded/Embedded.jl"
   include((@__DIR__)*"/LevelSetEvolution/UnfittedEvolution/MutableRungeKutta.jl") # <- commented out in "LevelSetEvolution/LevelSetEvolution.jl"
+
+  function default_find_rcv_ids(::MPIArray)
+    PartitionedArrays.find_rcv_ids_ibarrier
+  end
 end
 
 include("Embedded/Embedded.jl")
