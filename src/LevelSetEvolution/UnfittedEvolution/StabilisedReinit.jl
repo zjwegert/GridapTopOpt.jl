@@ -82,10 +82,10 @@ function solve!(s::StabilisedReinit,φh,cache::Nothing)
   solve!(φ_tmp,nls,op,nls_cache)
   if _get_solver_flag(nls.log) ∈ (SOLVER_CONVERGED_ATOL,SOLVER_CONVERGED_RTOL)
     copy!(get_free_dof_values(φh),φ_tmp)
+    # Check LS
+    correct_ls!(φh)
     update_collection!(s.Ωs,φh)
   end
-  # Check LS
-  correct_ls!(φh)
   return φh
 end
 
@@ -102,10 +102,10 @@ function solve!(s::StabilisedReinit,φh,cache)
   solve!(φ_tmp,nls,op,nls_cache)
   if _get_solver_flag(nls.log) ∈ (SOLVER_CONVERGED_ATOL,SOLVER_CONVERGED_RTOL)
     copy!(get_free_dof_values(φh),φ_tmp)
+    # Check LS
+    correct_ls!(φh)
     update_collection!(s.Ωs,φh)
   end
-  # Check LS
-  correct_ls!(φh)
   return φh
 end
 

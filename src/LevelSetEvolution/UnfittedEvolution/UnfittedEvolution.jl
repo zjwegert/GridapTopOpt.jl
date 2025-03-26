@@ -98,7 +98,7 @@ end
 function correct_ls!(φh;tol = 1e-10)
   x = get_free_dof_values(φh)
   for i in eachindex(x)
-    abs(x[i]) < tol && (x[i] = tol)
+    abs(x[i]) < tol && (x[i] = tol*sign(x[i]))
   end
 end
 
