@@ -524,11 +524,22 @@ function FESpaces._change_argument(
   g
 end
 
+# function GridapDistributed.remove_ghost_cells(
+#   trian::AppendedTriangulation{Dc,Dp,<:Union{<:SubCellTriangulation,<:TriangulationView{Dc,Dp,<:SubCellTriangulation}}},
+#   gids
+# ) where {Dc,Dp}
+#   a = GridapDistributed.remove_ghost_cells(trian.a,gids)
+#   b = GridapDistributed.remove_ghost_cells(trian.b,gids)
+#   return iszero(num_cells(a)) ? b : lazy_append(a,b)
+# end
+
 function GridapDistributed.remove_ghost_cells(
   trian::AppendedTriangulation{Dc,Dp,<:Union{<:SubCellTriangulation,<:TriangulationView{Dc,Dp,<:SubCellTriangulation}}},
   gids
 ) where {Dc,Dp}
   a = GridapDistributed.remove_ghost_cells(trian.a,gids)
   b = GridapDistributed.remove_ghost_cells(trian.b,gids)
-  return iszero(num_cells(a)) ? b : lazy_append(a,b)
+  iszero(num_cells(a)) && return b
+  iszero(num_cells(b)) && return a
+  return lazy_append(a,b)
 end
