@@ -20,7 +20,7 @@ function generate_model(D,n,ranks,mesh_partition)
   return model
 end
 
-function main_2d(model,name;vtk=false)
+function main_2d_sub(model,name;vtk=false)
   order = 1
   Ω = Triangulation(model)
 
@@ -30,21 +30,12 @@ function main_2d(model,name;vtk=false)
   f(x,y0) = abs(x[2]-y0) - 0.05
   g(x,x0,y0,r) = sqrt((x[1]-x0)^2 + (x[2]-y0)^2) - r
   f(x) = min(f(x,0.75),f(x,0.25),
-    g(x,0.15,0.5,0.1),
+    g(x,0.15,0.5,0.09),
     g(x,0.5,0.6,0.2),
-    g(x,0.85,0.5,0.1),
+    g(x,0.85,0.5,0.09),
     g(x,0.5,0.15,0.05))
   φh = interpolate(f,V_φ)
-
-  _φ = get_free_dof_values(φh)
-  map(local_views(_φ)) do φ
-    idx = findall(isapprox(0.0;atol=1e-10),φ)
-    if !isempty(idx)
-      i_am_main(ranks) && println("    Correcting level values at $(length(idx)) nodes")
-    end
-    φ[idx] .+= 1e-10
-  end
-  consistent!(_φ) |> wait
+  GridapTopOpt.correct_ls!(φh)
 
   geo = DiscreteGeometry(φh,model)
   cutgeo = cut(model,geo)
@@ -63,7 +54,8 @@ function main_2d(model,name;vtk=false)
 
   cell_to_lcolor, lcolor_to_group, color_gids = GridapTopOpt.tag_disconnected_volumes(model,cell_to_state;groups=((GridapTopOpt.CUT,IN),OUT));
 
-  μ,_ = GridapTopOpt.get_isolated_volumes_mask_v2(cutgeo,[1,2,5,7])
+  φ_cell_values = map(get_cell_dof_values,local_views(φh))
+  μ,_ = GridapTopOpt.get_isolated_volumes_mask_polytopal(model,φ_cell_values,[1,2,5,7])
 
   cell_to_color = map(cell_to_lcolor,partition(color_gids)) do cell_to_lcolor, colors
     local_to_global(colors)[cell_to_lcolor]
@@ -87,20 +79,112 @@ function main_2d(model,name;vtk=false)
   return μ,V_φ
 end
 
-function main(distribute,mesh_partition;vtk=false)
+function main_2d(distribute,mesh_partition;vtk=false)
   ranks = distribute(LinearIndices((prod(mesh_partition),)))
   model = generate_model(2,40,ranks,mesh_partition)
 
-  μ,V_φ = main_2d(model,"distributed_$mesh_partition";vtk)
+  μ,V_φ = main_2d_sub(model,"distributed_$mesh_partition";vtk)
 
   g(x,x0,y0,r) = sqrt((x[1]-x0)^2 + (x[2]-y0)^2) - r
-  f(x) = min(g(x,0.15,0.5,0.1),g(x,0.85,0.5,0.1))
+  f(x) = min(g(x,0.15,0.5,0.09),g(x,0.85,0.5,0.09))
   fh = interpolate(f,V_φ)
   geo = DiscreteGeometry(fh,model)
   cell_to_state = map(compute_bgcell_to_inoutcut,local_views(model),local_views(geo))
 
+  i_am_main(ranks) && println("Testing $mesh_partition")
   map(local_views(μ),cell_to_state) do μ,cell_to_state
     @test getfield.(μ.cell_field,:value)==collect(cell_to_state.<=0)
+  end
+end
+
+function main_3d_sub(model,name;vtk=false)
+  order = 1
+  Ω = Triangulation(model)
+
+  reffe = ReferenceFE(lagrangian,Float64,order)
+  V_φ = TestFESpace(model,reffe)
+
+  f(x,y0) = abs(x[2]-y0) + abs(x[3]-0.5) - 0.05
+  g(x,x0,y0,r) = sqrt((x[1]-x0)^2 + (x[2]-y0)^2 + (x[3]-0.5)^2) - r
+  f(x) = min(f(x,0.75),f(x,0.25),
+    g(x,0.15,0.5,0.09),
+    g(x,0.5,0.6,0.2),
+    g(x,0.85,0.5,0.09),
+    g(x,0.5,0.15,0.05))
+  φh = interpolate(f,V_φ)
+  GridapTopOpt.correct_ls!(φh)
+
+  geo = DiscreteGeometry(φh,model)
+  cutgeo = cut(model,geo)
+
+  cell_to_state = map(compute_bgcell_to_inoutcut,local_views(model),local_views(geo))
+  cell_to_lcolor, lcolor_to_group = map(local_views(model),cell_to_state) do model, cell_to_state
+    GridapTopOpt.tag_disconnected_volumes(model,cell_to_state;groups=((GridapTopOpt.CUT,IN),OUT))
+  end |> tuple_of_arrays;
+
+  n_lcolor = map(length,lcolor_to_group)
+  cell_ids = partition(get_cell_gids(model))
+
+  color_gids = GridapTopOpt.generate_volume_gids(
+    cell_ids,n_lcolor,cell_to_lcolor
+  )
+
+  cell_to_lcolor, lcolor_to_group, color_gids = GridapTopOpt.tag_disconnected_volumes(model,cell_to_state;groups=((GridapTopOpt.CUT,IN),OUT));
+
+  φ_cell_values = map(get_cell_dof_values,local_views(φh))
+  μ,_ = GridapTopOpt.get_isolated_volumes_mask_polytopal(model,φ_cell_values,[25])
+
+  cell_to_color = map(cell_to_lcolor,partition(color_gids)) do cell_to_lcolor, colors
+    local_to_global(colors)[cell_to_lcolor]
+  end
+
+  if vtk
+    Ω_φ = get_triangulation(V_φ)
+    writevtk(
+      Ω,"results/IsolatedVol_$name",
+      cellfields=[
+        "φh"=>φh,
+        "μ"=>μ,
+        "inoutcut"=>CellField(cell_to_state,Ω_φ),
+        "loc_vols"=>CellField(cell_to_lcolor,Ω_φ),
+        "vols"=>CellField(cell_to_color,Ω_φ),
+      ],
+      append=false
+    );
+  end
+
+  return μ,V_φ
+end
+
+function main_3d(distribute,mesh_partition;vtk=false)
+  ranks = distribute(LinearIndices((prod(mesh_partition),)))
+  model = generate_model(3,40,ranks,mesh_partition)
+
+  μ,V_φ = main_3d_sub(model,"distributed_$mesh_partition";vtk)
+
+  g(x,x0,y0,r) = sqrt((x[1]-x0)^2 + (x[2]-y0)^2 + (x[3]-0.5)^2) - r
+  f(x) = min(g(x,0.15,0.5,0.09),g(x,0.85,0.5,0.09))
+  fh = interpolate(f,V_φ)
+  geo = DiscreteGeometry(fh,model)
+  cell_to_state = map(compute_bgcell_to_inoutcut,local_views(model),local_views(geo))
+  μ_expected = map(cell_to_state) do cell_to_state
+    collect(Float64,cell_to_state.<=0)
+  end
+
+  if vtk
+    writevtk(
+      get_triangulation(model),"results/expected_IsolatedVol_$mesh_partition",
+      cellfields=[
+        "μ_expected"=>CellField(μ_expected,get_triangulation(V_φ)),
+        "diff"=>CellField(μ_expected,get_triangulation(V_φ))-μ
+      ],
+      append=false
+    );
+  end
+
+  i_am_main(ranks) && println("Testing $mesh_partition")
+  map(local_views(μ),cell_to_state) do μ,cell_to_state
+    @test getfield.(μ.cell_field,:value)==collect(Float64,cell_to_state.<=0)
   end
 end
 
@@ -135,16 +219,7 @@ function main_gmsh(ranks;vtk=false)
   _φf2(x) = max(φf(x),-(max(2/0.2*abs(x[1]-0.319),2/0.2*abs(x[2]-0.3))-1))
   φf2(x) = min(_φf2(x),sqrt((x[1]-0.35)^2+(x[2]-0.26)^2)-0.025)
   φh = interpolate(φf2,V_φ)
-
-  _φ = get_free_dof_values(φh)
-  map(local_views(_φ)) do φ
-    idx = findall(isapprox(0.0;atol=1e-10),φ)
-    if !isempty(idx)
-      i_am_main(ranks) && println("    Correcting level values at $(length(idx)) nodes")
-    end
-    φ[idx] .+= 1e-10
-  end
-  consistent!(_φ) |> wait
+  GridapTopOpt.correct_ls!(φh)
 
   # Setup integration meshes and measures
   geo = DiscreteGeometry(φh,model)
@@ -153,8 +228,9 @@ function main_gmsh(ranks;vtk=false)
   Ωs = DifferentiableTriangulation(Triangulation(cutgeo,PHYSICAL),V_φ)
   Ωf = DifferentiableTriangulation(Triangulation(cutgeo,PHYSICAL_OUT),V_φ)
 
-  ψ_s,_ = GridapTopOpt.get_isolated_volumes_mask_v2(cutgeo,["Gamma_s_D"])
-  _,ψ_f = GridapTopOpt.get_isolated_volumes_mask_v2(cutgeo,["Gamma_f_D"])
+  φ_cell_values = map(get_cell_dof_values,local_views(φh))
+  ψ_s,_ = GridapTopOpt.get_isolated_volumes_mask_polytopal(model,φ_cell_values,["Gamma_s_D"])
+  _,ψ_f = GridapTopOpt.get_isolated_volumes_mask_polytopal(model,φ_cell_values,["Gamma_f_D"])
 
   if vtk
     writevtk(get_triangulation(φh),path*"initial_islands",cellfields=["φh"=>φh,"ψ_f"=>ψ_f,"ψ_s"=>ψ_s];append=false)
@@ -164,14 +240,27 @@ function main_gmsh(ranks;vtk=false)
 end
 
 with_mpi() do distribute
-  main(distribute,(2,2);vtk=true)
-  main(distribute,(1,4);vtk=true)
-  main(distribute,(4,1);vtk=false)
+  main_2d(distribute,(2,2);vtk=false)
+  main_2d(distribute,(1,4);vtk=false)
+  main_2d(distribute,(4,1);vtk=false)
 end
 
 with_debug() do distribute
-  main(distribute,(6,10);vtk=false)
-  main(distribute,(7,3);vtk=true)
+  main_2d(distribute,(6,10);vtk=false)
+  main_2d(distribute,(7,3);vtk=false)
+end
+
+with_mpi() do distribute
+  main_3d(distribute,(2,2,1);vtk=false)
+  main_3d(distribute,(2,1,2);vtk=false)
+  main_3d(distribute,(1,4,1);vtk=false)
+  main_3d(distribute,(4,1,1);vtk=false)
+  main_3d(distribute,(1,1,4);vtk=false)
+end
+
+with_debug() do distribute
+  main_3d(distribute,(3,4,5);vtk=false)
+  main_3d(distribute,(5,5,5);vtk=false)
 end
 
 with_mpi() do distribute

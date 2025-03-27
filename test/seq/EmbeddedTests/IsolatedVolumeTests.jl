@@ -6,12 +6,16 @@ using GridapGmsh
 
 using GridapEmbedded
 using GridapEmbedded.LevelSetCutters
+using GridapEmbedded.Distributed
 using Gridap.Geometry, Gridap.FESpaces, Gridap.CellData, Gridap.Adaptivity, Gridap.Arrays
+
+using GridapDistributed, PartitionedArrays
 
 function main_2d(n;vtk)
   order = 1
-  model = UnstructuredDiscreteModel(CartesianDiscreteModel((0,1,0,1),(n,n)))
-  update_labels!(1,model,x->x[1]≈0,"Gamma_D")
+  base_model = UnstructuredDiscreteModel(CartesianDiscreteModel((0,1,0,1),(n,n)))
+  ref_model = refine(base_model, refinement_method = "barycentric")
+  model = Adaptivity.get_model(ref_model)
   Ω = Triangulation(model)
 
   reffe_scalar = ReferenceFE(lagrangian,Float64,order)
@@ -19,19 +23,13 @@ function main_2d(n;vtk)
 
   f(x,y0) = abs(x[2]-y0) - 0.05
   g(x,x0,y0,r) = sqrt((x[1]-x0)^2 + (x[2]-y0)^2) - r
-  f(x) = min(f(x,0.75),f(x,0.25),
-    g(x,0.15,0.5,0.1),
+  q(x) = min(f(x,0.75),f(x,0.25),
+    g(x,0.15,0.5,0.09),
     g(x,0.5,0.6,0.2),
-    g(x,0.85,0.5,0.1),
+    g(x,0.85,0.5,0.09),
     g(x,0.5,0.15,0.05))
-  φh = interpolate(f,V_φ)
-
-  φ = get_free_dof_values(φh)
-  idx = findall(isapprox(0.0;atol=1e-10),φ)
-  if length(idx)>0
-    println("    Correcting level values at $(length(idx)) nodes")
-    φ[idx] .+= 1e-10
-  end
+  φh = interpolate(q,V_φ)
+  GridapTopOpt.correct_ls!(φh)
 
   geo = DiscreteGeometry(φh,model)
   cutgeo = cut(model,geo)
@@ -39,19 +37,11 @@ function main_2d(n;vtk)
   bgcell_to_inoutcut = compute_bgcell_to_inoutcut(cutgeo,geo)
   cell_to_color, color_to_group = GridapTopOpt.tag_disconnected_volumes(model,bgcell_to_inoutcut;groups=((GridapTopOpt.CUT,IN),OUT))
 
-  color_to_tagged = GridapTopOpt.find_isolated_volumes(model,["Gamma_D"],cell_to_color,color_to_group)
+  color_to_tagged = GridapTopOpt.find_isolated_volumes(model,[1,2,5,7],cell_to_color,color_to_group)
   cell_to_tagged = map(c -> color_to_tagged[c], cell_to_color)
 
-  μ,_ = GridapTopOpt.get_isolated_volumes_mask_v2(cutgeo,["Gamma_D"])
-
-  # Expected
-  f(x) = min(g(x,0.15,0.5,0.1),g(x,0.85,0.5,0.1))
-  fh = interpolate(f,V_φ)
-  _geo = DiscreteGeometry(fh,model)
-  _bgcell_to_inoutcut = compute_bgcell_to_inoutcut(model,_geo)
-  _data = CellField(collect(Float64,_bgcell_to_inoutcut .<= 0),Triangulation(model))
-
-  @test get_data(μ) == get_data(_data)
+  φ_cell_values = get_cell_dof_values(φh)
+  μ,_ = GridapTopOpt.get_isolated_volumes_mask_polytopal(model,φ_cell_values,[1,2,5,7])
 
   if vtk
     writevtk(
@@ -68,6 +58,73 @@ function main_2d(n;vtk)
       append=false
     )
   end
+
+  # Expected
+  f2(x) = min(g(x,0.15,0.5,0.09),g(x,0.85,0.5,0.09))
+  fh = interpolate(f2,V_φ)
+  _geo = DiscreteGeometry(fh,model)
+  _bgcell_to_inoutcut = compute_bgcell_to_inoutcut(model,_geo)
+  _data = CellField(collect(Float64,_bgcell_to_inoutcut .<= 0),Triangulation(model))
+
+  @test get_data(μ) == get_data(_data)
+end
+
+function main_3d(n;vtk)
+  order = 1
+  base_model = UnstructuredDiscreteModel(CartesianDiscreteModel((0,1,0,1,0,1),(n,n,n)))
+  ref_model = refine(base_model, refinement_method = "barycentric")
+  model = Adaptivity.get_model(ref_model)
+  Ω = Triangulation(model)
+
+  reffe_scalar = ReferenceFE(lagrangian,Float64,order)
+  V_φ = TestFESpace(model,reffe_scalar)
+
+  f(x,y0) = abs(x[2]-y0) + abs(x[3]-0.5) - 0.05
+  g(x,x0,y0,r) = sqrt((x[1]-x0)^2 + (x[2]-y0)^2 + (x[3]-0.5)^2) - r
+  q(x) = min(f(x,0.75),f(x,0.25),
+    g(x,0.15,0.5,0.09),
+    g(x,0.5,0.6,0.2),
+    g(x,0.85,0.5,0.09),
+    g(x,0.5,0.15,0.05))
+  φh = interpolate(q,V_φ)
+  GridapTopOpt.correct_ls!(φh)
+
+  geo = DiscreteGeometry(φh,model)
+  cutgeo = cut(model,geo)
+
+  bgcell_to_inoutcut = compute_bgcell_to_inoutcut(cutgeo,geo)
+  cell_to_color, color_to_group = GridapTopOpt.tag_disconnected_volumes(model,bgcell_to_inoutcut;groups=((GridapTopOpt.CUT,IN),OUT))
+
+  color_to_tagged = GridapTopOpt.find_isolated_volumes(model,[25,],cell_to_color,color_to_group)
+  cell_to_tagged = map(c -> color_to_tagged[c], cell_to_color)
+
+  φ_cell_values = get_cell_dof_values(φh)
+  μ,_ = GridapTopOpt.get_isolated_volumes_mask_polytopal(model,φ_cell_values,[25,])
+
+  if vtk
+    writevtk(
+      Ω,"results/background_3d",
+      cellfields=[
+        "φh"=>φh,
+        "μ"=>μ,
+      ],
+      celldata=[
+        "inoutcut"=>bgcell_to_inoutcut,
+        "volumes"=>cell_to_color,
+        "tagged"=>cell_to_tagged,
+      ];
+      append=false
+    )
+  end
+
+  # Expected
+  f_exp(x) = min(g(x,0.15,0.5,0.09),g(x,0.85,0.5,0.09))
+  fh = interpolate(f_exp,V_φ)
+  _geo = DiscreteGeometry(fh,model)
+  _bgcell_to_inoutcut = compute_bgcell_to_inoutcut(model,_geo)
+  _data = CellField(collect(Float64,_bgcell_to_inoutcut .<= 0),Triangulation(model))
+
+  @test get_data(μ) == get_data(_data)
 end
 
 function main_gmsh(;vtk=false)
@@ -101,13 +158,7 @@ function main_gmsh(;vtk=false)
   _φf2(x) = max(φf(x),-(max(2/0.2*abs(x[1]-0.319),2/0.2*abs(x[2]-0.3))-1))
   φf2(x) = min(_φf2(x),sqrt((x[1]-0.35)^2+(x[2]-0.26)^2)-0.025)
   φh = interpolate(φf2,V_φ)
-
-  φ = get_free_dof_values(φh)
-  idx = findall(isapprox(0.0;atol=1e-10),φ)
-  if length(idx)>0
-    println("    Correcting level values at $(length(idx)) nodes")
-    φ[idx] .+= 1e-10
-  end
+  GridapTopOpt.correct_ls!(φh)
 
   # Setup integration meshes and measures
   geo = DiscreteGeometry(φh,model)
@@ -116,8 +167,9 @@ function main_gmsh(;vtk=false)
   Ωs = DifferentiableTriangulation(Triangulation(cutgeo,PHYSICAL),V_φ)
   Ωf = DifferentiableTriangulation(Triangulation(cutgeo,PHYSICAL_OUT),V_φ)
 
-  ψ_s,_ = GridapTopOpt.get_isolated_volumes_mask_v2(cutgeo,["Gamma_s_D"])
-  _,ψ_f = GridapTopOpt.get_isolated_volumes_mask_v2(cutgeo,["Gamma_f_D"])
+  φ_cell_values = get_cell_dof_values(φh)
+  ψ_s,_ = GridapTopOpt.get_isolated_volumes_mask_polytopal(model,φ_cell_values,["Gamma_s_D"])
+  _,ψ_f = GridapTopOpt.get_isolated_volumes_mask_polytopal(model,φ_cell_values,["Gamma_f_D"])
 
   if vtk
     writevtk(get_triangulation(φh),path*"initial_islands",cellfields=["φh"=>φh,"ψ_f"=>ψ_f,"ψ_s"=>ψ_s];append=false)
@@ -126,8 +178,9 @@ function main_gmsh(;vtk=false)
   end
 end
 
-main_2d(41;vtk=true)
-main_2d(101;vtk=true)
+main_2d(41;vtk=false)
+main_2d(101;vtk=false)
+main_3d(31;vtk=false)
 main_gmsh(;vtk=true)
 
 end

@@ -192,7 +192,8 @@ function main(ranks)
   γ_p_h = mean(γ_p ∘ hₕ)
 
   # Terms
-  σf_n(u,p,n) = μ*∇(u) ⋅ n - p*n
+  _I = one(SymTensorValue{3,Float64})
+  σf(u,p) = 2μ*ε(u) - p*_I
   a_Ω(∇u,∇v) = μ*(∇u ⊙ ∇v)
   b_Ω(div_v,p) = -p*(div_v)
   ab_Γ(u,∇u,v,∇v,p,q,n) = n ⋅ ( - μ*(∇u ⋅ v + ∇v ⋅ u) + v*p + u*q) + γ_Nu_h*(u⋅v)
@@ -212,7 +213,6 @@ function main(ranks)
   l_fluid((),(v,q),φ) =  ∫(0q)Ω.dΩf
 
   ## Structure
-  _I = one(SymTensorValue{3,Float64})
   # Material parameters
   function lame_parameters(E,ν)
     λ = (E*ν)/((1+ν)*(1-2*ν))
@@ -238,7 +238,7 @@ function main(ranks)
   end
   function l_solid(((u,p),),s,φ)
     n = -get_normal_vector(Ω.Γ)
-    return ∫(-σf_n(u,p,n) ⋅ s)Ω.dΓ
+    return ∫(-(1-Ω.ψ_s)*(n ⋅ σf(u,p)) ⋅ s)Ω.dΓ
   end
 
   ## Optimisation functionals

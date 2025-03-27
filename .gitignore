@@ -32,3 +32,4 @@ GridapTopOpt.so
 results/*
 tmp/*
 *.msh
+*.jdl2

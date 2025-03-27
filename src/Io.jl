@@ -77,6 +77,7 @@ function pload!(dir::AbstractString, x)
   ranks = get_parts(x)
   y = pload(dir,ranks)
   copyto!(x,y)
+  consistent!(x) |> fetch
   return x
 end
 
