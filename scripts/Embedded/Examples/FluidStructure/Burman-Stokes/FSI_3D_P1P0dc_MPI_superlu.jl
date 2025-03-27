@@ -44,7 +44,7 @@ function gamg_ksp_setup(;rtol=10^-8,maxits=100)
 end
 
 function main(ranks)
-  path = "./results/FSI_3D_Burman_P1P0dc_MPI_superlu/"
+  path = "./results/FSI_3D_Burman_P1P0dc_MPI_superlu_at_broken_lsf/"
   files_path = path*"data/"
   i_am_main(ranks) && mkpath(files_path)
 
@@ -195,17 +195,17 @@ function main(ranks)
   σf_n(u,p,n) = μ*∇(u) ⋅ n - p*n
   a_Ω(∇u,∇v) = μ*(∇u ⊙ ∇v)
   b_Ω(div_v,p) = -p*(div_v)
-  a_Γ(u,∇u,v,∇v,n) = - μ*n⋅(∇u ⋅ v + ∇v⋅ u) + γ_Nu_h*(u⋅v)
-  b_Γ(v,p,n) = (n⋅v)*p
+  ab_Γ(u,∇u,v,∇v,p,q,n) = n ⋅ ( - μ*(∇u ⋅ v + ∇v ⋅ u) + v*p + u*q) + γ_Nu_h*(u⋅v)
   ju(∇u,∇v) = γ_u_h*(jump(Ω.n_Γg ⋅ ∇u) ⋅ jump(Ω.n_Γg ⋅ ∇v))
   jp(p,q) = γ_p_h*(jump(p) * jump(q))
+  v_ψ(p,q) = k_p * Ω.ψ_f*p*q
 
   function a_fluid((),(u,p),(v,q),φ)
     ∇u = ∇(u); ∇v = ∇(v);
     div_u = ∇⋅u; div_v = ∇⋅v
     n_Γ = -get_normal_vector(Ω.Γ)
-    return ∫(a_Ω(∇u,∇v) + b_Ω(div_v,p) + b_Ω(div_u,q))Ω.dΩf +
-      ∫(a_Γ(u,∇u,v,∇v,Ω.n_Γ) + b_Γ(v,p,Ω.n_Γ) + b_Γ(u,q,Ω.n_Γ))Ω.dΓ +
+    return ∫(a_Ω(∇u,∇v) + b_Ω(div_v,p) + b_Ω(div_u,q) + v_ψ(p,q))Ω.dΩf +
+      ∫(ab_Γ(u,∇u,v,∇v,p,q,n_Γ))Ω.dΓ +
       ∫(ju(∇u,∇v))Ω.dΓg - ∫(jp(p,q))Ω.dΓi
   end
 
