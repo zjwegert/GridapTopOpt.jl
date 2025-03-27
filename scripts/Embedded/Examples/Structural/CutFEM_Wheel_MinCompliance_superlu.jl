@@ -36,7 +36,7 @@ end
 
 function main(ranks)
   # Params
-  vf = 0.3
+  vf = 0.25
   γ_evo = 0.1
   max_steps = 10
   α_coeff = γ_evo*max_steps
@@ -199,9 +199,9 @@ function main(ranks)
 end
 
 with_mpi() do distribute
-  ncpus = 48
+  ncpus = 64
   ranks = distribute(LinearIndices((ncpus,)))
-  petsc_options = "-ksp_converged_reason -ksp_error_if_not_converged true -pc_type lu -pc_factor_mat_solver_type superlu_dist -mat_superlu_dist_printstat"
+  petsc_options = "-ksp_converged_reason -ksp_error_if_not_converged true -pc_type lu -pc_factor_mat_solver_type superlu_dist"
   GridapPETSc.with(;args=split(petsc_options)) do
     main(ranks)
   end

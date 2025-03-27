@@ -192,27 +192,27 @@ function main(ranks)
   γ_p_h = mean(γ_p ∘ hₕ)
 
   # Terms
-  σf_n(u,p,n) = μ*∇(u) ⋅ n - p*n
+  _I = one(SymTensorValue{3,Float64})
+  σf(u,p) = 2μ*ε(u) - p*_I
   a_Ω(∇u,∇v) = μ*(∇u ⊙ ∇v)
   b_Ω(div_v,p) = -p*(div_v)
-  a_Γ(u,∇u,v,∇v,n) = - μ*n⋅(∇u ⋅ v + ∇v⋅ u) + γ_Nu_h*(u⋅v)
-  b_Γ(v,p,n) = (n⋅v)*p
+  ab_Γ(u,∇u,v,∇v,p,q,n) = n ⋅ ( - μ*(∇u ⋅ v + ∇v ⋅ u) + v*p + u*q) + γ_Nu_h*(u⋅v)
   ju(∇u,∇v) = γ_u_h*(jump(Ω.n_Γg ⋅ ∇u) ⋅ jump(Ω.n_Γg ⋅ ∇v))
   jp(p,q) = γ_p_h*(jump(p) * jump(q))
+  v_ψ(p,q) = k_p * Ω.ψ_f*p*q
 
   function a_fluid((),(u,p),(v,q),φ)
     ∇u = ∇(u); ∇v = ∇(v);
     div_u = ∇⋅u; div_v = ∇⋅v
     n_Γ = -get_normal_vector(Ω.Γ)
-    return ∫(a_Ω(∇u,∇v) + b_Ω(div_v,p) + b_Ω(div_u,q))Ω.dΩf +
-      ∫(a_Γ(u,∇u,v,∇v,Ω.n_Γ) + b_Γ(v,p,Ω.n_Γ) + b_Γ(u,q,Ω.n_Γ))Ω.dΓ +
+    return ∫(a_Ω(∇u,∇v) + b_Ω(div_v,p) + b_Ω(div_u,q) + v_ψ(p,q))Ω.dΩf +
+      ∫(ab_Γ(u,∇u,v,∇v,p,q,n_Γ))Ω.dΓ + #Ω.n_Γ))Ω.dΓ +
       ∫(ju(∇u,∇v))Ω.dΓg - ∫(jp(p,q))Ω.dΓi
   end
 
   l_fluid((),(v,q),φ) =  ∫(0q)Ω.dΩf
 
   ## Structure
-  _I = one(SymTensorValue{3,Float64})
   # Material parameters
   function lame_parameters(E,ν)
     λ = (E*ν)/((1+ν)*(1-2*ν))
@@ -238,7 +238,7 @@ function main(ranks)
   end
   function l_solid(((u,p),),s,φ)
     n = -get_normal_vector(Ω.Γ)
-    return ∫(-σf_n(u,p,n) ⋅ s)Ω.dΓ
+    return ∫(-(1-Ω.ψ_s)*(n ⋅ σf(u,p)) ⋅ s)Ω.dΓ
   end
 
   ## Optimisation functionals
@@ -299,16 +299,17 @@ function main(ranks)
     γ=γ_evo,verbose=i_am_main(ranks),constraint_names=[:Vol],converged,has_oscillations)
   for (it,(uh,ph,dh),φh) in optimiser
     GC.gc()
-    if iszero(it % iter_mod)
-      writevtk(Ω_act,files_path*"Omega_act_$it",
-        cellfields=["φ"=>φh,"|∇(φ)|"=>(norm ∘ ∇(φh)),"uh"=>uh,"ph"=>ph,"dh"=>dh,
-          "ψ_s"=>Ω.ψ_s,"ψ_f"=>Ω.ψ_f])
-      writevtk(Ω.Ωf,files_path*"Omega_f_$it",
-        cellfields=["uh"=>uh,"ph"=>ph,"dh"=>dh])
-      writevtk(Ω.Ωs,files_path*"Omega_s_$it",
-        cellfields=["uh"=>uh,"ph"=>ph,"dh"=>dh])
-    end
+    #if iszero(it % iter_mod)
+    #  writevtk(Ω_act,files_path*"Omega_act_$it",
+    #    cellfields=["φ"=>φh,"|∇(φ)|"=>(norm ∘ ∇(φh)),"uh"=>uh,"ph"=>ph,"dh"=>dh,
+    #      "ψ_s"=>Ω.ψ_s,"ψ_f"=>Ω.ψ_f])
+    #  writevtk(Ω.Ωf,files_path*"Omega_f_$it",
+    #    cellfields=["uh"=>uh,"ph"=>ph,"dh"=>dh])
+    #  writevtk(Ω.Ωs,files_path*"Omega_s_$it",
+    #    cellfields=["uh"=>uh,"ph"=>ph,"dh"=>dh])
+    #end
     psave(files_path*"LSF_$it",get_free_dof_values(φh))
+
     write_history(path*"/history.txt",optimiser.history;ranks)
 
     # Geometric operation to re-add the non-designable region # TODO: Move to a function
@@ -319,6 +320,21 @@ function main(ranks)
     end
     consistent!(_φ) |> wait
     reinit!(ls_evo,φh)
+
+    update_collection!(Ω,φh)
+    writevtk(Ω_act,files_path*"Omega_act_$it",
+        cellfields=["φ"=>φh,"|∇(φ)|"=>(norm ∘ ∇(φh)),"ψ_s"=>Ω.ψ_s,"ψ_f"=>Ω.ψ_f])
+    writevtk(Ω.Ω_act_s,files_path*"Omega_act_s_$it",
+        cellfields=["φ"=>φh,"|∇(φ)|"=>(norm ∘ ∇(φh)),"ψ_s"=>Ω.ψ_s,"ψ_f"=>Ω.ψ_f])
+    writevtk(Ω.Ω_act_f,files_path*"Omega_act_f_$it",
+        cellfields=["φ"=>φh,"|∇(φ)|"=>(norm ∘ ∇(φh)),"ψ_s"=>Ω.ψ_s,"ψ_f"=>Ω.ψ_f])
+    writevtk(Ω.Ωf,files_path*"Omega_f_$it")
+    writevtk(Ω.Ωs,files_path*"Omega_s_$it")
+    writevtk(Ω.Γg,files_path*"Gammag_$it",cellfields=["n_Gammag_plus"=>Ω.n_Γg.plus,"n_Gammag_minus"=>Ω.n_Γg.minus])
+    writevtk(Ω.Γi,files_path*"Gammai_$it",cellfields=["n_Gammai_plus"=>Ω.n_Γi.plus,"n_Gammai_minus"=>Ω.n_Γi.minus])
+    writevtk(Ω.Γ,files_path*"Gamma_$it",cellfields=["n_Gamma"=>Ω.n_Γ])
+    psave(files_path*"LSF_$it",get_free_dof_values(φh))
+
   end
   it = get_history(optimiser).niter; uh,ph,dh = get_state(pcf)
   writevtk(Ω_act,path*"Omega_act_$it",

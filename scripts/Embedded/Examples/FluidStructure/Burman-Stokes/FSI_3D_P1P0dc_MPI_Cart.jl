@@ -241,7 +241,8 @@ function main(ranks,mesh_partition)
   # Terms
   _n(∇φ) = ∇φ/(10^-20+norm(∇φ)) # TODO: Currently required as diff through get_normal_vector is broken in distributed
 
-  σf_n(u,p,n) = μ*∇(u) ⋅ n - p*n
+  _I = one(SymTensorValue{3,Float64})
+  σf(u,p) = 2μ*ε(u) - p*_I
   a_Ω(u,v) = μ*(∇(u) ⊙ ∇(v))
   b_Ω(v,p) = -p*(∇⋅v)
   a_Γ(u,v,n) = - μ*(n⋅∇(u)) ⋅ v - μ*(n⋅∇(v)) ⋅ u + (γ_Nu ∘ hₕ)*(u⋅v)
@@ -274,7 +275,7 @@ function main(ranks,mesh_partition)
   k_d = 1.0
   γ_Gd(h) = α_Gd*(λs + μs)*h^3
   # Terms
-  σ(ε) = λs*tr(ε)*one(ε) + 2*μs*ε
+  σ(ε) = λs*tr(ε)*_I + 2*μs*ε
   a_s_Ω(d,s) = ε(s) ⊙ (σ ∘ ε(d)) # Elasticity
   j_s_k(d,s) = mean(γ_Gd ∘ hₕ)*jump(Ω.n_Γg ⋅ ∇(s)) ⋅ jump(Ω.n_Γg ⋅ ∇(d))
   v_s_ψ(d,s) = k_d*Ω.ψ_s*d⋅s # Isolated volume term
@@ -288,7 +289,7 @@ function main(ranks,mesh_partition)
   function l_solid(((u,p),),s,φ)
     n = -get_normal_vector(Ω.Γ)
     # n = -(_n ∘ ∇(φ))
-    return ∫(-σf_n(u,p,n) ⋅ s)Ω.dΓ
+    return ∫(-(1-Ω.ψ_s)*(n ⋅ σf(u,p)) ⋅ s)Ω.dΓ
   end
 
   ∂R2∂xh1((du,dp),((u,p),),d,s,φ) = -1*l_solid(((du,dp),),s,φ)
