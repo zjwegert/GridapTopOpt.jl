@@ -57,16 +57,16 @@ __init__() = begin
   end
   
   # This can be removed in future
-  function remove_ghost_cells(
-    trian::AppendedTriangulation{Dc,Dp,<:Union{<:SubCellTriangulation,<:TriangulationView{Dc,Dp,<:SubCellTriangulation}}},
-    gids
-  ) where {Dc,Dp}
-    a = remove_ghost_cells(trian.a,gids)
-    b = remove_ghost_cells(trian.b,gids)
-    iszero(num_cells(a)) && return b
-    iszero(num_cells(b)) && return a
-    return lazy_append(a,b)
-  end
+  #function remove_ghost_cells(
+  #  trian::AppendedTriangulation{Dc,Dp,<:Union{<:SubCellTriangulation,<:TriangulationView{Dc,Dp,<:SubCellTriangulation}}},
+  #  gids
+  #) where {Dc,Dp}
+  #  a = remove_ghost_cells(trian.a,gids)
+  #  b = remove_ghost_cells(trian.b,gids)
+  #  iszero(num_cells(a)) && return b
+  #  iszero(num_cells(b)) && return a
+  #  return lazy_append(a,b)
+  #end
 end
 
 include("Embedded/Embedded.jl")

@@ -44,12 +44,12 @@ function gamg_ksp_setup(;rtol=10^-8,maxits=100)
 end
 
 function main(ranks)
-  path = "./results/FSI_3D_Burman_P1P0dc_MPI_superlu_at_broken_lsf/"
+  path = "./results/FSI_3D_Burman_P1P0dc_MPI_superlu/"
   files_path = path*"data/"
   i_am_main(ranks) && mkpath(files_path)
 
   γ_evo = 0.2
-  max_steps = 10 # Based on number of elements in vertical direction divided by 10
+  max_steps = 20 # Based on number of elements in vertical direction divided by 10
   vf = 0.025
   α_coeff = γ_evo*max_steps
   iter_mod = 1
@@ -69,7 +69,7 @@ function main(ranks)
   model = GmshDiscreteModel(ranks,(@__DIR__)*"/../Meshes/mesh_3d_finer.msh")
   model = UnstructuredDiscreteModel(model)
   # map(test_mesh,local_views(model))
-  writevtk(model,path*"model")
+  #writevtk(model,path*"model")
 
   Ω_act = Triangulation(model)
   hₕ = get_element_diameter_field(model)
@@ -94,7 +94,7 @@ function main(ranks)
   # Check LS
   GridapTopOpt.correct_ls!(φh)
 
-  writevtk(get_triangulation(φh),path*"initial_lsf",cellfields=["φh"=>φh])
+  #writevtk(get_triangulation(φh),path*"initial_lsf",cellfields=["φh"=>φh])
 
   # Setup integration meshes and measures
   order = 1
@@ -242,7 +242,8 @@ function main(ranks)
   end
 
   ## Optimisation functionals
-  J_comp(((u,p),d),φ) = ∫(ε(d) ⊙ (σ ∘ ε(d)))Ω.dΩs
+  iso_vol_frac(φ) = ∫(Ω.ψ_s/vol_D)Ω.dΩs
+  J_comp(((u,p),d),φ) = ∫(ε(d) ⊙ (σ ∘ ε(d)))Ω.dΩs + iso_vol_frac(φ)
   Vol(((u,p),d),φ) = ∫(1/vol_D)Ω.dΩs - ∫(vf/vol_D)dΩ_act
   dVol(q,(u,p,d),φ) = ∫(-1/vol_D*q/(abs(Ω.n_Γ ⋅ ∇(φ))))Ω.dΓ
 
@@ -310,6 +311,9 @@ function main(ranks)
     end
     psave(files_path*"LSF_$it",get_free_dof_values(φh))
     write_history(path*"/history.txt",optimiser.history;ranks)
+    
+    isolated_vol = sum(iso_vol_frac(φh))
+    i_am_main(ranks) && println(" --- Isolated volume: ",isolated_vol)
 
     # Geometric operation to re-add the non-designable region # TODO: Move to a function
     _φ = get_free_dof_values(φh)
@@ -330,7 +334,7 @@ function main(ranks)
 end
 
 with_mpi() do distribute
-  ncpus = 192
+  ncpus = 512
   ranks = distribute(LinearIndices((ncpus,)))
   petsc_options = "-ksp_converged_reason -ksp_error_if_not_converged true -pc_type lu -pc_factor_mat_solver_type superlu_dist -mat_superlu_dist_printstat"
   GridapPETSc.with(;args=split(petsc_options)) do
