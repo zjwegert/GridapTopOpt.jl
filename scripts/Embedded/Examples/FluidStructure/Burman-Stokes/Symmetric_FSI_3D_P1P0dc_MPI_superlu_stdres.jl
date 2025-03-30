@@ -44,7 +44,7 @@ function gamg_ksp_setup(;rtol=10^-8,maxits=100)
 end
 
 function main(ranks)
-  path = "./results/Symmetric_FSI_3D_Burman_P1P0dc_MPI_superlu/"
+  path = "./results/Symmetric_FSI_3D_Burman_P1P0dc_MPI_superlu_stdres/"
   files_path = path*"data/"
   i_am_main(ranks) && mkpath(files_path)
 
