@@ -332,7 +332,7 @@ function main(ranks)
 end
 
 with_mpi() do distribute
-  ncpus = 256
+  ncpus = 512
   ranks = distribute(LinearIndices((ncpus,)))
   petsc_options = "-ksp_converged_reason -ksp_error_if_not_converged true -pc_type lu -pc_factor_mat_solver_type superlu_dist -mat_superlu_dist_printstat"
   GridapPETSc.with(;args=split(petsc_options)) do
