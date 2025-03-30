@@ -124,7 +124,7 @@ function _update_labels_locally!(e,model::DiscreteModel{3},mask,name)
     vtx_edge_connectivity[j]) for j = 1:length(vtx_edge_connectivity)]
   edge_Γ = unique(reduce(vcat,getindex.(vtx_edge_connectivity,edge_entries),init=[]))
   # Faces
-  face_entries = [findall(x->count(x .∈  vtx_face_connectivity[1:end.!=j])>2,
+  face_entries = [findall(x->count(x .∈  vtx_face_connectivity[1:end.!=j])>=2,
     vtx_face_connectivity[j]) for j = 1:length(vtx_face_connectivity)]
   face_Γ = unique(reduce(vcat,getindex.(vtx_face_connectivity,face_entries),init=[]))
   labels.d_to_dface_to_entity[1][vtxs_Γ] .= entity
