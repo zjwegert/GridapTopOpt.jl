@@ -75,7 +75,7 @@ function main(ranks)
   # Cut the background model
   reffe_scalar = ReferenceFE(lagrangian,Float64,1)
   V_φ = TestFESpace(model,reffe_scalar)
-  V_reg = TestFESpace(model,reffe_scalar;dirichlet_tags=["Gamma_N",])
+  V_reg = TestFESpace(model,reffe_scalar;dirichlet_tags=["Gamma_D_new",])#["Gamma_N",])
   U_reg = TrialFESpace(V_reg)
 
   f((x,y,z),q,r) = - cos(q*π*x)*cos(q*π*y)*cos(q*π*z)/q - r/q
@@ -87,7 +87,7 @@ function main(ranks)
   # Setup integration meshes and measures
   order = 1
   degree = 2*(order+1)
-  Γ_N = BoundaryTriangulation(model,tags="Gamma_N")
+  Γ_N = BoundaryTriangulation(model,tags=["Gamma_D_new",])#["Gamma_N",])
   dΓ_N = Measure(Γ_N,degree)
   dΩ_bg = Measure(Ω_bg,degree)
   Ω_data = EmbeddedCollection(model,φh) do cutgeo,cutgeo_facets,_φh
@@ -97,7 +97,7 @@ function main(ranks)
     Ω_act = Triangulation(cutgeo,ACTIVE)
     # Isolated volumes
     φ_cell_values = map(get_cell_dof_values,local_views(_φh))
-    ψ,_ = GridapTopOpt.get_isolated_volumes_mask_polytopal(model,φ_cell_values,["Gamma_D_new"])
+    ψ,_ = GridapTopOpt.get_isolated_volumes_mask_polytopal(model,φ_cell_values,["Gamma_N",])#["Gamma_D_new",])
     (;
       :Ω_act => Ω_act,
       :Ω     => Ω,
@@ -117,7 +117,7 @@ function main(ranks)
   # Setup spaces
   reffe_d = ReferenceFE(lagrangian,VectorValue{D,Float64},order)
   function build_spaces(Ω_act)
-    V = TestFESpace(Ω_act,reffe_d,conformity=:H1,dirichlet_tags=["Gamma_D_new"])
+    V = TestFESpace(Ω_act,reffe_d,conformity=:H1,dirichlet_tags=["Gamma_N",])#["Gamma_D_new",])
     U = TrialFESpace(V)
     return U,V
   end
