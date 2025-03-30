@@ -110,8 +110,8 @@ function main(ranks)
     Γi = SkeletonTriangulation(cutgeo_facets,ACTIVE_OUT)
     # Isolated volumes
     φ_cell_values = map(get_cell_dof_values,local_views(_φh))
-    ψ_s,_ = GridapTopOpt.get_isolated_volumes_mask_polytopal(model,φ_cell_values,["Gamma_s_D"])
-    _,ψ_f = GridapTopOpt.get_isolated_volumes_mask_polytopal(model,φ_cell_values,["Gamma_f_D"])
+    ψ_s,_ = GridapTopOpt.get_isolated_volumes_mask_polytopal(model,φ_cell_values,["Gamma_s_D","Gamma_Symm"])
+    _,ψ_f = GridapTopOpt.get_isolated_volumes_mask_polytopal(model,φ_cell_values,["Gamma_f_D","Gamma_Symm"])
     (;
       :Ωs       => Ωs,
       :dΩs      => Measure(Ωs,degree),
