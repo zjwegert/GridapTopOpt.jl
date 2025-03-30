@@ -44,13 +44,27 @@ function main(ranks)
   D = 3
 
   # Output path
-  path = "./results/CutFEM_Wheel_MinCompliance_Neumann_gammag_$(γg_evo)_vf_$(vf)_superlu/"
+  path = "./results/CutFEM_Wheel_MinCompliance_Neumann_gammag_$(γg_evo)_vf_$(vf)_superlu_newDiriAlt/"
   files_path = path*"data/"
   i_am_main(ranks) && mkpath(files_path)
 
   # Load mesh
   model = GmshDiscreteModel(ranks,(@__DIR__)*"/Meshes/wheel.msh")
   model = UnstructuredDiscreteModel(model)
+  # f_diri(x) =
+  #   (cos(2pi/3)<=x[1]<=cos(pi/3) && abs(x[2] - sqrt(1-x[1]^2))<1e-4) ||
+  #   (-1<=x[1]<=cos(7pi/6) && abs(x[2] - sqrt(1-x[1]^2))<1e-4) ||
+  #   (-1<=x[1]<=cos(7pi/6) && abs(x[2] - -sqrt(1-x[1]^2))<1e-4) ||
+  #   (cos(2pi/3)<=x[1]<=cos(pi/3) && abs(x[2] - -sqrt(1-x[1]^2))<1e-4) ||
+  #   (cos(pi/6)<=x[1]<=1 && abs(x[2] - -sqrt(1-x[1]^2))<1e-4) ||
+  #   (cos(pi/6)<=x[1]<=1 && abs(x[2] - sqrt(1-x[1]^2))<1e-4)
+  # alt
+  f_diri(x) =
+    (cos(pi/3)<=x[1]<=cos(pi/6) && abs(x[2] - sqrt(1-x[1]^2))<1e-4) ||
+    (cos(7pi/6)<=x[1]<=cos(2pi/3) && abs(x[2] - sqrt(1-x[1]^2))<1e-4) ||
+    (cos(pi/3)<=x[1]<=cos(pi/6) && abs(x[2] - -sqrt(1-x[1]^2))<1e-4) ||
+    (cos(7pi/6)<=x[1]<=cos(2pi/3) && abs(x[2] - -sqrt(1-x[1]^2))<1e-4)
+  update_labels!(1,model,f_diri,"Gamma_D_new")
   writevtk(model,path*"model")
 
   # Get triangulation and element size
@@ -83,7 +97,7 @@ function main(ranks)
     Ω_act = Triangulation(cutgeo,ACTIVE)
     # Isolated volumes
     φ_cell_values = map(get_cell_dof_values,local_views(_φh))
-    ψ,_ = GridapTopOpt.get_isolated_volumes_mask_polytopal(model,φ_cell_values,["Gamma_D"])
+    ψ,_ = GridapTopOpt.get_isolated_volumes_mask_polytopal(model,φ_cell_values,["Gamma_D_new"])
     (;
       :Ω_act => Ω_act,
       :Ω     => Ω,
@@ -103,7 +117,7 @@ function main(ranks)
   # Setup spaces
   reffe_d = ReferenceFE(lagrangian,VectorValue{D,Float64},order)
   function build_spaces(Ω_act)
-    V = TestFESpace(Ω_act,reffe_d,conformity=:H1,dirichlet_tags=["Gamma_D"])
+    V = TestFESpace(Ω_act,reffe_d,conformity=:H1,dirichlet_tags=["Gamma_D_new"])
     U = TrialFESpace(V)
     return U,V
   end
@@ -135,7 +149,7 @@ function main(ranks)
   ## Optimisation functionals
   vol_D = sum(∫(1)dΩ_bg)
   iso_vol_frac(φ) = ∫(Ω_data.ψ/vol_D)Ω_data.dΩ
-  J_comp(d,φ) = ∫(ε(d) ⊙ (σ ∘ ε(d)))Ω_data.dΩ + iso_vol_frac(φ)
+  J_comp(d,φ) = ∫(ε(d) ⊙ (σ ∘ ε(d)))Ω_data.dΩ #+ iso_vol_frac(φ)
   Vol(d,φ) = ∫(1/vol_D)Ω_data.dΩ - ∫(vf/vol_D)dΩ_bg
   dVol(q,d,φ) = ∫(-1/vol_D*q/(abs(Ω_data.n_Γ ⋅ ∇(φ))))Ω_data.dΓ
 
