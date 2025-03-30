@@ -49,7 +49,7 @@ function main(ranks)
   i_am_main(ranks) && mkpath(files_path)
 
   γ_evo = 0.2
-  max_steps = 20 # Based on number of elements in vertical direction divided by 10
+  max_steps = 15 # Based on number of elements in vertical direction divided by 10
   vf = 0.025
   α_coeff = γ_evo*max_steps
   iter_mod = 1
