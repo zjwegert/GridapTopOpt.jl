@@ -54,32 +54,26 @@ struct StaggeredAffineFEStateMap{NB,SB,A,B,C,D,E,F} <: AbstractFEStateMap
     """
 
     ## Pullback cache (this is a temporary solution before we refactor ChainRules)
-    #println("	      --- Setup Pullback cache")
     uhd = zero(op.trial)
     xhs, λᵀs_∂Rs∂φ = (), ()
     for k in 1:NB
       xh_k = get_solution(op,uhd,k)
       _a(uk,vk,φ) = op.biforms[k](xhs,uk,vk,φ)
       _l(vk,φ) = op.liforms[k](xhs,vk,φ)
-      #println("	        --- Compute λᵀ$(k)_∂R$(k)∂φ")
       λᵀk_∂Rk∂φ = ∇((uk,vk,φ) -> _a(uk,vk,φ) - _l(vk,φ),[xh_k,xh_k,φh],3)
       xhs, λᵀs_∂Rs∂φ = (xhs...,xh_k), (λᵀs_∂Rs∂φ...,λᵀk_∂Rk∂φ)
     end
-    #println("	      --- Collect cell vecs")
     vecdata = collect_cell_vector(U_reg,sum(λᵀs_∂Rs∂φ))
-    #println("	      --- Alloc vector")
     Σ_λᵀs_∂Rs∂φ = allocate_vector(assem_deriv,vecdata)
     plb_caches = (Σ_λᵀs_∂Rs∂φ,assem_deriv)
 
     ## Forward cache
-    #println("	      --- Setup forward cache")
     op_at_φ = get_staggered_operator_at_φ(op,φh)
     xh = one(op.trial)
     op_cache = _instantiate_caches(xh,solver,op_at_φ)
     fwd_caches = (zero_free_values(op.trial),op.trial,op_cache,op_at_φ)
 
     ## Adjoint cache
-    #println("	      --- Setup adjoint cache")
     xh_adj = one(op.trial)
     op_adjoint = dummy_generate_adjoint_operator(op_at_φ,assems_adjoint,φh,xh_adj,∂Rk∂xhi)
     op_cache = _instantiate_caches(xh_adj,adjoint_solver,op_adjoint)
@@ -105,13 +99,10 @@ function StaggeredAffineFEStateMap(
   adjoint_solver  :: StaggeredFESolver{NB} = StaggeredFESolver(fill(LUSolver(),length(op.biforms)))
 ) where {NB,SB}
 
-  _type_unstable_warning("StaggeredAffineFEStateMap","∂Rk∂xhi")
-
   ∂Rk∂xhi = ()
   for k = 2:NB
     _∂Rk∂xhi = ()
     for i = 1:k-1
-      # println("	      --- Compute ∂R$(k)∂xh$(i)")
       __∂Rk∂xhi(dxj,xhs,xhk,vhk,φ) = ∇(
         xi->op.biforms[k]((xhs[1:i-1]...,xi,xhs[i+1:end]...),xhk,vhk,φ) -
             op.liforms[k]((xhs[1:i-1]...,xi,xhs[i+1:end]...),vhk,φ)
@@ -275,8 +266,6 @@ function StaggeredNonlinearFEStateMap(
   adjoint_solver :: StaggeredFESolver{NB} = StaggeredFESolver(fill(LUSolver(),length(op.residuals))),
   adjoint_jacobians :: Vector{<:Function} = op.jacobians
 ) where {NB,SB}
-
-  _type_unstable_warning("StaggeredNonlinearFEStateMap","∂Rk∂xhi")
 
   ∂Rk∂xhi = ()
   for k = 2:NB
@@ -520,7 +509,6 @@ function StaggeredStateParamMap(F::Function,φ_to_u::StaggeredFEStateMapTypes)
   assem_U = GridapTopOpt.get_pde_assembler(φ_to_u)
 
   @assert length(Us) == length(assem_U)
-  _type_unstable_warning("StaggeredStateParamMap","∂F∂xhi")
   NB = length(Us)
 
   ∂F∂xhi = ()
@@ -595,18 +583,4 @@ function ChainRulesCore.rrule(u_to_j::StaggeredStateParamMap,u::AbstractVector,�
   uh = FEFunction(trial,u)
   φh = FEFunction(V_φ,φ)
   return ChainRulesCore.rrule(u_to_j,uh,φh)
-end
-
-function _type_unstable_warning(V,deriv_names)
-  @warn """\n
-  You are creating a $V without specifying $deriv_names. This will
-  now be generated using AutoDiff.
-
-  When a variable being differentiated is not defined on the whole integration
-  domain (e.g., the case of CutFEM), AutoDiff will cause a type-instability
-  error due to Gridap#1052.
-
-  We are aware of this bug and are working on a fix. In the meantime, please
-  pass the analytic expressions for $deriv_names to avoid this bug.
-  """ maxlog=1
 end

@@ -57,42 +57,8 @@ function get_transient_operator(φh,velh,s::CutFEMEvolve)
   γg, h, dΓg, n_Γg = params.γg, params.h, params.dΓg, params.n_Γg
   ϵ = 1e-20
 
-  ## Generate L2-projected normal
-  # V_reg2 = TestFESpace(get_triangulation(V_φ).model,
-  #   ReferenceFE(lagrangian,VectorValue{2,Float64},1))
-  # U_reg2 = TrialFESpace(V_reg2)
-  # a_hilb2(p,q) =∫(p ⋅ q)dΩ_bg;
-  # vel_ext2 = VelocityExtension(a_hilb2,U_reg2,V_reg2)
-  # _n(∇φh) = ∇φh/(1e-20 + norm(∇φh))
-  # l_n(q) = ∫((_n ∘ ∇(φh)) ⋅ q)dΩ_bg
-  # _b = assemble_vector(l_n,V_reg2)
-  # project!(vel_ext2,_b)
-  # n_regh = FEFunction(V_reg2,_b)
-  # v_norm = maximum(abs,get_free_dof_values(velh))
-  # _nrmls(v) = v/(ϵ + v_norm)
-  # βh_new = (_nrmls ∘ velh) * n_regh
-
-  ## Generate H1-projected vector field for β
-  # V_reg2 = TestFESpace(get_triangulation(V_φ).model,
-  #   ReferenceFE(lagrangian,VectorValue{2,Float64},1);dirichlet_tags=["Omega_NonDesign","Gamma_s_D"])
-  # U_reg2 = TrialFESpace(V_reg2)
-  # _α(hₕ) = 3(hₕ)^2
-  # a_hilb2(p,q) =∫((_α(h))*∇(p) ⊙ ∇(q) + p ⋅ q)dΩ_bg;
-  # vel_ext2 = VelocityExtension(a_hilb2,U_reg2,V_reg2)
-  # _n(∇φh) = ∇φh/(1e-20 + norm(∇φh))
-  # # l_n(v) = ∫((velh*(_n ∘ ∇(φh)) ⋅ v))dΩ_bg
-  # l_n(v) = ∫((velh*(s.Ωs.n_Γ ⋅ v)))s.Ωs.dΓ
-  # _b = assemble_vector(l_n,V_reg2)
-  # project!(vel_ext2,_b)
-  # n_regh = FEFunction(V_reg2,_b)
-  # β = n_regh/sqrt(dot(_b,vel_ext2.K*_b))
-
-  # writevtk(get_triangulation(φh),"results/beta",cellfields=["beta"=>β])
   v_norm = maximum(abs,get_free_dof_values(velh))
-  # β(vh,n) = vh/(ϵ + v_norm) * n/(ϵ + norm(n))
-  # β(vh,n) = n/(ϵ + norm(n))
   β(vh,∇φ) = vh/(ϵ + v_norm) * ∇φ/(ϵ + norm(∇φ))
-
   γ(h) = γg*h^2
 
   aₛ(u,v,h::CellField) = ∫(mean(γ ∘ h)*jump(∇(u) ⋅ n_Γg)*jump(∇(v) ⋅ n_Γg))dΓg
