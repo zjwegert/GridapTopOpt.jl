@@ -12,15 +12,6 @@ else
   global γg_evo =  0.01
 end
 
-function test_mesh(model)
-  grid_topology = Geometry.get_grid_topology(model)
-  D = num_cell_dims(grid_topology)
-  d = 0
-  vertex_to_cells = Geometry.get_faces(grid_topology,d,D)
-  bad_vertices = findall(i->i==0,map(length,vertex_to_cells))
-  @assert isempty(bad_vertices) "Bad vertices detected: re-generate your mesh with a different resolution"
-end
-
 CGAMGSolver(;kwargs...) = PETScLinearSolver(gamg_ksp_setup(;kwargs...))
 
 function gamg_ksp_setup(;rtol=10^-8,maxits=100)
@@ -43,6 +34,15 @@ function gamg_ksp_setup(;rtol=10^-8,maxits=100)
   return ksp_setup
 end
 
+function lsf_union!(φh1,φh2)
+  _φ1 = get_free_dof_values(φh1)
+  _φ2 = get_free_dof_values(φh2)
+  map(local_views(_φ1),local_views(_φ2)) do φ1,φ2
+    φ1 .= min.(φ1,φ2)
+  end
+  consistent!(_φ1) |> wait
+end
+
 function main(ranks)
   path = "./results/Symmetric_FSI_3D_Burman_P1P0dc_MPI_superlu_stdres/"
   files_path = path*"data/"
@@ -60,9 +60,9 @@ function main(ranks)
   H = 1.0;
   x0 = 2;
   l = 1.0;
-  w = 0.05;
+  w = 0.1;
   a = 0.7;
-  b = 0.05;
+  b = 0.1;
   cw = 0.1;
   vol_D = L*H
 
@@ -77,7 +77,7 @@ function main(ranks)
   # Cut the background model
   reffe_scalar = ReferenceFE(lagrangian,Float64,1)
   V_φ = TestFESpace(model,reffe_scalar)
-  V_reg = TestFESpace(model,reffe_scalar;dirichlet_tags=["Omega_NonDesign","Gamma_s_D"])
+  V_reg = TestFESpace(model,reffe_scalar;dirichlet_tags=["Omega_NonDesign","Gamma_Bottom"])
   U_reg = TrialFESpace(V_reg)
 
   _e = 1/3*hmin
@@ -110,7 +110,7 @@ function main(ranks)
     Γi = SkeletonTriangulation(cutgeo_facets,ACTIVE_OUT)
     # Isolated volumes
     φ_cell_values = map(get_cell_dof_values,local_views(_φh))
-    ψ_s,_ = GridapTopOpt.get_isolated_volumes_mask_polytopal(model,φ_cell_values,["Gamma_s_D","Gamma_Symm"])
+    ψ_s,_ = GridapTopOpt.get_isolated_volumes_mask_polytopal(model,φ_cell_values,["Gamma_Bottom","Gamma_Symm"])
     _,ψ_f = GridapTopOpt.get_isolated_volumes_mask_polytopal(model,φ_cell_values,["Gamma_f_D","Gamma_Symm"])
     (;
       :Ωs       => Ωs,
@@ -147,12 +147,12 @@ function main(ranks)
   function build_spaces(Ω_act_s,Ω_act_f)
     # Test spaces
     V = TestFESpace(Ω_act_f,reffe_u,conformity=:H1,
-      dirichlet_tags=["Gamma_f_D","Gamma_s_D","Gamma_Bottom","Gamma_Top",
+      dirichlet_tags=["Gamma_f_D","Gamma_Bottom","Gamma_Top",
       "Gamma_Symm","Gamma_Right","Gamma_TopCorners"],
-      dirichlet_masks=[(true,true,true),(true,true,true),(true,true,true),
+      dirichlet_masks=[(true,true,true),(true,true,true),
         (false,true,false),(false,false,true),(false,false,true),(false,true,true)])
     Q = TestFESpace(Ω_act_f,reffe_p,conformity=:L2)
-    T = TestFESpace(Ω_act_s,reffe_d,conformity=:H1,dirichlet_tags=["Gamma_s_D","Gamma_Symm"],
+    T = TestFESpace(Ω_act_s,reffe_d,conformity=:H1,dirichlet_tags=["Gamma_Bottom","Gamma_Symm"],
       dirichlet_masks=[(true,true,true),(false,false,true)])
 
     # Trial spaces
@@ -241,7 +241,7 @@ function main(ranks)
 
   ## Optimisation functionals
   iso_vol_frac(φ) = ∫(Ω.ψ_s/vol_D)Ω.dΩs
-  J_comp(((u,p),d),φ) = ∫(ε(d) ⊙ (σ ∘ ε(d)))Ω.dΩs #+ iso_vol_frac(φ)
+  J_comp(((u,p),d),φ) = ∫(ε(d) ⊙ (σ ∘ ε(d)))Ω.dΩs
   Vol(((u,p),d),φ) = ∫(1/vol_D)Ω.dΩs - ∫(vf/vol_D)dΩ_act
   dVol(q,(u,p,d),φ) = ∫(-1/vol_D*q/(abs(Ω.n_Γ ⋅ ∇(φ))))Ω.dΓ
 
@@ -271,9 +271,7 @@ function main(ranks)
   reinit_nls = NewtonSolver(PETScLinearSolver();maxiter=20,rtol=1.e-14,verbose=i_am_main(ranks))
 
   evo = CutFEMEvolve(V_φ,Ω,dΩ_act,hₕ;max_steps,γg=γg_evo,ode_ls=evolve_ls,ode_nl=evolve_nls)
-  reinit1 = StabilisedReinit(V_φ,Ω,dΩ_act,hₕ;stabilisation_method=ArtificialViscosity(0.5),nls=reinit_nls)
-  reinit2 = StabilisedReinit(V_φ,Ω,dΩ_act,hₕ;stabilisation_method=GridapTopOpt.InteriorPenalty(V_φ,γg=0.1),nls=reinit_nls)
-  reinit = GridapTopOpt.MultiStageStabilisedReinit([reinit1,reinit2])
+  reinit = StabilisedReinit(V_φ,Ω,dΩ_act,hₕ;stabilisation_method=ArtificialViscosity(0.5),nls=reinit_nls)
   ls_evo = UnfittedFEEvolution(evo,reinit)
 
   reinit!(ls_evo,φh_nondesign)
@@ -297,7 +295,6 @@ function main(ranks)
   optimiser = AugmentedLagrangian(pcf,ls_evo,vel_ext,φh;
     γ=γ_evo,verbose=i_am_main(ranks),constraint_names=[:Vol],converged,has_oscillations)
   for (it,(uh,ph,dh),φh) in optimiser
-    GC.gc()
     if iszero(it % iter_mod)
       writevtk(Ω_act,files_path*"Omega_act_$it",
         cellfields=["φ"=>φh,"|∇(φ)|"=>(norm ∘ ∇(φh)),"uh"=>uh,"ph"=>ph,"dh"=>dh,
@@ -313,14 +310,11 @@ function main(ranks)
     isolated_vol = sum(iso_vol_frac(φh))
     i_am_main(ranks) && println(" --- Isolated volume: ",isolated_vol)
 
-    # Geometric operation to re-add the non-designable region # TODO: Move to a function
-    _φ = get_free_dof_values(φh)
-    _φ_nondesign = get_free_dof_values(φh_nondesign)
-    map(local_views(_φ),local_views(_φ_nondesign)) do φ,φ_nondesign
-      φ .= min.(φ,φ_nondesign)
+    # Union with non-designable region/s
+    if !GridapTopOpt.finished(optimiser)
+      lsf_union!(φh,φh_nondesign)
+      reinit!(ls_evo,φh)
     end
-    consistent!(_φ) |> wait
-    reinit!(ls_evo,φh)
   end
   it = get_history(optimiser).niter; uh,ph,dh = get_state(pcf)
   writevtk(Ω_act,path*"Omega_act_$it",
@@ -329,12 +323,13 @@ function main(ranks)
     cellfields=["uh"=>uh,"ph"=>ph,"dh"=>dh])
   writevtk(Ω.Ωs,path*"Omega_s_$it",
     cellfields=["uh"=>uh,"ph"=>ph,"dh"=>dh])
+  psave(path*"LSF_$it",get_free_dof_values(φh))
 end
 
 with_mpi() do distribute
   ncpus = 256
   ranks = distribute(LinearIndices((ncpus,)))
-  petsc_options = "-ksp_converged_reason -ksp_error_if_not_converged true -pc_type lu -pc_factor_mat_solver_type superlu_dist -mat_superlu_dist_printstat"
+  petsc_options = "-ksp_converged_reason -ksp_error_if_not_converged true -pc_type lu -pc_factor_mat_solver_type superlu_dist"
   GridapPETSc.with(;args=split(petsc_options)) do
     main(ranks)
   end

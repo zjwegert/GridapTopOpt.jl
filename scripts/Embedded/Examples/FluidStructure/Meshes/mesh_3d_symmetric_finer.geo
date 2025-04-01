@@ -6,9 +6,9 @@ L = 4.0;
 H = 1.0;
 x0 = 2;
 l = 1.0;
-w = 0.05;
+w = 0.1;
 a = 0.7;
-b = 0.05;
+b = 0.1;
 cw = 0.1; //+ Width between wall and non-designable domain
 
 //+ Mesh sizes

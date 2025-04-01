@@ -75,11 +75,12 @@ function main(ranks)
   # Cut the background model
   reffe_scalar = ReferenceFE(lagrangian,Float64,1)
   V_φ = TestFESpace(model,reffe_scalar)
-  V_reg = TestFESpace(model,reffe_scalar;dirichlet_tags=["Gamma_D_new",])#["Gamma_N",])
+  V_reg = TestFESpace(model,reffe_scalar;dirichlet_tags=["Gamma_N",])#["Gamma_D_new",])
   U_reg = TrialFESpace(V_reg)
 
-  f((x,y,z),q,r) = - cos(q*π*x)*cos(q*π*y)*cos(q*π*z)/q - r/q
-  φh = interpolate(x->f(x,4,0.1),V_φ)
+  _f1((x,y,z),q,r) = - cos(q*π*x)*cos(q*π*y)*cos(q*π*z)/q - r/q
+  _f2((x,y,z)) = -sqrt(x^2+y^2)+0.9
+  φh = interpolate(x->min(_f1(x,4,0.1),_f2(x)),V_φ)
 
   # Check LS
   GridapTopOpt.correct_ls!(φh)
@@ -87,7 +88,7 @@ function main(ranks)
   # Setup integration meshes and measures
   order = 1
   degree = 2*(order+1)
-  Γ_N = BoundaryTriangulation(model,tags=["Gamma_D_new",])#["Gamma_N",])
+  Γ_N = BoundaryTriangulation(model,tags=["Gamma_N",])#["Gamma_D_new",])
   dΓ_N = Measure(Γ_N,degree)
   dΩ_bg = Measure(Ω_bg,degree)
   Ω_data = EmbeddedCollection(model,φh) do cutgeo,cutgeo_facets,_φh
@@ -97,7 +98,7 @@ function main(ranks)
     Ω_act = Triangulation(cutgeo,ACTIVE)
     # Isolated volumes
     φ_cell_values = map(get_cell_dof_values,local_views(_φh))
-    ψ,_ = GridapTopOpt.get_isolated_volumes_mask_polytopal(model,φ_cell_values,["Gamma_N",])#["Gamma_D_new",])
+    ψ,_ = GridapTopOpt.get_isolated_volumes_mask_polytopal(model,φ_cell_values,["Gamma_D_new",])#["Gamma_N",])
     (;
       :Ω_act => Ω_act,
       :Ω     => Ω,
@@ -107,7 +108,7 @@ function main(ranks)
       :n_Γg  => get_normal_vector(Γg),
       :Γ     => Γ,
       :dΓ    => Measure(Γ,degree),
-      :n_Γ        => get_normal_vector(Γ), # Note, need to recompute inside obj/constraints to compute derivs
+      :n_Γ   => get_normal_vector(Γ), # Note, need to recompute inside obj/constraints to compute derivs
       :ψ     => ψ
     )
   end
@@ -117,12 +118,10 @@ function main(ranks)
   # Setup spaces
   reffe_d = ReferenceFE(lagrangian,VectorValue{D,Float64},order)
   function build_spaces(Ω_act)
-    V = TestFESpace(Ω_act,reffe_d,conformity=:H1,dirichlet_tags=["Gamma_N",])#["Gamma_D_new",])
+    V = TestFESpace(Ω_act,reffe_d,conformity=:H1,dirichlet_tags=["Gamma_D_new",])#["Gamma_N",])
     U = TrialFESpace(V)
     return U,V
   end
-  _U_init = build_spaces(Ω_data.Ω_act)[1]
-  i_am_main(ranks) && println("Number of free dofs: ",num_free_dofs(_U_init))
 
   ### Weak form
   # Material parameters
@@ -141,7 +140,7 @@ function main(ranks)
   a_s_Ω(d,s) = ε(s) ⊙ (σ ∘ ε(d)) # Elasticity
   j_s_k(d,s) = mean(γ_Gd ∘ hₕ)*(jump(Ω_data.n_Γg ⋅ ∇(s)) ⋅ jump(Ω_data.n_Γg ⋅ ∇(d)))
   v_s_ψ(d,s) = (k_d*Ω_data.ψ)*(d⋅s) # Isolated volume term
-  g((x,y,z)) = 100VectorValue(-y,x,0.0)
+  g((x,y,z)) = 0.1VectorValue(-y,x,0.0)
 
   a(d,s,φ) = ∫(a_s_Ω(d,s) + v_s_ψ(d,s))Ω_data.dΩ + ∫(j_s_k(d,s))Ω_data.dΓg
   l(s,φ) = ∫(s⋅g)dΓ_N
@@ -158,7 +157,6 @@ function main(ranks)
   state_collection = GridapTopOpt.EmbeddedCollection_in_φh(model,φh) do _φh
     update_collection!(Ω_data,_φh)
     U,V = build_spaces(Ω_data.Ω_act)
-    # elast_ls = ElasticitySolver(U;rtol=1.e-8,maxits=200)
     state_map = AffineFEStateMap(a,l,U,V,V_φ,U_reg,_φh;ls=elast_ls,adjoint_ls=elast_ls)
     (;
       :state_map => state_map,
@@ -175,9 +173,7 @@ function main(ranks)
   reinit_nls = NewtonSolver(PETScLinearSolver();maxiter=20,rtol=1.e-14,verbose=i_am_main(ranks))
 
   evo = CutFEMEvolve(V_φ,Ω_data,dΩ_bg,hₕ;max_steps,γg=γg_evo,ode_ls=evolve_ls,ode_nl=evolve_nls)
-  reinit1 = StabilisedReinit(V_φ,Ω_data,dΩ_bg,hₕ;stabilisation_method=ArtificialViscosity(0.5),nls=reinit_nls)
-  reinit2 = StabilisedReinit(V_φ,Ω_data,dΩ_bg,hₕ;stabilisation_method=GridapTopOpt.InteriorPenalty(V_φ,γg=0.1),nls=reinit_nls)
-  reinit = GridapTopOpt.MultiStageStabilisedReinit([reinit1,reinit2])
+  reinit = StabilisedReinit(V_φ,Ω_data,dΩ_bg,hₕ;stabilisation_method=ArtificialViscosity(0.5),nls=reinit_nls)
   ls_evo = UnfittedFEEvolution(evo,reinit)
 
   ## Hilbertian extension-regularisation problems
@@ -210,10 +206,11 @@ function main(ranks)
   it = get_history(optimiser).niter; uh = get_state(pcf)
   writevtk(Ω_bg,path*"Omega_act_$it",cellfields=["φ"=>φh,"|∇(φ)|"=>(norm ∘ ∇(φh)),"uh"=>uh,"ψ"=>Ω_data.ψ])
   writevtk(Ω_data.Ω,path*"Omega_in_$it",cellfields=["uh"=>uh])
+  psave(path*"LSF_$it",get_free_dof_values(φh))
 end
 
 with_mpi() do distribute
-  ncpus = 64
+  ncpus = 48
   ranks = distribute(LinearIndices((ncpus,)))
   petsc_options = "-ksp_converged_reason -ksp_error_if_not_converged true -pc_type lu -pc_factor_mat_solver_type superlu_dist"
   GridapPETSc.with(;args=split(petsc_options)) do
