@@ -81,7 +81,7 @@ function main(ranks)
   U_reg = TrialFESpace(V_reg)
 
   _e = 1/3*hmin
-  f0((x,y,z),a,b) = max(2/a*abs(x-x0),1/(b/2+1)*abs(y-b/2+1),2/(H-2cw)*abs(z-H/2))-1
+  f0((x,y,z),a,b) = (max(2/a*abs(x-x0),1/(b/2+1)*abs(y-b/2+1),2/(H-2cw)*abs(z-H/2))-1)*min(a,b,cw,H)
   f1((x,y,z),q,r) = - cos(q*π*x)*cos(q*π*y)*cos(q*π*z)/q - r/q
   fin(x) = f0(x,l*(1+_e),a*(1+_e))
   fsolid(x) = min(f0(x,l*(1+_e),b*(1+_e)),f0(x,w*(1+_e),a*(1+_e)))

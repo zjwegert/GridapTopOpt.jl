@@ -13,7 +13,7 @@ cw = 0.1; //+ Width between wall and non-designable domain
 
 //+ Mesh sizes
 size_f = 0.05;
-size_s = 0.01; //+ or 0.01 for finer
+size_s = 0.01;
 
 //+ Main area
 Point(1) = {0,0,0,size_f};
@@ -107,9 +107,9 @@ Physical Point("Gamma_Top", 139) = {17, 33, 23, 41, 27, 47};
 Physical Curve("Gamma_Top", 140) = {24, 61, 77, 35, 34, 76, 22, 59, 96, 125, 92, 44, 43, 91, 128};
 Physical Surface("Gamma_Top", 141) = {34, 61, 7, 14, 45, 81, 84, 57, 20};
 //+
-Physical Point("Gamma_Bottom", 149) = {2, 4, 52, 59, 3, 64, 30, 48};
-Physical Curve("Gamma_Bottom", 150) = {94, 131, 115, 117, 101, 102, 65, 28, 1, 27, 2, 47, 3, 50, 49, 93, 130};
-Physical Surface("Gamma_Bottom", 151) = {85, 58, 23, 72, 29, 9, 63, 36};
+Physical Point("Gamma_Bottom", 149) = {2, 4, 52, 59, 3, 64, 30, 48, 36, 20, 29, 46};
+Physical Curve("Gamma_Bottom", 150) = {94, 131, 115, 117, 101, 102, 65, 28, 1, 27, 2, 47, 3, 50, 49, 93, 130, 64, 55, 88, 90};
+Physical Surface("Gamma_Bottom", 151) = {85, 58, 23, 72, 29, 9, 63, 36, 55};
 //+
 Physical Point("Gamma_Right", 152) = {53, 58, 61, 56, 55, 54, 60, 57};
 Physical Curve("Gamma_Right", 153) = {119, 120, 112, 114, 110, 124, 121, 123, 106, 107, 127, 104, 116, 132};
@@ -121,10 +121,6 @@ Physical Surface("Gamma_Left", 157) = {3, 5, 4, 2, 6, 1};
 //+
 Physical Point("Gamma_TopCorners", 159) = {5, 7, 6, 62, 63, 49};
 Physical Curve("Gamma_TopCorners", 158) = {98, 126, 129, 5, 6, 7};
-//+
-Physical Point("Gamma_s_D", 142) = {36, 20, 29, 46};
-Physical Curve("Gamma_s_D", 143) = {64, 55, 88, 90};
-Physical Surface("Gamma_s_D", 144) = {55};
 //+
 Physical Point("Omega_NonDesign", 145) = {37, 21, 32, 31, 40, 44, 45, 28, 39, 42, 25, 24};
 Physical Curve("Omega_NonDesign", 146) = {66, 75, 73, 83, 86, 85, 84, 74, 78, 71, 54, 57, 58, 53, 39, 79};
@@ -144,13 +140,9 @@ Physical Surface("Gamma_f_N", 138) += {103};
 Physical Curve("Gamma_Top", 140) += {135, 146, 155};
 Physical Surface("Gamma_Top", 141) += {101, 95, 88};
 //+
-Physical Point("Gamma_Bottom", 149) += {76};
-Physical Curve("Gamma_Bottom", 150) += {157, 139};
+Physical Point("Gamma_Bottom", 149) += {76, 77, 69};
+Physical Curve("Gamma_Bottom", 150) += {157, 139, 168, 161, 144};
 Physical Surface("Gamma_Bottom", 151) += {104, 113, 94};
-//+
-Physical Point("Gamma_s_D", 142) += {77, 69};
-Physical Curve("Gamma_s_D", 143) += {168, 161, 144};
-Physical Surface("Gamma_s_D", 170) = {113};
 //+
 Physical Volume("Omega_NonDesign", 148) += {11};
 Physical Curve("Omega_NonDesign", 146) += {164, 169, 152, 153, 143, 162};
