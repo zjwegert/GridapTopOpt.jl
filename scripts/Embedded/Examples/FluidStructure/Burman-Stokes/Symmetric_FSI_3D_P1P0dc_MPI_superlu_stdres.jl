@@ -122,7 +122,7 @@ function main(ranks)
       :n_Γg     => get_normal_vector(Γg),
       :Γ        => Γ,
       :dΓ       => Measure(Γ,degree),
-      :n_Γ        => get_normal_vector(Γ), # Note, need to recompute inside obj/constraints to compute derivs
+      :n_Γ      => get_normal_vector(Γ), # Note, need to recompute inside obj/constraints to compute derivs
       :Ω_act_s  => Ω_act_s,
       :dΩ_act_s => Measure(Ω_act_s,degree),
       :Ω_act_f  => Ω_act_f,
@@ -148,7 +148,7 @@ function main(ranks)
     # Test spaces
     V = TestFESpace(Ω_act_f,reffe_u,conformity=:H1,
       dirichlet_tags=["Gamma_f_D","Gamma_Bottom","Gamma_Top",
-      "Gamma_Symm","Gamma_Right","Gamma_TopCorners"],
+        "Gamma_Symm","Gamma_Right","Gamma_TopCorners"],
       dirichlet_masks=[(true,true,true),(true,true,true),
         (false,true,false),(false,false,true),(false,false,true),(false,true,true)])
     Q = TestFESpace(Ω_act_f,reffe_p,conformity=:L2)
@@ -156,7 +156,7 @@ function main(ranks)
       dirichlet_masks=[(true,true,true),(false,false,true)])
 
     # Trial spaces
-    U = TrialFESpace(V,[uin,[VectorValue(0.0,0.0,0.0) for _ = 1:6]...])
+    U = TrialFESpace(V,[uin,[VectorValue(0.0,0.0,0.0) for _ = 1:5]...])
     P = TrialFESpace(Q)
     R = TrialFESpace(T)
 
