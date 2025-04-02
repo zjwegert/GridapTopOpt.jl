@@ -191,7 +191,6 @@ function main(ranks)
   optimiser = AugmentedLagrangian(pcf,ls_evo,vel_ext,φh;
     γ=γ_evo,verbose=i_am_main(ranks),constraint_names=[:Vol],converged)
   for (it,uh,φh) in optimiser
-    GC.gc()
     if iszero(it % iter_mod)
       writevtk(Ω_bg,files_path*"Omega_act_$it",
         cellfields=["φ"=>φh,"|∇(φ)|"=>(norm ∘ ∇(φh)),"uh"=>uh,"ψ"=>Ω_data.ψ])
