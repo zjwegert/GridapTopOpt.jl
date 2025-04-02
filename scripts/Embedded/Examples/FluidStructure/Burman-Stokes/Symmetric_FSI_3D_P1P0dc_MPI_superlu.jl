@@ -88,7 +88,7 @@ function main(ranks)
   fholes((x,y,z),q,r) = max(f1((x,y,z),q,r),f1((x-1/q,y,z),q,r))
   lsf(x) = min(max(fin(x),fholes(x,5,0.5)),fsolid(x))
   φh = interpolate(lsf,V_φ)
-  φh_nondesign = interpolate(fsolid,V_φ)
+  # φh_nondesign = interpolate(fsolid,V_φ)
 
   # Check LS
   GridapTopOpt.correct_ls!(φh)
@@ -274,7 +274,7 @@ function main(ranks)
   reinit = StabilisedReinit(V_φ,Ω,dΩ_act,hₕ;stabilisation_method=ArtificialViscosity(0.5),nls=reinit_nls)
   ls_evo = UnfittedFEEvolution(evo,reinit)
 
-  reinit!(ls_evo,φh_nondesign)
+  # reinit!(ls_evo,φh_nondesign)
 
   ## Hilbertian extension-regularisation problems
   _α(hₕ) = (α_coeff*hₕ)^2
@@ -310,11 +310,11 @@ function main(ranks)
     isolated_vol = sum(iso_vol_frac(φh))
     i_am_main(ranks) && println(" --- Isolated volume: ",isolated_vol)
 
-    # Union with non-designable region/s
-    if !GridapTopOpt.finished(optimiser)
-      lsf_union!(φh,φh_nondesign)
-      reinit!(ls_evo,φh)
-    end
+    # # Union with non-designable region/s
+    # if !GridapTopOpt.finished(optimiser)
+    #   lsf_union!(φh,φh_nondesign)
+    #   reinit!(ls_evo,φh)
+    # end
   end
   it = get_history(optimiser).niter; uh,ph,dh = get_state(pcf)
   writevtk(Ω_act,path*"Omega_act_$it",
@@ -327,7 +327,7 @@ function main(ranks)
 end
 
 with_mpi() do distribute
-  ncpus = 512
+  ncpus = 96
   ranks = distribute(LinearIndices((ncpus,)))
   petsc_options = "-ksp_converged_reason -ksp_error_if_not_converged true -pc_type lu -pc_factor_mat_solver_type superlu_dist"
   GridapPETSc.with(;args=split(petsc_options)) do

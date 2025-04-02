@@ -60,11 +60,12 @@ function get_transient_operator(φh,velh,s::CutFEMEvolve)
   v_norm = maximum(abs,get_free_dof_values(velh))
   β(vh,∇φ) = vh/(ϵ + v_norm) * ∇φ/(ϵ + norm(∇φ))
   γ(h) = γg*h^2
-
-  aₛ(u,v,h::CellField) = ∫(mean(γ ∘ h)*jump(∇(u) ⋅ n_Γg)*jump(∇(v) ⋅ n_Γg))dΓg
-  aₛ(u,v,h::Real) = ∫(γ(h)*jump(∇(u) ⋅ n_Γg)*jump(∇(v) ⋅ n_Γg))dΓg
-
   βh = β ∘ (velh,∇(φh))
+  βhmag = mean(norm ∘ βh)
+
+  aₛ(u,v,h::CellField) = ∫(mean(γ ∘ h)*βhmag*jump(∇(u) ⋅ n_Γg)*jump(∇(v) ⋅ n_Γg))dΓg
+  aₛ(u,v,h::Real) = ∫(γ(h)*βhmag*jump(∇(u) ⋅ n_Γg)*jump(∇(v) ⋅ n_Γg))dΓg
+
   stiffness(t,u,v) = ∫((βh ⋅ ∇(u)) * v)dΩ_bg + aₛ(u,v,h)
   mass(t, ∂ₜu, v) = ∫(∂ₜu * v)dΩ_bg
   forcing(t,v) = ∫(0v)dΩ_bg + ∫(0*jump(∇(v) ⋅ n_Γg))dΓg
