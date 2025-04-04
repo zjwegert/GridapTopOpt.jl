@@ -52,7 +52,7 @@ function main(ranks)
   max_steps = 20 # Based on number of elements in vertical direction divided by 10
   vf = 0.025
   α_coeff = γ_evo*max_steps
-  iter_mod = 10
+  iter_mod = -1
   D = 3
 
   # Load gmsh mesh (Currently need to update mesh.geo and these values concurrently)
@@ -110,8 +110,8 @@ function main(ranks)
     Γi = SkeletonTriangulation(cutgeo_facets,ACTIVE_OUT)
     # Isolated volumes
     φ_cell_values = map(get_cell_dof_values,local_views(_φh))
-    ψ_s,_ = GridapTopOpt.get_isolated_volumes_mask_polytopal(model,φ_cell_values,["Gamma_Bottom","Gamma_Symm"])
-    _,ψ_f = GridapTopOpt.get_isolated_volumes_mask_polytopal(model,φ_cell_values,["Gamma_f_D","Gamma_Symm"])
+    ψ_s,_ = GridapTopOpt.get_isolated_volumes_mask_polytopal(model,φ_cell_values,["Gamma_Bottom"])
+    _,ψ_f = GridapTopOpt.get_isolated_volumes_mask_polytopal(model,φ_cell_values,["Gamma_f_D"])
     (;
       :Ωs       => Ωs,
       :dΩs      => Measure(Ωs,degree),
@@ -324,6 +324,7 @@ function main(ranks)
   writevtk(Ω.Ωs,path*"Omega_s_$it",
     cellfields=["uh"=>uh,"ph"=>ph,"dh"=>dh])
   psave(path*"LSF_$it",get_free_dof_values(φh))
+  nothing
 end
 
 with_mpi() do distribute
