@@ -36,29 +36,21 @@ end
 
 function main(ranks)
   # Params
-  vf = 0.25
+  vf = 0.15
   γ_evo = 0.1
   max_steps = 10
   α_coeff = γ_evo*max_steps
-  iter_mod = 1
+  iter_mod = -1
   D = 3
 
   # Output path
-  path = "./results/CutFEM_Wheel_MinCompliance_Neumann_gammag_$(γg_evo)_vf_$(vf)_superlu_newDiriAlt/"
+  path = "./results/CutFEM_Wheel_MinCompliance_Neumann_gammag_$(γg_evo)_vf_$(vf)_superlu/"
   files_path = path*"data/"
   i_am_main(ranks) && mkpath(files_path)
 
   # Load mesh
   model = GmshDiscreteModel(ranks,(@__DIR__)*"/Meshes/wheel.msh")
   model = UnstructuredDiscreteModel(model)
-  # f_diri(x) =
-  #   (cos(2pi/3)<=x[1]<=cos(pi/3) && abs(x[2] - sqrt(1-x[1]^2))<1e-4) ||
-  #   (-1<=x[1]<=cos(7pi/6) && abs(x[2] - sqrt(1-x[1]^2))<1e-4) ||
-  #   (-1<=x[1]<=cos(7pi/6) && abs(x[2] - -sqrt(1-x[1]^2))<1e-4) ||
-  #   (cos(2pi/3)<=x[1]<=cos(pi/3) && abs(x[2] - -sqrt(1-x[1]^2))<1e-4) ||
-  #   (cos(pi/6)<=x[1]<=1 && abs(x[2] - -sqrt(1-x[1]^2))<1e-4) ||
-  #   (cos(pi/6)<=x[1]<=1 && abs(x[2] - sqrt(1-x[1]^2))<1e-4)
-  # alt
   f_diri(x) =
     (cos(pi/3)<=x[1]<=cos(pi/6) && abs(x[2] - sqrt(1-x[1]^2))<1e-4) ||
     (cos(7pi/6)<=x[1]<=cos(2pi/3) && abs(x[2] - sqrt(1-x[1]^2))<1e-4) ||
@@ -75,7 +67,7 @@ function main(ranks)
   # Cut the background model
   reffe_scalar = ReferenceFE(lagrangian,Float64,1)
   V_φ = TestFESpace(model,reffe_scalar)
-  V_reg = TestFESpace(model,reffe_scalar;dirichlet_tags=["Gamma_N",])#["Gamma_D_new",])
+  V_reg = TestFESpace(model,reffe_scalar;dirichlet_tags=["Gamma_N",])
   U_reg = TrialFESpace(V_reg)
 
   _f1((x,y,z),q,r) = - cos(q*π*x)*cos(q*π*y)*cos(q*π*z)/q - r/q
@@ -88,7 +80,7 @@ function main(ranks)
   # Setup integration meshes and measures
   order = 1
   degree = 2*(order+1)
-  Γ_N = BoundaryTriangulation(model,tags=["Gamma_N",])#["Gamma_D_new",])
+  Γ_N = BoundaryTriangulation(model,tags=["Gamma_N",])
   dΓ_N = Measure(Γ_N,degree)
   dΩ_bg = Measure(Ω_bg,degree)
   Ω_data = EmbeddedCollection(model,φh) do cutgeo,cutgeo_facets,_φh
@@ -98,7 +90,7 @@ function main(ranks)
     Ω_act = Triangulation(cutgeo,ACTIVE)
     # Isolated volumes
     φ_cell_values = map(get_cell_dof_values,local_views(_φh))
-    ψ,_ = GridapTopOpt.get_isolated_volumes_mask_polytopal(model,φ_cell_values,["Gamma_D_new",])#["Gamma_N",])
+    ψ,_ = GridapTopOpt.get_isolated_volumes_mask_polytopal(model,φ_cell_values,["Gamma_D_new",])
     (;
       :Ω_act => Ω_act,
       :Ω     => Ω,
@@ -118,7 +110,7 @@ function main(ranks)
   # Setup spaces
   reffe_d = ReferenceFE(lagrangian,VectorValue{D,Float64},order)
   function build_spaces(Ω_act)
-    V = TestFESpace(Ω_act,reffe_d,conformity=:H1,dirichlet_tags=["Gamma_D_new",])#["Gamma_N",])
+    V = TestFESpace(Ω_act,reffe_d,conformity=:H1,dirichlet_tags=["Gamma_D_new",])
     U = TrialFESpace(V)
     return U,V
   end
@@ -140,7 +132,7 @@ function main(ranks)
   a_s_Ω(d,s) = ε(s) ⊙ (σ ∘ ε(d)) # Elasticity
   j_s_k(d,s) = mean(γ_Gd ∘ hₕ)*(jump(Ω_data.n_Γg ⋅ ∇(s)) ⋅ jump(Ω_data.n_Γg ⋅ ∇(d)))
   v_s_ψ(d,s) = (k_d*Ω_data.ψ)*(d⋅s) # Isolated volume term
-  g((x,y,z)) = 0.1VectorValue(-y,x,0.0)
+  g((x,y,z)) = 100VectorValue(-y,x,0.0)
 
   a(d,s,φ) = ∫(a_s_Ω(d,s) + v_s_ψ(d,s))Ω_data.dΩ + ∫(j_s_k(d,s))Ω_data.dΓg
   l(s,φ) = ∫(s⋅g)dΓ_N
@@ -148,7 +140,7 @@ function main(ranks)
   ## Optimisation functionals
   vol_D = sum(∫(1)dΩ_bg)
   iso_vol_frac(φ) = ∫(Ω_data.ψ/vol_D)Ω_data.dΩ
-  J_comp(d,φ) = ∫(ε(d) ⊙ (σ ∘ ε(d)))Ω_data.dΩ #+ iso_vol_frac(φ)
+  J_comp(d,φ) = ∫(ε(d) ⊙ (σ ∘ ε(d)))Ω_data.dΩ
   Vol(d,φ) = ∫(1/vol_D)Ω_data.dΩ - ∫(vf/vol_D)dΩ_bg
   dVol(q,d,φ) = ∫(-1/vol_D*q/(abs(Ω_data.n_Γ ⋅ ∇(φ))))Ω_data.dΓ
 
@@ -206,6 +198,7 @@ function main(ranks)
   writevtk(Ω_bg,path*"Omega_act_$it",cellfields=["φ"=>φh,"|∇(φ)|"=>(norm ∘ ∇(φh)),"uh"=>uh,"ψ"=>Ω_data.ψ])
   writevtk(Ω_data.Ω,path*"Omega_in_$it",cellfields=["uh"=>uh])
   psave(path*"LSF_$it",get_free_dof_values(φh))
+  nothing
 end
 
 with_mpi() do distribute

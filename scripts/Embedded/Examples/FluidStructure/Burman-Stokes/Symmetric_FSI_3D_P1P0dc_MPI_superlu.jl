@@ -34,17 +34,8 @@ function gamg_ksp_setup(;rtol=10^-8,maxits=100)
   return ksp_setup
 end
 
-function lsf_union!(φh1,φh2)
-  _φ1 = get_free_dof_values(φh1)
-  _φ2 = get_free_dof_values(φh2)
-  map(local_views(_φ1),local_views(_φ2)) do φ1,φ2
-    φ1 .= min.(φ1,φ2)
-  end
-  consistent!(_φ1) |> wait
-end
-
 function main(ranks)
-  path = "./results/Symmetric_FSI_3D_Burman_P1P0dc_MPI_superlu/"
+  path = "./results/Symmetric_FSI_3D_Burman_P1P0dc_MPI_superlu_$(γg_evo)/"
   files_path = path*"data/"
   i_am_main(ranks) && mkpath(files_path)
 
@@ -83,8 +74,8 @@ function main(ranks)
   _e = 1/3*hmin
   f0((x,y,z),a,b) = (max(2/a*abs(x-x0),1/(b/2+1)*abs(y-b/2+1),2/(H-2cw)*abs(z-H/2))-1)*min(a,b,cw,H)
   f1((x,y,z),q,r) = - cos(q*π*x)*cos(q*π*y)*cos(q*π*z)/q - r/q
-  fin(x) = f0(x,l*(1+_e),a*(1+_e))
-  fsolid(x) = min(f0(x,l*(1+_e),b*(1+_e)),f0(x,w*(1+_e),a*(1+_e)))
+  fin(x) = f0(x,l*(1.1+_e),a*(1.1+_e))
+  fsolid(x) = min(f0(x,l*(1.1+_e),b*(1+_e)),f0(x,w*(1+_e),a*(1.1+_e)))
   fholes((x,y,z),q,r) = max(f1((x,y,z),q,r),f1((x-1/q,y,z),q,r))
   lsf(x) = min(max(fin(x),fholes(x,5,0.5)),fsolid(x))
   φh = interpolate(lsf,V_φ)
@@ -274,8 +265,6 @@ function main(ranks)
   reinit = StabilisedReinit(V_φ,Ω,dΩ_act,hₕ;stabilisation_method=ArtificialViscosity(0.5),nls=reinit_nls)
   ls_evo = UnfittedFEEvolution(evo,reinit)
 
-  # reinit!(ls_evo,φh_nondesign)
-
   ## Hilbertian extension-regularisation problems
   _α(hₕ) = (α_coeff*hₕ)^2
   a_hilb(p,q) =∫((_α ∘ hₕ)*∇(p)⋅∇(q) + p*q)dΩ_act;
@@ -309,12 +298,6 @@ function main(ranks)
 
     isolated_vol = sum(iso_vol_frac(φh))
     i_am_main(ranks) && println(" --- Isolated volume: ",isolated_vol)
-
-    # # Union with non-designable region/s
-    # if !GridapTopOpt.finished(optimiser)
-    #   lsf_union!(φh,φh_nondesign)
-    #   reinit!(ls_evo,φh)
-    # end
   end
   it = get_history(optimiser).niter; uh,ph,dh = get_state(pcf)
   writevtk(Ω_act,path*"Omega_act_$it",
