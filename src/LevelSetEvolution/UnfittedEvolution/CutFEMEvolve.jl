@@ -2,7 +2,9 @@
     mutable struct CutFEMEvolve{V,M} <: Evolver
 
 CutFEM method for level-set evolution based on method developed by
-Burman et al. (2017). DOI: `10.1016/j.cma.2017.09.005`.
+- Burman et al. (2018). DOI: `10.1016/j.cma.2017.09.005`.
+- Burman et al. (2017). DOI: `10.1016/j.cma.2016.12.021`.
+- Burman and Fernández (2009). DOI: `10.1016/j.cma.2009.02.011`
 
 # Parameters
 - `ode_solver::ODESolver`: ODE solver
@@ -61,10 +63,10 @@ function get_transient_operator(φh,velh,s::CutFEMEvolve)
   β(vh,∇φ) = vh/(ϵ + v_norm) * ∇φ/(ϵ + norm(∇φ))
   γ(h) = γg*h^2
   βh = β ∘ (velh,∇(φh))
-  βhmag = mean(norm ∘ βh)
+  βh_n_Γg = abs ∘ (βh.plus ⋅ n_Γg.plus)
 
-  aₛ(u,v,h::CellField) = ∫(mean(γ ∘ h)*βhmag*jump(∇(u) ⋅ n_Γg)*jump(∇(v) ⋅ n_Γg))dΓg
-  aₛ(u,v,h::Real) = ∫(γ(h)*βhmag*jump(∇(u) ⋅ n_Γg)*jump(∇(v) ⋅ n_Γg))dΓg
+  aₛ(u,v,h::CellField) = ∫(mean(γ ∘ h)*βh_n_Γg*jump(∇(u) ⋅ n_Γg)*jump(∇(v) ⋅ n_Γg))dΓg
+  aₛ(u,v,h::Real) = ∫(γ(h)*βh_n_Γg*jump(∇(u) ⋅ n_Γg)*jump(∇(v) ⋅ n_Γg))dΓg
 
   stiffness(t,u,v) = ∫((βh ⋅ ∇(u)) * v)dΩ_bg + aₛ(u,v,h)
   mass(t, ∂ₜu, v) = ∫(∂ₜu * v)dΩ_bg
