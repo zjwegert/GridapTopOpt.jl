@@ -146,13 +146,18 @@ Physical Surface("Gamma_Bottom", 151) += {104, 113, 94};
 //+
 Physical Volume("Omega_NonDesign", 148) += {11};
 Physical Curve("Omega_NonDesign", 146) += {164, 169, 152, 153, 143, 162};
+Physical Surface("Omega_NonDesign", 147) += {99, 111, 107, 109, 112, 93, 105};
 //+
-Physical Point("Gamma_Symm", 170) = {78, 79, 80, 68, 67, 74, 73, 72};
-Physical Curve("Gamma_Symm", 171) = {147, 159, 148, 163, 167, 149, 150, 137, 166, 165, 158, 138, 136};
-Physical Surface("Gamma_Symm", 172) = {102, 89, 114, 108, 110, 96};
+Physical Point("Gamma_Symm", 170) = {67, 72};
+Physical Curve("Gamma_Symm", 171) = {147, 159, 148, 150, 137, 136};
+Physical Surface("Gamma_Symm", 172) = {102, 89, 114, 108, 96};
 //+
 Physical Point("Gamma_TopCorners", 159) += {66, 71, 75};
 Physical Curve("Gamma_TopCorners", 158) += {154, 145, 133};
+//+
+Physical Point("Gamma_Symm_NonDesign", 173) = {73, 74, 80, 79, 78, 68};
+Physical Curve("Gamma_Symm_NonDesign", 174) = {149, 163, 165, 167, 166, 138, 168, 158};
+Physical Surface("Gamma_Symm_NonDesign", 175) = {110};
 //+
 MeshSize {72, 73, 74, 67, 68, 80, 79, 78, 77, 69} = size_s;
 MeshSize {75, 76, 71, 66, 65, 70} = size_f;

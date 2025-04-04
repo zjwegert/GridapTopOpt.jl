@@ -68,7 +68,7 @@ function main(ranks)
   # Cut the background model
   reffe_scalar = ReferenceFE(lagrangian,Float64,1)
   V_φ = TestFESpace(model,reffe_scalar)
-  V_reg = TestFESpace(model,reffe_scalar;dirichlet_tags=["Omega_NonDesign","Gamma_Bottom"])
+  V_reg = TestFESpace(model,reffe_scalar;dirichlet_tags=["Omega_NonDesign","Gamma_Symm_NonDesign","Gamma_Bottom"])
   U_reg = TrialFESpace(V_reg)
 
   _e = 1/3*hmin
@@ -139,15 +139,15 @@ function main(ranks)
     # Test spaces
     V = TestFESpace(Ω_act_f,reffe_u,conformity=:H1,
       dirichlet_tags=["Gamma_f_D","Gamma_Bottom","Gamma_Top",
-        "Gamma_Symm","Gamma_Right","Gamma_TopCorners"],
-      dirichlet_masks=[(true,true,true),(true,true,true),
-        (false,true,false),(false,false,true),(false,false,true),(false,true,true)])
+        "Gamma_Symm","Gamma_Symm_NonDesign","Gamma_Right","Gamma_TopCorners"],
+      dirichlet_masks=[(true,true,true),(true,true,true),(false,true,false),
+        (false,false,true),(false,false,true),(false,false,true),(false,true,true)])
     Q = TestFESpace(Ω_act_f,reffe_p,conformity=:L2)
-    T = TestFESpace(Ω_act_s,reffe_d,conformity=:H1,dirichlet_tags=["Gamma_Bottom","Gamma_Symm"],
-      dirichlet_masks=[(true,true,true),(false,false,true)])
+    T = TestFESpace(Ω_act_s,reffe_d,conformity=:H1,dirichlet_tags=["Gamma_Bottom","Gamma_Symm","Gamma_Symm_NonDesign"],
+      dirichlet_masks=[(true,true,true),(false,false,true),(false,false,true)])
 
     # Trial spaces
-    U = TrialFESpace(V,[uin,[VectorValue(0.0,0.0,0.0) for _ = 1:5]...])
+    U = TrialFESpace(V,[uin,[VectorValue(0.0,0.0,0.0) for _ = 1:6]...])
     P = TrialFESpace(Q)
     R = TrialFESpace(T)
 
