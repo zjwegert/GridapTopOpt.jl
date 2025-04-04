@@ -40,7 +40,7 @@ function main(ranks)
   γ_evo = 0.1
   max_steps = 15
   α_coeff = γ_evo*max_steps
-  iter_mod = -1
+  iter_mod = NaN
   D = 3
 
   # Output path

@@ -43,7 +43,7 @@ function main(ranks)
   max_steps = 15 # Based on number of elements in vertical direction divided by 10
   vf = 0.025
   α_coeff = γ_evo*max_steps
-  iter_mod = -1
+  iter_mod = NaN
   D = 3
 
   # Load gmsh mesh (Currently need to update mesh.geo and these values concurrently)
