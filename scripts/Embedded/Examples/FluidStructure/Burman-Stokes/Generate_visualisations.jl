@@ -204,9 +204,11 @@ function main(ranks)
   elast_ls = PETScLinearSolver()
   solver = StaggeredFESolver([fluid_ls,elast_ls]);
 
-  al_keys = [:Iter,:J,:Vol]
+  al_keys = [:J,:Vol]
   al_bundles = Dict(:C => [:Vol,])
   history = GridapTopOpt.OptimiserHistory(Float64,al_keys,al_bundles,1000,i_am_main(ranks))
+
+  t = PTimer(ranks);
 
   for it = I0:IF
     if it % Imod != 0
@@ -221,15 +223,15 @@ function main(ranks)
 
     _J = sum(J_comp(((uh,ph),dh),φh))
     _Vol = sum(Vol(((uh,ph),dh),φh))
-    push!(history,(it,_J,_Vol))
+    push!(history,(_J,_Vol))
 
+    tic!(t;barrier=true)
     write_history(path*"/history.txt",history;ranks)
     writevtk(Ω_act,files_path*"Omega_act_$it",
       cellfields=["φ"=>φh,"|∇(φ)|"=>(norm ∘ ∇(φh)),"uh"=>uh,"ph"=>ph,"dh"=>dh,"ψ_s"=>Ω.ψ_s,"ψ_f"=>Ω.ψ_f])
     writevtk(Ω.Ωf,files_path*"Omega_f_$it",cellfields=["uh"=>uh,"ph"=>ph,"dh"=>dh])
     writevtk(Ω.Ωs,files_path*"Omega_s_$it",cellfields=["uh"=>uh,"ph"=>ph,"dh"=>dh])
-
-    consistent!(get_free_dof_values(φh)) |> fetch
+    toc!(t,"Write")
 
     i_am_main(ranks) && run(`tar -czf $files_path/data_$it.tar.gz $files_path/Omega_s_$it $files_path/Omega_f_$it $files_path/Omega_act_$it`) &&
       run(`rm -r $files_path/Omega_s_$it $files_path/Omega_f_$it $files_path/Omega_act_$it`)

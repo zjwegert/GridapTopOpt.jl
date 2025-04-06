@@ -113,9 +113,11 @@ function main(ranks)
   ## Setup solver and FE operators
   solver = PETScLinearSolver()
 
-  al_keys = [:Iter,:J,:Vol]
+  al_keys = [:J,:Vol]
   al_bundles = Dict(:C => [:Vol,])
   history = GridapTopOpt.OptimiserHistory(Float64,al_keys,al_bundles,1000,i_am_main(ranks))
+
+  t = PTimer(ranks);
 
   for it = I0:IF
     if it % Imod != 0
@@ -129,13 +131,13 @@ function main(ranks)
 
     _J = sum(J_comp(uh,φh))
     _Vol = sum(Vol(uh,φh))
-    push!(history,(it,_J,_Vol))
+    push!(history,(_J,_Vol))
 
+    tic!(t;barrier=true)
     write_history(path*"/history.txt",history;ranks)
     writevtk(Ω_bg,files_path*"Omega_act_$it",cellfields=["φ"=>φh,"|∇(φ)|"=>(norm ∘ ∇(φh)),"uh"=>uh,"ψ"=>Ω_data.ψ])
     writevtk(Ω_data.Ω,files_path*"Omega_in_$it",cellfields=["uh"=>uh])
-
-    consistent!(get_free_dof_values(φh)) |> fetch
+    toc!(t,"Write")
 
     i_am_main(ranks) && run(`tar -czf $files_path/data_$it.tar.gz $files_path/Omega_in_$it $files_path/Omega_act_$it`) &&
       run(`rm -r $files_path/Omega_in_$it $files_path/Omega_act_$it`)
