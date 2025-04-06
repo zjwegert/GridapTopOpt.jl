@@ -143,6 +143,7 @@ function main(ranks)
       run(`tar -czf $files_path/data_$it.tar.gz $files_path/Omega_in_$it $files_path/Omega_in_$it.pvtu
         $files_path/Omega_act_$it $files_path/Omega_act_$it.pvtu`)
       run(`rm -r $files_path/Omega_in_$it $files_path/Omega_act_$it`)
+      run(`rm -r $files_path/Omega_in_$it.pvtu $files_path/Omega_act_$it.pvtu`)
     end
   end
 end
