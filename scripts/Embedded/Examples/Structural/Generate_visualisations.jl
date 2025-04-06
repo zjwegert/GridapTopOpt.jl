@@ -118,7 +118,10 @@ function main(ranks)
   al_bundles = Dict(:C => [:Vol,])
   history = OptimiserHistory(Float64,al_keys,al_bundles,1000,i_am_main(ranks))
 
-  for it = I0:IJ:IF
+  for it = I0:IF
+    if it % Imod != 0
+      continue
+    end
     pload!(result_path*"/data/LSF_$it",get_free_dof_values(φh))
     update_collection!(Ω,φh)
     U,V = build_spaces(Ω_data.Ω_act)
