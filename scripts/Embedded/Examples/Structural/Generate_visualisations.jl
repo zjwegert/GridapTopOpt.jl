@@ -136,7 +136,7 @@ function main(ranks)
     writevtk(Ω_bg,files_path*"Omega_act_$it",cellfields=["φ"=>φh,"|∇(φ)|"=>(norm ∘ ∇(φh)),"uh"=>uh,"ψ"=>Ω_data.ψ])
     writevtk(Ω_data.Ω,files_path*"Omega_in_$it",cellfields=["uh"=>uh])
     out_paths = "$files_path/Omega_in_$it $files_path/Omega_act_$it"
-    i_am_main(ranks) && run(`tar -czf $files_path/data_$it.tar.gz $out_paths && rm -r $out_paths`)
+    i_am_main(ranks) && run(`tar -czf $files_path/data_$it.tar.gz $out_paths \&\& rm -r $out_paths`)
   end
 end
 
