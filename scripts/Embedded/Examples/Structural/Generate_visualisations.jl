@@ -31,7 +31,6 @@ function main(ranks)
     (cos(pi/3)<=x[1]<=cos(pi/6) && abs(x[2] - -sqrt(1-x[1]^2))<1e-4) ||
     (cos(7pi/6)<=x[1]<=cos(2pi/3) && abs(x[2] - -sqrt(1-x[1]^2))<1e-4)
   update_labels!(1,model,f_diri,"Gamma_D_new")
-  writevtk(model,path*"model")
 
   # Get triangulation and element size
   Ω_bg = Triangulation(model)
@@ -135,11 +134,11 @@ function main(ranks)
     write_history(path*"/history.txt",history;ranks)
     writevtk(Ω_bg,files_path*"Omega_act_$it",cellfields=["φ"=>φh,"|∇(φ)|"=>(norm ∘ ∇(φh)),"uh"=>uh,"ψ"=>Ω_data.ψ])
     writevtk(Ω_data.Ω,files_path*"Omega_in_$it",cellfields=["uh"=>uh])
-    out_paths = "$files_path/Omega_in_$it $files_path/Omega_act_$it"
 
     consistent!(get_free_dof_values(φh)) |> fetch
 
-    i_am_main(ranks) && run(`tar -czf $files_path/data_$it.tar.gz $out_paths \&\& rm -r $out_paths`)
+    i_am_main(ranks) && run(`tar -czf $files_path/data_$it.tar.gz $files_path/Omega_in_$it $files_path/Omega_act_$it \&\&
+      rm -r $files_path/Omega_in_$it $files_path/Omega_act_$it`)
   end
 end
 
