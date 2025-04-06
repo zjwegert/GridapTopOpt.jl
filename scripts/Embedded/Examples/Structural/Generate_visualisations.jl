@@ -139,8 +139,10 @@ function main(ranks)
     writevtk(Ω_data.Ω,files_path*"Omega_in_$it",cellfields=["uh"=>uh])
     toc!(t,"Write")
 
-    i_am_main(ranks) && run(`tar -czf $files_path/data_$it.tar.gz $files_path/Omega_in_$it $files_path/Omega_act_$it`) &&
+    if i_am_main(ranks)
+      run(`tar -czf $files_path/data_$it.tar.gz $files_path/Omega_in_$it $files_path/Omega_act_$it`)
       run(`rm -r $files_path/Omega_in_$it $files_path/Omega_act_$it`)
+    end
   end
 end
 
