@@ -234,8 +234,8 @@ function main(ranks)
     toc!(t,"Write")
 
     if i_am_main(ranks)
-      run(`tar -czf $files_path/data_$it.tar.gz $files_path/Omega_s_$it $files_path/Omega_f_$it $files_path/Omega_act_$it`)
-      run(`rm -r $files_path/Omega_s_$it $files_path/Omega_f_$it $files_path/Omega_act_$it`)
+      run(`tar -czf $files_path/data_$it.tar.gz $files_path/Omega_s_$it\* $files_path/Omega_f_$it\* $files_path/Omega_act_$it\*`)
+      run(`rm -r $files_path/Omega_s_$it\* $files_path/Omega_f_$it\* $files_path/Omega_act_$it\*`)
     end
   end
 end
