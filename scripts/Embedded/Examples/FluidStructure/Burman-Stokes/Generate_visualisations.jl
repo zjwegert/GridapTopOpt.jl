@@ -206,7 +206,7 @@ function main(ranks)
 
   al_keys = [:J,:Vol]
   al_bundles = Dict(:C => [:Vol,])
-  history = OptimiserHistory(Float64,al_keys,al_bundles,1000,i_am_main(ranks))
+  history = GridapTopOpt.OptimiserHistory(Float64,al_keys,al_bundles,1000,i_am_main(ranks))
 
   for it = I0:IF
     if it % Imod != 0
@@ -228,6 +228,9 @@ function main(ranks)
       cellfields=["φ"=>φh,"|∇(φ)|"=>(norm ∘ ∇(φh)),"uh"=>uh,"ph"=>ph,"dh"=>dh,"ψ_s"=>Ω.ψ_s,"ψ_f"=>Ω.ψ_f])
     writevtk(Ω.Ωf,files_path*"Omega_f_$it",cellfields=["uh"=>uh,"ph"=>ph,"dh"=>dh])
     writevtk(Ω.Ωs,files_path*"Omega_s_$it",cellfields=["uh"=>uh,"ph"=>ph,"dh"=>dh])
+
+    consistent!(get_free_dof_values(φh)) |> fetch
+
     out_paths = "$files_path/Omega_s_$it $files_path/Omega_f_$it $files_path/Omega_act_$it"
     i_am_main(ranks) && run(`tar -czf $files_path/data_$it.tar.gz $out_paths \&\& rm -r $out_paths`)
   end
