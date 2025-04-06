@@ -125,7 +125,7 @@ function main(ranks)
     pload!(result_path*"/data/LSF_$it",get_free_dof_values(φh))
     update_collection!(Ω_data,φh)
     U,V = build_spaces(Ω_data.Ω_act)
-    op = AffineFEOperator((u,v)->a(u,v,φh),(u,v)->l(v,φh),U,V)
+    op = AffineFEOperator((u,v)->a(u,v,φh),v->l(v,φh),U,V)
     dh = solve(solver,op)
 
     _J = sum(J_comp(dh,φh))
