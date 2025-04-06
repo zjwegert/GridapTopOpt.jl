@@ -137,8 +137,8 @@ function main(ranks)
 
     consistent!(get_free_dof_values(φh)) |> fetch
 
-    i_am_main(ranks) && run(`tar -czf $files_path/data_$it.tar.gz $files_path/Omega_in_$it $files_path/Omega_act_$it \&\&
-      rm -r $files_path/Omega_in_$it $files_path/Omega_act_$it`)
+    i_am_main(ranks) && run(`tar -czf $files_path/data_$it.tar.gz $files_path/Omega_in_$it $files_path/Omega_act_$it`) &&
+      run(`rm -r $files_path/Omega_in_$it $files_path/Omega_act_$it`)
   end
 end
 
