@@ -210,10 +210,14 @@ function main(ranks)
 
   t = PTimer(ranks);
 
+  its = []
+  k = 0
+
   for it = I0:IF
     if it % Imod != 0
       continue
     end
+    push!(its,it); k = k+1
     pload!(result_path*"/data/LSF_$it",get_free_dof_values(φh))
     update_collection!(Ω,φh)
     (UP,VQ),(R,T) = build_spaces(Ω.Ω_act_s,Ω.Ω_act_f)
@@ -233,12 +237,20 @@ function main(ranks)
     writevtk(Ω.Ωs,files_path*"Omega_s_$it",cellfields=["uh"=>uh,"ph"=>ph,"dh"=>dh])
     toc!(t,"Write")
 
-    if i_am_main(ranks)
-      run(`tar -czf $files_path/data_$it.tar.gz $files_path/Omega_s_$it $files_path/Omega_s_$it.pvtu $files_path/Omega_f_$it $files_path/Omega_f_$it.pvtu $files_path/Omega_act_$it $files_path/Omega_act_$it.pvtu`)
-      run(`rm -r $files_path/Omega_s_$it.pvtu $files_path/Omega_f_$it.pvtu $files_path/Omega_act_$it.pvtu`)
-      run(`rm -r $files_path/Omega_s_$it $files_path/Omega_f_$it $files_path/Omega_act_$it`)
+    if k>0 && i_am_main(ranks)
+      _it = its[k-1]
+      run(`tar -czf $files_path/data_$_it.tar.gz $files_path/Omega_s_$_it $files_path/Omega_s_$_it.pvtu $files_path/Omega_f_$_it $files_path/Omega_f_$_it.pvtu $files_path/Omega_act_$_it $files_path/Omega_act_$_it.pvtu`)
+      run(`rm -r $files_path/Omega_s_$_it.pvtu $files_path/Omega_f_$_it.pvtu $files_path/Omega_act_$_it.pvtu`)
+      run(`rm -r $files_path/Omega_s_$_it $files_path/Omega_f_$_it $files_path/Omega_act_$it`)
     end
   end
+  if i_am_main(ranks)
+    _it = its[end]
+    run(`tar -czf $files_path/data_$_it.tar.gz $files_path/Omega_s_$_it $files_path/Omega_s_$_it.pvtu $files_path/Omega_f_$_it $files_path/Omega_f_$_it.pvtu $files_path/Omega_act_$_it $files_path/Omega_act_$_it.pvtu`)
+    run(`rm -r $files_path/Omega_s_$_it.pvtu $files_path/Omega_f_$_it.pvtu $files_path/Omega_act_$_it.pvtu`)
+    run(`rm -r $files_path/Omega_s_$_it $files_path/Omega_f_$_it $files_path/Omega_act_$it`)
+  end
+  nothing
 end
 
 with_mpi() do distribute
