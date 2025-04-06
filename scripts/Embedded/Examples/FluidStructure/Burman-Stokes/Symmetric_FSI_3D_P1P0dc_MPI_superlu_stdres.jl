@@ -274,15 +274,15 @@ function main(ranks)
   converged(m) = GridapTopOpt.default_al_converged(
     m;
     L_tol = 0.01hmin,
-    C_tol = 0.01vf
+    C_tol = 0.05vf
   )
-  function has_oscillations(m,os_it)
-    history = GridapTopOpt.get_history(m)
-    it = GridapTopOpt.get_last_iteration(history)
-    all(@.(abs(history[:C,it]) < 0.05vf)) && GridapTopOpt.default_has_oscillations(m,os_it)
-  end
+  # function has_oscillations(m,os_it)
+  #   history = GridapTopOpt.get_history(m)
+  #   it = GridapTopOpt.get_last_iteration(history)
+  #   all(@.(abs(history[:C,it]) < 0.05vf)) && GridapTopOpt.default_has_oscillations(m,os_it)
+  # end
   optimiser = AugmentedLagrangian(pcf,ls_evo,vel_ext,φh;
-    γ=γ_evo,verbose=i_am_main(ranks),constraint_names=[:Vol],converged,has_oscillations)
+    γ=γ_evo,verbose=i_am_main(ranks),constraint_names=[:Vol],converged)#,has_oscillations)
   for (it,(uh,ph,dh),φh) in optimiser
     if iszero(it % iter_mod)
       writevtk(Ω_act,files_path*"Omega_act_$it",
