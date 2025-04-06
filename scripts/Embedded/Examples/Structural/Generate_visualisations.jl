@@ -126,10 +126,10 @@ function main(ranks)
     update_collection!(Ω_data,φh)
     U,V = build_spaces(Ω_data.Ω_act)
     op = AffineFEOperator((u,v)->a(u,v,φh),v->l(v,φh),U,V)
-    dh = solve(solver,op)
+    uh = solve(solver,op)
 
-    _J = sum(J_comp(dh,φh))
-    _Vol = sum(Vol(dh,φh))
+    _J = sum(J_comp(uh,φh))
+    _Vol = sum(Vol(uh,φh))
     push!(history,(_J,_Vol))
 
     write_history(path*"/history.txt",history;ranks)
