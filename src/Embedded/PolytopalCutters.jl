@@ -314,8 +314,7 @@ function generate_mask(
   ) do model, bgcell_to_lcolor, lcolor_to_group
     find_isolated_volumes(model,dirichlet_tags,bgcell_to_lcolor,lcolor_to_group)
   end
-  fetch(consistent!(fetch(assemble!(|,PVector(lcolor_to_isolated,partition(color_gids))))))
-  # fetch(consistent!(fetch(assemble!(&,PVector(lcolor_to_isolated,partition(color_gids))))))
+  fetch(consistent!(fetch(assemble!(&,PVector(lcolor_to_isolated,partition(color_gids))))))
   data = map(lcolor_to_isolated,bgcell_to_lcolor,lcolor_to_group) do lcolor_to_isolated, bgcell_to_lcolor, lcolor_to_group
     collect(Float64,map(c -> lcolor_to_isolated[c] && lcolor_to_group[c] == group, bgcell_to_lcolor))
   end
