@@ -77,7 +77,7 @@ function main(ranks)
   cw = 0.1;
   vol_D = L*H
 
-  model = GmshDiscreteModel(ranks,mesh_path*mesh_name)
+  model = GmshDiscreteModel(ranks,mesh_file)
   model = UnstructuredDiscreteModel(model)
   writevtk(model,model_path*"model")
 

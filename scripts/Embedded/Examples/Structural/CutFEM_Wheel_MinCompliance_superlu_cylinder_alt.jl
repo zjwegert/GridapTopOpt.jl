@@ -56,7 +56,7 @@ function main(ranks)
   end
 
   # Load mesh
-  model = GmshDiscreteModel(ranks,mesh_path*mesh_name)
+  model = GmshDiscreteModel(ranks,mesh_file)
   model = UnstructuredDiscreteModel(model)
   f_N(x) =
     ((cos(30π/180)<=x[1]<=cos(15π/180)) && abs(x[2] - sqrt(1-x[1]^2))<1e-4) ||
