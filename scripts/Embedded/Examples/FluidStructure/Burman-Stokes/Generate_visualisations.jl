@@ -241,14 +241,14 @@ function main(ranks)
       _it = its[k-1]
       run(`tar -czf $files_path/data_$_it.tar.gz $files_path/Omega_s_$_it $files_path/Omega_s_$_it.pvtu $files_path/Omega_f_$_it $files_path/Omega_f_$_it.pvtu $files_path/Omega_act_$_it $files_path/Omega_act_$_it.pvtu`)
       run(`rm -r $files_path/Omega_s_$_it.pvtu $files_path/Omega_f_$_it.pvtu $files_path/Omega_act_$_it.pvtu`)
-      run(`rm -r $files_path/Omega_s_$_it $files_path/Omega_f_$_it $files_path/Omega_act_$it`)
+      run(`rm -r $files_path/Omega_s_$_it $files_path/Omega_f_$_it $files_path/Omega_act_$_it`)
     end
   end
   if i_am_main(ranks)
     _it = its[end]
     run(`tar -czf $files_path/data_$_it.tar.gz $files_path/Omega_s_$_it $files_path/Omega_s_$_it.pvtu $files_path/Omega_f_$_it $files_path/Omega_f_$_it.pvtu $files_path/Omega_act_$_it $files_path/Omega_act_$_it.pvtu`)
     run(`rm -r $files_path/Omega_s_$_it.pvtu $files_path/Omega_f_$_it.pvtu $files_path/Omega_act_$_it.pvtu`)
-    run(`rm -r $files_path/Omega_s_$_it $files_path/Omega_f_$_it $files_path/Omega_act_$it`)
+    run(`rm -r $files_path/Omega_s_$_it $files_path/Omega_f_$_it $files_path/Omega_act_$_it`)
   end
   nothing
 end

@@ -12,6 +12,18 @@ else
   global γg_evo =  0.01
 end
 
+if isassigned(ARGS,2)
+  global γ_evo =  parse(Float64,ARGS[2])
+else
+  global γ_evo =  0.1
+end
+
+if isassigned(ARGS,3)
+  global α_Gd =  parse(Float64,ARGS[3])
+else
+  global α_Gd = 1e-7
+end
+
 CGAMGSolver(;kwargs...) = PETScLinearSolver(gamg_ksp_setup(;kwargs...))
 
 function gamg_ksp_setup(;rtol=10^-8,maxits=100)
@@ -35,16 +47,24 @@ function gamg_ksp_setup(;rtol=10^-8,maxits=100)
 end
 
 function main(ranks)
-  path = "./results/Symmetric_FSI_3D_Burman_P1P0dc_MPI_superlu_$(γg_evo)/"
-  files_path = path*"data/"
-  i_am_main(ranks) && mkpath(files_path)
-
-  γ_evo = 0.2
+  # Params
   max_steps = 20 # Based on number of elements in vertical direction divided by 10
-  vf = 0.025
+  vf = 0.035
   α_coeff = γ_evo*max_steps
-  iter_mod = NaN
+  iter_mod = 50
   D = 3
+  mesh_name = "mesh_3d_symmetric_finer.msh"
+  mesh_file = (@__DIR__)*"/../Meshes/$mesh_name"
+
+  # Output path
+  path = "./results/Symmetric_FSI_3D_Burman_P1P0dc_$(γg_evo)_gevo_$(γ_evo)_agd_$(α_Gd)/"
+  files_path = path*"data/"
+  mesh_path = path*"mesh/"
+  model_path = path*"model/"
+  if i_am_main(ranks)
+    mkpath(files_path); mkpath(mesh_path); mkpath(model_path);
+    cp(mesh_file,mesh_path*mesh_name)
+  end
 
   # Load gmsh mesh (Currently need to update mesh.geo and these values concurrently)
   L = 4.0;
@@ -57,9 +77,9 @@ function main(ranks)
   cw = 0.1;
   vol_D = L*H
 
-  model = GmshDiscreteModel(ranks,(@__DIR__)*"/../Meshes/mesh_3d_symmetric_finer.msh")
+  model = GmshDiscreteModel(ranks,mesh_path*mesh_name)
   model = UnstructuredDiscreteModel(model)
-  writevtk(model,path*"model")
+  writevtk(model,model_path*"model")
 
   Ω_act = Triangulation(model)
   hₕ = get_element_diameter_field(model)
@@ -79,7 +99,6 @@ function main(ranks)
   fholes((x,y,z),q,r) = max(f1((x,y,z),q,r),f1((x-1/q,y,z),q,r))
   lsf(x) = min(max(fin(x),fholes(x,5,0.5)),fsolid(x))
   φh = interpolate(lsf,V_φ)
-  # φh_nondesign = interpolate(fsolid,V_φ)
 
   # Check LS
   GridapTopOpt.correct_ls!(φh)
@@ -125,7 +144,6 @@ function main(ranks)
       :ψ_f      => ψ_f,
     )
   end
-  writevtk(get_triangulation(φh),path*"initial_islands",cellfields=["ψ_s"=>Ω.ψ_s,"ψ_f"=>Ω.ψ_f])
 
   # Setup spaces
   uin(x) = VectorValue(x[2],0.0,0.0)
@@ -210,7 +228,7 @@ function main(ranks)
   end
   λs, μs = lame_parameters(0.1,0.05)
   # Stabilization
-  α_Gd = 1e-3
+  # α_Gd = 1e-3
   k_d = 1.0
   γ_Gd(h) = α_Gd*(λs + μs)*h^3
   γ_Gd_h = mean(γ_Gd ∘ hₕ)
@@ -262,7 +280,7 @@ function main(ranks)
   reinit_nls = NewtonSolver(PETScLinearSolver();maxiter=20,rtol=1.e-14,verbose=i_am_main(ranks))
 
   evo = CutFEMEvolve(V_φ,Ω,dΩ_act,hₕ;max_steps,γg=γg_evo,ode_ls=evolve_ls,ode_nl=evolve_nls)
-  reinit = StabilisedReinit(V_φ,Ω,dΩ_act,hₕ;stabilisation_method=ArtificialViscosity(0.5),nls=reinit_nls)
+  reinit = StabilisedReinit(V_φ,Ω,dΩ_act,hₕ;stabilisation_method=ArtificialViscosity(0.1),nls=reinit_nls)
   ls_evo = UnfittedFEEvolution(evo,reinit)
 
   ## Hilbertian extension-regularisation problems
