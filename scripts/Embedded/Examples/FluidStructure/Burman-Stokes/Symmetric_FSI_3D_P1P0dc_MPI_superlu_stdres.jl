@@ -59,11 +59,9 @@ function main(ranks)
   # Output path
   path = "./results/Symmetric_FSI_3D_Burman_P1P0dc_stdres_$(γg_evo)_gevo_$(γ_evo)_agd_$(α_Gd)/"
   files_path = path*"data/"
-  mesh_path = path*"mesh/"
   model_path = path*"model/"
   if i_am_main(ranks)
-    mkpath(files_path); mkpath(mesh_path); mkpath(model_path);
-    cp(mesh_file,mesh_path*mesh_name)
+    mkpath(files_path); mkpath(model_path);
   end
 
   # Load gmsh mesh (Currently need to update mesh.geo and these values concurrently)

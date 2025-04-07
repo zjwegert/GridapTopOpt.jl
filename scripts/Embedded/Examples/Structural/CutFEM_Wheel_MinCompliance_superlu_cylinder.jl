@@ -48,11 +48,9 @@ function main(ranks)
   # Output path
   path = "./results/CutFEM_Wheel_MinCompliance_Neumann_gammag_$(γg_evo)_vf_$(vf)_superlu_cylinder/"
   files_path = path*"data/"
-  mesh_path = path*"mesh/"
   model_path = path*"model/"
   if i_am_main(ranks)
-    mkpath(files_path); mkpath(mesh_path); mkpath(model_path);
-    cp(mesh_file,mesh_path*mesh_name)
+    mkpath(files_path); mkpath(model_path);
   end
 
   # Load mesh
