@@ -45,11 +45,10 @@ function main_2d_sub(model,name;vtk=false)
     GridapTopOpt.tag_disconnected_volumes(model,cell_to_state;groups=((GridapTopOpt.CUT,IN),OUT))
   end |> tuple_of_arrays;
 
-  n_lcolor = map(length,lcolor_to_group)
   cell_ids = partition(get_cell_gids(model))
 
-  color_gids = GridapTopOpt.generate_volume_gids(
-    cell_ids,n_lcolor,cell_to_lcolor
+  cell_to_lcolor, lcolor_to_group, color_gids = GridapTopOpt.generate_volume_gids(
+    cell_ids,cell_to_lcolor,lcolor_to_group
   )
 
   cell_to_lcolor, lcolor_to_group, color_gids = GridapTopOpt.tag_disconnected_volumes(model,cell_to_state;groups=((GridapTopOpt.CUT,IN),OUT));
@@ -122,11 +121,9 @@ function main_3d_sub(model,name;vtk=false)
     GridapTopOpt.tag_disconnected_volumes(model,cell_to_state;groups=((GridapTopOpt.CUT,IN),OUT))
   end |> tuple_of_arrays;
 
-  n_lcolor = map(length,lcolor_to_group)
   cell_ids = partition(get_cell_gids(model))
-
-  color_gids = GridapTopOpt.generate_volume_gids(
-    cell_ids,n_lcolor,cell_to_lcolor
+  cell_to_lcolor, lcolor_to_group, color_gids = GridapTopOpt.generate_volume_gids(
+    cell_ids,cell_to_lcolor,lcolor_to_group
   )
 
   cell_to_lcolor, lcolor_to_group, color_gids = GridapTopOpt.tag_disconnected_volumes(model,cell_to_state;groups=((GridapTopOpt.CUT,IN),OUT));

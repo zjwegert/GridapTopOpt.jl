@@ -280,13 +280,12 @@ function tag_disconnected_volumes(
   groups::Tuple
 ) where Dc
 
-  cell_to_lcolor, lcolor_to_group = map(local_views(model),cell_to_state) do model, cell_to_state
+  _cell_to_lcolor, _lcolor_to_group = map(local_views(model),cell_to_state) do model, cell_to_state
     tag_disconnected_volumes(model,cell_to_state;groups)
   end |> tuple_of_arrays
 
   cell_ids = partition(get_cell_gids(model))
-  n_lcolor = map(length,lcolor_to_group)
-  color_gids = generate_volume_gids(cell_ids, n_lcolor, cell_to_lcolor)
+  cell_to_lcolor, lcolor_to_group, color_gids = generate_volume_gids(cell_ids, _cell_to_lcolor, _lcolor_to_group)
 
   return cell_to_lcolor, lcolor_to_group, color_gids
 end
@@ -347,7 +346,7 @@ function double_layer_exchange_cache(vector_partition,index_partition)
 end
 
 function generate_volume_gids(
-  cell_ids, n_lcolor, cell_to_lcolor
+  cell_ids, cell_to_lcolor, lcolor_to_group
 )
   # NOTE: We have to communicate both the snd and rcv layers, i.e
   # each processor sends and receives both
@@ -375,6 +374,7 @@ function generate_volume_gids(
   # For each local volume (color), collect:
   #   1. All the neighbors touching the volume
   #   2. The local color of the volume in the neighbor
+  n_lcolor = map(length,lcolor_to_group)
   ptrs, lcolor_to_nbors, lcolor_to_nbor_lcolor = map(
     n_lcolor, exchange_caches, cell_to_lcolor
   ) do n_lcolor, cache, cell_to_lcolor
@@ -453,12 +453,38 @@ function generate_volume_gids(
 
     lcolor_to_owner = map(c -> color_to_owner[c], lcolor_to_color)
     return JaggedArray(lcolor_to_color), JaggedArray(lcolor_to_owner), n_color
-  end |> tuple_of_arrays;
+  end |> tuple_of_arrays
 
   # Scatter global color information
   lcolor_to_color = scatter(lcolor_to_color)
   lcolor_to_owner = scatter(lcolor_to_owner)
   n_color = emit(n_color)
+
+  # Glue together local volumes that are split in two (i.e two lcolors with same color)
+  # Otherwise, there might be two lcolors with the same global color, which causes issues 
+  # for information exchange.
+  lcolor_to_color, lcolor_to_owner, lcolor_to_group = map(
+    lcolor_to_color,lcolor_to_owner,cell_to_lcolor,lcolor_to_group
+  ) do lcolor_to_color, lcolor_to_owner, cell_to_lcolor, lcolor_to_group
+    ulcolor_to_color = unique(lcolor_to_color)
+    lcolor_to_ulcolor = collect(Int,indexin(lcolor_to_color,ulcolor_to_color))
+
+    # Below could be done more concisely, but we want to check for consistency
+    ulcolor_to_owner = zeros(eltype(lcolor_to_owner),length(ulcolor_to_color))
+    ulcolor_to_group = zeros(eltype(lcolor_to_group),length(ulcolor_to_color))
+    for (lc,ulc) in enumerate(lcolor_to_ulcolor)
+      @assert iszero(ulcolor_to_owner[ulc]) || isequal(ulcolor_to_owner[ulc],lcolor_to_owner[lc])
+      @assert iszero(ulcolor_to_group[ulc]) || isequal(ulcolor_to_group[ulc],lcolor_to_group[lc])
+      ulcolor_to_owner[ulc] = lcolor_to_owner[lc]
+      ulcolor_to_group[ulc] = lcolor_to_group[lc]
+    end
+
+    for cell in eachindex(cell_to_lcolor)
+      cell_to_lcolor[cell] = lcolor_to_ulcolor[cell_to_lcolor[cell]]
+    end
+
+    return ulcolor_to_color, ulcolor_to_owner, ulcolor_to_group
+  end |> tuple_of_arrays
 
   # Locally build color gids
   color_ids = map(cell_ids,lcolor_to_color,lcolor_to_owner,n_color) do ids, lcolor_to_color, lcolor_to_owner, n_color
@@ -466,7 +492,7 @@ function generate_volume_gids(
     LocalIndices(Int(n_color),me,collect(Int,lcolor_to_color),collect(Int32,lcolor_to_owner))
   end
 
-  return PRange(color_ids)
+  return cell_to_lcolor, lcolor_to_group, PRange(color_ids)
 end
 
 # I tried to be clever, but I think this fails when we have volumes that are locally split in two
