@@ -7,9 +7,15 @@ using GridapTopOpt
 using GridapDistributed,PartitionedArrays,GridapPETSc
 
 if isassigned(ARGS,1)
-  global γg_evo =  parse(Float64,ARGS[1])
+  global const γg_evo =  parse(Float64,ARGS[1])
 else
-  global γg_evo =  0.01
+  global const γg_evo =  0.01
+end
+
+if isassigned(ARGS,2)
+  global const vf =  parse(Float64,ARGS[2])
+else
+  global const vf =  0.3
 end
 
 CGAMGSolver(;kwargs...) = PETScLinearSolver(gamg_ksp_setup(;kwargs...))
@@ -36,9 +42,9 @@ end
 
 function main(ranks)
   # Params
-  vf = 0.3
+  # vf = 0.4
   γ_evo = 0.1
-  max_steps = 15
+  max_steps = 10
   α_coeff = γ_evo*max_steps
   iter_mod = 50
   D = 3
@@ -46,7 +52,7 @@ function main(ranks)
   mesh_file = (@__DIR__)*"/Meshes/$mesh_name"
 
   # Output path
-  path = "./results/CutFEM_Wheel_MinCompliance_Neumann_gammag_$(γg_evo)_vf_$(vf)_superlu_cylinder/"
+  path = "./results/CutFEM_Wheel_MinCompliance_Neumann_gammag_$(γg_evo)_vf_$(vf)_superlu_cylinder_10step/"
   files_path = path*"data/"
   model_path = path*"model/"
   if i_am_main(ranks)
@@ -56,11 +62,17 @@ function main(ranks)
   # Load mesh
   model = GmshDiscreteModel(ranks,mesh_file)
   model = UnstructuredDiscreteModel(model)
+  # f_diri(x) =
+  #   (cos(pi/3)<=x[1]<=cos(pi/6) && abs(x[2] - sqrt(1-x[1]^2))<1e-4) ||
+  #   (cos(7pi/6)<=x[1]<=cos(2pi/3) && abs(x[2] - sqrt(1-x[1]^2))<1e-4) ||
+  #   (cos(pi/3)<=x[1]<=cos(pi/6) && abs(x[2] - -sqrt(1-x[1]^2))<1e-4) ||
+  #   (cos(7pi/6)<=x[1]<=cos(2pi/3) && abs(x[2] - -sqrt(1-x[1]^2))<1e-4)
   f_diri(x) =
-    (cos(pi/3)<=x[1]<=cos(pi/6) && abs(x[2] - sqrt(1-x[1]^2))<1e-4) ||
-    (cos(7pi/6)<=x[1]<=cos(2pi/3) && abs(x[2] - sqrt(1-x[1]^2))<1e-4) ||
-    (cos(pi/3)<=x[1]<=cos(pi/6) && abs(x[2] - -sqrt(1-x[1]^2))<1e-4) ||
-    (cos(7pi/6)<=x[1]<=cos(2pi/3) && abs(x[2] - -sqrt(1-x[1]^2))<1e-4)
+    ((cos(30π/180)<=x[1]<=cos(15π/180)) && abs(x[2] - sqrt(1-x[1]^2))<1e-4) ||
+    ((cos(97.5π/180)<=x[1]<=cos(82.5π/180)) && abs(x[2] - sqrt(1-x[1]^2))<1e-4) ||
+    ((cos(165π/180)<=x[1]<=cos(150π/180)) && abs(x[2] - sqrt(1-x[1]^2))<1e-4) ||
+    ((cos(142.5π/180)<=x[1]<=cos(127.5π/180)) && abs(x[2] - -sqrt(1-x[1]^2))<1e-4) ||
+    ((cos(52.5π/180)<=x[1]<=cos(37.5π/180)) && abs(x[2] - -sqrt(1-x[1]^2))<1e-4)
   update_labels!(1,model,f_diri,"Gamma_D_new")
   writevtk(model,model_path*"model")
 

@@ -7,9 +7,15 @@ using GridapTopOpt
 using GridapDistributed,PartitionedArrays,GridapPETSc
 
 if isassigned(ARGS,1)
-  global γg_evo =  parse(Float64,ARGS[1])
+  global const γg_evo =  parse(Float64,ARGS[1])
 else
-  global γg_evo =  0.01
+  global const γg_evo =  0.01
+end
+
+if isassigned(ARGS,2)
+  global const vf =  parse(Float64,ARGS[2])
+else
+  global const vf =  0.4
 end
 
 CGAMGSolver(;kwargs...) = PETScLinearSolver(gamg_ksp_setup(;kwargs...))
@@ -36,9 +42,9 @@ end
 
 function main(ranks)
   # Params
-  vf = 0.3
+  # vf = 0.4
   γ_evo = 0.1
-  max_steps = 15
+  max_steps = 10
   α_coeff = γ_evo*max_steps
   iter_mod = 50
   D = 3
@@ -46,7 +52,7 @@ function main(ranks)
   mesh_file = (@__DIR__)*"/Meshes/$mesh_name"
 
   # Output path
-  path = "./results/CutFEM_Wheel_MinCompliance_Neumann_gammag_$(γg_evo)_vf_$(vf)_superlu_cylinder_ALT/"
+  path = "./results/CutFEM_Wheel_MinCompliance_Neumann_gammag_$(γg_evo)_vf_$(vf)_superlu_cylinder_ALT_10step/"
   files_path = path*"data/"
   model_path = path*"model/"
   if i_am_main(ranks)

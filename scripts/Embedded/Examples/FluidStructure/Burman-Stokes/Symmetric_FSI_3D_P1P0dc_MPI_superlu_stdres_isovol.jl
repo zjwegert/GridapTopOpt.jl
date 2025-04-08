@@ -48,16 +48,16 @@ end
 
 function main(ranks)
   # Params
-  max_steps = 20 # Based on number of elements in vertical direction divided by 10
+  max_steps = 15 # Based on number of elements in vertical direction divided by 10
   vf = 0.035
   α_coeff = γ_evo*max_steps
   iter_mod = 50
   D = 3
-  mesh_name = "mesh_3d_symmetric_finer.msh"
+  mesh_name = "mesh_3d_symmetric.msh"
   mesh_file = (@__DIR__)*"/../Meshes/$mesh_name"
 
   # Output path
-  path = "./results/Symmetric_FSI_3D_Burman_P1P0dc_$(γg_evo)_gevo_$(γ_evo)_agd_$(α_Gd)/"
+  path = "./results/Symmetric_FSI_3D_Burman_P1P0dc_stdres_$(γg_evo)_gevo_$(γ_evo)_agd_$(α_Gd)/"
   files_path = path*"data/"
   model_path = path*"model/"
   if i_am_main(ranks)
@@ -248,7 +248,7 @@ function main(ranks)
 
   ## Optimisation functionals
   iso_vol_frac(φ) = ∫(Ω.ψ_s/vol_D)Ω.dΩs
-  J_comp(((u,p),d),φ) = ∫(ε(d) ⊙ (σ ∘ ε(d)))Ω.dΩs
+  J_comp(((u,p),d),φ) = ∫(ε(d) ⊙ (σ ∘ ε(d)))Ω.dΩs + iso_vol_frac(φ)
   Vol(((u,p),d),φ) = ∫(1/vol_D)Ω.dΩs - ∫(vf/vol_D)dΩ_act
   dVol(q,(u,p,d),φ) = ∫(-1/vol_D*q/(abs(Ω.n_Γ ⋅ ∇(φ))))Ω.dΓ
 
@@ -259,7 +259,6 @@ function main(ranks)
   state_collection = GridapTopOpt.EmbeddedCollection_in_φh(model,φh) do _φh
     update_collection!(Ω,_φh)
     (UP,VQ),(R,T) = build_spaces(Ω.Ω_act_s,Ω.Ω_act_f)
-    # elast_ls = ElasticitySolver(R;rtol=1.e-8,maxits=200)
     solver = StaggeredFESolver([fluid_ls,elast_ls]);
     op = StaggeredAffineFEOperator([a_fluid,a_solid],[l_fluid,l_solid],[UP,R],[VQ,T])
     state_map = StaggeredAffineFEStateMap(op,V_φ,U_reg,_φh;solver,adjoint_solver=solver)
@@ -327,7 +326,7 @@ function main(ranks)
 end
 
 with_mpi() do distribute
-  ncpus = 96
+  ncpus = 48
   ranks = distribute(LinearIndices((ncpus,)))
   petsc_options = "-ksp_converged_reason -ksp_error_if_not_converged true -pc_type lu -pc_factor_mat_solver_type superlu_dist"
   GridapPETSc.with(;args=split(petsc_options)) do

@@ -7,21 +7,21 @@ using GridapTopOpt
 using GridapDistributed,PartitionedArrays,GridapPETSc
 
 if isassigned(ARGS,1)
-  global γg_evo =  parse(Float64,ARGS[1])
+  global const γg_evo =  parse(Float64,ARGS[1])
 else
-  global γg_evo =  0.01
+  global const γg_evo =  0.01
 end
 
 if isassigned(ARGS,2)
-  global γ_evo =  parse(Float64,ARGS[2])
+  global const γ_evo =  parse(Float64,ARGS[2])
 else
-  global γ_evo =  0.1
+  global const γ_evo =  0.1
 end
 
 if isassigned(ARGS,3)
-  global α_Gd =  parse(Float64,ARGS[3])
+  global const α_Gd =  parse(Float64,ARGS[3])
 else
-  global α_Gd = 1e-7
+  global const α_Gd = 1e-7
 end
 
 CGAMGSolver(;kwargs...) = PETScLinearSolver(gamg_ksp_setup(;kwargs...))
