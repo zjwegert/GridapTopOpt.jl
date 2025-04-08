@@ -1,7 +1,6 @@
 module ElementDiameterTests
 using Test
 using GridapTopOpt
-using GridapTopOpt: _get_tri_circumdiameter, _get_tet_circumdiameter
 using Gridap, Gridap.Geometry, Gridap.Adaptivity, Gridap.Arrays
 
 using GridapGmsh,GridapDistributed, PartitionedArrays

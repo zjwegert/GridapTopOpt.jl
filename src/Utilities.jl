@@ -250,12 +250,10 @@ end
 #   should use h_K denotes the diameter of element K, and h_F denotes the average
 #   of the diameters of the elements sharing a facet K. The latter can be computed
 #   as the mean on the facet triangulation.
-#
-# In this implementation, diameter is interpreted as the circumdiameter of the polytope.
 """
     get_element_diameters(model)
 
-Given a general unstructured model return the element circumdiameters.
+Given a general unstructured model return the maximum vertex length of a polytope.
 """
 function get_element_diameters(model)
   coords = get_cell_coordinates(model)
@@ -263,9 +261,9 @@ function get_element_diameters(model)
   @assert length(polys) == 1 "Only one cell type is currently supported"
   poly = first(polys)
   if poly == TRI
-    return lazy_map(_get_tri_circumdiameter,coords)
+    return lazy_map(_get_tri_max_length,coords)
   elseif poly == TET
-    return lazy_map(_get_tet_circumdiameter,coords)
+    return lazy_map(_get_tet_max_length,coords)
   else
     @notimplemented "Only triangles and tetrahedra are currently supported"
   end
@@ -274,7 +272,7 @@ end
 """
     get_element_diameter_field(model)
 
-Given a general unstructured model return the element circumdiameters as a
+Given a general unstructured model return the maximum vertex length as a
 CellField over the triangulation.
 """
 function get_element_diameter_field(model)
@@ -296,28 +294,7 @@ function get_element_diameter_field(model::DistributedDiscreteModel)
   return DistributedCellField(fields,Ω)
 end
 
-# # Based on doi:10.1017/CBO9780511973611. C is the Cayley-Menger matrix.
-# function _get_tri_circumdiameter(coords)
-#   d12 = norm(coords[1]-coords[2])^2
-#   d13 = norm(coords[1]-coords[3])^2
-#   d23 = norm(coords[2]-coords[3])^2
-#   # C = [
-#   #   0  1   1   1
-#   #   1  0  d12 d13
-#   #   1 d12  0  d23
-#   #   1 d13 d23  0
-#   # ];
-#   # M = -2inv(C);
-#   # circumcentre = (M[1,2]*coords[1] + M[1,3]*coords[2] + M[1,4]*coords[3])/sum(M[1,2:end])
-#   # circumdiameter = sqrt(M[1,1])
-#   M11 = -((4*d12*d13*d23)/(d12^2+(d13-d23)^2-2*d12*(d13+d23)))
-#   return sqrt(M11)
-# end
-
-# TODO: I have replaced the get diameter function with one based on the literature.
-#   This is instead of circumdiameter. Once this is tested, all functions here should be
-#   renamed before release!
-function _get_tri_circumdiameter(coords)
+function _get_tri_max_length(coords)
   d12 = norm(coords[1]-coords[2])
   d13 = norm(coords[1]-coords[3])
   d23 = norm(coords[2]-coords[3])
@@ -325,32 +302,7 @@ function _get_tri_circumdiameter(coords)
   max(d12,d13,d23)
 end
 
-
-# function _get_tet_circumdiameter(coords)
-#   d12 = norm(coords[1]-coords[2])^2
-#   d13 = norm(coords[1]-coords[3])^2
-#   d14 = norm(coords[1]-coords[4])^2
-#   d23 = norm(coords[2]-coords[3])^2
-#   d24 = norm(coords[2]-coords[4])^2
-#   d34 = norm(coords[3]-coords[4])^2
-#   # C = [
-#   #   0  1   1   1   1
-#   #   1  0  d12 d13 d14
-#   #   1 d12  0  d23 d24
-#   #   1 d13 d23  0  d34
-#   #   1 d14 d24 d34  0
-#   # ];
-#   # M = -2inv(C);
-#   # circumcentre = (M[1,2]*coords[1] + M[1,3]*coords[2] + M[1,4]*coords[3] + M[1,5]*coords[4])/sum(M[1,2:end])
-#   # circumdiameter = sqrt(M[1,1])
-#   M11 = (d14^2*d23^2+(d13*d24-d12*d34)^2-2*d14*d23*(d13*d24+d12*d34))/(
-#     d13^2*d24+d12^2*d34+d23*(d14^2+d14*(d23-d24-d34)+d24*d34)-
-#     d13*(d14*(d23+d24-d34)+d24*(d23-d24+d34))-d12*((d23+d24-d34)*d34+
-#     d14*(d23-d24+d34)+d13*(-d23+d24+d34)))
-#   return sqrt(M11)
-# end
-
-function _get_tet_circumdiameter(coords)
+function _get_tet_max_length(coords)
   d12 = norm(coords[1]-coords[2])
   d13 = norm(coords[1]-coords[3])
   d14 = norm(coords[1]-coords[4])

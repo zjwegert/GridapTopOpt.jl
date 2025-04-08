@@ -321,6 +321,15 @@ function generate_mask(
   return data
 end
 
+"""
+    get_isolated_volumes_mask_polytopal(model::DiscreteModel,cell_values,dirichlet_tags)
+
+Given a DiscreteModel `model`, the cell values of the level set function
+`cell_values`, and a list of tags `dirichlet_tags`, this function returns two
+cell fields:
+- `cf_IN`: a CellField which is `1` on isolated volumes of the IN domain and `0` otherwise.
+- `cf_OUT`: a CellField which is `1` on isolated volumes of the OUT domain and `0` otherwise.
+"""
 function get_isolated_volumes_mask_polytopal(
   model::DiscreteModel,cell_values,dirichlet_tags
 )

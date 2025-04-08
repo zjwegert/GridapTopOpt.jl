@@ -1,23 +1,32 @@
-## Local generate
+# ## Local generate
 # cd("./docs/")
 # using Pkg; Pkg.activate(".")
+# Pkg.develop(path="../")
+# ##
 
 using Documenter
 using GridapTopOpt
 
 makedocs(
     sitename = "GridapTopOpt.jl",
-    # format = Documenter.HTML(
-    #   prettyurls = false,
-    #   # collapselevel = 1,
-    # ),
+    format = Documenter.HTML(
+      # prettyurls = false, # <- uncomment for live documentation
+      collapselevel = 1,
+    ),
+    warnonly = [:cross_references,:missing_docs],
+    checkdocs = :exports,
     modules = [GridapTopOpt],
     pages = [
       "Home" => "index.md",
       "Getting Started" => "getting-started.md",
+      "Examples" => [
+        "Introductory Examples" => "examples/index.md",
+        "FSI with CutFEM" => "examples/Fluid-structure_interaction_with_CutFEM.md",
+      ],
+      "Breaking Changes" => "breaking-changes.md",
       "Reference" => [
         "reference/optimisers.md",
-        "reference/chainrules.md",
+        "reference/statemaps.md",
         "reference/levelsetevolution.md",
         "reference/velext.md",
         "reference/io.md",

@@ -16,9 +16,9 @@ CutFEM method for level-set evolution based on method developed by
   max steps `max_steps`, and background mesh skeleton parameters
 - `cache`: Cache for evolver, initially `nothing`.
 
-# Note
-- The stepsize `dt = 0.1` in `RungeKutta` is a place-holder and is updated using
-  the `γ` passed to `solve!`.
+!!! warning
+    Caching for the `CutFEMEvolve` method is currently disabled. This will be
+    re-enabled in the future."
 """
 mutable struct CutFEMEvolve{A,B,C} <: Evolver
   ode_solver::ODESolver
@@ -28,6 +28,34 @@ mutable struct CutFEMEvolve{A,B,C} <: Evolver
   assembler::Assembler
   params::C
   cache
+
+  @doc """
+      CutFEMEvolve(V_φ::B,Ωs::EmbeddedCollection,dΩ_bg::A,h;
+        max_steps=10,
+        γg = 0.1,
+        ode_ls = LUSolver(),
+        ode_nl = ode_ls,
+        ode_solver = MutableRungeKutta(ode_nl, ode_ls, 0.1, :DIRK_CrankNicolson_2_2),
+        assembler=SparseMatrixAssembler(V_φ,V_φ)
+      ) where {A,B}
+
+  Create an instance of `CutFEMEvolve` with the space for the level-set `V_φ`,
+  the `EmbeddedCollection` `Ωs` for the triangulation and measures, the measure
+  `dΩ_bg` for the background mesh, and the mesh size `h`. The mesh size `h` can
+  either be a scalar or a `CellField` object.
+
+  The optional arguments are:
+  - `max_steps`: Maximum number of steps for the ODE solver.
+  - `γg`: Stabilisation parameter for the continuous interior penalty term.
+  - `ode_ls`: Linear solver for the ODE solver.
+  - `ode_nl`: Non-linear solver for the ODE solver.
+  - `ode_solver`: ODE solver, default is `MutableRungeKutta(ode_nl, ode_ls, 0.1, :DIRK_CrankNicolson_2_2)`.
+  - `assembler`: Assembler for the finite element space, default is `SparseMatrixAssembler(V_φ,V_φ)`.
+
+  # Note
+  - The stepsize `dt = 0.1` in `MutableRungeKutta` is a place-holder and is updated using
+    the `γ` passed to `solve!`.
+  """
   function CutFEMEvolve(V_φ::B,Ωs::EmbeddedCollection,dΩ_bg::A,h;
       max_steps=10,
       γg = 0.1,

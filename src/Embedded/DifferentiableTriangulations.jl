@@ -27,6 +27,15 @@ mutable struct DifferentiableTriangulation{Dc,Dp,A,B} <: Triangulation{Dc,Dp}
   end
 end
 
+"""
+    DifferentiableTriangulation(
+      trian::Union{<:SubCellTriangulation,<:SubFacetTriangulation},
+      fe_space
+    )
+
+Create an instance of `DifferentiableTriangulation` from a triangulation `trian`
+and an FE space `fe_space`.
+"""
 function DifferentiableTriangulation(
   trian::Union{<:SubCellTriangulation,<:SubFacetTriangulation},
   fe_space

@@ -1,1 +1,0 @@
-# Inverter mechanism

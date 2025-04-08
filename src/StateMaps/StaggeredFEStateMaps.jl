@@ -1,6 +1,14 @@
 """
     struct StaggeredAffineFEStateMap{NB,SB} <: AbstractFEStateMap{NB,SB}
-      ...
+      biforms    :: Vector{<:Function}
+      liforms    :: Vector{<:Function}
+      ∂Rk∂xhi    :: Tuple{Vararg{Tuple{Vararg{Function}}}}
+      spaces     :: A
+      assems     :: B
+      solvers    :: C
+      plb_caches :: D
+      fwd_caches :: E
+      adj_caches :: F
     end
 
 Affine staggered state map for the equivalent StaggeredAffineFEOperator,
@@ -17,8 +25,6 @@ These can be assembled into a set of linear systems:
     A_k u_k = b_k
 
 where `A_k` and `b_k` only depend on the previous variables `u_1,...,u_{k-1}`.
-
-- TODO: Document adjoint problem
 """
 struct StaggeredAffineFEStateMap{NB,SB,A,B,C,D,E,F} <: AbstractFEStateMap
   biforms    :: Vector{<:Function}
@@ -88,6 +94,28 @@ struct StaggeredAffineFEStateMap{NB,SB,A,B,C,D,E,F} <: AbstractFEStateMap
   end
 end
 
+"""
+    StaggeredAffineFEStateMap(
+        op              :: StaggeredAffineFEOperator{NB,SB},
+        V_φ             :: FESpace,
+        U_reg           :: FESpace,
+        φh;
+        assem_deriv     :: Assembler = SparseMatrixAssembler(U_reg,U_reg),
+        assems_adjoint  :: Vector{<:Assembler} = map(SparseMatrixAssembler,op.tests,op.trials),
+        solver          :: StaggeredFESolver{NB} = StaggeredFESolver(fill(LUSolver(),length(op.biforms))),
+        adjoint_solver  :: StaggeredFESolver{NB} = StaggeredFESolver(fill(LUSolver(),length(op.biforms)))
+    ) where {NB,SB}
+
+Create an instance of `StaggeredAffineFEStateMap` given a
+StaggeredAffineFEOperator `op`, the auxiliary space `V_φ` for `φh`,
+the FE space `U_reg` for derivatives, and the parameter `φh`.
+
+Otional arguemnts:
+- `assem_deriv` is the assembler for the derivative space.
+- `assems_adjoint` is a vector of assemblers for the adjoint space.
+- `solver` is a `StaggeredFESolver` for the forward problem.
+- `adjoint_solver` is a `StaggeredFESolver` for the adjoint problem.
+"""
 function StaggeredAffineFEStateMap(
   op              :: StaggeredAffineFEOperator{NB,SB},
   V_φ             :: FESpace,
@@ -169,8 +197,17 @@ function get_staggered_operator_at_φ(op::StaggeredAffineFEOperator,φh)
 end
 
 """
-    struct StaggeredNonlinearFEStateMap{NB,SB} <: AbstractFEStateMap{NB,SB}
-      ...
+    mutable struct StaggeredNonlinearFEStateMap{NB,SB} <: AbstractFEStateMap{NB,SB}
+      const residuals         :: Vector{<:Function}
+      const jacobians         :: Vector{<:Function}
+      const adjoint_jacobians :: Vector{<:Function}
+      const ∂Rk∂xhi           :: Tuple{Vararg{Tuple{Vararg{Function}}}}
+      const spaces            :: A
+      const assems            :: B
+      const solvers           :: C
+      const plb_caches        :: D
+      fwd_caches              :: E
+      const adj_caches        :: F
     end
 
 Staggered nonlinear state map for the equivalent StaggeredNonlinearFEOperator,
@@ -182,7 +219,8 @@ we expect a set of residual/jacobian pairs that also depend on φ:
   jac_k((u_1,...,u_{k-1},φ),u_k,du_k,dv_k) = ∫(...)
   res_k((u_1,...,u_{k-1},φ),u_k,v_k) = ∫(...)
 
-Note: This is mutable for now, in future we will refactor ChainRules to remove storage of caches
+!!! info
+    This is mutable for now, in future we will refactor ChainRules to remove storage of caches
 """
 mutable struct StaggeredNonlinearFEStateMap{NB,SB,A,B,C,D,E,F} <: AbstractFEStateMap
   const residuals         :: Vector{<:Function}
@@ -254,6 +292,31 @@ mutable struct StaggeredNonlinearFEStateMap{NB,SB,A,B,C,D,E,F} <: AbstractFEStat
   end
 end
 
+"""
+    function StaggeredNonlinearFEStateMap(
+      op             :: StaggeredNonlinearFEOperator{NB,SB},
+      V_φ            :: FESpace,
+      U_reg          :: FESpace,
+      φh;
+      assem_deriv    :: Assembler = SparseMatrixAssembler(U_reg,U_reg),
+      assems_adjoint :: Vector{<:Assembler} = map(SparseMatrixAssembler,op.tests,op.trials),
+      solver         :: StaggeredFESolver{NB} = StaggeredFESolver(
+        fill(NewtonSolver(LUSolver();maxiter=50,rtol=1.e-8,verbose=true),length(op.residuals))),
+      adjoint_solver :: StaggeredFESolver{NB} = StaggeredFESolver(fill(LUSolver(),length(op.residuals))),
+      adjoint_jacobians :: Vector{<:Function} = op.jacobians
+    ) where {NB,SB}
+
+Create an instance of `StaggeredNonlinearFEStateMap` given a
+`StaggeredNonlinearFEOperator` `op`, the auxiliary space `V_φ` for `φh`,
+the FE space `U_reg` for derivatives, and the parameter `φh`.
+
+Otional arguemnts:
+- `assem_deriv` is the assembler for the derivative space.
+- `assems_adjoint` is a vector of assemblers for the adjoint space.
+- `solver` is a `StaggeredFESolver` for the forward problem.
+- `adjoint_solver` is a `StaggeredFESolver` for the adjoint problem.
+- `adjoint_jacobians` is a vector of jacobians for the adjoint problem.
+"""
 function StaggeredNonlinearFEStateMap(
   op             :: StaggeredNonlinearFEOperator{NB,SB},
   V_φ            :: FESpace,

@@ -258,6 +258,9 @@ struct EmbeddedPDEConstrainedFunctionals{N,T} <: AbstractPDEConstrainedFunctiona
         embedded_collection :: EmbeddedCollection;analytic_dJ;analytic_dC)
 
   Create an instance of `EmbeddedPDEConstrainedFunctionals`.
+
+  The embedded_collection must be a `EmbeddedCollection` that contains the
+  `:state_map`, `:J`, and `:C` objects.
   """
   function EmbeddedPDEConstrainedFunctionals(
       embedded_collection :: EmbeddedCollection;
@@ -296,7 +299,7 @@ get_state_map(m::EmbeddedPDEConstrainedFunctionals) = m.embedded_collection.stat
 get_state(m::EmbeddedPDEConstrainedFunctionals) = get_state(get_state_map(m))
 
 """
-    evaluate_functionals!(pcf::EmbeddedPDEConstrainedFunctionals,φh)
+    evaluate_functionals!(pcf::EmbeddedPDEConstrainedFunctionals,φh;update_space::Bool=true)
 
 Evaluate the objective and constraints at `φh`.
 
@@ -322,7 +325,7 @@ function evaluate_functionals!(pcf::EmbeddedPDEConstrainedFunctionals,φ::Abstra
 end
 
 """
-    evaluate_derivatives!(pcf::EmbeddedPDEConstrainedFunctionals,φh)
+    evaluate_derivatives!(pcf::EmbeddedPDEConstrainedFunctionals,φh;update_space::Bool=true)
 
 Evaluate the derivatives of the objective and constraints at `φh`.
 
@@ -344,7 +347,7 @@ function evaluate_derivatives!(pcf::EmbeddedPDEConstrainedFunctionals,φ::Abstra
 end
 
 """
-    Fields.evaluate!(pcf::EmbeddedPDEConstrainedFunctionals,φh)
+    Fields.evaluate!(pcf::EmbeddedPDEConstrainedFunctionals,φh;update_space::Bool=true)
 
 Evaluate the objective and constraints, and their derivatives at
 `φh`.
@@ -401,6 +404,13 @@ function Fields.evaluate!(pcf::EmbeddedPDEConstrainedFunctionals,φ::AbstractVec
   return evaluate!(pcf,φh;kwargs...)
 end
 
+"""
+    EmbeddedCollection_in_φh(recipes::Union{<:Function,Vector{<:Function}},bgmodel,φ0)
+
+Returns an `EmbeddedCollection` whoose recipes are only updated using the
+parameter `φ0`. This is useful for problems where the recipes are not computed
+using the cut geometry information.
+"""
 function EmbeddedCollection_in_φh(recipes::Union{<:Function,Vector{<:Function}},bgmodel,φ0)
   c = EmbeddedCollection(recipes,bgmodel)
   update_collection_with_φh!(c,φ0)

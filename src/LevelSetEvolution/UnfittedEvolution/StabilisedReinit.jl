@@ -31,6 +31,25 @@ mutable struct StabilisedReinit{A,B,C,D} <: Reinitialiser
   assembler::Assembler
   params::D
   cache
+  @doc """
+      StabilisedReinit(V_φ::C,Ωs::EmbeddedCollection,dΩ_bg::B,h;
+        γd = 20.0,
+        nls = NewtonSolver(LUSolver();maxiter=20,rtol=1.e-14,verbose=true),
+        assembler=SparseMatrixAssembler(V_φ,V_φ),
+        stabilisation_method::A = InteriorPenalty(V_φ)
+      ) where {A,B,C}
+
+  Create an instance of `StabilisedReinit` with the space for the level-set `V_φ`,
+  the `EmbeddedCollection` `Ωs` for the triangulation and measures, the measure
+  `dΩ_bg` for the background mesh, and the mesh size `h`. The mesh size `h` can
+  either be a scalar or a `CellField` object.
+
+  The optional arguments are:
+  - `γd`: Interface penalty parameter for the reinitialisation equation.
+  - `nls`: Nonlinear solver for solving the reinitialisation equation.
+  - `assembler`: Assembler for the finite element space.
+  - `stabilisation_method`: A `StabilisationMethod` method for stabilising the problem.
+  """
   function StabilisedReinit(V_φ::C,Ωs::EmbeddedCollection,dΩ_bg::B,h;
       γd = 20.0,
       nls = NewtonSolver(LUSolver();maxiter=20,rtol=1.e-14,verbose=true),
