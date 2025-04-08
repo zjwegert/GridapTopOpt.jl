@@ -31,7 +31,6 @@ function main(ranks)
   a = 0.7;
   b = 0.1;
   cw = 0.1;
-  vol_D = L*H
 
   model = GmshDiscreteModel(ranks,result_path*"/Mesh/$mesh_name")
   model = UnstructuredDiscreteModel(model)
@@ -194,6 +193,7 @@ function main(ranks)
   end
 
   ## Optimisation functionals
+  vol_D = sum(∫(1)dΩ_act)
   iso_vol_frac(φ) = ∫(Ω.ψ_s/vol_D)Ω.dΩs
   J_comp(((u,p),d),φ) = ∫(ε(d) ⊙ (σ ∘ ε(d)))Ω.dΩs
   Vol(((u,p),d),φ) = ∫(1/vol_D)Ω.dΩs - ∫(vf/vol_D)dΩ_act

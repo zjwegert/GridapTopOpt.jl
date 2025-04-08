@@ -24,6 +24,12 @@ else
   global const α_Gd = 1e-7
 end
 
+if isassigned(ARGS,4)
+  global const vf =  parse(Float64,ARGS[4])
+else
+  global const vf = 0.04
+end
+
 CGAMGSolver(;kwargs...) = PETScLinearSolver(gamg_ksp_setup(;kwargs...))
 
 function gamg_ksp_setup(;rtol=10^-8,maxits=100)
@@ -49,7 +55,7 @@ end
 function main(ranks)
   # Params
   max_steps = 15 # Based on number of elements in vertical direction divided by 10
-  vf = 0.035
+  # vf = 0.035
   α_coeff = γ_evo*max_steps
   iter_mod = 50
   D = 3
@@ -57,7 +63,7 @@ function main(ranks)
   mesh_file = (@__DIR__)*"/../Meshes/$mesh_name"
 
   # Output path
-  path = "./results/Symmetric_FSI_3D_Burman_P1P0dc_stdres_$(γg_evo)_gevo_$(γ_evo)_agd_$(α_Gd)_isovol/"
+  path = "./results/Symmetric_FSI_3D_Burman_P1P0dc_stdres_vf_$(vf)_$(γg_evo)_gevo_$(γ_evo)_agd_$(α_Gd)_isovol/"
   files_path = path*"data/"
   model_path = path*"model/"
   if i_am_main(ranks)
@@ -73,7 +79,6 @@ function main(ranks)
   a = 0.7;
   b = 0.1;
   cw = 0.1;
-  vol_D = L*H
 
   model = GmshDiscreteModel(ranks,mesh_file)
   model = UnstructuredDiscreteModel(model)
@@ -247,6 +252,7 @@ function main(ranks)
   end
 
   ## Optimisation functionals
+  vol_D = sum(∫(1)dΩ_act)
   iso_vol_frac(φ) = ∫(Ω.ψ_s/vol_D)Ω.dΩs
   J_comp(((u,p),d),φ) = ∫(ε(d) ⊙ (σ ∘ ε(d)))Ω.dΩs + iso_vol_frac(φ)
   Vol(((u,p),d),φ) = ∫(1/vol_D)Ω.dΩs - ∫(vf/vol_D)dΩ_act
