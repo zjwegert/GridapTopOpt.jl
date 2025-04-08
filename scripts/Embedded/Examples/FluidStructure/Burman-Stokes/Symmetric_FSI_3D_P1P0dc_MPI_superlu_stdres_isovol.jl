@@ -57,7 +57,7 @@ function main(ranks)
   mesh_file = (@__DIR__)*"/../Meshes/$mesh_name"
 
   # Output path
-  path = "./results/Symmetric_FSI_3D_Burman_P1P0dc_stdres_$(γg_evo)_gevo_$(γ_evo)_agd_$(α_Gd)/"
+  path = "./results/Symmetric_FSI_3D_Burman_P1P0dc_stdres_$(γg_evo)_gevo_$(γ_evo)_agd_$(α_Gd)_isovol/"
   files_path = path*"data/"
   model_path = path*"model/"
   if i_am_main(ranks)
