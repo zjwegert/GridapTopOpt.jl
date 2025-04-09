@@ -584,7 +584,7 @@ struct NonlinearFEStateMap{A,B,C,D,E,F} <: AbstractFEStateMap
   )
     res = IntegrandWithMeasure(res,dΩ)
     if isnothing(jac)
-      jacf = (u,du,v,φh) -> jacobian(res,[u,v,φh],1)
+      jacf = (u,du,v,φh) -> Gridap.jacobian(res,[u,v,φh],1)
     else
       jacf = (u,du,v,φh) -> jac(u,du,v,φh,dΩ...)
     end
