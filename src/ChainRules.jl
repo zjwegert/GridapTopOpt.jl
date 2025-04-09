@@ -621,7 +621,7 @@ get_measure(m::NonlinearFEStateMap) = m.res.dΩ
 get_spaces(m::NonlinearFEStateMap) = m.spaces
 get_assemblers(m::NonlinearFEStateMap) = (m.fwd_caches[4],m.plb_caches[2],m.adj_caches[4])
 
-function forward_solve!(φ_to_u::NonlinearFEStateMap,φh)
+function forward_solve!(φ_to_u::NonlinearFEStateMap,φh::FEFunction)
   U, V, _, _ = φ_to_u.spaces
   nls, nls_cache, x, assem_U = φ_to_u.fwd_caches
 
