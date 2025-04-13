@@ -27,7 +27,7 @@ end
 if isassigned(ARGS,4)
   global const vf =  parse(Float64,ARGS[4])
 else
-  global const vf = 0.06
+  global const vf = 0.04
 end
 
 CGAMGSolver(;kwargs...) = PETScLinearSolver(gamg_ksp_setup(;kwargs...))
@@ -55,6 +55,7 @@ end
 function main(ranks)
   # Params
   max_steps = 15 # Based on number of elements in vertical direction divided by 10
+  # vf = 0.035
   α_coeff = γ_evo*max_steps
   iter_mod = 50
   D = 3
@@ -62,7 +63,7 @@ function main(ranks)
   mesh_file = (@__DIR__)*"/../Meshes/$mesh_name"
 
   # Output path
-  path = "./results/Symmetric_FSI_3D_Burman_P1P0dc_stdres_vf_$(vf)_$(γg_evo)_gevo_$(γ_evo)_agd_$(α_Gd)/"
+  path = "./results/Symmetric_FSI_3D_Burman_P1P0dc_stdres_vf_$(vf)_$(γg_evo)_gevo_$(γ_evo)_agd_$(α_Gd)_isovol/"
   files_path = path*"data/"
   model_path = path*"model/"
   if i_am_main(ranks)
@@ -291,18 +292,14 @@ function main(ranks)
   vel_ext = VelocityExtension(a_hilb,U_reg,V_reg;ls=CGAMGSolver())
 
   ## Optimiser
-  converged(m) = GridapTopOpt.default_al_converged(
+  converged(m) = GridapTopOpt.default_hp_converged(
     m;
-    L_tol = 0.075hmin,
+    J_tol = 0.1hmin,
     C_tol = 0.05vf
   )
-  # function has_oscillations(m,os_it)
-  #   history = GridapTopOpt.get_history(m)
-  #   it = GridapTopOpt.get_last_iteration(history)
-  #   all(@.(abs(history[:C,it]) < 0.05vf)) && GridapTopOpt.default_has_oscillations(m,os_it)
-  # end
-  optimiser = AugmentedLagrangian(pcf,ls_evo,vel_ext,φh;
-    γ=γ_evo,verbose=i_am_main(ranks),constraint_names=[:Vol],converged)#,has_oscillations)
+  optimiser = HilbertianProjection(pcf,ls_evo,vel_ext,φh;
+    γ=γ_evo,verbose=i_am_main(ranks),constraint_names=[:Vol],converged,
+    ls_ξ_reduce_abs_tol=0.1*vf,ls_ξ = 0.0025,ls_ξ_reduce_coef = 0.1)
   for (it,(uh,ph,dh),φh) in optimiser
     if iszero(it % iter_mod)
       writevtk(Ω_act,files_path*"Omega_act_$it",
