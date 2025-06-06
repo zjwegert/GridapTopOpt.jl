@@ -7,6 +7,7 @@ using GridapEmbedded, GridapEmbedded.LevelSetCutters, GridapEmbedded.Interfaces
 
 using Gridap.Arrays: Operation
 using GridapEmbedded.Interfaces: get_conormal_vector,get_subfacet_normal_vector,get_ghost_normal_vector
+using GridapEmbedded.LevelSetCutters: DifferentiableTriangulation
 
 function generate_model(D,n)
   domain = (D==2) ? (0,1,0,1) : (0,1,0,1,0,1)
