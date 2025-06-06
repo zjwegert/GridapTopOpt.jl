@@ -100,12 +100,18 @@ function _update_labels_locally!(e,model::DiscreteModel{2},mask,name)
   # Vertices
   vtxs_Γ = findall(mask)
   vtx_edge_connectivity = Array(get_faces(topo,0,1)[vtxs_Γ])
+  vtx_face_connectivity = Array(get_faces(topo,0,2)[vtxs_Γ])
   # Edges
-  edge_entries = [findall(x->any(x .∈  vtx_edge_connectivity[1:end.!=j]),
+  edge_entries = [findall(x->any(x .∈ vtx_edge_connectivity[1:end.!=j]),
     vtx_edge_connectivity[j]) for j = 1:length(vtx_edge_connectivity)]
   edge_Γ = unique(reduce(vcat,getindex.(vtx_edge_connectivity,edge_entries),init=[]))
+  # Faces
+  face_entries = [findall(x->count(x .∈ vtx_face_connectivity[1:end.!=j])>=2,
+    vtx_face_connectivity[j]) for j = 1:length(vtx_face_connectivity)]
+  face_Γ = unique(reduce(vcat,getindex.(vtx_face_connectivity,face_entries),init=[]))
   labels.d_to_dface_to_entity[1][vtxs_Γ] .= entity
   labels.d_to_dface_to_entity[2][edge_Γ] .= entity
+  labels.d_to_dface_to_entity[3][face_Γ] .= entity
   add_tag!(labels,name,[entity])
   return cell_to_entity
 end
@@ -117,19 +123,25 @@ function _update_labels_locally!(e,model::DiscreteModel{3},mask,name)
   entity = maximum(cell_to_entity) + e
   # Vertices
   vtxs_Γ = findall(mask)
-  vtx_edge_connectivity = Array(Geometry.get_faces(topo,0,1)[vtxs_Γ])
-  vtx_face_connectivity = Array(Geometry.get_faces(topo,0,2)[vtxs_Γ])
+  vtx_edge_connectivity = Array(get_faces(topo,0,1)[vtxs_Γ])
+  vtx_face_connectivity = Array(get_faces(topo,0,2)[vtxs_Γ])
+  vtx_cell_connectivity = Array(get_faces(topo,0,3)[vtxs_Γ])
   # Edges
-  edge_entries = [findall(x->any(x .∈  vtx_edge_connectivity[1:end.!=j]),
+  edge_entries = [findall(x->any(x .∈ vtx_edge_connectivity[1:end.!=j]),
     vtx_edge_connectivity[j]) for j = 1:length(vtx_edge_connectivity)]
   edge_Γ = unique(reduce(vcat,getindex.(vtx_edge_connectivity,edge_entries),init=[]))
   # Faces
-  face_entries = [findall(x->count(x .∈  vtx_face_connectivity[1:end.!=j])>=2,
+  face_entries = [findall(x->count(x .∈ vtx_face_connectivity[1:end.!=j])>=2,
     vtx_face_connectivity[j]) for j = 1:length(vtx_face_connectivity)]
   face_Γ = unique(reduce(vcat,getindex.(vtx_face_connectivity,face_entries),init=[]))
+  # Cells
+  cell_entries = [findall(x->count(x .∈ vtx_cell_connectivity[1:end.!=j])>=3,
+    vtx_cell_connectivity[j]) for j = 1:length(vtx_cell_connectivity)]
+  cell_Γ = unique(reduce(vcat,getindex.(vtx_cell_connectivity,cell_entries),init=[]))
   labels.d_to_dface_to_entity[1][vtxs_Γ] .= entity
   labels.d_to_dface_to_entity[2][edge_Γ] .= entity
   labels.d_to_dface_to_entity[3][face_Γ] .= entity
+  labels.d_to_dface_to_entity[4][cell_Γ] .= entity
   add_tag!(labels,name,[entity])
   return cell_to_entity
 end
