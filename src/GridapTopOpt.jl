@@ -49,7 +49,6 @@ import GridapDistributed: remove_ghost_cells
 
 __init__() = begin
   include((@__DIR__)*"/GridapExtensions.jl")
-  include((@__DIR__)*"/Embedded/SubFacetBoundaryTriangulations.jl") # <- commented out in "Embedded/Embedded.jl"
   include((@__DIR__)*"/LevelSetEvolution/UnfittedEvolution/MutableRungeKutta.jl") # <- commented out in "LevelSetEvolution/LevelSetEvolution.jl"
 
   function default_find_rcv_ids(::MPIArray)
@@ -58,8 +57,6 @@ __init__() = begin
 end
 
 include("Embedded/Embedded.jl")
-export DifferentiableTriangulation
-export SubFacetBoundaryTriangulation, SubFacetSkeletonTriangulation
 export EmbeddedCollection, update_collection!, add_recipe!
 export CUT
 export get_isolated_volumes_mask_polytopal
