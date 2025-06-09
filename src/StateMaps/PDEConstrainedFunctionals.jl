@@ -428,3 +428,68 @@ function Base.show(io::IO,::MIME"text/plain",f::AbstractPDEConstrainedFunctional
   print(io,"$(nameof(typeof(f))):
     num_constraints: $N")
 end
+
+struct CustomPDEConstrainedFunctionals{N,A} #<: ParameterisedObjective{N,A}
+  φ_to_jc :: Function
+  dJ :: Vector{Float64}
+  dC :: Vector{Vector{Float64}}
+  analytic_dJ
+  analytic_dC
+  state_map :: A
+  V_φ :: FESpace
+
+    function CustomPDEConstrainedFunctionals(
+      φ_to_jc :: Function,
+      state_map :: AbstractFEStateMap,
+      φh_bg;
+    )
+
+    V_φ = φh_bg.fe_space
+    φh = interpolate(φh_bg,get_aux_space(state_map))
+    φ = φh.free_values
+    
+    # Pre-allocaitng
+    grad = Zygote.jacobian(φ_to_jc, φ)
+    dJ = grad[1][1,:]
+    dC = [collect(row) for row in eachrow(grad[1][2:end,:])]    
+
+    N = length(dC)
+    A = typeof(state_map)
+    analytic_dJ = nothing
+    analytic_dC = fill(nothing,N)
+
+    return new{N,A}(φ_to_jc,dJ,dC,analytic_dJ,analytic_dC,state_map,V_φ)
+  end
+end
+
+function Fields.evaluate!(pcf::CustomPDEConstrainedFunctionals,φh_bg)
+  φ_to_jc,dJ,dC = pcf.φ_to_jc,pcf.dJ,pcf.dC
+
+  φh = interpolate(φh_bg,get_aux_space(pcf.state_map))
+
+  obj,grad = Zygote.withjacobian(φ_to_jc, φh.free_values)
+  j = obj[1]
+  c = obj[2:end]
+  copy!(dJ,grad[1][1,:])
+  copy!(dC,[collect(row) for row in eachrow(grad[1][2:end,:])])
+
+  return j,c,dJ,dC
+end
+
+get_state(m::CustomPDEConstrainedFunctionals) = get_state(m.state_map)
+
+function evaluate_functionals!(pcf::CustomPDEConstrainedFunctionals,φh::FEFunction)
+  φ = φh.free_values
+  return evaluate_functionals!(pcf,φ)
+end
+
+function evaluate_functionals!(pcf::CustomPDEConstrainedFunctionals,φ_bg::AbstractVector)
+  φ_to_jc =  pcf.φ_to_jc
+  φh_bg = FEFunction(pcf.V_φ,φ_bg)
+  φh = interpolate(φh_bg,get_aux_space(pcf.state_map))
+  φ = φh.free_values
+  obj = φ_to_jc(φ)
+  j = obj[1]
+  c = obj[2:end]
+  return j,c
+end
