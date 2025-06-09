@@ -30,7 +30,7 @@ For more advanced installations, such as use of a custom MPI/PETSc installation 
 ## Usage and tutorials
 In order to get familiar with the library we recommend following the numerical examples described in:
 
-> Zachary J. Wegert, Jordi Manyer, Connor Mallon, Santiago Badia, and Vivien J. Challis (2024). "GridapTopOpt.jl: A scalable computational toolbox for level set-based topology optimisation". In preparation.
+> Wegert, Z.J., Manyer, J., Mallon, C.N. et al. GridapTopOpt.jl: a scalable Julia toolbox for level set-based topology optimisation. Struct Multidisc Optim 68, 22 (2025). [https://doi.org/10.1007/s00158-024-03927-3](https://doi.org/10.1007/s00158-024-03927-3)
 
 In addition, there are several driver scripts available in `/scripts/..`
 

@@ -1,14 +1,11 @@
-module LSTOSequentialTests
+module GridapTopOptSequentialTests
 
 using Test
 
-@time @testset "Thermal Compliance - ALM" begin include("ThermalComplianceALMTests.jl") end
-@time @testset "Thermal Compliance - HPM" begin include("ThermalComplianceHPMTests.jl") end
-@time @testset "Nonlinear Thermal Compliance - ALM" begin include("NonlinearThermalComplianceALMTests.jl") end
-@time @testset "Nonlinear Neohook with Jacobian - ALM" begin include("NeohookAnalyticJacALMTests.jl") end
-@time @testset "Inverse Homogenisation - ALM" begin include("InverseHomogenisationALMTests.jl") end
-@time @testset "Inverter - HPM" begin include("InverterHPMTests.jl") end
-@time @testset "PZMultiFieldRepeatingState - ALM" begin include("PZMultiFieldRepeatingStateTests.jl") end
-@time @testset "JLD2SaveLoad" begin include("JLD2SaveLoad.jl") end
+@time @testset "StateMapTests" begin include("StateMapTests/runtests.jl") end
+@time @testset "UtilityTests" begin include("UtilityTests/runtests.jl") end
+@time @testset "EmbeddedTests" begin include("EmbeddedTests/runtests.jl") end
+@time @testset "UnfittedEvolution" begin include("UnfittedEvolutionTests/runtests.jl") end
+@time @testset "GridapTopOptTests" begin include("GridapTopOptTests/runtests.jl") end
 
 end # module

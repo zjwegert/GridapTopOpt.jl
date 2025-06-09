@@ -76,23 +76,23 @@ function nl_elast(mesh_partition,ranks,el_size,order,verbose)
   ## Volume change
   J(F) = sqrt(det(C(F)))
   ## Residual
-  res(u,v,φ,dΩ,dΓ_N) = ∫( (I ∘ φ)*((dE ∘ (∇(v),∇(u))) ⊙ (S ∘ ∇(u))) )*dΩ - ∫(g⋅v)dΓ_N
+  res(u,v,φ) = ∫( (I ∘ φ)*((dE ∘ (∇(v),∇(u))) ⊙ (S ∘ ∇(u))) )*dΩ - ∫(g⋅v)dΓ_N
   Tm = SparseMatrixCSR{0,PetscScalar,PetscInt}
   Tv = Vector{PetscScalar}
   lin_solver = ElasticitySolver(V)
   nl_solver = NewtonSolver(lin_solver;maxiter=50,rtol=10^-8,verbose)
   state_map = NonlinearFEStateMap(
-    res,U,V,V_φ,U_reg,φh,dΩ,dΓ_N;
+    res,U,V,V_φ,U_reg,φh;
     assem_U = SparseMatrixAssembler(Tm,Tv,U,V),
     assem_adjoint = SparseMatrixAssembler(Tm,Tv,V,U),
     assem_deriv = SparseMatrixAssembler(Tm,Tv,U_reg,U_reg),
     nls = nl_solver, adjoint_ls = lin_solver
   )
   # Objective and constraints
-  J(u,φ,dΩ,dΓ_N) = ∫((I ∘ φ)*((dE ∘ (∇(u),∇(u))) ⊙ (S ∘ ∇(u))))dΩ
+  J(u,φ) = ∫((I ∘ φ)*((dE ∘ (∇(u),∇(u))) ⊙ (S ∘ ∇(u))))dΩ
   vol_D = sum(∫(1)dΩ)
-  C1(u,φ,dΩ,dΓ_N) = ∫(((ρ ∘ φ) - vf)/vol_D)dΩ
-  dC1(q,u,φ,dΩ,dΓ_N) = ∫(-1/vol_D*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
+  C1(u,φ) = ∫(((ρ ∘ φ) - vf)/vol_D)dΩ
+  dC1(q,u,φ) = ∫(-1/vol_D*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
   pcfs = PDEConstrainedFunctionals(J,[C1],state_map,analytic_dC=[dC1])
   # Velocity extension
   α = 4max_steps*γ*maximum(get_el_Δ(model))
@@ -152,24 +152,24 @@ function therm(mesh_partition,ranks,el_size,order,verbose)
   interp = SmoothErsatzMaterialInterpolation(η = 2*maximum(get_el_Δ(model)))
   I,H,DH,ρ = interp.I,interp.H,interp.DH,interp.ρ
   # Weak formulation
-  a(u,v,φ,dΩ,dΓ_N) = ∫((I ∘ φ)*κ*∇(u)⋅∇(v))dΩ
-  l(v,φ,dΩ,dΓ_N) = ∫(g*v)dΓ_N
+  a(u,v,φ) = ∫((I ∘ φ)*κ*∇(u)⋅∇(v))dΩ
+  l(v,φ) = ∫(g*v)dΓ_N
   Tm = SparseMatrixCSR{0,PetscScalar,PetscInt}
   Tv = Vector{PetscScalar}
   solver = PETScLinearSolver()
   state_map = AffineFEStateMap(
-    a,l,U,V,V_φ,U_reg,φh,dΩ,dΓ_N;
+    a,l,U,V,V_φ,U_reg,φh;
     assem_U = SparseMatrixAssembler(Tm,Tv,U,V),
     assem_adjoint = SparseMatrixAssembler(Tm,Tv,V,U),
     assem_deriv = SparseMatrixAssembler(Tm,Tv,U_reg,U_reg),
     ls = solver,adjoint_ls = solver
   )
   # Objective and constraints
-  J(u,φ,dΩ,dΓ_N) = ∫((I ∘ φ)*κ*∇(u)⋅∇(u))dΩ
-  dJ(q,u,φ,dΩ,dΓ_N) = ∫(κ*∇(u)⋅∇(u)*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
+  J(u,φ) = ∫((I ∘ φ)*κ*∇(u)⋅∇(u))dΩ
+  dJ(q,u,φ) = ∫(κ*∇(u)⋅∇(u)*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
   vol_D = sum(∫(1)dΩ)
-  C1(u,φ,dΩ,dΓ_N) = ∫(((ρ ∘ φ) - vf)/vol_D)dΩ
-  dC1(q,u,φ,dΩ,dΓ_N) = ∫(-1/vol_D*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
+  C1(u,φ) = ∫(((ρ ∘ φ) - vf)/vol_D)dΩ
+  dC1(q,u,φ) = ∫(-1/vol_D*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
   pcfs = PDEConstrainedFunctionals(J,[C1],state_map,
     analytic_dJ=dJ,analytic_dC=[dC1])
   # Velocity extension
@@ -228,24 +228,24 @@ function elast(mesh_partition,ranks,el_size,order,verbose)
   interp = SmoothErsatzMaterialInterpolation(η = 2*maximum(get_el_Δ(model)))
   I,H,DH,ρ = interp.I,interp.H,interp.DH,interp.ρ
   # Weak formulation
-  a(u,v,φ,dΩ,dΓ_N) = ∫((I ∘ φ)*(C ⊙ ε(u) ⊙ ε(v)))dΩ
-  l(v,φ,dΩ,dΓ_N) = ∫(v⋅g)dΓ_N
+  a(u,v,φ) = ∫((I ∘ φ)*(C ⊙ ε(u) ⊙ ε(v)))dΩ
+  l(v,φ) = ∫(v⋅g)dΓ_N
   Tm = SparseMatrixCSR{0,PetscScalar,PetscInt}
   Tv = Vector{PetscScalar}
   solver = ElasticitySolver(V)
   state_map = AffineFEStateMap(
-    a,l,U,V,V_φ,U_reg,φh,dΩ,dΓ_N;
+    a,l,U,V,V_φ,U_reg,φh;
     assem_U = SparseMatrixAssembler(Tm,Tv,U,V),
     assem_adjoint = SparseMatrixAssembler(Tm,Tv,V,U),
     assem_deriv = SparseMatrixAssembler(Tm,Tv,U_reg,U_reg),
     ls = solver,adjoint_ls = solver
   )
   # Objective and constraints
-  J(u,φ,dΩ,dΓ_N) = ∫((I ∘ φ)*(C ⊙ ε(u) ⊙ ε(u)))dΩ
-  dJ(q,u,φ,dΩ,dΓ_N) = ∫((C ⊙ ε(u) ⊙ ε(u))*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
+  J(u,φ) = ∫((I ∘ φ)*(C ⊙ ε(u) ⊙ ε(u)))dΩ
+  dJ(q,u,φ) = ∫((C ⊙ ε(u) ⊙ ε(u))*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
   vol_D = sum(∫(1)dΩ)
-  C1(u,φ,dΩ,dΓ_N) = ∫(((ρ ∘ φ) - vf)/vol_D)dΩ
-  dC1(q,u,φ,dΩ,dΓ_N) = ∫(-1/vol_D*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
+  C1(u,φ) = ∫(((ρ ∘ φ) - vf)/vol_D)dΩ
+  dC1(q,u,φ) = ∫(-1/vol_D*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
   pcfs = PDEConstrainedFunctionals(J,[C1],state_map,
     analytic_dJ=dJ,analytic_dC=[dC1])
   # Velocity extension
@@ -320,15 +320,15 @@ function inverter_HPM(mesh_partition,ranks,el_size,order,verbose)
   interp = SmoothErsatzMaterialInterpolation(η = η_coeff*maximum(el_Δ))
   I,H,DH,ρ = interp.I,interp.H,interp.DH,interp.ρ
 
-  a(u,v,φ,dΩ,dΓ_in,dΓ_out) = ∫((I ∘ φ)*(C ⊙ ε(u) ⊙ ε(v)))dΩ + ∫(ks*(u⋅v))dΓ_out
-  l(v,φ,dΩ,dΓ_in,dΓ_out) = ∫(v⋅g)dΓ_in
+  a(u,v,φ) = ∫((I ∘ φ)*(C ⊙ ε(u) ⊙ ε(v)))dΩ + ∫(ks*(u⋅v))dΓ_out
+  l(v,φ) = ∫(v⋅g)dΓ_in
 
   ## Optimisation functionals
   e₁ = VectorValue(1,0,0)
-  J(u,φ,dΩ,dΓ_in,dΓ_out) = ∫((u⋅e₁)/vol_Γ_in)dΓ_in
-  Vol(u,φ,dΩ,dΓ_in,dΓ_out) = ∫(((ρ ∘ φ) - vf)/vol_D)dΩ;
-  dVol(q,u,φ,dΩ,dΓ_in,dΓ_out) = ∫(-1/vol_D*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
-  UΓ_out(u,φ,dΩ,dΓ_in,dΓ_out) = ∫((u⋅-e₁-δₓ)/vol_Γ_out)dΓ_out
+  J(u,φ) = ∫((u⋅e₁)/vol_Γ_in)dΓ_in
+  Vol(u,φ) = ∫(((ρ ∘ φ) - vf)/vol_D)dΩ;
+  dVol(q,u,φ) = ∫(-1/vol_D*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
+  UΓ_out(u,φ) = ∫((u⋅-e₁-δₓ)/vol_Γ_out)dΓ_out
 
   ## Finite difference solver
   ls_evo = HamiltonJacobiEvolution(FirstOrderStencil(3,Float64),model,V_φ,tol,max_steps)
@@ -339,7 +339,7 @@ function inverter_HPM(mesh_partition,ranks,el_size,order,verbose)
   solver = ElasticitySolver(V)
 
   state_map = AffineFEStateMap(
-    a,l,U,V,V_φ,U_reg,φh,dΩ,dΓ_in,dΓ_out;
+    a,l,U,V,V_φ,U_reg,φh;
     assem_U = SparseMatrixAssembler(Tm,Tv,U,V),
     assem_adjoint = SparseMatrixAssembler(Tm,Tv,V,U),
     assem_deriv = SparseMatrixAssembler(Tm,Tv,U_reg,U_reg),
