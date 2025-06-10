@@ -49,14 +49,14 @@ import Gridap: solve!
 import PartitionedArrays: default_find_rcv_ids
 import GridapDistributed: remove_ghost_cells
 
-#__init__() = begin
+__init__() = begin
   include((@__DIR__)*"/GridapExtensions.jl")
   include((@__DIR__)*"/LevelSetEvolution/UnfittedEvolution/MutableRungeKutta.jl") # <- commented out in "LevelSetEvolution/LevelSetEvolution.jl"
 
   function default_find_rcv_ids(::MPIArray)
     PartitionedArrays.find_rcv_ids_ibarrier
   end
-#end
+end
 
 include("Embedded/Embedded.jl")
 export EmbeddedCollection, update_collection!, add_recipe!
