@@ -149,7 +149,7 @@ A Hilbertian projection method as described by Wegert et al., 2023
 - `params::NamedTuple`: Optimisation parameters.
 """
 struct HilbertianProjection{A} <: Optimiser
-  problem           :: CustomPDEConstrainedFunctionals
+  problem           :: AbstractPDEConstrainedFunctionals
   ls_evolver        :: LevelSetEvolution
   vel_ext           :: VelocityExtension
   projector         :: HilbertianProjectionMap
@@ -160,7 +160,7 @@ struct HilbertianProjection{A} <: Optimiser
   φ0 # TODO: Remove me please
 
     function HilbertianProjection(
-    problem    :: CustomPDEConstrainedFunctionals{N},
+    problem    :: AbstractPDEConstrainedFunctionals{N},
     ls_evolver :: LevelSetEvolution,
     vel_ext    :: VelocityExtension,
     φ0;
@@ -280,7 +280,7 @@ function Base.iterate(m::HilbertianProjection,state)
   end
 
   ## Line search
-  U_reg = get_deriv_space(m.problem.state_map)
+  U_reg = get_deriv_space(m.problem.embedded_collection.state_map)
   @show num_free_dofs(U_reg)
   V_φ   = φh.fe_space #get_aux_space(m.problem.state_map)
   @show num_free_dofs(V_φ)

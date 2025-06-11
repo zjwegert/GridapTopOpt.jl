@@ -68,6 +68,7 @@ include("StateMaps/StateMaps.jl")
 export PDEConstrainedFunctionals
 export EmbeddedPDEConstrainedFunctionals
 export CustomPDEConstrainedFunctionals
+export CustomEmbeddedPDEConstrainedFunctionals
 export AffineFEStateMap
 export NonlinearFEStateMap
 export RepeatingAffineFEStateMap
