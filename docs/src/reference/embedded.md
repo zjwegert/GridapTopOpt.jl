@@ -1,8 +1,10 @@
+# Embedded
+
 !!! warning
     This page is still under construction! Please refer to the tutorial
     for a discussion of functionality.
 
-# Level-set evolution and reinitalisation
+## Level-set evolution and reinitalisation
 ```@autodocs
 Modules = [GridapTopOpt]
 Pages = ["LevelSetEvolution/UnfittedEvolution/UnfittedEvolution.jl",
@@ -10,14 +12,14 @@ Pages = ["LevelSetEvolution/UnfittedEvolution/UnfittedEvolution.jl",
   "LevelSetEvolution/UnfittedEvolution/StabilisedReinit.jl"]
 ```
 
-# Isolated volumes
+## Isolated volumes
 ```@autodocs
 Modules = [GridapTopOpt]
 Pages = ["Embedded/IsolatedVolumes.jl",
   "Embedded/PolytopalCutters.jl"]
 ```
 
-# `EmbeddedCollection` and `EmbeddedPDEConstrainedFunctionals`
+## `EmbeddedCollection` and `EmbeddedPDEConstrainedFunctionals`
 ```@docs
 GridapTopOpt.EmbeddedCollection
 ```
@@ -33,12 +35,5 @@ GridapTopOpt.evaluate!(pcf::EmbeddedPDEConstrainedFunctionals,φh;update_space::
 GridapTopOpt.EmbeddedCollection_in_φh
 ```
 
-# Shape derivatives
-## Automatic differentation
-```@docs
-GridapTopOpt.DifferentiableTriangulation
-```
-
-## Analytic derivatives
-Examples of calculating analytic derivatives can be found in
-`test\seq\EmbeddedTests\EmbeddedDifferentiationTests.jl`.
+## Automatic shape differentiation
+Automatic shape differentiation has been moved to [GridapEmbedded](https://gridap.github.io/GridapEmbedded.jl/stable/GeometricalDerivatives/#Geometrical-Derivatives).

@@ -331,21 +331,21 @@ end
 # end
 
 ################# Embedded #################
-# Fix for isbitstype bug in Gridap.Polynomials
-function Arrays.return_cache(
-  fg::Fields.FieldGradientArray{1,Polynomials.MonomialBasis{D,V}},
-  x::AbstractVector{<:Point}) where {D,V}
-  xi = testitem(x)
-  T = gradient_type(V,xi)
-  Polynomials._return_cache(fg,x,T,Val(false))
-end
+# # Fix for isbitstype bug in Gridap.Polynomials
+# function Arrays.return_cache(
+#   fg::Fields.FieldGradientArray{1,Polynomials.MonomialBasis{D,V}},
+#   x::AbstractVector{<:Point}) where {D,V}
+#   xi = testitem(x)
+#   T = gradient_type(V,xi)
+#   Polynomials._return_cache(fg,x,T,Val(false))
+# end
 
-function Arrays.evaluate!(
-  cache,
-  fg::Fields.FieldGradientArray{1,Polynomials.MonomialBasis{D,V}},
-  x::AbstractVector{<:Point}) where {D,V}
-  Polynomials._evaluate!(cache,fg,x,Val(false))
-end
+# function Arrays.evaluate!(
+#   cache,
+#   fg::Fields.FieldGradientArray{1,Polynomials.MonomialBasis{D,V}},
+#   x::AbstractVector{<:Point}) where {D,V}
+#   Polynomials._evaluate!(cache,fg,x,Val(false))
+# end
 
 # Fix for autodiff of CompositeTriangulations of Skeleton trians
 
@@ -373,21 +373,21 @@ function FESpaces._compute_cell_ids(
 end
 
 ################# MultiField #################
-# TODO: Remove this once resolved in GridapDistributed#169
-function test_triangulation(Ω1,Ω2)
-  @assert typeof(Ω1.grid) == typeof(Ω2.grid)
-  t = map(fieldnames(typeof(Ω1.grid))) do field
-    getfield(Ω1.grid,field) == getfield(Ω2.grid,field)
-  end
-  all(t)
-  a = Ω1.model === Ω2.model
-  b = Ω1.tface_to_mface == Ω2.tface_to_mface
-  a && b && all(t)
-end
+# # TODO: Remove this once resolved in GridapDistributed#169
+# function test_triangulation(Ω1,Ω2)
+#   @assert typeof(Ω1.grid) == typeof(Ω2.grid)
+#   t = map(fieldnames(typeof(Ω1.grid))) do field
+#     getfield(Ω1.grid,field) == getfield(Ω2.grid,field)
+#   end
+#   all(t)
+#   a = Ω1.model === Ω2.model
+#   b = Ω1.tface_to_mface == Ω2.tface_to_mface
+#   a && b && all(t)
+# end
 
-function CellData.get_triangulation(f::MultiFieldCellField)
-  s1 = first(f.single_fields)
-  trian = get_triangulation(s1)
-  @check all(map(i->test_triangulation(trian,get_triangulation(i)),f.single_fields))
-  trian
-end
+# function CellData.get_triangulation(f::MultiFieldCellField)
+#   s1 = first(f.single_fields)
+#   trian = get_triangulation(s1)
+#   @check all(map(i->test_triangulation(trian,get_triangulation(i)),f.single_fields))
+#   trian
+# end

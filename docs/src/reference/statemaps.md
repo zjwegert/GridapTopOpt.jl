@@ -1,7 +1,7 @@
+# StateMaps
+
 !!! compat
     Formally known as `ChainRules`.
-
-# StateMaps
 
 ## `PDEConstrainedFunctionals`
 
