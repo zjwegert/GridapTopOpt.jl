@@ -7,6 +7,8 @@ using PartitionedArrays
 using GridapPETSc
 using GridapTopOpt
 
+using GridapTopOpt: StateParamMap
+
 """
   This example appears in our manuscript:
     "Level-set topology optimisation with unfitted finite elements and automatic shape differentiation"
@@ -24,7 +26,7 @@ using GridapTopOpt
 
   In the above, j(d,s) is the ghost penalty term over the ghost skeleton Γg
   with outward normal n_Γg, and i(d,s) enforces zero temperature within the
-  isolated volumes marked by χ. There are given by
+  isolated volumes marked by χ. These are given by
       j(d,s) = ∫ γh³[[∇(d)⋅n_Γg]]⋅[[(∇(s)⋅n_Γg]] dΓg, &
       i(d,s) = ∫ χd ⋅ s dΩ.
 """
@@ -143,14 +145,14 @@ function main(ranks)
 
   ## Setup solver and FE operators
   elast_ls = PETScLinearSolver()
-  state_collection = GridapTopOpt.EmbeddedCollection_in_φh(model,φh) do _φh
+  state_collection = EmbeddedCollection_in_φh(model,φh) do _φh
     update_collection!(Ω_data,_φh)
     U,V = build_spaces(Ω_data.Ω_act)
     state_map = AffineFEStateMap(a,l,U,V,V_φ,U_reg,_φh;ls=elast_ls,adjoint_ls=elast_ls)
     (;
       :state_map => state_map,
-      :J => GridapTopOpt.StateParamMap(J_comp,state_map),
-      :C => map(Ci -> GridapTopOpt.StateParamMap(Ci,state_map),[Vol,])
+      :J => StateParamMap(J_comp,state_map),
+      :C => map(Ci -> StateParamMap(Ci,state_map),[Vol,])
     )
   end
 

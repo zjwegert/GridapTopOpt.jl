@@ -7,6 +7,8 @@ using PartitionedArrays
 using GridapPETSc
 using GridapTopOpt
 
+using GridapTopOpt: StaggeredStateParamMap
+
 """
   This example appears in our manuscript:
     "Level-set topology optimisation with unfitted finite elements and automatic shape differentiation"
@@ -30,7 +32,7 @@ using GridapTopOpt
     velocity-pressure coupling terms, j_fu(u,v) is the velocity ghost penalty term over
     the ghost skeleton Γg with outward normal n_Γg, and j_fp(p,q) is the symmetric pressure
     penalty over the skeleton Γi. In addition, i_f(p,q) enforces zero pressure within the isolated volumes
-    marked by ψ_f. They are given by
+    marked by ψ_f. These are given by
         a_f(u,v) = ∫ μf(∇u ⊙ ∇v) dΩf - ∫ μ(n ⋅ ∇u) ⋅ v + μ(n ⋅ ∇v) ⋅ u - (γ_N/h)u ⋅ v dΓ,
         b_f(v,p) = -∫ p∇ ⋅ v dΩf - ∫ pn⋅v dΓ,
         j_fu(∇u,∇v) = ∫ (γ_u*μ_f*h)[[∇(d)⋅n_Γg]]⋅[[(∇(s)⋅n_Γg]] dΓg,
@@ -39,7 +41,7 @@ using GridapTopOpt
 
   - For R₂ above, j(d,s) is the displacement ghost penalty term over the ghost skeleton Γg
     with outward normal n_Γg, and i(d,s) enforces zero displacement within the
-    isolated volumes marked by ψ_s. There are given by
+    isolated volumes marked by ψ_s. These are given by
         j(d,s) = ∫ γh³[[∇(d)⋅n_Γg]]⋅[[(∇(s)⋅n_Γg]] dΓg, &
         i(d,s) = ∫ ψ_s(d ⋅ s) dΩₛ.
 """
@@ -254,7 +256,7 @@ function main(ranks)
   fluid_ls = PETScLinearSolver()
   elast_ls = PETScLinearSolver()
 
-  state_collection = GridapTopOpt.EmbeddedCollection_in_φh(model,φh) do _φh
+  state_collection = EmbeddedCollection_in_φh(model,φh) do _φh
     update_collection!(Ω,_φh)
     (UP,VQ),(R,T) = build_spaces(Ω.Ω_act_s,Ω.Ω_act_f)
     solver = StaggeredFESolver([fluid_ls,elast_ls]);
@@ -262,8 +264,8 @@ function main(ranks)
     state_map = StaggeredAffineFEStateMap(op,V_φ,U_reg,_φh;solver,adjoint_solver=solver)
     (;
       :state_map => state_map,
-      :J => GridapTopOpt.StaggeredStateParamMap(J_comp,state_map),
-      :C => map(Ci -> GridapTopOpt.StaggeredStateParamMap(Ci,state_map),[Vol,])
+      :J => StaggeredStateParamMap(J_comp,state_map),
+      :C => map(Ci -> StaggeredStateParamMap(Ci,state_map),[Vol,])
     )
   end
 
