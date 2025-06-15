@@ -572,12 +572,12 @@ function evaluate_functionals!(pcf::CustomEmbeddedPDEConstrainedFunctionals,φ_b
   Ωs = pcf.Ωs
   φh_bg = FEFunction(pcf.V_φ,φ_bg)
   update_collection!(Ωs,φh_bg)
-  update_collection_with_φh!(state_collection,φ_bg)
+  update_collection_with_φh!(state_collection,φh_bg)
 
   φh = interpolate(φh_bg,get_aux_space(state_collection.state_map))
   φ = φh.free_values
-  obj = φ_to_jc(φ)
+  obj = φ_to_jc(state_collection)(φ)
   j = obj[1]
   c = obj[2:end]
   return j,c
-end 
+end
