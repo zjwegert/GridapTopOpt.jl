@@ -39,6 +39,7 @@ using GridapSolvers.BlockSolvers: combine_fespaces, get_solution
 using GridapEmbedded
 using GridapEmbedded.LevelSetCutters, GridapEmbedded.Interfaces
 using GridapEmbedded.Interfaces: SubFacetData, SubCellTriangulation, SubFacetTriangulation
+using GridapEmbedded.LevelSetCutters: DifferentiableTriangulation
 
 using JLD2: save_object, load_object, jldsave
 
@@ -61,6 +62,7 @@ export EmbeddedCollection, update_collection!, add_recipe!
 export EmbeddedCollection_in_φh
 export CUT
 export get_isolated_volumes_mask_polytopal
+export DifferentiableTriangulation
 
 include("StateMaps/StateMaps.jl")
 export PDEConstrainedFunctionals

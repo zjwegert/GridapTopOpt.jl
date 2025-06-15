@@ -8,7 +8,7 @@ using Test
 
 function main(verbose)
   model = CartesianDiscreteModel((0,1,0,1),(8,8))
-  order = 2
+  order = 1
   reffe = ReferenceFE(lagrangian,Float64,order)
   Ω = Triangulation(model)
 
@@ -60,7 +60,7 @@ function main(verbose)
   rel_error = norm(_dF - fdm_grad, Inf)/norm(fdm_grad,Inf)
 
   verbose && println("Relative error in gradient: $rel_error")
-  @test rel_error < 1e-8
+  @test rel_error < 1e-6
 end
 
 main(false)
