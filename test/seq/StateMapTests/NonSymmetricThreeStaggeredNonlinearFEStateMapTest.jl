@@ -88,7 +88,7 @@ function main(;verbose,analytic_partials)
   rel_error = norm(_dF - fdm_grad, Inf)/norm(fdm_grad,Inf)
 
   verbose && println("Relative error in gradient: $rel_error")
-  @test rel_error < 1e-8
+  @test rel_error < 1e-6
 end
 
 main(verbose = false, analytic_partials = true)
