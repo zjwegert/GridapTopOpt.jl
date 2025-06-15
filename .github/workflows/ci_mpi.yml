@@ -5,19 +5,20 @@ jobs:
     name: Julia ${{ matrix.version }} - ${{ matrix.os }} - ${{ matrix.arch }} - ${{ github.event_name }}
     runs-on: ${{ matrix.os }}
     env:
+      P4EST_ROOT_DIR: "/opt/p4est/2.8.5/"
       JULIA_MPI_BINARY: "system"
       JULIA_PETSC_LIBRARY: "/opt/petsc/3.18/lib/libpetsc"
     strategy:
       fail-fast: false
       matrix:
         version:
-          - '1.9'
+          - '1.11'
         os:
           - ubuntu-latest
         arch:
           - x64
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       - name: Cache petsc
         id: cache-petsc
         uses: actions/cache@v2
@@ -27,8 +28,8 @@ jobs:
          restore-keys: |
           ${{ runner.os }}-build-${{ env.JULIA_PETSC_LIBRARY }}-
           ${{ runner.os }}-build-
-          ${{ runner.os }}-  
-      - uses: julia-actions/setup-julia@v1
+          ${{ runner.os }}-
+      - uses: julia-actions/setup-julia@v2
         with:
           version: ${{ matrix.version }}
           arch: ${{ matrix.arch }}
@@ -36,6 +37,28 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y wget gfortran g++ openmpi-bin libopenmpi-dev
+                - name: Install p4est
+        run: |
+          # Install p4est 2.8.5 from sources
+          CURR_DIR=$(pwd)
+          PACKAGE=p4est
+          VERSION=2.8.5
+          INSTALL_ROOT=/opt
+          P4EST_INSTALL=$INSTALL_ROOT/$PACKAGE/$VERSION
+          TAR_FILE=$PACKAGE-$VERSION.tar.gz
+          URL="https://github.com/p4est/p4est.github.io/raw/master/release"
+          ROOT_DIR=/tmp
+          SOURCES_DIR=$ROOT_DIR/$PACKAGE-$VERSION
+          BUILD_DIR=$SOURCES_DIR/build
+          wget -q $URL/$TAR_FILE -O $ROOT_DIR/$TAR_FILE
+          mkdir -p $SOURCES_DIR
+          tar xzf $ROOT_DIR/$TAR_FILE -C $SOURCES_DIR --strip-components=1
+          cd $SOURCES_DIR
+          ./configure --prefix=$P4EST_INSTALL --without-blas --without-lapack --enable-mpi -disable-dependency-tracking
+          make --quiet
+          make --quiet install
+          rm -rf $ROOT_DIR/$TAR_FILE $SOURCES_DIR
+          cd $CURR_DIR
       - name: Install petsc
         run: |
           CURR_DIR=$(pwd)
