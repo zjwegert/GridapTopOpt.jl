@@ -5,7 +5,7 @@ using Gridap, Gridap.Geometry, Gridap.Adaptivity, Gridap.Arrays
 
 using GridapGmsh,GridapDistributed, PartitionedArrays
 
-function main(distribute,mesh_partition,D)
+function main(distribute,mesh_partition,D,n)
   ranks = distribute(LinearIndices((prod(mesh_partition),)))
   domain = (D==2) ? (0,1,0,1) : (0,1,0,1,0,1)
   cell_partition = (D==2) ? (n,n) : (n,n,n)
@@ -24,8 +24,8 @@ function main(distribute,mesh_partition,D)
 end
 
 with_mpi() do distribute
-  @test main(distribute,(2,2),2)
-  @test main(distribute,(2,2),3)
+  @test main(distribute,(2,2),2,4)
+  @test main(distribute,(2,2),3,4)
 end
 
 end
