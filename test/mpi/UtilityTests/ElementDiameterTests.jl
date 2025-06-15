@@ -15,6 +15,7 @@ function main(distribute,mesh_partition)
   model_serial = GmshDiscreteModel("test/meshes/mesh_finer.msh")
   h_serial = get_element_diameters(model_serial)
   @test test_array(h_serial,collect(h))
+  true
 end
 
 with_mpi() do distribute
