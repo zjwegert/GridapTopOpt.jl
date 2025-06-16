@@ -48,11 +48,6 @@ import Gridap: solve!
 import PartitionedArrays: default_find_rcv_ids
 import GridapDistributed: remove_ghost_cells
 
-## Temperary fix for some new checks (TODO: remove)
-if Gridap.Helpers.execution_mode != "performance"
-  Gridap.Helpers.set_performance_mode()
-end
-
 __init__() = begin
   include((@__DIR__)*"/GridapExtensions.jl")
   include((@__DIR__)*"/LevelSetEvolution/UnfittedEvolution/MutableRungeKutta.jl") # <- commented out in "LevelSetEvolution/LevelSetEvolution.jl"
