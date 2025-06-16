@@ -277,7 +277,7 @@ function main(model,geo_params;ls=LUSolver(),hilb_ls=LUSolver())
       writevtk(Ω.Ωs,files_path*"Omega_s_$it",
         cellfields=["uh"=>uh,"ph"=>ph,"dh"=>dh])
     end
-    write_history(path*"/history.txt",optimiser.history;ranks)
+    write_history(path*"/history.txt",optimiser.history)
 
     isolated_vol = sum(iso_vol_frac(φh))
     println(" --- Isolated volume: ",isolated_vol)
