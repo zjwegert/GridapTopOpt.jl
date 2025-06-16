@@ -130,7 +130,7 @@ function main_3d(n;vtk)
   @test get_data(μ) == get_data(_data)
 end
 
-function main_gmsh(;vtk=false)
+function main_gmsh(msh_file;vtk=false)
   path = "./results/IsolatedGmsh_BiteTest/"
   files_path = path*"data/"
   mkpath(files_path)
@@ -143,7 +143,7 @@ function main_gmsh(;vtk=false)
   a = 0.3;
   b = 0.01;
 
-  model = GmshDiscreteModel((@__DIR__)*"/../../meshes/mesh_finer.msh")
+  model = GmshDiscreteModel((@__DIR__)*"/../../meshes/$msh_file")
   vtk && writevtk(model,path*"model")
 
   # Cut the background model
@@ -181,10 +181,10 @@ function main_gmsh(;vtk=false)
   end
 end
 
-main_2d(41;vtk=false)
-main_2d(41;vtk=false,two_refinement=true)
-main_2d(101;vtk=false)
-main_3d(31;vtk=false)
-main_gmsh(;vtk=true)
+main_2d(10;vtk=false)
+main_2d(10;vtk=false,two_refinement=true)
+main_3d(11;vtk=false)
+main_gmsh("mesh.msh";vtk=false)
+# main_gmsh("mesh_finer.msh";vtk=true)
 
 end

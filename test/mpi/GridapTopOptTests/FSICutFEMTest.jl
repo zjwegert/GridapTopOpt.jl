@@ -13,7 +13,7 @@ using GridapTopOpt: StaggeredStateParamMap
 
 function main(distribute,mesh_partition)
   ranks = distribute(LinearIndices((prod(mesh_partition),)))
-  model, geo_params = build_model(ranks,mesh_partition,4*20,20;b=1/20,w=1/20)
+  model, geo_params = build_model(ranks,mesh_partition,4*5,5;b=1/5,w=1/5)
 
   # Triangulation
   Ω_act = Triangulation(model)
@@ -235,6 +235,8 @@ end
 function build_model(ranks,mesh_partition,nx,ny;L=2.0,H=0.5,x0=0.5,l=0.4,w=0.05,a=0.3,b=0.05)
   geo_params = (;L,H,x0,l,w,a,b)
   base_model = UnstructuredDiscreteModel(CartesianDiscreteModel(ranks,mesh_partition,(0,L,0,H),(nx,ny)))
+  ref_model = refine(base_model, refinement_method = "barycentric")
+  model = get_model(ref_model)
   f_Γ_Top(x) = x[2] == H
   f_Γ_Bottom(x) = x[2] == 0.0
   f_Γ_D(x) = x[1] == 0.0
@@ -242,15 +244,13 @@ function build_model(ranks,mesh_partition,nx,ny;L=2.0,H=0.5,x0=0.5,l=0.4,w=0.05,
   f_box(x) = 0.0 <= x[2] <= a + eps() && (x0 - l/2 - eps() <= x[1] <= x0 + l/2 + eps())
   f_NonDesign(x) = ((x0 - w/2 - eps() <= x[1] <= x0 + w/2 + eps() && 0.0 <= x[2] <= a + eps()) ||
     (x0 - l/2 - eps() <= x[1] <= x0 + l/2 + eps() && 0.0 <= x[2] <= b + eps()))
-  update_labels!(1,base_model,f_Γ_Top,"Gamma_Top")
-  update_labels!(2,base_model,f_Γ_Bottom,"Gamma_Bottom")
-  update_labels!(3,base_model,f_Γ_D,"Gamma_f_D")
-  update_labels!(4,base_model,f_Γ_N,"Gamma_f_N")
-  update_labels!(5,base_model,f_box,"RefineBox")
-  update_labels!(6,base_model,f_NonDesign,"Omega_NonDesign")
-  update_labels!(7,base_model,x->f_NonDesign(x) && f_Γ_Bottom(x),"Gamma_s_D")
-  ref_model = refine(base_model, refinement_method = "barycentric")
-  model = get_model(ref_model)
+  update_labels!(1,model,f_Γ_Top,"Gamma_Top")
+  update_labels!(2,model,f_Γ_Bottom,"Gamma_Bottom")
+  update_labels!(3,model,f_Γ_D,"Gamma_f_D")
+  update_labels!(4,model,f_Γ_N,"Gamma_f_N")
+  update_labels!(5,model,f_box,"RefineBox")
+  update_labels!(6,model,f_NonDesign,"Omega_NonDesign")
+  update_labels!(7,model,x->f_NonDesign(x) && f_Γ_Bottom(x),"Gamma_s_D")
   return model, geo_params
 end
 

@@ -249,7 +249,7 @@ function main(model,geo_params;ls=LUSolver(),hilb_ls=LUSolver())
   evolve_nls = NewtonSolver(ls;maxiter=1,verbose=true)
   reinit_nls = NewtonSolver(ls;maxiter=20,rtol=1.e-14,verbose=true)
 
-  evo = CutFEMEvolve(V_φ,Ω,dΩ_act,hₕ;max_steps,γg=0.01,ode_ls=ls,ode_nl=evolve_nls)
+  evo = CutFEMEvolve(V_φ,Ω,dΩ_act,hₕ;max_steps,γg=0.1,ode_ls=ls,ode_nl=evolve_nls)
   reinit = StabilisedReinit(V_φ,Ω,dΩ_act,hₕ;stabilisation_method=ArtificialViscosity(0.5),nls=reinit_nls)
   ls_evo = UnfittedFEEvolution(evo,reinit)
 
@@ -262,7 +262,7 @@ function main(model,geo_params;ls=LUSolver(),hilb_ls=LUSolver())
   ## Optimiser
   converged(m) = GridapTopOpt.default_al_converged(
     m;
-    L_tol = 0.075hmin,
+    L_tol = 0.01hmin,
     C_tol = 0.05vf
   )
   optimiser = AugmentedLagrangian(pcf,ls_evo,vel_ext,φh;

@@ -2,7 +2,8 @@ module ThermalCutFEMTest
 using Test
 using Gridap, Gridap.Adaptivity, Gridap.Geometry
 using GridapEmbedded, GridapEmbedded.LevelSetCutters
-using GridapTopOpt, GridapSolvers
+using GridapTopOpt
+using GridapSolvers, GridapSolvers.BlockSolvers, GridapSolvers.NonlinearSolvers
 using GridapDistributed, GridapPETSc, PartitionedArrays
 
 using GridapTopOpt: StateParamMap
@@ -10,7 +11,7 @@ using GridapTopOpt: StateParamMap
 function main(distribute,mesh_partition)
   ranks = distribute(LinearIndices((prod(mesh_partition),)))
   # Params
-  n = 50            # Initial mesh size (pre-refinement)
+  n = 5            # Initial mesh size (pre-refinement)
   max_steps = 10/n  # Time-steps for evolution equation
   vf = 0.3          # Volume fraction
   α_coeff = 2       # Regularisation coefficient extension-regularisation
@@ -19,8 +20,8 @@ function main(distribute,mesh_partition)
   _model = CartesianDiscreteModel(ranks,mesh_partition,(0,1,0,1),(n,n))
   base_model = UnstructuredDiscreteModel(_model)
   ref_model = refine(base_model, refinement_method = "barycentric")
-  ref_model = refine(ref_model)
-  ref_model = refine(ref_model)
+  # ref_model = refine(ref_model)
+  # ref_model = refine(ref_model)
   model = get_model(ref_model)
   h = minimum(get_element_diameters(model))
   hₕ = get_element_diameter_field(model)

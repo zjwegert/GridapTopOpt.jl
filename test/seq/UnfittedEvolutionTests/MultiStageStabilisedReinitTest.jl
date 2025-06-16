@@ -6,7 +6,7 @@ using Gridap, Gridap.Geometry, Gridap.Adaptivity
 using GridapEmbedded, GridapEmbedded.LevelSetCutters
 
 order = 1
-n = 201
+n = 101
 _model = CartesianDiscreteModel((0,1,0,1),(n,n))
 cd = Gridap.Geometry.get_cartesian_descriptor(_model)
 base_model = UnstructuredDiscreteModel(_model)
@@ -31,8 +31,8 @@ V_φ = TestFESpace(model,reffe_scalar)
 end
 
 ls_evo = CutFEMEvolve(V_φ,Ωs,dΩ,h)
-reinit1 = StabilisedReinit(V_φ,Ω,dΩ_act,hₕ;stabilisation_method=ArtificialViscosity(2.0))
-reinit2 = StabilisedReinit(V_φ,Ω,dΩ_act,hₕ;stabilisation_method=GridapTopOpt.InteriorPenalty(V_φ,γg=1.0))
+reinit1 = StabilisedReinit(V_φ,Ωs,dΩ,h;stabilisation_method=ArtificialViscosity(1.5h))
+reinit2 = StabilisedReinit(V_φ,Ωs,dΩ,h;stabilisation_method=GridapTopOpt.InteriorPenalty(V_φ,γg=1.0))
 ls_reinit = GridapTopOpt.MultiStageStabilisedReinit([reinit1,reinit2])
 evo = UnfittedFEEvolution(ls_evo,ls_reinit)
 reinit!(evo,φh);

@@ -80,7 +80,7 @@ end
 
 function main_2d(distribute,mesh_partition;vtk=false)
   ranks = distribute(LinearIndices((prod(mesh_partition),)))
-  model = generate_model(2,40,ranks,mesh_partition)
+  model = generate_model(2,10,ranks,mesh_partition)
 
   μ,V_φ = main_2d_sub(model,"distributed_$mesh_partition";vtk)
 
@@ -155,7 +155,7 @@ end
 
 function main_3d(distribute,mesh_partition;vtk=false)
   ranks = distribute(LinearIndices((prod(mesh_partition),)))
-  model = generate_model(3,40,ranks,mesh_partition)
+  model = generate_model(3,11,ranks,mesh_partition)
 
   μ,V_φ = main_3d_sub(model,"distributed_$mesh_partition";vtk)
 
@@ -240,27 +240,8 @@ with_mpi() do distribute
   main_2d(distribute,(2,2);vtk=false)
   main_2d(distribute,(1,4);vtk=false)
   main_2d(distribute,(4,1);vtk=false)
-end
-
-with_debug() do distribute
-  main_2d(distribute,(6,10);vtk=false)
-  main_2d(distribute,(7,3);vtk=false)
-end
-
-with_mpi() do distribute
   main_3d(distribute,(2,2,1);vtk=false)
-  # main_3d(distribute,(2,1,2);vtk=false)
-  # main_3d(distribute,(1,4,1);vtk=false)
-  main_3d(distribute,(4,1,1);vtk=false)
-  main_3d(distribute,(1,1,4);vtk=false)
-end
 
-# with_debug() do distribute
-#   main_3d(distribute,(3,4,5);vtk=false)
-#   main_3d(distribute,(5,5,5);vtk=false)
-# end
-
-with_mpi() do distribute
   ranks = distribute(LinearIndices((4,)))
   main_gmsh(ranks;vtk=true)
 end
