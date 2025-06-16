@@ -529,8 +529,18 @@ struct CustomEmbeddedPDEConstrainedFunctionals{N,A} <:  AbstractPDEConstrainedFu
     
     # Pre-allocaitng
     grad = Zygote.jacobian(φ_to_jc(state_collection),φ)
-    dJ = grad[1][1,:]
-    dC = [collect(row) for row in eachrow(grad[1][2:end,:])]    
+    dJ_bg = grad[1][1,:]
+    dC_bg = [collect(row) for row in eachrow(grad[1][2:end,:])] 
+    
+    U_reg = get_deriv_space(state_collection.state_map)
+
+    dJ_bgₕ = FEFunction(V_φ,dJ_bg)
+    dJₕ = interpolate(dJ_bgₕ,U_reg)
+    dJ = dJₕ.free_values
+
+    dC_bgₕ = map(dC_bg -> FEFunction(V_φ,dC_bg),dC_bg)
+    dCₕ = map(dC_bgₕ -> interpolate(dC_bgₕ,U_reg),dC_bgₕ)
+    dC = [dCₕ_i.free_values for dCₕ_i in dCₕ]
 
     N = length(dC)
     A = typeof(state_collection.state_map)
@@ -553,8 +563,21 @@ function Fields.evaluate!(pcf::CustomEmbeddedPDEConstrainedFunctionals,φh_bg)
   obj,grad = Zygote.withjacobian(φ_to_jc(state_collection), φh.free_values)
   j = obj[1]
   c = obj[2:end]
-  copy!(dJ,grad[1][1,:])
-  copy!(dC,[collect(row) for row in eachrow(grad[1][2:end,:])])
+
+  V_φ = φh_bg.fe_space
+  U_reg = get_deriv_space(state_collection.state_map)
+
+  dJ_bg = grad[1][1,:]
+  dJ_bgₕ = FEFunction(V_φ,dJ_bg)
+  dJₕ = interpolate(dJ_bgₕ,U_reg)
+  dJ = dJₕ.free_values
+  dC_bg = [collect(row) for row in eachrow(grad[1][2:end,:])]
+  dC_bgₕ = map(dC -> FEFunction(V_φ,dC),dC_bg)
+  dCₕ = map(dC -> interpolate(dC,U_reg),dC_bgₕ)
+  dC = [dCₕ_i.free_values for dCₕ_i in dCₕ]
+
+  #copy!(dJ,grad[1][1,:])
+  #copy!(dC,[collect(row) for row in eachrow(grad[1][2:end,:])])
 
   return j,c,dJ,dC
 end
