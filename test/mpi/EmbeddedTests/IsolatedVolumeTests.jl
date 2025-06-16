@@ -111,7 +111,7 @@ function main_3d_sub(model,name;vtk=false)
     g(x,0.85,0.5,0.09),
     g(x,0.5,0.15,0.05))
   φh = interpolate(f,V_φ)
-  GridapTopOpt.correct_ls!(φh)
+  GridapTopOpt.correct_ls!(φh;tol=1e-8)
 
   geo = DiscreteGeometry(φh,model)
   cutgeo = cut(model,geo)
