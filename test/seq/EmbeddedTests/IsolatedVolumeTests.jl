@@ -143,7 +143,7 @@ function main_gmsh(;vtk=false)
   a = 0.3;
   b = 0.01;
 
-  model = GmshDiscreteModel("test/meshes/mesh_finer.msh")
+  model = GmshDiscreteModel("./test/meshes/mesh_finer.msh")
   vtk && writevtk(model,path*"model")
 
   # Cut the background model
