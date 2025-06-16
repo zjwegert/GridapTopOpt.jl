@@ -11,10 +11,13 @@ using Gridap.Geometry, Gridap.FESpaces, Gridap.CellData, Gridap.Adaptivity, Grid
 
 using GridapDistributed, PartitionedArrays
 
-function main_2d(n;vtk)
+function main_2d(n;vtk,two_refinement=false)
   order = 1
   base_model = UnstructuredDiscreteModel(CartesianDiscreteModel((0,1,0,1),(n,n)))
   ref_model = refine(base_model, refinement_method = "barycentric")
+  if two_refinement
+    ref_model = refine(ref_model)
+  end
   model = Adaptivity.get_model(ref_model)
   Ω = Triangulation(model)
 
@@ -179,6 +182,7 @@ function main_gmsh(;vtk=false)
 end
 
 main_2d(41;vtk=false)
+main_2d(41;vtk=false,two_refinement=true)
 main_2d(101;vtk=false)
 main_3d(31;vtk=false)
 main_gmsh(;vtk=true)
