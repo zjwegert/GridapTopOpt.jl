@@ -169,6 +169,7 @@ We have directly computed the shape derivative of the volume functional using th
 Next, we setup the `AffineFEStateMap` and `PDEConstrainedFunctionals` objects. Here we use another new objective `EmbeddedCollection_in_φh` that is similar to `EmbeddedCollection` except it does not cut the mesh and only expects recipes that take arguments in `φh`. This allows us to update the spaces and state maps whenever required. Note that this is different to how we usually setup these objects because we have to recreate the FE spaces and state maps at each iteration. This is because the active mesh for the unfitted discretisation is changing over the course of the level-set evolution. This new `state_collection` holds the state map, the objective as a `StateParamMap`, and set of `StateParamMap` for the constraints. This is given by the follow snippet
 ```julia
 state_collection = EmbeddedCollection_in_φh(model,φh) do _φh
+  update_collection!(Ωs,_φh)
   V = TestFESpace(Ωs.Ωact,reffe_scalar;dirichlet_tags=["Omega_D"])
   U = TrialFESpace(V,0.0)
   state_map = AffineFEStateMap(a,l,U,V,V_φ,U_reg,_φh)
