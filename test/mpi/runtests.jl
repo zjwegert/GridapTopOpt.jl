@@ -1,4 +1,5 @@
 using Test
+using GridapTopOpt
 
 include("UtilityTests/runtests.jl")
 include("StateMapTests/runtests.jl")
