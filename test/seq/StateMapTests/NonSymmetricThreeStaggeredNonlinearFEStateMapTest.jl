@@ -11,7 +11,7 @@ function main(;verbose,analytic_partials)
   order = 1
   reffe = ReferenceFE(lagrangian,Float64,order)
   Ω = Triangulation(model)
-  V = FESpace(Ω,reffe;dirichlet_tags="boundary")
+  V = FESpace(model,reffe;dirichlet_tags="boundary")
 
   sol = [x -> x[1], x -> x[2], x -> x[1] + x[2], x -> 2.0*x[1]]
   U1 = TrialFESpace(V,sol[1])
@@ -22,9 +22,9 @@ function main(;verbose,analytic_partials)
   # Define weakforms
   dΩ = Measure(Ω,4*order)
 
-  V_φ = TestFESpace(Ω,reffe)
+  V_φ = TestFESpace(model,reffe)
   φh = interpolate(1,V_φ)
-  V_reg = TestFESpace(Ω,reffe)
+  V_reg = TestFESpace(model,reffe)
   U_reg = TrialFESpace(V_reg)
 
   F(u::Function) = x -> (u(x) + 1) * u(x)

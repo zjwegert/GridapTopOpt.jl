@@ -12,13 +12,13 @@ function main(verbose)
   reffe = ReferenceFE(lagrangian,Float64,order)
   Ω = Triangulation(model)
 
-  V_φ = TestFESpace(Ω,reffe)
+  V_φ = TestFESpace(model,reffe)
   φf(x) = x[1]*x[2]+1
   φh = interpolate(φf,V_φ)
-  V_reg = TestFESpace(Ω,reffe)
+  V_reg = TestFESpace(model,reffe)
   U_reg = TrialFESpace(V_reg)
 
-  V = FESpace(Ω,reffe;dirichlet_tags="boundary")
+  V = FESpace(model,reffe;dirichlet_tags="boundary")
 
   rhs = [x -> x[2], x -> x[1] + x[2]]
   sol = [x -> rhs[1](x), x -> rhs[2](x) + rhs[1](x)*φf(x)]

@@ -14,13 +14,13 @@ function driver(model,verbose)
   reffe = ReferenceFE(lagrangian,Float64,order)
   Ω = Triangulation(model)
 
-  V_φ = TestFESpace(Ω,reffe)
+  V_φ = TestFESpace(model,reffe)
   φf(x) = x[1]*x[2]+1
   φh = interpolate(φf,V_φ)
-  V_reg = TestFESpace(Ω,reffe)
+  V_reg = TestFESpace(model,reffe)
   U_reg = TrialFESpace(V_reg)
 
-  V = FESpace(Ω,reffe;dirichlet_tags="boundary")
+  V = FESpace(model,reffe;dirichlet_tags="boundary")
 
   _rhs(x) = x[1] - x[2]
   _sol(x) = _rhs(x)*φf(x)
