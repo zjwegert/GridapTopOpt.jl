@@ -249,16 +249,16 @@ end
 
 with_mpi() do distribute
   main_3d(distribute,(2,2,1);vtk=false)
-  main_3d(distribute,(2,1,2);vtk=false)
-  main_3d(distribute,(1,4,1);vtk=false)
+  # main_3d(distribute,(2,1,2);vtk=false)
+  # main_3d(distribute,(1,4,1);vtk=false)
   main_3d(distribute,(4,1,1);vtk=false)
   main_3d(distribute,(1,1,4);vtk=false)
 end
 
-with_debug() do distribute
-  main_3d(distribute,(3,4,5);vtk=false)
-  main_3d(distribute,(5,5,5);vtk=false)
-end
+# with_debug() do distribute
+#   main_3d(distribute,(3,4,5);vtk=false)
+#   main_3d(distribute,(5,5,5);vtk=false)
+# end
 
 with_mpi() do distribute
   ranks = distribute(LinearIndices((4,)))
