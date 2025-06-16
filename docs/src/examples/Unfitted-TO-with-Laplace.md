@@ -1,6 +1,4 @@
 # Topology optimisation on unfitted meshes
-!!! note
-    This page is under construction
 
 In this tutorial, we will learn:
 - How to formulate a Laplace's equation with CutFEM based on [Burman et al. (2015)](https://doi.org/10.1002/nme.4823)
@@ -107,6 +105,10 @@ f3 = (x,y) -> (x-0.5)^2 + (y-0.5)^2 - 0.06^2
 f((x,y)) = min(max(f1(x,y),f2(x,y)),f3(x,y))
 φh = interpolate(f,V_φ)
 ```
+Before defining the triangulation, we need to ensure that the initial cut interface defined by the level-set function does not intersect the vertices in the background domain. We do this using:
+```julia
+GridapTopOpt.correct_ls!(φh)
+```
 
 ## Background triangulations and measures
 Next we define the measures for the background domain as usual
@@ -126,7 +128,6 @@ To make it possible to update the embedded triangulations, measures, and the ind
   Γ = DifferentiableTriangulation(EmbeddedBoundary(cutgeo),V_φ)
   Γg = GhostSkeleton(cutgeo)
   Ωact = Triangulation(cutgeo,ACTIVE)
-  # Isolated volumes
   φ_cell_values = get_cell_dof_values(_φh)
   χ,_ = get_isolated_volumes_mask_polytopal(model,φ_cell_values,["Omega_D",])
   (;
@@ -152,7 +153,7 @@ In the above, we use `get_isolated_volumes_mask_polytopal` to create a cell fiel
 ## FE problem
 Now that all the measures are defined, lets define the weak form, optimisation functionals, and the FE operators. First, we can define the weak form and optimisation functionals as
 ```julia
-const γg = 0.1
+γg = 0.1
 a(u,v,φ) = ∫(∇(v)⋅∇(u))Ωs.dΩin +
            ∫((γg*mean(hₕ))*jump(Ωs.n_Γg⋅∇(v))*jump(Ωs.n_Γg⋅∇(u)))Ωs.dΓg +
            ∫(Ωs.χ*v*u)Ωs.dΩin

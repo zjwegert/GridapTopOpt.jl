@@ -1,35 +1,17 @@
+module ThermalCutFEMTest
+using Test
 using Gridap, Gridap.Adaptivity, Gridap.Geometry
 using GridapEmbedded, GridapEmbedded.LevelSetCutters
 using GridapTopOpt, GridapSolvers
 
 using GridapTopOpt: StateParamMap
 
-"""
-  (Serial) Minimum thermal compliance with a CutFEM formulation based on Burman et al. (2015)
-    [10.1002/nme.4823] & automatic shape differentiation in 2D.
-
-  Optimisation problem:
-      Min J(Ω) = ∫ ∇(u)⋅∇(u) dΩ
-       Ω
-    s.t., Vol(Ω) = 0.3,
-          ⎡u∈V=H¹(Ω;u(Γ_D)=0),
-          ⎣∫ ∇(u)⋅∇(v) dΩ + j(u,v) + i(u,v) = ∫ v dΓ_N, ∀v∈V.
-
-  In the above, j(u,v) is the ghost penalty term over the ghost skeleton Γg
-  with outward normal n_Γg, and i(u,v) enforces zero temperature within the
-  isolated volumes marked by χ. These are given by
-      j(u,v) = ∫ γh[[∇(u)⋅n_Γg]][[(∇(v)⋅n_Γg]] dΓg, &
-      i(u,v) = ∫ χuv dΩ.
-"""
 function main()
-  path="./results/Unfitted_Thermal2D/"
-  mkpath(path)
   # Params
   n = 50            # Initial mesh size (pre-refinement)
   max_steps = 10/n  # Time-steps for evolution equation
   vf = 0.3          # Volume fraction
   α_coeff = 2       # Regularisation coefficient extension-regularisation
-  iter_mod = 1      # Write output every iter_mod iterations
 
   # Model and some refinement
   _model = CartesianDiscreteModel((0,1,0,1),(n,n))
@@ -37,7 +19,7 @@ function main()
   ref_model = refine(base_model, refinement_method = "barycentric")
   ref_model = refine(ref_model)
   ref_model = refine(ref_model)
-  model = ref_model.model
+  model = get_model(ref_model)
   h = minimum(get_element_diameters(model))
   hₕ = get_element_diameter_field(model)
   f_Γ_D(x) = (x[1]-0.5)^2 + (x[2]-0.5)^2 <= 0.05^2
@@ -45,7 +27,6 @@ function main()
     ((x[2] ≈ 0 || x[2] ≈ 1) && (0.2 <= x[1] <= 0.3 + eps() || 0.7 - eps() <= x[1] <= 0.8))
   update_labels!(1,model,f_Γ_D,"Omega_D")
   update_labels!(2,model,f_Γ_N,"Gamma_N")
-  writevtk(model,path*"model")
 
   ## Levet-set function space and derivative regularisation space
   reffe_scalar = ReferenceFE(lagrangian,Float64,1)
@@ -130,22 +111,13 @@ function main()
   vel_ext = VelocityExtension(a_hilb,U_reg,V_reg)
 
   ## Optimiser
-  converged(m) = GridapTopOpt.default_al_converged(
-    m;
-    L_tol = 0.01*h,
-    C_tol = 0.01
-  )
-  optimiser = AugmentedLagrangian(pcfs,ls_evo,vel_ext,φh;verbose=true,constraint_names=[:Vol],converged)
-  for (it,uh,φh) in optimiser
-    if iszero(it % iter_mod)
-      writevtk(Ω_bg,path*"Omega$it",cellfields=["φ"=>φh,"|∇(φ)|"=>(norm ∘ ∇(φh)),"uh"=>uh,"χ"=>Ωs.χ])
-      writevtk(Ωs.Ωin,path*"Omega_in$it",cellfields=["uh"=>uh])
-    end
-    write_history(path*"/history.txt",optimiser.history)
-  end
-  it = get_history(optimiser).niter; uh = get_state(pcfs)
-  writevtk(Ω_bg,path*"Omega$it",cellfields=["φ"=>φh,"|∇(φ)|"=>(norm ∘ ∇(φh)),"uh"=>uh,"χ"=>Ωs.χ])
-  writevtk(Ωs.Ωin,path*"Omega_in$it",cellfields=["uh"=>uh])
+  optimiser = AugmentedLagrangian(pcfs,ls_evo,vel_ext,φh;verbose=true,constraint_names=[:Vol])
+
+  # Do a few iterations
+  vars, state = iterate(optimiser)
+  vars, state = iterate(optimiser,state)
+  true
 end
 
-main()
+@test main()
+end

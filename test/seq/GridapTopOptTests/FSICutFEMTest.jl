@@ -1,3 +1,5 @@
+module FSICutFEMTest
+using Test
 using Gridap, Gridap.Geometry, Gridap.Adaptivity, Gridap.MultiField, Gridap.TensorValues
 using GridapEmbedded, GridapEmbedded.LevelSetCutters
 using GridapSolvers, GridapSolvers.BlockSolvers, GridapSolvers.NonlinearSolvers
@@ -9,56 +11,16 @@ using GridapTopOpt
 
 using GridapTopOpt: StaggeredStateParamMap
 
-"""
-  Two-dimensional minimum elastic compliance of an elastic part in an FSI problem
-    using a CutFEM formulation based on Burman et al. (2018) [10.1016/j.cma.2017.09.005]
-    and Burman et al. (2015) [10.1002/nme.4823]. For the fluid part, we use a P1/P0dc
-    formulation.
-
-  Optimisation problem:
-      Min J(Ωₛ) = ∫ ε(d) ⊙ σ(ε(d)) dΩ
-       Ωₛ
-    s.t., Vol(Ωₛ) = 0.1,
-          R₁((u,p),(v,q)) = 0, ⟶ ⎡(u,p)∈U×Q [=H¹(Ωf;u(Γ_D)=uᵢₙ)×L²(Ωf)],
-                                 ⎣a_f(u,v) + b_f(v,p) + b_f(u,q) + j_fu(u,v) + j_fp(p,q) + i_f(p,q) = 0, ∀(v,q)∈V×Q,
-          R₂((u,p),d.s) = 0.   ⟶ ⎡d∈V=H¹(Ωₛ;u(Γ_D)=0),
-                                 ⎣∫ ε(s) ⊙ σ ∘ ε(d) dΩₛ + j(d,s) + i(d,s) - ∫ n ⋅ σf(u,p)) ⋅ s dΓ = 0, ∀s∈V.
-
-  - For R₁ above, a_f(u,v) is the velocity bilinear form, b_f(v,p) and b_f(u,q) are the
-    velocity-pressure coupling terms, j_fu(u,v) is the velocity ghost penalty term over
-    the ghost skeleton Γg with outward normal n_Γg, and j_fp(p,q) is the symmetric pressure
-    penalty over the skeleton Γi. In addition, i_f(p,q) enforces zero pressure within the isolated volumes
-    marked by ψ_f. These are given by
-        a_f(u,v) = ∫ μf(∇u ⊙ ∇v) dΩf - ∫ μ(n ⋅ ∇u) ⋅ v + μ(n ⋅ ∇v) ⋅ u - (γ_N/h)u ⋅ v dΓ,
-        b_f(v,p) = -∫ p∇ ⋅ v dΩf - ∫ pn⋅v dΓ,
-        j_fu(∇u,∇v) = ∫ (γ_u*μ_f*h)[[∇(d)⋅n_Γg]]⋅[[(∇(s)⋅n_Γg]] dΓg,
-        j_fp(p,q) = ∫ (h*γ_p/μ_f)h[[∇(d)⋅n_Γg]]⋅[[(∇(s)⋅n_Γg]] dΓi,
-        i_f(p,q) = ∫ ψ_f(pq) dΩf.
-
-  - For R₂ above, j(d,s) is the displacement ghost penalty term over the ghost skeleton Γg
-    with outward normal n_Γg, and i(d,s) enforces zero displacement within the
-    isolated volumes marked by ψ_s. These are given by
-        j(d,s) = ∫ γh³[[∇(d)⋅n_Γg]]⋅[[(∇(s)⋅n_Γg]] dΓg, &
-        i(d,s) = ∫ ψ_s(d ⋅ s) dΩₛ.
-"""
-function main(model,geo_params;ls=LUSolver(),hilb_ls=LUSolver())
-  # Output path
-  path = "./results/Unfitted_FSI_2d/"
-  files_path = path*"data/"
-  model_path = path*"model/"
-  mkpath(files_path); mkpath(model_path);
-
+function main(model,geo_params)
   # Triangulation
-  writevtk(model,model_path*"model")
   Ω_act = Triangulation(model)
   hₕ = get_element_diameter_field(model)
   hmin = minimum(get_element_diameters(model))
 
   # Params
-  vf = 0.1
+  vf = 0.03
   γ_evo =  0.1
   max_steps = 1/hmin/10
-  iter_mod = 10
   D = 2
 
   # Cut the background model
@@ -76,8 +38,6 @@ function main(model,geo_params;ls=LUSolver(),hilb_ls=LUSolver())
   fholes((x,y),q,r) = max(f1((x,y),q,r),f1((x-1/q,y),q,r))
   lsf(x) = min(max(fin(x),fholes(x,25,0.2)),fsolid(x))
   φh = interpolate(lsf,V_φ)
-  writevtk(Ω_act,files_path*"Omega_act_φh",
-    cellfields=["φ"=>φh,"|∇(φ)|"=>(norm ∘ ∇(φh))])
 
   # Check LS
   GridapTopOpt.correct_ls!(φh)
@@ -98,7 +58,7 @@ function main(model,geo_params;ls=LUSolver(),hilb_ls=LUSolver())
     Ω_act_f = Triangulation(cutgeo,ACTIVE_OUT)
     Γi = SkeletonTriangulation(cutgeo_facets,ACTIVE_OUT)
     # Isolated volumes
-    φ_cell_values = get_cell_dof_values(_φh)
+    φ_cell_values = _get_cell_dof_values(_φh)
     ψ_s,_ = get_isolated_volumes_mask_polytopal(model,φ_cell_values,["Gamma_s_D"])
     _,ψ_f = get_isolated_volumes_mask_polytopal(model,φ_cell_values,["Gamma_f_D"])
     (;
@@ -233,7 +193,7 @@ function main(model,geo_params;ls=LUSolver(),hilb_ls=LUSolver())
   state_collection = EmbeddedCollection_in_φh(model,φh) do _φh
     update_collection!(Ω,_φh)
     (UP,VQ),(R,T) = build_spaces(Ω.Ω_act_s,Ω.Ω_act_f)
-    solver = StaggeredFESolver([ls,ls]);
+    solver = StaggeredFESolver([LUSolver(),LUSolver()]);
     op = StaggeredAffineFEOperator([a_fluid,a_solid],[l_fluid,l_solid],[UP,R],[VQ,T])
     state_map = StaggeredAffineFEStateMap(op,V_φ,U_reg,_φh;solver,adjoint_solver=solver)
     (;
@@ -246,10 +206,10 @@ function main(model,geo_params;ls=LUSolver(),hilb_ls=LUSolver())
   pcf = EmbeddedPDEConstrainedFunctionals(state_collection;analytic_dC=[dVol])
 
   ## Evolution Method
-  evolve_nls = NewtonSolver(ls;maxiter=1,verbose=true)
-  reinit_nls = NewtonSolver(ls;maxiter=20,rtol=1.e-14,verbose=true)
+  evolve_nls = NewtonSolver(LUSolver();maxiter=1,verbose=true)
+  reinit_nls = NewtonSolver(LUSolver();maxiter=20,rtol=1.e-14,verbose=true)
 
-  evo = CutFEMEvolve(V_φ,Ω,dΩ_act,hₕ;max_steps,γg=0.01,ode_ls=ls,ode_nl=evolve_nls)
+  evo = CutFEMEvolve(V_φ,Ω,dΩ_act,hₕ;max_steps,γg=0.01,ode_ls=LUSolver(),ode_nl=evolve_nls)
   reinit = StabilisedReinit(V_φ,Ω,dΩ_act,hₕ;stabilisation_method=ArtificialViscosity(0.5),nls=reinit_nls)
   ls_evo = UnfittedFEEvolution(evo,reinit)
 
@@ -257,40 +217,21 @@ function main(model,geo_params;ls=LUSolver(),hilb_ls=LUSolver())
   α_coeff = γ_evo*max_steps
   _α(hₕ) = (α_coeff*hₕ)^2
   a_hilb(p,q) =∫((_α ∘ hₕ)*∇(p)⋅∇(q) + p*q)dΩ_act;
-  vel_ext = VelocityExtension(a_hilb,U_reg,V_reg;ls=hilb_ls)
+  vel_ext = VelocityExtension(a_hilb,U_reg,V_reg;ls=LUSolver())
 
   ## Optimiser
-  converged(m) = GridapTopOpt.default_al_converged(
-    m;
-    L_tol = 0.075hmin,
-    C_tol = 0.05vf
-  )
   optimiser = AugmentedLagrangian(pcf,ls_evo,vel_ext,φh;
-    γ=γ_evo,verbose=true,constraint_names=[:Vol],converged)
-  for (it,(uh,ph,dh),φh) in optimiser
-    if iszero(it % iter_mod)
-      writevtk(Ω_act,files_path*"Omega_act_$it",
-        cellfields=["φ"=>φh,"|∇(φ)|"=>(norm ∘ ∇(φh)),"uh"=>uh,"ph"=>ph,"dh"=>dh,
-          "ψ_s"=>Ω.ψ_s,"ψ_f"=>Ω.ψ_f])
-      writevtk(Ω.Ωf,files_path*"Omega_f_$it",
-        cellfields=["uh"=>uh,"ph"=>ph,"dh"=>dh])
-      writevtk(Ω.Ωs,files_path*"Omega_s_$it",
-        cellfields=["uh"=>uh,"ph"=>ph,"dh"=>dh])
-    end
-    write_history(path*"/history.txt",optimiser.history;ranks)
+    γ=γ_evo,verbose=true,constraint_names=[:Vol])
 
-    isolated_vol = sum(iso_vol_frac(φh))
-    println(" --- Isolated volume: ",isolated_vol)
-  end
-  it = get_history(optimiser).niter; uh,ph,dh = get_state(pcf)
-  writevtk(Ω_act,path*"Omega_act_$it",
-    cellfields=["φ"=>φh,"|∇(φ)|"=>(norm ∘ ∇(φh)),"uh"=>uh,"ph"=>ph,"dh"=>dh])
-  writevtk(Ω.Ωf,path*"Omega_f_$it",
-    cellfields=["uh"=>uh,"ph"=>ph,"dh"=>dh])
-  writevtk(Ω.Ωs,path*"Omega_s_$it",
-    cellfields=["uh"=>uh,"ph"=>ph,"dh"=>dh])
-  nothing
+  # Do a few iterations
+  vars, state = iterate(optimiser)
+  vars, state = iterate(optimiser,state)
+  true
 end
+
+## Get cell dof values
+_get_cell_dof_values(φh) = get_cell_dof_values(φh,local_views(φh))
+_get_cell_dof_values(φh::CellField) = get_cell_dof_values(φh)
 
 ## Build refined model
 function build_cells_to_refine(model)
@@ -328,4 +269,6 @@ end
 
 ## Run serial
 model, geo_params = build_model(4*20,20,b=1/20,w=1/20)
-main(model,geo_params)
+@test main(model,geo_params)
+
+end

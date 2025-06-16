@@ -4,4 +4,4 @@ We refer users to the introductory examples found in:
 
 !!! warning
     Since this publication, there are been some minor API changes. See ['Breaking changes'](../breaking-changes.md)
-    for more information.
+    for more information. Example scripts with the lastest API can be found in `/scripts/Examples/...`.
