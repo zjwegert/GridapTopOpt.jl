@@ -74,7 +74,7 @@ function main(;order,AD_case)
   ls_evo = HamiltonJacobiEvolution(FirstOrderStencil(2,Float64),model,V_φ,tol,max_steps)
 
   ## Setup solver and FE operators
-  state_map = AffineFEStateMap(a,l,U,V,V_φ,U_reg,φh)
+  state_map = AffineFEStateMap(a,l,U,V,V_φ,φh)
   pcfs = if AD_case == :no_ad
     PDEConstrainedFunctionals(J,[Vol],state_map,analytic_dJ=dJ,analytic_dC=[dVol])
   elseif AD_case == :with_ad

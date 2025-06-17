@@ -204,7 +204,7 @@ function Fields.evaluate!(pcf::PDEConstrainedFunctionals,φh;kwargs...)
   analytic_dC  = pcf.analytic_dC
   U = get_trial_space(get_state_map(pcf))
 
-  U_reg = get_deriv_space(get_state_map(pcf))
+  V_φ = get_aux_space(get_state_map(pcf))
   deriv_assem = get_deriv_assembler(get_state_map(pcf))
 
   ## Foward problem
@@ -224,7 +224,7 @@ function Fields.evaluate!(pcf::PDEConstrainedFunctionals,φh;kwargs...)
     # Analytic shape derivative
     j_val = F(uh,φh)
     _dF(q) = dF_analytic(q,uh,φh)
-    assemble_vector!(_dF,dF,deriv_assem,U_reg)
+    assemble_vector!(_dF,dF,deriv_assem,V_φ)
     return j_val
   end
   j = ∇!(J,dJ,analytic_dJ)
@@ -369,7 +369,7 @@ function Fields.evaluate!(pcf::EmbeddedPDEConstrainedFunctionals,φh;update_spac
   state_map   = get_state_map(pcf)
   U           = get_trial_space(state_map)
 
-  U_reg = get_deriv_space(state_map)
+  V_φ = get_aux_space(state_map)
   deriv_assem = get_deriv_assembler(state_map)
 
   ## Foward problem
@@ -389,7 +389,7 @@ function Fields.evaluate!(pcf::EmbeddedPDEConstrainedFunctionals,φh;update_spac
     # Analytic shape derivative
     j_val = F(uh,φh)
     _dF(q) = dF_analytic(q,uh,φh)
-    assemble_vector!(_dF,dF,deriv_assem,U_reg)
+    assemble_vector!(_dF,dF,deriv_assem,V_φ)
     return j_val
   end
   j = ∇!(J,dJ,analytic_dJ)

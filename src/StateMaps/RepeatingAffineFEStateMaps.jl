@@ -27,17 +27,17 @@ struct RepeatingAffineFEStateMap{A,B,C,D,E,F,G} <: AbstractFEStateMap
   @doc """
       RepeatingAffineFEStateMap(
         nblocks::Int,a::Function,l::Vector{<:Function},
-        U0,V0,V_φ,U_reg,φh;
+        U0,V0,V_φ,φh;
         assem_U = SparseMatrixAssembler(U0,V0),
         assem_adjoint = SparseMatrixAssembler(V0,U0),
-        assem_deriv = SparseMatrixAssembler(U_reg,U_reg),
+        assem_deriv = SparseMatrixAssembler(V_φ,V_φ),
         ls::LinearSolver = LUSolver(),
         adjoint_ls::LinearSolver = LUSolver()
       )
 
   Create an instance of `RepeatingAffineFEStateMap` given the number of blocks `nblocks`,
   a bilinear form `a`, a vector of linear form `l` as `Function` types, the trial and test
-  spaces `U` and `V`, the FE space `V_φ` for `φh`, the FE space `U_reg` for derivatives,
+  spaces `U` and `V`, the FE space `V_φ` for `φh` and derivatives,
   and the measures as additional arguments.
 
   Optional arguments enable specification of assemblers and linear solvers.
@@ -49,10 +49,10 @@ struct RepeatingAffineFEStateMap{A,B,C,D,E,F,G} <: AbstractFEStateMap
   """
   function RepeatingAffineFEStateMap(
     nblocks::Int,biform::Function,liforms::Vector{<:Function},
-    U0,V0,V_φ,U_reg,φh;
+    U0,V0,V_φ,φh;
     assem_U = SparseMatrixAssembler(U0,V0),
     assem_adjoint = SparseMatrixAssembler(V0,U0),
-    assem_deriv = SparseMatrixAssembler(U_reg,U_reg),
+    assem_deriv = SparseMatrixAssembler(V_φ,V_φ),
     ls::LinearSolver = LUSolver(),
     adjoint_ls::LinearSolver = LUSolver()
   )
@@ -62,7 +62,7 @@ struct RepeatingAffineFEStateMap{A,B,C,D,E,F,G} <: AbstractFEStateMap
     assem_U0 = assem_U
 
     U, V = repeat_spaces(nblocks,U0,V0)
-    spaces = (U,V,V_φ,U_reg)
+    spaces = (U,V,V_φ)
     assem_U = SparseMatrixAssembler(
       get_local_matrix_type(assem_U0), get_local_vector_type(assem_U0),
       U, V, get_local_assembly_strategy(assem_U0)
@@ -74,7 +74,7 @@ struct RepeatingAffineFEStateMap{A,B,C,D,E,F,G} <: AbstractFEStateMap
     for liform in liforms
       contr = contr - ∇(liform,[uhd,φh],2)
     end
-    dudφ_vec = allocate_vector(assem_deriv,collect_cell_vector(U_reg,contr))
+    dudφ_vec = allocate_vector(assem_deriv,collect_cell_vector(V_φ,contr))
     plb_caches = (dudφ_vec,assem_deriv)
 
     ## Forward cache

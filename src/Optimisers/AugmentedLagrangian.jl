@@ -165,7 +165,7 @@ function Base.iterate(m::AugmentedLagrangian)
   for (λi,Λi,Ci,dCi) in zip(λ,Λ,C,dC)
     dL .+= -λi*dCi .+ Λi*Ci*dCi
   end
-  project!(m.vel_ext,FEFunction(dL,V_φ),V_φ)
+  project!(m.vel_ext,FEFunction(V_φ,dL),V_φ)
 
   # Update history and build state
   push!(history,(L,J,C...,params.γ,λ...,Λ...))
@@ -221,7 +221,7 @@ function Base.iterate(m::AugmentedLagrangian,state)
   for (λi,Λi,Ci,dCi) in zip(λ,Λ,C,dC)
     dL .+= -λi*dCi .+ Λi*Ci*dCi
   end
-  project!(m.vel_ext,FEFunction(dL,V_φ),V_φ)
+  project!(m.vel_ext,FEFunction(V_φ,dL),V_φ)
 
   ## Update history and build state
   push!(history,(L,J,C...,γ,λ...,Λ...))

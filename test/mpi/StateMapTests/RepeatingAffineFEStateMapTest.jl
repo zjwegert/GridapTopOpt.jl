@@ -16,8 +16,6 @@ function driver(model,verbose)
 
   V_φ = TestFESpace(model,reffe)
   φh = interpolate(1,V_φ)
-  V_reg = TestFESpace(model,reffe)
-  U_reg = TrialFESpace(V_reg)
 
   V = FESpace(model,reffe;dirichlet_tags="boundary")
 
@@ -33,7 +31,7 @@ function driver(model,verbose)
   l2(v1,φ) = ∫(φ * φ * rhs * v1)dΩ
 
   # Create operator from components
-  φ_to_u = RepeatingAffineFEStateMap(2,a1,[l1,l2],U,V,V_φ,U_reg,φh)
+  φ_to_u = RepeatingAffineFEStateMap(2,a1,[l1,l2],U,V,V_φ,φh)
 
   # Test solution
   GridapTopOpt.forward_solve!(φ_to_u,φh)
@@ -54,7 +52,7 @@ function driver(model,verbose)
   pcf = PDEConstrainedFunctionals(F,φ_to_u)
   _,_,dF,_ = evaluate!(pcf,φh)
 
-  return dF,U_reg
+  return dF,V_φ
 end
 
 function main(distribute,mesh_partition)

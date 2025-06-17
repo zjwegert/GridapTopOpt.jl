@@ -6,7 +6,7 @@ An abstract type for velocity extension structures. Structs that inherit from
 """
 abstract type AbstractVelocityExtension end
 
-function project!(::AbstractVelocityExtension,::CellField)
+function project!(::AbstractVelocityExtension,::CellField,V_φ)
   @abstractmethod
 end
 

@@ -24,36 +24,36 @@ struct AffineFEStateMap{A,B,C,D,E,F} <: AbstractFEStateMap
   @doc """
       AffineFEStateMap(
         a::Function,l::Function,
-        U,V,V_φ,U_reg,φh;
+        U,V,V_φ,φh;
         assem_U = SparseMatrixAssembler(U,V),
         assem_adjoint = SparseMatrixAssembler(V,U),
-        assem_deriv = SparseMatrixAssembler(U_reg,U_reg),
+        assem_deriv = SparseMatrixAssembler(V_φ,V_φ),
         ls::LinearSolver = LUSolver(),
         adjoint_ls::LinearSolver = LUSolver()
       )
 
   Create an instance of `AffineFEStateMap` given the bilinear form `a` and linear
   form `l` as `Function` types, trial and test spaces `U` and `V`, the FE space `V_φ`
-  for `φh`, the FE space `U_reg` for derivatives, and the measures as additional arguments.
+  for `φh` and derivatives, and the measures as additional arguments.
 
   Optional arguments enable specification of assemblers and linear solvers.
   """
   function AffineFEStateMap(
       biform::Function,liform::Function,
-      U,V,V_φ,U_reg,φh;
+      U,V,V_φ,φh;
       assem_U = SparseMatrixAssembler(U,V),
       assem_adjoint = SparseMatrixAssembler(V,U),
-      assem_deriv = SparseMatrixAssembler(U_reg,U_reg),
+      assem_deriv = SparseMatrixAssembler(V_φ,V_φ),
       ls::LinearSolver = LUSolver(),
       adjoint_ls::LinearSolver = LUSolver()
     )
     # TODO: I really want to get rid of the φh argument...
 
-    spaces = (U,V,V_φ,U_reg)
+    spaces = (U,V,V_φ)
 
     ## Pullback cache
     uhd = zero(U)
-    vecdata = collect_cell_vector(U_reg,∇(biform,[uhd,uhd,φh],3) - ∇(liform,[uhd,φh],2))
+    vecdata = collect_cell_vector(V_φ,∇(biform,[uhd,uhd,φh],3) - ∇(liform,[uhd,φh],2))
     dudφ_vec = allocate_vector(assem_deriv,vecdata)
     plb_caches = (dudφ_vec,assem_deriv)
 
@@ -83,7 +83,7 @@ get_assemblers(m::AffineFEStateMap) = (m.fwd_caches[6],m.plb_caches[2],m.adj_cac
 
 function forward_solve!(φ_to_u::AffineFEStateMap,φh)
   biform, liform = φ_to_u.biform, φ_to_u.liform
-  U, V, _, _ = φ_to_u.spaces
+  U, V, _ = φ_to_u.spaces
   ns, K, b, x, uhd, assem_U, _ = φ_to_u.fwd_caches
 
   a_fwd(u,v) = biform(u,v,φh)
@@ -106,7 +106,7 @@ end
 
 function update_adjoint_caches!(φ_to_u::AffineFEStateMap,uh,φh)
   adjoint_ns, adjoint_K, _, assem_adjoint, _ = φ_to_u.adj_caches
-  U, V, _, _ = φ_to_u.spaces
+  U, V, _ = φ_to_u.spaces
   assemble_matrix!((u,v) -> φ_to_u.biform(v,u,φh),adjoint_K,assem_adjoint,V,U)
   numerical_setup!(adjoint_ns,adjoint_K)
   return φ_to_u.adj_caches

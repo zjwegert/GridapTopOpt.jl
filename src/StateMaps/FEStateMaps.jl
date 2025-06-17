@@ -57,7 +57,7 @@ get_aux_space(m::AbstractFEStateMap) = get_spaces(m)[3]
 
 Return space for derivatives.
 """
-get_deriv_space(m::AbstractFEStateMap) = get_spaces(m)[4]
+get_deriv_space(m::AbstractFEStateMap) = get_aux_space(m)
 
 """
     get_pde_assembler(m::AbstractFEStateMap)
@@ -144,7 +144,7 @@ and solve the adjoint problem `dRduᵀ*λ = ∂F∂uᵀ` using [`adjoint_solve!`
 """
 function pullback(φ_to_u::AbstractFEStateMap,uh,φh,du;updated=false)
   dudφ_vec, assem_deriv = φ_to_u.plb_caches
-  U_reg = get_deriv_space(φ_to_u)
+  V_φ = get_deriv_space(φ_to_u)
 
   ## Adjoint Solve
   if !updated
@@ -154,7 +154,7 @@ function pullback(φ_to_u::AbstractFEStateMap,uh,φh,du;updated=false)
   λh = FEFunction(get_test_space(φ_to_u),λ)
 
   ## Compute grad
-  dudφ_vecdata = collect_cell_vector(U_reg,dRdφ(φ_to_u,uh,λh,φh))
+  dudφ_vecdata = collect_cell_vector(V_φ,dRdφ(φ_to_u,uh,λh,φh))
   assemble_vector!(dudφ_vec,assem_deriv,dudφ_vecdata)
   rmul!(dudφ_vec, -1)
 
