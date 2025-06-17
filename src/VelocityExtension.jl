@@ -88,6 +88,7 @@ by the `vel_ext`.
 function project!(vel_ext::VelocityExtension,dF::AbstractVector)
   ns, x = vel_ext.cache
   fill!(x,zero(eltype(x)))
+  @show length(dF), length(x)
   solve!(x,ns,dF)
   copy!(dF,x)
   return dF

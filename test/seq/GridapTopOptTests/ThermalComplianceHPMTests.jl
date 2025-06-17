@@ -3,6 +3,17 @@ using Test
 using Gridap, GridapTopOpt
 using GridapTopOpt: WithAutoDiff, NoAutoDiff
 
+using GridapEmbedded.LevelSetCutters: DifferentiableTriangulation
+
+using Gridap,GridapTopOpt, GridapSolvers
+using Gridap.Adaptivity, Gridap.Geometry
+using GridapEmbedded, GridapEmbedded.LevelSetCutters
+
+using GridapTopOpt: StateParamMap
+
+using GridapEmbedded.LevelSetCutters: DifferentiableTriangulation
+
+
 order = 1 
 ## Parameters
 xmax = ymax = 1.0
@@ -47,32 +58,26 @@ V_φ = TestFESpace(model,reffe_scalar)#;dirichlet_tags=["Gamma_N"])
 V_φ_ = TestFESpace(model,reffe_scalar;dirichlet_tags=["Gamma_N"])
 U_φ_ = TrialFESpace(V_φ_,-0.01)
 
-  a(u,v,φ) = ∫((I ∘ φ)*κ*∇(u)⋅∇(v))dΩ
-  l(v,φ) = ∫(v)dΓ_N
+V_reg = V_φ_
+U_reg = TrialFESpace(V_reg,0.0)
 
-  ## Optimisation functionals
-  J(u,φ) = ∫((I ∘ φ)*κ*∇(u)⋅∇(u))dΩ
-  dJ(q,u,φ) = ∫(κ*∇(u)⋅∇(u)*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ;
-  Vol(u,φ) = ∫(((ρ ∘ φ) - vf)/vol_D)dΩ;
-  dVol(q,u,φ) = ∫(-1/vol_D*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
+φh = interpolate(initial_lsf(4,0.2),V_φ)
+a(u,v,φ) = ∫((I ∘ φ)*κ*∇(u)⋅∇(v))dΩ
+l(v,φ) = ∫(v)dΓ_N
+
+## Optimisation functionals
+J(u,φ) = ∫((I ∘ φ)*κ*∇(u)⋅∇(u))dΩ
+dJ(q,u,φ) = ∫(κ*∇(u)⋅∇(u)*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ;
+Vol(u,φ) = ∫(((ρ ∘ φ) - vf)/vol_D)dΩ;
+dVol(q,u,φ) = ∫(-1/vol_D*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
 
 ## Interpolation and weak form
 interp = SmoothErsatzMaterialInterpolation(η = η_coeff*maximum(el_Δ))
 I,H,DH,ρ = interp.I,interp.H,interp.DH,interp.ρ
 
-  ## Setup solver and FE operators
-  state_map = AffineFEStateMap(a,l,U,V,V_φ,U_reg,φh)
-  pcfs = if AD_case == :no_ad
-    PDEConstrainedFunctionals(J,[Vol],state_map,analytic_dJ=dJ,analytic_dC=[dVol])
-  elseif AD_case == :with_ad
-    PDEConstrainedFunctionals(J,[Vol],state_map)
-  elseif AD_case == :partial_ad1
-    PDEConstrainedFunctionals(J,[Vol],state_map,analytic_dJ=dJ)
-  elseif AD_case == :partial_ad2
-    PDEConstrainedFunctionals(J,[Vol],state_map,analytic_dC=[dVol])
-  else
-    @error "AD case not defined"
-  end
+
+state_map = AffineFEStateMap(a,l,U,V,V_φ,U_reg,φh)
+pcf = PDEConstrainedFunctionals(J,[Vol],state_map)
 
 ## Optimisation functionals
 J(u,φ,dΩ,dΓ_N) = ∫((I ∘ φ)*κ*∇(u)⋅∇(u))dΩ
@@ -82,9 +87,6 @@ dVol(q,u,φ,dΩ,dΓ_N) = ∫(-1/vol_D*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
 
 ## Finite difference solver and level set function
 ls_evo = HamiltonJacobiEvolution(FirstOrderStencil(2,Float64),model,V_φ,tol,max_steps)
-
-## Setup solver and FE operators
-state_map = AffineFEStateMap(a,l,U,V,U_φ_,U_reg,φh,dΩ,dΓ_N)
 
 import GridapTopOpt: StateParamIntegrandWithMeasure
 
@@ -106,30 +108,73 @@ end
 
 φ_to_jc(φ)
 
-
-φh.fe_space
-
 Zygote.jacobian(φ_to_jc,φ)
 
-φh_bg =  interpolate(φh,V_φ)
 
 
-φh_bg.free_values
-φh.free_values
 
-pcf = CustomPDEConstrainedFunctionals(φ_to_jc,state_map,φh_bg)
+Ωs = EmbeddedCollection(model,φh) do cutgeo,_,_
+  Ωin = DifferentiableTriangulation(Triangulation(cutgeo,PHYSICAL),V_φ)
+  Γ = DifferentiableTriangulation(EmbeddedBoundary(cutgeo),V_φ)
+  Γg = GhostSkeleton(cutgeo)
+  Ωact = Triangulation(cutgeo,ACTIVE)
+  (;
+    :Ωin  => Ωin,
+    :dΩin => Measure(Ωin,2*order),
+    :Γg   => Γg,
+    :dΓg  => Measure(Γg,2*order),
+    :n_Γg => get_normal_vector(Γg),
+    :Γ    => Γ,
+    :dΓ   => Measure(Γ,2*order),
+    :n_Γ  => get_normal_vector(Γ), # Note, need to recompute inside obj/constraints to compute derivs
+    :Ωact => Ωact,
+    :χ => GridapTopOpt.get_isolated_volumes_mask(cutgeo,["Gamma_D"])
+  )
+end
 
-## Hilbertian extension-regularisation problems
-α = α_coeff*maximum(el_Δ)
-a_hilb(p,q) =∫(α^2*∇(p)⋅∇(q) + p*q)dΩ;
-vel_ext = VelocityExtension(a_hilb,U_reg,V_reg)
+## Weak form
+const γg = 0.1
+hₕ = mean(el_Δ)
+a(u,v,φ) = ∫(∇(v)⋅∇(u))Ωs.dΩin +
+  ∫((γg*mean(hₕ))*jump(Ωs.n_Γg⋅∇(v))*jump(Ωs.n_Γg⋅∇(u)))Ωs.dΓg +
+  ∫(Ωs.χ*v*u)Ωs.dΩin
+l(v,φ) = ∫(v)dΓ_N
 
-## Optimiser
-optimiser = HilbertianProjection(pcf,ls_evo,vel_ext,φh_bg;
-  γ,γ_reinit,verbose=true,constraint_names=[:Vol])
+## Optimisation functionals
+J(u,φ) = ∫(∇(u)⋅∇(u))Ωs.dΩin
+Vol(u,φ) = ∫(1/vol_D)Ωs.dΩin - ∫(vf/vol_D)dΩ
+dVol(q,u,φ) = ∫(-1/vol_D*q/(abs(Ωs.n_Γ ⋅ ∇(φ))))Ωs.dΓ
 
-# Do a few iterations
-vars, state = iterate(optimiser)
-vars, state = iterate(optimiser,state)
+## Setup solver and FE operators
+V = TestFESpace(Ωs.Ωact,reffe_scalar;dirichlet_tags=["Gamma_D"])
+U = TrialFESpace(V,0.0)
+state_map2 = AffineFEStateMap(a,l,U,V,V_φ,U_reg,φh)
+objective2 = StateParamMap(J,state_map)
+
+function φ_to_jc2(φ)
+  u = state_map2(φ)
+  j = objective2(u,φ)
+  [j]
+end
+
+Zygote.jacobian(φ_to_jc2,φ)
+
+
+
+
+# pcf = CustomPDEConstrainedFunctionals(φ_to_jc,state_map,φh_bg)
+
+# ## Hilbertian extension-regularisation problems
+# α = α_coeff*maximum(el_Δ)
+# a_hilb(p,q) =∫(α^2*∇(p)⋅∇(q) + p*q)dΩ;
+# vel_ext = VelocityExtension(a_hilb,U_reg,V_reg)
+
+# ## Optimiser
+# optimiser = HilbertianProjection(pcf,ls_evo,vel_ext,φh_bg;
+#   γ,γ_reinit,verbose=true,constraint_names=[:Vol])
+
+# # Do a few iterations
+# vars, state = iterate(optimiser)
+# vars, state = iterate(optimiser,state)
 
 end # module

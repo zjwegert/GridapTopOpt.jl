@@ -4,6 +4,8 @@ using GridapEmbedded, GridapEmbedded.LevelSetCutters
 
 using GridapTopOpt: StateParamMap
 
+using GridapEmbedded.LevelSetCutters: DifferentiableTriangulation
+
 path="./results/CutFEM_thermal_compliance_ALM_island_detect/"
 rm(path,force=true,recursive=true)
 mkpath(path)
@@ -15,13 +17,14 @@ vf = 0.4
 α_coeff = max_steps*γ
 iter_mod = 1
 
-_model = CartesianDiscreteModel((0,1,0,1),(n,n))
-base_model = UnstructuredDiscreteModel(_model)
-ref_model = refine(base_model, refinement_method = "barycentric")
-model = ref_model.model
-el_Δ = get_el_Δ(_model)
+_model = simplexify(CartesianDiscreteModel((0,1,0,1),(n,n)))
+# base_model = UnstructuredDiscreteModel(_model)
+# ref_model = refine(base_model, refinement_method = "barycentric")
+# model = ref_model.model
+model = _model
+el_Δ = 1/n #get_el_Δ(_model)
 h = maximum(el_Δ)
-h_refine = maximum(el_Δ)/2
+h_refine = h# maximum(el_Δ)/2
 f_Γ_D(x) = (x[1] ≈ 0.0 && (x[2] <= 0.2 + eps() || x[2] >= 0.8 - eps()))
 f_Γ_N(x) = (x[1] ≈ 1 && 0.4 - eps() <= x[2] <= 0.6 + eps())
 update_labels!(1,model,f_Γ_D,"Gamma_D")
@@ -39,12 +42,13 @@ reffe_scalar = ReferenceFE(lagrangian,Float64,order)
 V_reg = TestFESpace(model,reffe_scalar;dirichlet_tags=["Gamma_N"])
 U_reg = TrialFESpace(V_reg,0)
 V_φ = TestFESpace(model,reffe_scalar)
+U_φ_ = TrialFESpace(V_reg,-1.0)
 
 ## Levet-set function
 φh = interpolate(x->-cos(4π*x[1])*cos(4π*x[2])-0.4,V_φ)
 Ωs = EmbeddedCollection(model,φh) do cutgeo,_,_
-  Ωin = DifferentiableTriangulation(Triangulation(cutgeo,PHYSICAL),V_φ)
-  Γ = DifferentiableTriangulation(EmbeddedBoundary(cutgeo),V_φ)
+  Ωin = DifferentiableTriangulation(Triangulation(cutgeo,PHYSICAL),U_φ_)
+  Γ = DifferentiableTriangulation(EmbeddedBoundary(cutgeo),U_φ_)
   Γg = GhostSkeleton(cutgeo)
   Ωact = Triangulation(cutgeo,ACTIVE)
   (;
@@ -77,14 +81,25 @@ dVol(q,u,φ) = ∫(-1/vol_D*q/(abs(Ωs.n_Γ ⋅ ∇(φ))))Ωs.dΓ
 state_collection = GridapTopOpt.EmbeddedCollection_in_φh(model,φh) do _φh
   V = TestFESpace(Ωs.Ωact,reffe_scalar;dirichlet_tags=["Gamma_D"])
   U = TrialFESpace(V,0.0)
-  state_map = AffineFEStateMap(a,l,U,V,V_φ,U_reg,_φh)
+  state_map = AffineFEStateMap(a,l,U,V,U_φ_,U_reg,_φh)
   (;
     :state_map => state_map,
     :J => StateParamMap(J,state_map),
     :C => map(Ci -> StateParamMap(Ci,state_map),[Vol,])
   )
 end
+
 pcfs = EmbeddedPDEConstrainedFunctionals(state_collection;analytic_dC=(dVol,))
+
+# function φ_to_jc(φ,state_collection)
+#   u = state_collection.state_map(φ)
+#   j = state_collection.J(u,φ)
+#   c = state_collection.C[1](u,φ)
+#   [j,c]
+# end
+# φ_to_jc(state_collection) = φ -> φ_to_jc(φ,state_collection)
+# #pcfs = CustomEmbeddedPDEConstrainedFunctionals(φ_to_jc,state_collection,Ωs,φh)
+
 
 ## Evolution Method
 evo = CutFEMEvolve(V_φ,Ωs,dΩ,h;max_steps,γg=0.1)
