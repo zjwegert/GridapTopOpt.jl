@@ -4,44 +4,74 @@ using GridapPETSc, GridapPETSc.PETSC
 using GridapPETSc: PetscScalar, PetscInt, PETSC,  @check_error_code
 
 using MPI
-using BlockArrays
-using CircularArrays
+using BlockArrays, CircularArrays, FillArrays
 using LinearAlgebra
 using ChainRulesCore
 using DelimitedFiles, Printf
+using DataStructures
 
 using Gridap
 using Gridap.Helpers, Gridap.Algebra, Gridap.TensorValues
-using Gridap.Geometry, Gridap.CellData, Gridap.Fields
-using Gridap.ReferenceFEs, Gridap.FESpaces,  Gridap.MultiField
-using Gridap.Geometry: get_faces
+using Gridap.Geometry, Gridap.CellData, Gridap.Fields, Gridap.Arrays
+using Gridap.ReferenceFEs, Gridap.FESpaces,  Gridap.MultiField, Gridap.Polynomials
+
+using Gridap.Geometry: get_faces, num_nodes, TriangulationView
 using Gridap.FESpaces: get_assembly_strategy
+using Gridap.ODEs: ODESolver
 using Gridap: writevtk
 
 using GridapDistributed
 using GridapDistributed: DistributedDiscreteModel, DistributedTriangulation,
   DistributedFESpace, DistributedDomainContribution, to_parray_of_arrays,
   allocate_in_domain, DistributedCellField, DistributedMultiFieldCellField,
-  DistributedMultiFieldFEBasis, BlockPMatrix, BlockPVector, change_ghost
+  DistributedMultiFieldFEBasis, BlockPMatrix, BlockPVector, change_ghost,
+  gradient, jacobian, DistributedMultiFieldFEFunction, DistributedSingleFieldFEFunction
 
 using PartitionedArrays
 using PartitionedArrays: getany, tuple_of_arrays, matching_ghost_indices
 
 using GridapSolvers
 using GridapSolvers.LinearSolvers, GridapSolvers.NonlinearSolvers, GridapSolvers.BlockSolvers
-using GridapSolvers.SolverInterfaces: SolverVerboseLevel, SOLVER_VERBOSE_NONE, SOLVER_VERBOSE_LOW, SOLVER_VERBOSE_HIGH
+using GridapSolvers.SolverInterfaces: SolverVerboseLevel, SOLVER_VERBOSE_NONE, SOLVER_VERBOSE_LOW, SOLVER_VERBOSE_HIGH,
+  SOLVER_CONVERGED_ATOL, SOLVER_CONVERGED_RTOL, ConvergenceLog, finished_flag
+using GridapSolvers.BlockSolvers: combine_fespaces, get_solution
+
+using GridapEmbedded
+using GridapEmbedded.LevelSetCutters, GridapEmbedded.Interfaces
+using GridapEmbedded.Interfaces: SubFacetData, SubCellTriangulation, SubFacetTriangulation
+using GridapEmbedded.LevelSetCutters: DifferentiableTriangulation
 
 using JLD2: save_object, load_object, jldsave
 
 import Base: +
+import Gridap: solve!
+import PartitionedArrays: default_find_rcv_ids
+import GridapDistributed: remove_ghost_cells
 
-include("GridapExtensions.jl")
+__init__() = begin
+  include((@__DIR__)*"/GridapExtensions.jl")
+  include((@__DIR__)*"/LevelSetEvolution/UnfittedEvolution/MutableRungeKutta.jl") # <- commented out in "LevelSetEvolution/LevelSetEvolution.jl"
 
-include("ChainRules.jl")
+  function default_find_rcv_ids(::MPIArray)
+    PartitionedArrays.find_rcv_ids_ibarrier
+  end
+end
+
+include("Embedded/Embedded.jl")
+export EmbeddedCollection, update_collection!, add_recipe!
+export EmbeddedCollection_in_φh
+export CUT
+export get_isolated_volumes_mask_polytopal
+export DifferentiableTriangulation
+
+include("StateMaps/StateMaps.jl")
 export PDEConstrainedFunctionals
+export EmbeddedPDEConstrainedFunctionals
 export AffineFEStateMap
 export NonlinearFEStateMap
 export RepeatingAffineFEStateMap
+export StaggeredAffineFEStateMap
+export StaggeredNonlinearFEStateMap
 export get_state
 export evaluate_functionals!
 export evaluate_derivatives!
@@ -51,11 +81,19 @@ export SmoothErsatzMaterialInterpolation
 export update_labels!
 export initial_lsf
 export get_el_Δ
+export get_cartesian_element_sizes
+export get_element_diameters
+export get_element_diameter_field
 export isotropic_elast_tensor
 
 include("LevelSetEvolution/LevelSetEvolution.jl")
 export HamiltonJacobiEvolution
 export FirstOrderStencil
+export UnfittedFEEvolution
+export CutFEMEvolve
+export StabilisedReinit
+export ArtificialViscosity
+export InteriorPenalty
 export evolve!
 export reinit!
 
@@ -64,6 +102,7 @@ export ElasticitySolver
 
 include("VelocityExtension.jl")
 export VelocityExtension
+export IdentityVelocityExtension
 export project!
 
 include("Optimisers/Optimisers.jl")

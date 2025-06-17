@@ -1,7 +1,7 @@
 """
     abstract type Stencil
 
-Finite difference stencil for a single step of the Hamilton-Jacobi 
+Finite difference stencil for a single step of the Hamilton-Jacobi
 evolution equation and reinitialisation equation.
 
 Your own spatial stencil can be implemented by extending the methods below.
@@ -40,7 +40,7 @@ end
     evolve!(::Stencil,φ,vel,Δt,Δx,isperiodic,caches) -> φ
 
 Single finite difference step of the Hamilton-Jacobi evoluation equation for a given
-`Stencil`. 
+`Stencil`.
 """
 function evolve!(::Stencil,φ,vel,Δt,Δx,isperiodic,caches)
   @abstractmethod
@@ -49,7 +49,7 @@ end
 """
     struct FirstOrderStencil{D,T} <: Stencil end
 
-A first order upwind difference scheme based on Osher and Fedkiw 
+A first order upwind difference scheme based on Osher and Fedkiw
 ([link](https://doi.org/10.1007/b98879)).
 """
 struct FirstOrderStencil{D,T} <: Stencil
@@ -59,7 +59,7 @@ struct FirstOrderStencil{D,T} <: Stencil
 end
 
 function check_order(::FirstOrderStencil,order)
-  @check order >= 1 "FirstOrderStencil requires reference element to have order >= 1" 
+  @check order >= 1 "FirstOrderStencil requires reference element to have order >= 1"
 end
 
 function allocate_caches(::FirstOrderStencil{2},φ,vel)
@@ -135,7 +135,7 @@ function reinit!(::FirstOrderStencil{3,T},φ_new,φ,vel,Δt,Δx,isperiodic,cache
   ∇⁺ .= @. ∇⁺^2+∇⁻^2 # |∇φ|² (partially computed)
   ∇⁻ .= @. (D⁺ᶻ - D⁻ᶻ)/(2Δz); ~xperiodic ? ∇⁻[:,:,[1,end]] .= zero(T) : 0;
   ϵₛ = minimum((Δx,Δy,Δz))
-  vel .= @. φ/sqrt(φ^2 + ϵₛ^2*(∇⁺+∇⁻^2))
+  vel .= @. φ/sqrt(φ^2 + ϵₛ^2*(∇⁺^2+∇⁻^2))
   # Forward (+) & Backward (-)
   D⁺ʸ .= (D⁺ʸ - φ)/Δy; ~yperiodic ? D⁺ʸ[:,end,:] .= zero(T) : 0;
   D⁺ˣ .= (D⁺ˣ - φ)/Δx; ~xperiodic ? D⁺ˣ[end,:,:] .= zero(T) : 0;

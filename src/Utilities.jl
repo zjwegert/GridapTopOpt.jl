@@ -69,13 +69,13 @@ end
 """
     update_labels!(e::Int,model,f_Γ::Function,name::String)
 
-Given a tag number `e`, a `CartesianDiscreteModel` or `DistributedDiscreteModel` model,
-an indicator function `f_Γ`, and a string `name`, label the corresponding vertices, edges, and faces
+Given a tag number `e`, a `DiscreteModel` model, an indicator function `f_Γ`,
+and a string `name`, label the corresponding vertices, edges, and faces
 as `name`.
 
 Note: `f_Γ` must recieve a Vector and return a Boolean depending on whether it indicates Γ
 """
-function update_labels!(e::Integer,model::CartesianDiscreteModel,f_Γ::Function,name::String)
+function update_labels!(e::Integer,model::DiscreteModel,f_Γ::Function,name::String)
   mask = mark_nodes(f_Γ,model)
   _update_labels_locally!(e,model,mask,name)
   nothing
@@ -92,7 +92,7 @@ function update_labels!(e::Integer,model::DistributedDiscreteModel,f_Γ::Functio
   nothing
 end
 
-function _update_labels_locally!(e,model::CartesianDiscreteModel{2},mask,name)
+function _update_labels_locally!(e,model::DiscreteModel{2},mask,name)
   topo   = get_grid_topology(model)
   labels = get_face_labeling(model)
   cell_to_entity = labels.d_to_dface_to_entity[end]
@@ -100,36 +100,48 @@ function _update_labels_locally!(e,model::CartesianDiscreteModel{2},mask,name)
   # Vertices
   vtxs_Γ = findall(mask)
   vtx_edge_connectivity = Array(get_faces(topo,0,1)[vtxs_Γ])
+  vtx_face_connectivity = Array(get_faces(topo,0,2)[vtxs_Γ])
   # Edges
-  edge_entries = [findall(x->any(x .∈  vtx_edge_connectivity[1:end.!=j]),
+  edge_entries = [findall(x->any(x .∈ vtx_edge_connectivity[1:end.!=j]),
     vtx_edge_connectivity[j]) for j = 1:length(vtx_edge_connectivity)]
   edge_Γ = unique(reduce(vcat,getindex.(vtx_edge_connectivity,edge_entries),init=[]))
+  # Faces
+  face_entries = [findall(x->count(x .∈ vtx_face_connectivity[1:end.!=j])>=2,
+    vtx_face_connectivity[j]) for j = 1:length(vtx_face_connectivity)]
+  face_Γ = unique(reduce(vcat,getindex.(vtx_face_connectivity,face_entries),init=[]))
   labels.d_to_dface_to_entity[1][vtxs_Γ] .= entity
   labels.d_to_dface_to_entity[2][edge_Γ] .= entity
+  labels.d_to_dface_to_entity[3][face_Γ] .= entity
   add_tag!(labels,name,[entity])
   return cell_to_entity
 end
 
-function _update_labels_locally!(e,model::CartesianDiscreteModel{3},mask,name)
+function _update_labels_locally!(e,model::DiscreteModel{3},mask,name)
   topo   = get_grid_topology(model)
   labels = get_face_labeling(model)
   cell_to_entity = labels.d_to_dface_to_entity[end]
   entity = maximum(cell_to_entity) + e
   # Vertices
   vtxs_Γ = findall(mask)
-  vtx_edge_connectivity = Array(Geometry.get_faces(topo,0,1)[vtxs_Γ])
-  vtx_face_connectivity = Array(Geometry.get_faces(topo,0,2)[vtxs_Γ])
+  vtx_edge_connectivity = Array(get_faces(topo,0,1)[vtxs_Γ])
+  vtx_face_connectivity = Array(get_faces(topo,0,2)[vtxs_Γ])
+  vtx_cell_connectivity = Array(get_faces(topo,0,3)[vtxs_Γ])
   # Edges
-  edge_entries = [findall(x->any(x .∈  vtx_edge_connectivity[1:end.!=j]),
+  edge_entries = [findall(x->any(x .∈ vtx_edge_connectivity[1:end.!=j]),
     vtx_edge_connectivity[j]) for j = 1:length(vtx_edge_connectivity)]
   edge_Γ = unique(reduce(vcat,getindex.(vtx_edge_connectivity,edge_entries),init=[]))
   # Faces
-  face_entries = [findall(x->count(x .∈  vtx_face_connectivity[1:end.!=j])>2,
+  face_entries = [findall(x->count(x .∈ vtx_face_connectivity[1:end.!=j])>=2,
     vtx_face_connectivity[j]) for j = 1:length(vtx_face_connectivity)]
   face_Γ = unique(reduce(vcat,getindex.(vtx_face_connectivity,face_entries),init=[]))
+  # Cells
+  cell_entries = [findall(x->count(x .∈ vtx_cell_connectivity[1:end.!=j])>=3,
+    vtx_cell_connectivity[j]) for j = 1:length(vtx_cell_connectivity)]
+  cell_Γ = unique(reduce(vcat,getindex.(vtx_cell_connectivity,cell_entries),init=[]))
   labels.d_to_dface_to_entity[1][vtxs_Γ] .= entity
   labels.d_to_dface_to_entity[2][edge_Γ] .= entity
   labels.d_to_dface_to_entity[3][face_Γ] .= entity
+  labels.d_to_dface_to_entity[4][cell_Γ] .= entity
   add_tag!(labels,name,[entity])
   return cell_to_entity
 end
@@ -162,22 +174,23 @@ where x is a vector with components xᵢ.
 initial_lsf(ξ,a;b=0) = x::VectorValue -> -1/4*prod(cos.(get_array(@.(ξ*pi*(x-b))))) - a/4
 
 """
-    get_el_Δ(model)
+    get_cartesian_element_sizes(model)
 
-Given a CartesianDiscreteModel or DistributedDiscreteModel that is
-uniform, return the element size as a tuple.
+Given a CartesianDiscreteModel return the element size as a tuple.
 """
-function get_el_Δ(model::CartesianDiscreteModel)
+function get_cartesian_element_sizes(model::CartesianDiscreteModel)
   desc = get_cartesian_descriptor(model)
   return desc.sizes
 end
 
-function get_el_Δ(model::DistributedDiscreteModel)
+function get_cartesian_element_sizes(model::DistributedDiscreteModel)
   local_Δ = map(local_views(model)) do model
-    get_el_Δ(model)
+    get_cartesian_element_sizes(model)
   end
   return getany(local_Δ)
 end
+
+const get_el_Δ = get_cartesian_element_sizes
 
 """
     isotropic_elast_tensor(D::Int,E::M,v::M)
@@ -231,4 +244,122 @@ function _zerocrossing_period(v;t=0:length(v)-1,line=sum(v)/length(v))
   inds = findall(@. ≥(line, $@view(v[2:end])) & <(line, $@view(v[1:end-1])))
   difft = diff(t[inds])
   sum(difft)/length(difft)
+end
+
+import Gridap.ReferenceFEs: get_order
+function get_order(space::FESpace)
+  return get_order(first(Gridap.CellData.get_data(get_fe_basis(space))))
+end
+
+function get_order(space::DistributedFESpace)
+  order = map(get_order,local_views(space))
+  return getany(order)
+end
+
+# Element diameter for general model
+
+# According to Massing et al. (doi:10.1007/s10915-014-9838-9) the stabilisation terms
+#   should use h_K denotes the diameter of element K, and h_F denotes the average
+#   of the diameters of the elements sharing a facet K. The latter can be computed
+#   as the mean on the facet triangulation.
+"""
+    get_element_diameters(model)
+
+Given a general unstructured model return the maximum vertex length of a polytope.
+"""
+function get_element_diameters(model)
+  coords = get_cell_coordinates(model)
+  polys = get_polytopes(model)
+  @assert length(polys) == 1 "Only one cell type is currently supported"
+  poly = first(polys)
+  if poly == TRI
+    return lazy_map(_get_tri_max_length,coords)
+  elseif poly == TET
+    return lazy_map(_get_tet_max_length,coords)
+  else
+    @notimplemented "Only triangles and tetrahedra are currently supported"
+  end
+end
+
+"""
+    get_element_diameter_field(model)
+
+Given a general unstructured model return the maximum vertex length as a
+CellField over the triangulation.
+"""
+function get_element_diameter_field(model)
+  return CellField(get_element_diameters(model),Triangulation(model))
+end
+
+function get_element_diameters(model::DistributedDiscreteModel{Dc}) where Dc
+  h = map(get_element_diameters,local_views(model))
+  gids = get_face_gids(model,Dc)
+  return PVector(h,partition(gids))
+end
+
+function get_element_diameter_field(model::DistributedDiscreteModel)
+  Ω = Triangulation(model)
+  fields = map(local_views(model)) do model
+    h = get_element_diameters(model)
+    CellField(h,Triangulation(model))
+  end
+  return DistributedCellField(fields,Ω)
+end
+
+function _get_tri_max_length(coords)
+  d12 = norm(coords[1]-coords[2])
+  d13 = norm(coords[1]-coords[3])
+  d23 = norm(coords[2]-coords[3])
+
+  max(d12,d13,d23)
+end
+
+function _get_tet_max_length(coords)
+  d12 = norm(coords[1]-coords[2])
+  d13 = norm(coords[1]-coords[3])
+  d14 = norm(coords[1]-coords[4])
+  d23 = norm(coords[2]-coords[3])
+  d24 = norm(coords[2]-coords[4])
+  d34 = norm(coords[3]-coords[4])
+
+  max(d12,d13,d14,d23,d24,d34)
+end
+
+# Test that a distributed and serial field are the same.
+#
+# Note:
+#   - This is only designed for small tests
+#   - We require that the distributed model is generated with a global ordering
+#     that matches the serial model. See function below.
+function test_serial_and_distributed_fields(fhd::CellField,Vd,fhs::FEFunction,Vs)
+  fhd_cell_values = map(local_views(Vd),local_views(fhd)) do Vd,fhd
+    free = get_free_dof_values(fhd)
+    diri = get_dirichlet_dof_values(Vd)
+    scatter_free_and_dirichlet_values(Vd,free,diri)
+  end
+
+  free = get_free_dof_values(fhs)
+  diri = get_dirichlet_dof_values(Vs)
+  fhs_cell_values = scatter_free_and_dirichlet_values(Vs,free,diri)
+
+  dmodel = get_background_model(get_triangulation(Vd))
+  map(partition(get_cell_gids(dmodel)),fhd_cell_values) do gids,lfhd_cell_values
+    lfhd_cell_values ≈ fhs_cell_values[local_to_global(gids)]
+  end
+end
+
+# Generate a distributed model from a serial model with global ordering that
+#  matches the serial model
+function ordered_distributed_model_from_serial_model(ranks,model_serial)
+  cell_to_part = reduce(vcat,[[i for j in 1:num_cells(model_serial)/length(ranks)] for i in 1:length(ranks)])
+  append!(cell_to_part,[length(ranks) for i = 1: num_cells(model_serial) % length(ranks)]...)
+  @assert length(cell_to_part) == num_cells(model_serial)
+  DiscreteModel(ranks,model_serial,cell_to_part)
+end
+
+# MultiField
+function test_serial_and_distributed_fields(fhd::DistributedMultiFieldCellField,Vd,fhs::MultiFieldFEFunction,Vs)
+  @assert num_fields(fhd)==num_fields(Vd)==num_fields(fhs)==num_fields(Vs)
+  result = map(i->test_serial_and_distributed_fields(fhd[i],Vd[i],fhs[i],Vs[i]),1:num_fields(fhd)) |> to_parray_of_arrays
+  map(all,result)
 end

@@ -1,1 +1,0 @@
-# MPI and PartitionedArrays.jl

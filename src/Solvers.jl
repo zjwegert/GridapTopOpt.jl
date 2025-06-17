@@ -123,7 +123,7 @@ end
 _num_dims(space::FESpace) = num_cell_dims(get_triangulation(space))
 _num_dims(space::GridapDistributed.DistributedSingleFieldFESpace) = getany(map(_num_dims,local_views(space)))
 
-function Gridap.Algebra.numerical_setup(ss::ElasticitySymbolicSetup,_A::PSparseMatrix)
+function Gridap.Algebra.numerical_setup(ss::ElasticitySymbolicSetup,_A::AbstractMatrix)
   s = ss.solver
 
   # Create ns
