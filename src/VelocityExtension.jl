@@ -6,7 +6,7 @@ An abstract type for velocity extension structures. Structs that inherit from
 """
 abstract type AbstractVelocityExtension end
 
-function project!(::AbstractVelocityExtension,::AbstractVector)
+function project!(::AbstractVelocityExtension,::CellField)
   @abstractmethod
 end
 
@@ -21,8 +21,8 @@ A velocity-extension method that does nothing.
 """
 struct IdentityVelocityExtension <: AbstractVelocityExtension end
 
-project!(::IdentityVelocityExtension,dF) = dF
-project!(::IdentityVelocityExtension,dF_vec::Vector{<:AbstractVector}) = dF_vec
+project!(::IdentityVelocityExtension,dFh::CellField,V_φ) = dFh
+project!(::IdentityVelocityExtension,dFh_vec::Vector{<:CellField},V_φ) = dFh_vec
 
 """
     struct VelocityExtension{A,B} <: AbstractVelocityExtension
@@ -47,11 +47,13 @@ This provides two benefits:
 # Properties
 
 - `K::A`: The discretised inner product over ``H``.
-- `cache::B`: Cached objects used for [`project!`](@ref)
+- `U_reg::B`: The trial space used for the Hilbertian extension-regularisation.
+- `cache::C`: Cached objects used for [`project!`](@ref)
 """
-struct VelocityExtension{A,B} <: AbstractVelocityExtension
+struct VelocityExtension{A,B,C} <: AbstractVelocityExtension
   K     :: A
-  cache :: B
+  U_reg :: B
+  cache :: C
 end
 
 """
@@ -75,22 +77,23 @@ function VelocityExtension(
   K  = assemble_matrix(biform,assem,U_reg,V_reg)
   ns = numerical_setup(symbolic_setup(ls,K),K)
   x  = allocate_in_domain(K)
-  cache = (ns,x)
-  return VelocityExtension(K,cache)
+  b = allocate_in_range(K)
+  cache = (ns,x,b)
+  return VelocityExtension(K,U_reg,cache)
 end
 
 """
-    project!(vel_ext::VelocityExtension,dF::AbstractVector) -> dF
+    project!(vel_ext::VelocityExtension,dFh::CellField,V_φ) -> dFh_reg
 
-Project shape derivative `dF` onto a function space described
-by the `vel_ext`.
+Project `dFh` onto a function space described by the `vel_ext`.
 """
-function project!(vel_ext::VelocityExtension,dF::AbstractVector)
-  ns, x = vel_ext.cache
-  fill!(x,zero(eltype(x)))
-  solve!(x,ns,dF)
-  copy!(dF,x)
-  return dF
+function project!(vel_ext::VelocityExtension,dFh::CellField,V_φ)
+  ns, x, b = vel_ext.cache
+  U_reg = vel_ext.U_reg
+  interpolate!(dFh,b,U_reg)
+  solve!(x,ns,b)
+  interpolate!(FEFunction(U_reg,x),get_free_dof_values(dFh),V_φ)
+  return dFh
 end
 
-project!(vel_ext::VelocityExtension,dF_vec::Vector{<:AbstractVector}) = broadcast(dF -> project!(vel_ext,dF),dF_vec)
+project!(vel_ext::VelocityExtension,dFh_vec::Vector{<:CellField},V_φ) = broadcast(dFh -> project!(vel_ext,dFh,V_φ),dFh_vec)

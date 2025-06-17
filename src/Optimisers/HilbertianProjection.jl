@@ -33,21 +33,17 @@ struct HilbertianProjectionMap{A}
   end
 end
 
-function update_descent_direction!(m::HilbertianProjectionMap{<:AbstractMatrix},dV,C,dC,K)
-  θ, θ_aux, orthog_cache = m.caches
-  copy!(θ,dV)
-  _update_descent_direction!(m,θ,C,dC,K,θ_aux,orthog_cache)
-end
-
-function update_descent_direction!(m::HilbertianProjectionMap{<:PSparseMatrix},dV,C,dC,K)
+function update_descent_direction!(m::HilbertianProjectionMap,dV,C,dC,K,V_φ)
   θ, θ_aux, dC_aux, orthog_cache = m.caches
-  copy!(θ,dV)
-  copy!.(dC_aux,dC)
-  _update_descent_direction!(m,θ,C,dC_aux,K,θ_aux,orthog_cache)
+  U_reg = m.vel_ext.U_reg
+  interpolate!(FEFunction(dV,V_φ),θ,U_reg)
+  for i ∈ eachindex(dC)
+    interpolate!(FEFunction(dC[i],V_φ),dC_aux[i],U_reg)
+  end
+  return _update_descent_direction!(m,θ,C,dC_aux,K,θ_aux,orthog_cache)
 end
 
 function _update_descent_direction!(m::HilbertianProjectionMap,θ,C,dC,K,θ_aux,orthog_cache)
-
   # Orthogonalisation of dC
   dC_orthog, normsq, nullity = evaluate!(orthog_cache,m.orthog,dC,K)
 
@@ -306,6 +302,7 @@ end
 function Base.iterate(m::HilbertianProjection)
   history, params = m.history, m.params
   φh = m.φ0
+  V_φ = get_aux_space(get_state_map(m.problem))
 
   ## Reinitialise as SDF
   reinit!(m.ls_evolver,φh,params.γ_reinit)
@@ -317,9 +314,9 @@ function Base.iterate(m::HilbertianProjection)
   φ_tmp = copy(vel)
 
   ## Hilbertian extension-regularisation
-  project!(m.vel_ext,dJ)
-  project!(m.vel_ext,dC)
-  θ = update_descent_direction!(m.projector,dJ,C,dC,m.vel_ext.K)
+  project!(m.vel_ext,FEFunction(V_φ,dJ))
+  project!(m.vel_ext,map(dCi->FEFunction(V_φ,dCi),dC))
+  θ = update_descent_direction!(m.projector,dJ,C,dC,m.vel_ext.K,V_φ)
 
   # Update history and build state
   push!(history,(J,C...,params.γ))
@@ -350,14 +347,14 @@ function Base.iterate(m::HilbertianProjection,state)
 
   ## Line search
   U_reg = get_deriv_space(get_state_map(m.problem))
-  V_φ   = get_aux_space(get_state_map(m.problem))
+  V_φ = get_aux_space(get_state_map(m.problem))
   interpolate!(FEFunction(U_reg,θ),vel,V_φ)
   J, C, dJ, dC, γ = _linesearch!(m,state,γ)
 
   ## Hilbertian extension-regularisation
-  project!(m.vel_ext,dJ)
-  project!(m.vel_ext,dC)
-  θ = update_descent_direction!(m.projector,dJ,C,dC,m.vel_ext.K)
+  project!(m.vel_ext,FEFunction(V_φ,dJ),V_φ)
+  project!(m.vel_ext,map(dCi->FEFunction(V_φ,dCi),dC),V_φ)
+  θ = update_descent_direction!(m.projector,dJ,C,dC,m.vel_ext.K,V_φ)
 
   ## Update history and build state
   push!(history,(J,C...,γ))
