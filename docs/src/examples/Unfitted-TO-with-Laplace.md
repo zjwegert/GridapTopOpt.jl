@@ -27,9 +27,11 @@ u &= 0~\text{on }\overline{\Omega}_D,
 where $C(\Omega)=(\operatorname{Vol}(\Omega) - 0.3)/\operatorname{Vol}(D)$ constrains the volume of $\Omega$. The
 background domain $D$ and boundary conditions are shown below:
 
+```@raw html
 <p align="center">
-<img src="./Unfitted-TO-with-Laplace-images/Unfitted-TO-with-Laplace.png" width="300">
+<img src="./Unfitted-TO-with-Laplace.png" width="300">
 </p>
+```
 
 ## Unfitted formulation
 In the following, we discretise the PDE governing $u$ using CutFEM based on [Burman et al. (2015)](https://doi.org/10.1002/nme.4823). The weak formulation for this problem is: for $V=H^1(\Omega;u_{\Gamma_D}=0)$, find $u\in V$ such that
@@ -240,8 +242,10 @@ writevtk(Ωs.Ωin,path*"Omega_in$it",cellfields=["uh"=>uh])
 ```
 
 Solving this problem results in the following iteration history:
+```@raw html
 <p align="center">
-<img src="./Unfitted-TO-with-Laplace-images/result.gif" width="300">
+<img src="Unfitted-TO-with-Laplace-result.gif" width="300">
 </p>
+```
 
 The full script for this problem can be found [here](../../../scripts/Examples/Unfitted/Thermal2D_CutFEM.jl).
