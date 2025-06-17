@@ -14,11 +14,9 @@ function main(;verbose,analytic_partials)
   Ω1 = Triangulation(model,1:12)
   Ω2 = Triangulation(model,9:16)
 
-  V_φ = TestFESpace(Ω,reffe)
+  V_φ = TestFESpace(model,reffe)
   φf(x) = x[1]+1
   φh = interpolate(φf,V_φ)
-  V_reg = TestFESpace(Ω,reffe)
-  U_reg = TrialFESpace(V_reg)
 
   V1 = FESpace(Ω1,reffe;dirichlet_tags="boundary")
   VB1 = MultiFieldFESpace([V1,V1])
@@ -49,9 +47,9 @@ function main(;verbose,analytic_partials)
   if analytic_partials
     ∂R2∂xh1((du1,du2),((u1,u2),),u3,v3,φ) = ∫(φ * (du1 + du2) * u3 * v3)dΩ2 - ∫(φ * φ * rhs[3] * (du1 + du2) * v3)dΩ2
     ∂Rk∂xhi = ((∂R2∂xh1,),)
-    φ_to_u = StaggeredAffineFEStateMap(op,∂Rk∂xhi,V_φ,U_reg,φh)
+    φ_to_u = StaggeredAffineFEStateMap(op,∂Rk∂xhi,V_φ,φh)
   else
-    φ_to_u = StaggeredAffineFEStateMap(op,V_φ,U_reg,φh)
+    φ_to_u = StaggeredAffineFEStateMap(op,V_φ,φh)
   end
 
   # Test solution

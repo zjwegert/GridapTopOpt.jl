@@ -14,13 +14,11 @@ function driver(model,verbose,analytic_partials)
   reffe = ReferenceFE(lagrangian,Float64,order)
   Ω = Triangulation(model)
 
-  V_φ = TestFESpace(Ω,reffe)
+  V_φ = TestFESpace(model,reffe)
   φf(x) = x[1]+1
   φh = interpolate(φf,V_φ)
-  V_reg = TestFESpace(Ω,reffe)
-  U_reg = TrialFESpace(V_reg)
 
-  V = FESpace(Ω,reffe;dirichlet_tags="boundary")
+  V = FESpace(model,reffe;dirichlet_tags="boundary")
 
   rhs = [x -> x[1], x -> (x[1] - x[2])]
   sol = [x -> rhs[1](x)*φf(x), x -> rhs[2](x)*φf(x)]
@@ -42,9 +40,9 @@ function driver(model,verbose,analytic_partials)
   if analytic_partials
     ∂R2∂xh1(du1,(u1,),u2,v2,φ) = ∫(du1 * u2 * v2)dΩ - ∫(φ * rhs[2] * du1 * v2)dΩ
     ∂Rk∂xhi = ((∂R2∂xh1,),)
-    φ_to_u = StaggeredAffineFEStateMap(op,∂Rk∂xhi,V_φ,U_reg,φh)
+    φ_to_u = StaggeredAffineFEStateMap(op,∂Rk∂xhi,V_φ,φh)
   else
-    φ_to_u = StaggeredAffineFEStateMap(op,V_φ,U_reg,φh)
+    φ_to_u = StaggeredAffineFEStateMap(op,V_φ,φh)
   end
 
   # Test solution
@@ -70,7 +68,7 @@ function driver(model,verbose,analytic_partials)
   end
   _,_,dF,_ = evaluate!(pcf,φh);
 
-  return dF,U_reg
+  return dF,V_φ
 end
 
 function main(distribute,mesh_partition,analytic_partials)

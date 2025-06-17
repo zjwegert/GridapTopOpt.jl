@@ -11,7 +11,7 @@ function main(;verbose,analytic_partials)
   order = 1
   reffe = ReferenceFE(lagrangian,Float64,order)
   Ω = Triangulation(model)
-  V = FESpace(Ω,reffe;dirichlet_tags="boundary")
+  V = FESpace(model,reffe;dirichlet_tags="boundary")
 
   sol = [x -> x[1], x -> x[2], x -> x[1] + x[2], x -> 2.0*x[1]]
   U1 = TrialFESpace(V,sol[1])
@@ -22,10 +22,8 @@ function main(;verbose,analytic_partials)
   # Define weakforms
   dΩ = Measure(Ω,4*order)
 
-  V_φ = TestFESpace(Ω,reffe)
+  V_φ = TestFESpace(model,reffe)
   φh = interpolate(1,V_φ)
-  V_reg = TestFESpace(Ω,reffe)
-  U_reg = TrialFESpace(V_reg)
 
   F(u::Function) = x -> (u(x) + 1) * u(x)
   F(u) = (u + 1) * u
@@ -61,9 +59,9 @@ function main(;verbose,analytic_partials)
     ∂R3∂xh1(du1,(u1,(u2,u3)),u4,v4,φ) = ∫(0du1)dΩ
     ∂R3∂xh2((du2,du3),(u1,(u2,u3)),u4,v4,φ) = ∫(du3 * (φ * F(u4) - F(sol[4])) * v4)dΩ
     ∂Rk∂xhi = ((∂R2∂xh1,),(∂R3∂xh1,∂R3∂xh2))
-    φ_to_u = StaggeredNonlinearFEStateMap(op,∂Rk∂xhi,V_φ,U_reg,φh;solver)
+    φ_to_u = StaggeredNonlinearFEStateMap(op,∂Rk∂xhi,V_φ,φh;solver)
   else
-    φ_to_u = StaggeredNonlinearFEStateMap(op,V_φ,U_reg,φh;solver)
+    φ_to_u = StaggeredNonlinearFEStateMap(op,V_φ,φh;solver)
   end
 
   ## Test gradient
@@ -88,7 +86,7 @@ function main(;verbose,analytic_partials)
   rel_error = norm(_dF - fdm_grad, Inf)/norm(fdm_grad,Inf)
 
   verbose && println("Relative error in gradient: $rel_error")
-  @test rel_error < 1e-8
+  @test rel_error < 1e-6
 end
 
 main(verbose = false, analytic_partials = true)

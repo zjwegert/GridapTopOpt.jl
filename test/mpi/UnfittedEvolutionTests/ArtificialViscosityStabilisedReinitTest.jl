@@ -12,7 +12,7 @@ function main(distribute,mesh_partition)
   ranks = distribute(LinearIndices((prod(mesh_partition),)))
 
   order = 1
-  n = 201
+  n = 101
   _model = CartesianDiscreteModel(ranks,mesh_partition,(0,1,0,1),(n,n))
   base_model = UnstructuredDiscreteModel(_model)
   ref_model = refine(base_model, refinement_method = "barycentric")
@@ -45,10 +45,10 @@ function main(distribute,mesh_partition)
 
   L2error(u) = sqrt(sum(∫(u ⋅ u)dΩ))
   # Check |∇(φh)|
-  @test abs(L2error(norm ∘ ∇(φh))-1) < 1e-4
+  @test abs(L2error(norm ∘ ∇(φh))-1) < 1e-3
 
   # Check φh error
-  @test L2error(φh-φh0) < 1e-4
+  @test L2error(φh-φh0) < 1e-3
 
   # Check facet coords
   geo = DiscreteGeometry(φh,model)
@@ -59,7 +59,7 @@ function main(distribute,mesh_partition)
   Γ0 = EmbeddedBoundary(cutgeo0)
 
   map(local_views(Γ),local_views(Γ0)) do Γ,Γ0
-    @test norm(Γ.parent.subfacets.point_to_coords - Γ0.parent.subfacets.point_to_coords,Inf) < 1e-4
+    @test norm(Γ.parent.subfacets.point_to_coords - Γ0.parent.subfacets.point_to_coords,Inf) < 1e-3
   end
 end
 

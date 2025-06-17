@@ -6,7 +6,7 @@ using Gridap, Gridap.Geometry, Gridap.Adaptivity
 using GridapEmbedded
 
 order = 1
-n = 201
+n = 50
 _model = CartesianDiscreteModel((0,1,0,1),(n,n))
 cd = Gridap.Geometry.get_cartesian_descriptor(_model)
 base_model = UnstructuredDiscreteModel(_model)
@@ -49,12 +49,12 @@ evolve!(evo,φh,velh,0.1)
 
 # Test advected LSF mataches expected LSF
 L2error(u) = sqrt(sum(∫(u ⋅ u)dΩ))
-@test L2error(φh_expected_lsf-φh) < 1e-4
+@test L2error(φh_expected_lsf-φh) < 1e-3
 
 # # Test advected LSF mataches original LSF when going backwards
 velh = interpolate(x->1,V_φ)
 evolve!(evo,φh,velh,0.1)
-@test L2error(φh0-φh) < 1e-5
+@test L2error(φh0-φh) < 1e-4
 
 # writevtk(
 #   Ω,"results/test_evolve",

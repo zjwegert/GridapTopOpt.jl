@@ -14,13 +14,11 @@ function driver(model,verbose)
   reffe = ReferenceFE(lagrangian,Float64,order)
   Ω = Triangulation(model)
 
-  V_φ = TestFESpace(Ω,reffe)
+  V_φ = TestFESpace(model,reffe)
   φf(x) = x[1]*x[2]+1
   φh = interpolate(φf,V_φ)
-  V_reg = TestFESpace(Ω,reffe)
-  U_reg = TrialFESpace(V_reg)
 
-  V = FESpace(Ω,reffe;dirichlet_tags="boundary")
+  V = FESpace(model,reffe;dirichlet_tags="boundary")
 
   rhs = [x->x[1],x->x[1]-x[2]]
   sol = [x->rhs[1](x)+rhs[2](x)*φf(x),x->rhs[2](x)]
@@ -35,7 +33,7 @@ function driver(model,verbose)
   l1((v1,v2),φ) = ∫(rhs[1] * v1 + v2*rhs[2])dΩ
 
   # Create operator from components
-  φ_to_u = AffineFEStateMap(a1,l1,UB,VB,V_φ,U_reg,φh)
+  φ_to_u = AffineFEStateMap(a1,l1,UB,VB,V_φ,φh)
 
   # Test solution
   GridapTopOpt.forward_solve!(φ_to_u,φh)
@@ -54,7 +52,7 @@ function driver(model,verbose)
   pcf = PDEConstrainedFunctionals(F,φ_to_u)
   _,_,dF,_ = evaluate!(pcf,φh)
 
-  return dF,U_reg
+  return dF,V_φ
 end
 
 function main(distribute,mesh_partition)

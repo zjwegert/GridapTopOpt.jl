@@ -20,14 +20,20 @@ makedocs(
       "Home" => "index.md",
       "Getting Started" => "getting-started.md",
       "Examples" => [
-        "Introductory Examples" => "examples/index.md",
+        "Introductory examples" => "examples/index.md",
+        "Topology optimisation on unfitted meshes" => "examples/Unfitted-TO-with-Laplace.md",
         "FSI with CutFEM" => "examples/Fluid-structure_interaction_with_CutFEM.md",
       ],
-      "Breaking Changes" => "breaking-changes.md",
+      "Breaking changes" => "breaking-changes.md",
       "Reference" => [
         "reference/optimisers.md",
         "reference/statemaps.md",
-        "reference/levelsetevolution.md",
+        "LevelSetEvolution" => [
+          "reference/levelsetevolution/index.md",
+          "reference/levelsetevolution/finitediff.md",
+          "reference/levelsetevolution/unfitted.md"
+        ],
+        "reference/embedded.md",
         "reference/velext.md",
         "reference/io.md",
         "reference/utilities.md",

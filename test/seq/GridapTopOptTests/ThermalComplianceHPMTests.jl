@@ -52,8 +52,19 @@ reffe_scalar = ReferenceFE(lagrangian,Float64,order)
 V = TestFESpace(model,reffe_scalar;dirichlet_tags=["Gamma_D"])
 U = TrialFESpace(V,0.0)
 
-V_φ = TestFESpace(model,reffe_scalar)#;dirichlet_tags=["Gamma_N"])
-# U_φ = TrialFESpace(V_φ,-0.1)
+  ## Setup solver and FE operators
+  state_map = AffineFEStateMap(a,l,U,V,V_φ,φh)
+  pcfs = if AD_case == :no_ad
+    PDEConstrainedFunctionals(J,[Vol],state_map,analytic_dJ=dJ,analytic_dC=[dVol])
+  elseif AD_case == :with_ad
+    PDEConstrainedFunctionals(J,[Vol],state_map)
+  elseif AD_case == :partial_ad1
+    PDEConstrainedFunctionals(J,[Vol],state_map,analytic_dJ=dJ)
+  elseif AD_case == :partial_ad2
+    PDEConstrainedFunctionals(J,[Vol],state_map,analytic_dC=[dVol])
+  else
+    @error "AD case not defined"
+  end
 
 V_φ_ = TestFESpace(model,reffe_scalar;dirichlet_tags=["Gamma_N"])
 U_φ_ = TrialFESpace(V_φ_,-0.01)

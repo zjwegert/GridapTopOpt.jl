@@ -7,47 +7,30 @@ struct HilbertianProjectionMap{A}
   function HilbertianProjectionMap(
     nC :: Int,
     orthog::OrthogonalisationMap,
-    vel_ext::VelocityExtension{A};
+    vel_ext::VelocityExtension;
     λ=0.5, α_min=0.1, α_max=1.0, debug=false
-  ) where A <: AbstractMatrix
-    θ = allocate_in_domain(vel_ext.K)
-    θ_aux = allocate_in_domain(vel_ext.K)
-    orth_caches = return_cache(orthog,fill(θ,nC),vel_ext.K)
-    caches = (θ,θ_aux,orth_caches)
-    params = (;λ,α_min,α_max,debug)
-    return new{A}(orthog,vel_ext,caches,params)
-  end
-  function HilbertianProjectionMap(
-    nC :: Int,
-    orthog::OrthogonalisationMap,
-    vel_ext::VelocityExtension{A};
-    λ=0.5, α_min=0.1, α_max=1.0, debug=false
-  ) where A <: PSparseMatrix
+  )
     θ  = allocate_in_domain(vel_ext.K)
     dC = [allocate_in_domain(vel_ext.K) for _ = 1:nC]
     θ_aux = allocate_in_domain(vel_ext.K)
     orth_caches = return_cache(orthog,dC,vel_ext.K)
     caches = (θ,θ_aux,dC,orth_caches)
     params = (;λ,α_min,α_max,debug)
-    return new{A}(orthog,vel_ext,caches,params)
+    return new{typeof(vel_ext.K)}(orthog,vel_ext,caches,params)
   end
 end
 
-function update_descent_direction!(m::HilbertianProjectionMap{<:AbstractMatrix},dV,C,dC,K)
-  θ, θ_aux, orthog_cache = m.caches
-  copy!(θ,dV)
-  _update_descent_direction!(m,θ,C,dC,K,θ_aux,orthog_cache)
-end
-
-function update_descent_direction!(m::HilbertianProjectionMap{<:PSparseMatrix},dV,C,dC,K)
+function update_descent_direction!(m::HilbertianProjectionMap,dV,C,dC,K,V_φ)
   θ, θ_aux, dC_aux, orthog_cache = m.caches
-  copy!(θ,dV)
-  copy!.(dC_aux,dC)
-  _update_descent_direction!(m,θ,C,dC_aux,K,θ_aux,orthog_cache)
+  U_reg = m.vel_ext.U_reg
+  interpolate!(FEFunction(V_φ,dV),θ,U_reg)
+  for i ∈ eachindex(dC)
+    interpolate!(FEFunction(V_φ,dC[i]),dC_aux[i],U_reg)
+  end
+  return _update_descent_direction!(m,θ,C,dC_aux,K,θ_aux,orthog_cache)
 end
 
 function _update_descent_direction!(m::HilbertianProjectionMap,θ,C,dC,K,θ_aux,orthog_cache)
-
   # Orthogonalisation of dC
   dC_orthog, normsq, nullity = evaluate!(orthog_cache,m.orthog,dC,K)
 
@@ -237,6 +220,7 @@ end
 function Base.iterate(m::HilbertianProjection)
   history, params = m.history, m.params
   φh = m.φ0
+  V_φ = get_aux_space(get_state_map(m.problem))
 
   ## Reinitialise as SDF
   reinit!(m.ls_evolver,φh,params.γ_reinit)
@@ -248,9 +232,9 @@ function Base.iterate(m::HilbertianProjection)
   φ_tmp = copy(vel)
 
   ## Hilbertian extension-regularisation
-  project!(m.vel_ext,dJ)
-  project!(m.vel_ext,dC)
-  θ = update_descent_direction!(m.projector,dJ,C,dC,m.vel_ext.K)
+  project!(m.vel_ext,FEFunction(V_φ,dJ),V_φ)
+  project!(m.vel_ext,map(dCi->FEFunction(V_φ,dCi),dC),V_φ)
+  θ = update_descent_direction!(m.projector,dJ,C,dC,m.vel_ext.K,V_φ)
 
   # Update history and build state
   push!(history,(J,C...,params.γ))
@@ -280,17 +264,15 @@ function Base.iterate(m::HilbertianProjection,state)
   end
 
   ## Line search
-  U_reg = get_deriv_space(m.problem.embedded_collection.state_map)
-  @show num_free_dofs(U_reg)
-  V_φ   = φh.fe_space #get_aux_space(m.problem.state_map)
-  @show num_free_dofs(V_φ)
+  U_reg = m.vel_ext.U_reg
+  V_φ = get_aux_space(get_state_map(m.problem))
   interpolate!(FEFunction(U_reg,θ),vel,V_φ)
   J, C, dJ, dC, γ = _linesearch!(m,state,γ)
 
   ## Hilbertian extension-regularisation
-  project!(m.vel_ext,dJ)
-  project!(m.vel_ext,dC)
-  θ = update_descent_direction!(m.projector,dJ,C,dC,m.vel_ext.K)
+  project!(m.vel_ext,FEFunction(V_φ,dJ),V_φ)
+  project!(m.vel_ext,map(dCi->FEFunction(V_φ,dCi),dC),V_φ)
+  θ = update_descent_direction!(m.projector,dJ,C,dC,m.vel_ext.K,V_φ)
 
   ## Update history and build state
   push!(history,(J,C...,γ))

@@ -12,13 +12,11 @@ function main(verbose)
   reffe = ReferenceFE(lagrangian,Float64,order)
   Ω = Triangulation(model)
 
-  V_φ = TestFESpace(Ω,reffe)
+  V_φ = TestFESpace(model,reffe)
   φf(x) = x[1]*x[2]+1
   φh = interpolate(φf,V_φ)
-  V_reg = TestFESpace(Ω,reffe)
-  U_reg = TrialFESpace(V_reg)
 
-  V = FESpace(Ω,reffe;dirichlet_tags="boundary")
+  V = FESpace(model,reffe;dirichlet_tags="boundary")
 
   rhs = [x -> x[2], x -> x[1] + x[2]]
   sol = [x -> rhs[1](x), x -> rhs[2](x) + rhs[1](x)*φf(x)]
@@ -38,7 +36,7 @@ function main(verbose)
   # Create operator from components
   lsolver = LUSolver()
   solver = NewtonSolver(lsolver;rtol=1.e-10,verbose)
-  φ_to_u = NonlinearFEStateMap(r,UB,VB,V_φ,U_reg,φh;nls=solver)
+  φ_to_u = NonlinearFEStateMap(r,UB,VB,V_φ,φh;nls=solver)
 
   ## Test solution
   GridapTopOpt.forward_solve!(φ_to_u,φh)

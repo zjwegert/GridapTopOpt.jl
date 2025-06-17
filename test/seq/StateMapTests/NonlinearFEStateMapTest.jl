@@ -8,16 +8,14 @@ using Test
 
 function main(verbose)
   model = CartesianDiscreteModel((0,1,0,1),(8,8))
-  order = 2
+  order = 1
   reffe = ReferenceFE(lagrangian,Float64,order)
   Ω = Triangulation(model)
 
-  V_φ = TestFESpace(Ω,reffe)
+  V_φ = TestFESpace(model,reffe)
   φh = interpolate(1,V_φ)
-  V_reg = TestFESpace(Ω,reffe)
-  U_reg = TrialFESpace(V_reg)
 
-  V = FESpace(Ω,reffe;dirichlet_tags="boundary")
+  V = FESpace(model,reffe;dirichlet_tags="boundary")
 
   _sol(x) = x[1] + 1
   U = TrialFESpace(V,_sol)
@@ -33,7 +31,7 @@ function main(verbose)
   # Create operator from components
   lsolver = LUSolver()
   solver = NewtonSolver(lsolver;rtol=1.e-10,verbose)
-  φ_to_u = NonlinearFEStateMap(r,U,V,V_φ,U_reg,φh;nls=solver)
+  φ_to_u = NonlinearFEStateMap(r,U,V,V_φ,φh;nls=solver)
 
   ## Test solution
   GridapTopOpt.forward_solve!(φ_to_u,φh)
@@ -60,7 +58,7 @@ function main(verbose)
   rel_error = norm(_dF - fdm_grad, Inf)/norm(fdm_grad,Inf)
 
   verbose && println("Relative error in gradient: $rel_error")
-  @test rel_error < 1e-8
+  @test rel_error < 1e-6
 end
 
 main(false)

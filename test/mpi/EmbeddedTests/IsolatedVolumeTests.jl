@@ -80,7 +80,7 @@ end
 
 function main_2d(distribute,mesh_partition;vtk=false)
   ranks = distribute(LinearIndices((prod(mesh_partition),)))
-  model = generate_model(2,40,ranks,mesh_partition)
+  model = generate_model(2,10,ranks,mesh_partition)
 
   μ,V_φ = main_2d_sub(model,"distributed_$mesh_partition";vtk)
 
@@ -111,7 +111,7 @@ function main_3d_sub(model,name;vtk=false)
     g(x,0.85,0.5,0.09),
     g(x,0.5,0.15,0.05))
   φh = interpolate(f,V_φ)
-  GridapTopOpt.correct_ls!(φh)
+  GridapTopOpt.correct_ls!(φh;tol=1e-8)
 
   geo = DiscreteGeometry(φh,model)
   cutgeo = cut(model,geo)
@@ -155,7 +155,7 @@ end
 
 function main_3d(distribute,mesh_partition;vtk=false)
   ranks = distribute(LinearIndices((prod(mesh_partition),)))
-  model = generate_model(3,40,ranks,mesh_partition)
+  model = generate_model(3,11,ranks,mesh_partition)
 
   μ,V_φ = main_3d_sub(model,"distributed_$mesh_partition";vtk)
 
@@ -198,7 +198,7 @@ function main_gmsh(ranks;vtk=false)
   a = 0.3;
   b = 0.01;
 
-  model = GmshDiscreteModel(ranks,"test/meshes/mesh_finer.msh")
+  model = GmshDiscreteModel(ranks,(@__DIR__)*"/../../meshes/mesh_finer.msh")
   vtk && writevtk(model,path*"model")
 
   # Cut the background model
@@ -240,27 +240,8 @@ with_mpi() do distribute
   main_2d(distribute,(2,2);vtk=false)
   main_2d(distribute,(1,4);vtk=false)
   main_2d(distribute,(4,1);vtk=false)
-end
-
-with_debug() do distribute
-  main_2d(distribute,(6,10);vtk=false)
-  main_2d(distribute,(7,3);vtk=false)
-end
-
-with_mpi() do distribute
   main_3d(distribute,(2,2,1);vtk=false)
-  main_3d(distribute,(2,1,2);vtk=false)
-  main_3d(distribute,(1,4,1);vtk=false)
-  main_3d(distribute,(4,1,1);vtk=false)
-  main_3d(distribute,(1,1,4);vtk=false)
-end
 
-with_debug() do distribute
-  main_3d(distribute,(3,4,5);vtk=false)
-  main_3d(distribute,(5,5,5);vtk=false)
-end
-
-with_mpi() do distribute
   ranks = distribute(LinearIndices((4,)))
   main_gmsh(ranks;vtk=true)
 end

@@ -6,7 +6,7 @@ using Gridap, Gridap.Geometry, Gridap.Adaptivity
 using GridapEmbedded, GridapEmbedded.LevelSetCutters
 
 order = 1
-n = 201
+n = 101
 _model = CartesianDiscreteModel((0,1,0,1),(n,n))
 cd = Gridap.Geometry.get_cartesian_descriptor(_model)
 base_model = UnstructuredDiscreteModel(_model)

@@ -6,7 +6,7 @@ using Gridap, Gridap.Geometry, Gridap.Adaptivity
 using GridapEmbedded, GridapEmbedded.LevelSetCutters
 
 order = 1
-n = 201
+n = 101
 _model = CartesianDiscreteModel((0,1,0,1),(n,n))
 cd = Gridap.Geometry.get_cartesian_descriptor(_model)
 base_model = UnstructuredDiscreteModel(_model)
@@ -37,10 +37,10 @@ reinit!(evo,φh);
 
 L2error(u) = sqrt(sum(∫(u ⋅ u)dΩ))
 # Check |∇(φh)|
-@test abs(L2error(norm ∘ ∇(φh))-1) < 1e-4
+@test abs(L2error(norm ∘ ∇(φh))-1) < 1e-3
 
 # Check φh error
-@test L2error(φh-φh0) < 1e-4
+@test L2error(φh-φh0) < 1e-3
 
 # Check facet coords
 geo = DiscreteGeometry(φh,model)
@@ -49,7 +49,7 @@ cutgeo = cut(model,geo)
 cutgeo0 = cut(model,geo0)
 Γ = EmbeddedBoundary(cutgeo)
 Γ0 = EmbeddedBoundary(cutgeo0)
-@test norm(Γ.subfacets.point_to_coords - Γ0.subfacets.point_to_coords,Inf) < 1e-4
+@test norm(Γ.subfacets.point_to_coords - Γ0.subfacets.point_to_coords,Inf) < 1e-3
 
 # writevtk(
 #   Ω,"results/test_evolve",

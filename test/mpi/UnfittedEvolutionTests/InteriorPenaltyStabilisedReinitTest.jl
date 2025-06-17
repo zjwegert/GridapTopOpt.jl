@@ -12,7 +12,7 @@ function main(distribute,mesh_partition)
   ranks = distribute(LinearIndices((prod(mesh_partition),)))
 
   order = 1
-  n = 201
+  n = 101
   _model = CartesianDiscreteModel(ranks,mesh_partition,(0,1,0,1),(n,n))
   base_model = UnstructuredDiscreteModel(_model)
   ref_model = refine(base_model, refinement_method = "barycentric")

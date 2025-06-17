@@ -11,10 +11,13 @@ using Gridap.Geometry, Gridap.FESpaces, Gridap.CellData, Gridap.Adaptivity, Grid
 
 using GridapDistributed, PartitionedArrays
 
-function main_2d(n;vtk)
+function main_2d(n;vtk,two_refinement=false)
   order = 1
   base_model = UnstructuredDiscreteModel(CartesianDiscreteModel((0,1,0,1),(n,n)))
   ref_model = refine(base_model, refinement_method = "barycentric")
+  if two_refinement
+    ref_model = refine(ref_model)
+  end
   model = Adaptivity.get_model(ref_model)
   Ω = Triangulation(model)
 
@@ -127,7 +130,7 @@ function main_3d(n;vtk)
   @test get_data(μ) == get_data(_data)
 end
 
-function main_gmsh(;vtk=false)
+function main_gmsh(msh_file;vtk=false)
   path = "./results/IsolatedGmsh_BiteTest/"
   files_path = path*"data/"
   mkpath(files_path)
@@ -140,7 +143,7 @@ function main_gmsh(;vtk=false)
   a = 0.3;
   b = 0.01;
 
-  model = GmshDiscreteModel("test/meshes/mesh_finer.msh")
+  model = GmshDiscreteModel((@__DIR__)*"/../../meshes/$msh_file")
   vtk && writevtk(model,path*"model")
 
   # Cut the background model
@@ -178,9 +181,10 @@ function main_gmsh(;vtk=false)
   end
 end
 
-main_2d(41;vtk=false)
-main_2d(101;vtk=false)
-main_3d(31;vtk=false)
-main_gmsh(;vtk=true)
+main_2d(10;vtk=false)
+main_2d(10;vtk=false,two_refinement=true)
+main_3d(11;vtk=false)
+main_gmsh("mesh.msh";vtk=false)
+# main_gmsh("mesh_finer.msh";vtk=true)
 
 end

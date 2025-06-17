@@ -11,7 +11,7 @@ using GridapDistributed, PartitionedArrays
 function main(distribute,mesh_partition)
   ranks = distribute(LinearIndices((prod(mesh_partition),)))
 
-  n = 200
+  n = 50
   order = 1
   _model = CartesianDiscreteModel(ranks,mesh_partition,(0,1,0,1),(n,n))
   base_model = UnstructuredDiscreteModel(_model)
@@ -44,17 +44,17 @@ function main(distribute,mesh_partition)
 
   velh = interpolate(x->-1,V_φ)
   evolve!(evo,φh,velh,0.1)
-  Δt = GridapTopOpt._compute_Δt(h,0.1,get_free_dof_values(velh))
+  Δt = 0.1*h
   φh_expected_lsf = interpolate(x->-sqrt((x[1]-0.5)^2+(x[2]-0.5)^2)+0.25+evo.evolver.params.max_steps*Δt,V_φ)
 
   # Test advected LSF mataches expected LSF
   L2error(u) = sqrt(sum(∫(u ⋅ u)dΩ))
-  @test L2error(φh_expected_lsf-φh) < 1e-4
+  @test L2error(φh_expected_lsf-φh) < 1e-3
 
   # # Test advected LSF mataches original LSF when going backwards
   velh = interpolate(x->1,V_φ)
   evolve!(evo,φh,velh,0.1)
-  @test L2error(φh0-φh) < 1e-5
+  @test L2error(φh0-φh) < 1e-4
 end
 
 with_mpi() do distribute

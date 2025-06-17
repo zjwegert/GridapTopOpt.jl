@@ -12,13 +12,11 @@ function main(verbose)
   reffe = ReferenceFE(lagrangian,Float64,order)
   Ω = Triangulation(model)
 
-  V_φ = TestFESpace(Ω,reffe)
+  V_φ = TestFESpace(model,reffe)
   φf(x) = x[1]*x[2]+1
   φh = interpolate(φf,V_φ)
-  V_reg = TestFESpace(Ω,reffe)
-  U_reg = TrialFESpace(V_reg)
 
-  V = FESpace(Ω,reffe;dirichlet_tags="boundary")
+  V = FESpace(model,reffe;dirichlet_tags="boundary")
 
   _rhs(x) = x[1] - x[2]
   _sol(x) = _rhs(x)*φf(x)
@@ -31,7 +29,7 @@ function main(verbose)
   l1(v1,φ) = ∫(φ* φ * _rhs * v1)dΩ
 
   # Create operator from components
-  φ_to_u = AffineFEStateMap(a1,l1,U,V,V_φ,U_reg,φh)
+  φ_to_u = AffineFEStateMap(a1,l1,U,V,V_φ,φh)
 
   # Test solution
   GridapTopOpt.forward_solve!(φ_to_u,φh)

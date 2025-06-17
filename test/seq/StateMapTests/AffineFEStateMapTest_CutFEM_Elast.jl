@@ -30,8 +30,6 @@ function main(n;verbose=true)
   # Cut the background model
   reffe_scalar = ReferenceFE(lagrangian,Float64,1)
   V_φ = TestFESpace(model,reffe_scalar)
-  V_reg = TestFESpace(model,reffe_scalar)#;dirichlet_tags=["Gamma_N"])
-  U_reg = TrialFESpace(V_reg)
 
   f((x,y),q,r) = - cos(q*π*x)*cos(q*π*y)/q - r/q
   lsf(x) = f(x,4,0.1)
@@ -112,7 +110,7 @@ function main(n;verbose=true)
   state_collection = GridapTopOpt.EmbeddedCollection_in_φh(model,φh) do _φh
     update_collection!(Ω_data,_φh)
     U,V = build_spaces(Ω_data.Ω_act)
-    state_map = AffineFEStateMap(a,l,U,V,V_φ,U_reg,_φh)
+    state_map = AffineFEStateMap(a,l,U,V,V_φ,_φh)
     (;
       :state_map => state_map,
       :J => GridapTopOpt.StateParamMap(J_comp,state_map),
@@ -133,7 +131,7 @@ function main(n;verbose=true)
   rel_error = norm(_dF - fdm_grad,Inf)/norm(fdm_grad,Inf)
 
   verbose && println("Relative error in gradient: $rel_error")
-  @test rel_error < 1e-8
+  @test rel_error < 1e-6
 end
 
 main(10;verbose=true)

@@ -110,7 +110,7 @@ function main(;AD,use_mfs=false)
   stencil = HamiltonJacobiEvolution(FirstOrderStencil(2,Float64),model,V_φ,tol,max_steps)
 
   ## Setup solver and FE operators
-  state_map = RepeatingAffineFEStateMap(5,a,l,UP,VQ,V_φ,U_reg,φh)
+  state_map = RepeatingAffineFEStateMap(5,a,l,UP,VQ,V_φ,φh)
   pcfs = if AD
     PDEConstrainedFunctionals(J,[C1],state_map;analytic_dJ=DJ,analytic_dC=[DC1])
   else

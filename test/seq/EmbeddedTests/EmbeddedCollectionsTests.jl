@@ -35,7 +35,7 @@ function main()
     )
   end
 
-  function r_Γ(cutgeo,cutgeo_facet)
+  function r_Γ(cutgeo,cutgeo_facet,φh)
     Γ = EmbeddedBoundary(cutgeo)
     (;
       :Γ  => Γ,

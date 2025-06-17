@@ -12,7 +12,7 @@ function main(distribute,mesh_partition)
   ranks = distribute(LinearIndices((prod(mesh_partition),)))
 
   order = 1
-  n = 201
+  n = 101
   _model = CartesianDiscreteModel(ranks,mesh_partition,(0,1,0,1),(n,n))
   base_model = UnstructuredDiscreteModel(_model)
   ref_model = refine(base_model, refinement_method = "barycentric")
@@ -38,7 +38,7 @@ function main(distribute,mesh_partition)
 
   ls_evo = CutFEMEvolve(V_φ,Ωs,dΩ,h)
   reinit1 = StabilisedReinit(V_φ,Ωs,dΩ,h;
-    stabilisation_method=ArtificialViscosity(2.0),
+    stabilisation_method=ArtificialViscosity(1.5h),
     nls = GridapSolvers.NewtonSolver(LUSolver();maxiter=50,rtol=1.e-14,verbose=i_am_main(ranks)))
   reinit2 = StabilisedReinit(V_φ,Ωs,dΩ,h;
     stabilisation_method=InteriorPenalty(V_φ),

@@ -195,8 +195,9 @@ function cut_conforming(topo::UnstructuredGridTopology{D}, cell_values) where D
 
     if !cell_iscut[cell]
       n_subcells += 1
-      subcell_nodes[n_subcells] = nodes
-      subcell_polys[n_subcells] = p
+      _p, _nodes = ensure_positive_orientation(p, nodes)
+      subcell_nodes[n_subcells] = _nodes
+      subcell_polys[n_subcells] = _p
       subcell_to_inout[n_subcells] = ifelse(all(v->v<0,values),IN,OUT)
       subcell_to_cell[n_subcells] = cell
     else
@@ -213,14 +214,16 @@ function cut_conforming(topo::UnstructuredGridTopology{D}, cell_values) where D
       nodes = [nodes...,edge_to_new_node[edges]...]
 
       n_subcells += 1
-      subcell_nodes[n_subcells] = nodes[lnodes_in]
-      subcell_polys[n_subcells] = p_in
+      _p_in, _nodes_in = ensure_positive_orientation(p_in, nodes[lnodes_in])
+      subcell_nodes[n_subcells] = _nodes_in
+      subcell_polys[n_subcells] = _p_in
       subcell_to_inout[n_subcells] = IN
       subcell_to_cell[n_subcells] = cell
 
       n_subcells += 1
-      subcell_nodes[n_subcells] = nodes[lnodes_out]
-      subcell_polys[n_subcells] = p_out
+      _p_out, _nodes_out = ensure_positive_orientation(p_out, nodes[lnodes_out])
+      subcell_nodes[n_subcells] = _nodes_out
+      subcell_polys[n_subcells] = _p_out
       subcell_to_inout[n_subcells] = OUT
       subcell_to_cell[n_subcells] = cell
     end
@@ -236,17 +239,20 @@ function cut_conforming(topo::UnstructuredGridTopology{D}, cell_values) where D
   return ptopo, subcell_to_inout, subcell_to_cell
 end
 
-# function cut_conforming(model::UnstructuredDiscreteModel{D}, cell_values) where D
-#   ptopo, subcell_to_inout, subcell_to_cell = cut_conforming(get_grid_topology(model),cell_values)
-#   pgrid = Geometry.PolytopalGrid(
-#     Geometry.get_vertex_coordinates(ptopo),
-#     Geometry.get_faces(ptopo,D,0),
-#     get_polytopes(ptopo)
-#   )
-#   plabels = FaceLabeling(ptopo)
-#   pmodel = Geometry.PolytopalDiscreteModel(pgrid,ptopo,plabels)
-#   return pmodel, subcell_to_inout, subcell_to_cell
-# end
+function ensure_positive_orientation(p::GeneralPolytope{D}, new_to_old) where D
+  ReferenceFEs.compute_orientation(p) > 0 && (return p, new_to_old)
+
+  graph = map(reverse,ReferenceFEs.get_graph(p))
+  vertices = get_vertex_coordinates(p)
+  return GeneralPolytope{D}(vertices,graph,p.isopen,nothing), new_to_old
+end
+
+function ensure_positive_orientation(p::GeneralPolytope{2}, new_to_old)
+  ReferenceFEs.compute_orientation(p) > 0 && (return p, new_to_old)
+
+  vertices = get_vertex_coordinates(p)
+  return GeneralPolytope{2}(reverse(vertices)), reverse(new_to_old)
+end
 
 function cut_conforming(model, cell_values)
   ptopo, subcell_to_inout, subcell_to_cell = cut_conforming(get_grid_topology(model),cell_values)

@@ -99,7 +99,7 @@ function main(distribute,mesh_partition)
   ls_evo = HamiltonJacobiEvolution(FirstOrderStencil(2,Float64),model,V_φ,tol,max_steps)
 
   ## Setup solver and FE operators
-  state_map = NonlinearFEStateMap(res,U,V,V_φ,U_reg,φh;jac)
+  state_map = NonlinearFEStateMap(res,U,V,V_φ,φh;jac)
   pcfs = PDEConstrainedFunctionals(J,[Vol],state_map,analytic_dC=[dVol])
 
   ## Hilbertian extension-regularisation problems

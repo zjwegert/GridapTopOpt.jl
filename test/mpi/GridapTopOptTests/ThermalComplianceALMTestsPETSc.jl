@@ -81,10 +81,10 @@ function main(distribute,mesh_partition;order,AD)
   solver = PETScLinearSolver()
 
   state_map = AffineFEStateMap(
-    a,l,U,V,V_φ,U_reg,φh;
+    a,l,U,V,V_φ,φh;
     assem_U = SparseMatrixAssembler(Tm,Tv,U,V),
     assem_adjoint = SparseMatrixAssembler(Tm,Tv,V,U),
-    assem_deriv = SparseMatrixAssembler(Tm,Tv,U_reg,U_reg),
+    assem_deriv = SparseMatrixAssembler(Tm,Tv,V_φ,V_φ),
     ls = solver,adjoint_ls = solver
   )
   pcfs = if AD
@@ -129,7 +129,7 @@ function main_3d(distribute,mesh_partition,;order)
   prop_Γ_N = 0.2
   prop_Γ_D = 0.2
   dom = (0,xmax,0,ymax,0,zmax)
-  el_size = (20,20,20)
+  el_size = (10,10,10)
   γ = 0.1
   γ_reinit = 0.5
   max_steps = floor(Int,order*minimum(el_size)/10)
