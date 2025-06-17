@@ -29,7 +29,7 @@ background domain $D$ and boundary conditions are shown below:
 
 ```@raw html
 <p align="center">
-<img src="./Unfitted-TO-with-Laplace.png" width="300">
+<img src="../Unfitted-TO-with-Laplace.png" width="300">
 </p>
 ```
 
@@ -244,7 +244,7 @@ writevtk(Ωs.Ωin,path*"Omega_in$it",cellfields=["uh"=>uh])
 Solving this problem results in the following iteration history:
 ```@raw html
 <p align="center">
-<img src="Unfitted-TO-with-Laplace-result.gif" width="300">
+<img src="../Unfitted-TO-with-Laplace-result.gif" width="300">
 </p>
 ```
 
