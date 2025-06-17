@@ -1,3 +1,4 @@
+module tmp
 using Gridap,GridapTopOpt, GridapSolvers
 using Gridap.Adaptivity, Gridap.Geometry
 using GridapEmbedded, GridapEmbedded.LevelSetCutters
@@ -9,7 +10,7 @@ using GridapEmbedded.LevelSetCutters: DifferentiableTriangulation
 path="./results/CutFEM_thermal_compliance_ALM_island_detect/"
 rm(path,force=true,recursive=true)
 mkpath(path)
-n = 50
+n = 30
 order = 1
 γ = 0.2
 max_steps = floor(Int,order*n/10)
@@ -47,8 +48,8 @@ U_φ_ = TrialFESpace(V_reg,-1.0)
 ## Levet-set function
 φh = interpolate(x->-cos(4π*x[1])*cos(4π*x[2])-0.4,V_φ)
 Ωs = EmbeddedCollection(model,φh) do cutgeo,_,_
-  Ωin = DifferentiableTriangulation(Triangulation(cutgeo,PHYSICAL),U_φ_)
-  Γ = DifferentiableTriangulation(EmbeddedBoundary(cutgeo),U_φ_)
+  Ωin = DifferentiableTriangulation(Triangulation(cutgeo,PHYSICAL),V_φ)
+  Γ = DifferentiableTriangulation(EmbeddedBoundary(cutgeo),V_φ)
   Γg = GhostSkeleton(cutgeo)
   Ωact = Triangulation(cutgeo,ACTIVE)
   (;
@@ -81,7 +82,7 @@ dVol(q,u,φ) = ∫(-1/vol_D*q/(abs(Ωs.n_Γ ⋅ ∇(φ))))Ωs.dΓ
 state_collection = GridapTopOpt.EmbeddedCollection_in_φh(model,φh) do _φh
   V = TestFESpace(Ωs.Ωact,reffe_scalar;dirichlet_tags=["Gamma_D"])
   U = TrialFESpace(V,0.0)
-  state_map = AffineFEStateMap(a,l,U,V,U_φ_,U_reg,_φh)
+  state_map = AffineFEStateMap(a,l,U,V,V_φ,_φh)
   (;
     :state_map => state_map,
     :J => StateParamMap(J,state_map),
@@ -89,16 +90,14 @@ state_collection = GridapTopOpt.EmbeddedCollection_in_φh(model,φh) do _φh
   )
 end
 
-pcfs = EmbeddedPDEConstrainedFunctionals(state_collection;analytic_dC=(dVol,))
-
-# function φ_to_jc(φ,state_collection)
-#   u = state_collection.state_map(φ)
-#   j = state_collection.J(u,φ)
-#   c = state_collection.C[1](u,φ)
-#   [j,c]
-# end
-# φ_to_jc(state_collection) = φ -> φ_to_jc(φ,state_collection)
-# #pcfs = CustomEmbeddedPDEConstrainedFunctionals(φ_to_jc,state_collection,Ωs,φh)
+function φ_to_jc(φ,state_collection)
+  u = state_collection.state_map(φ)
+  j = state_collection.J(u,φ)
+  c = state_collection.C[1](u,φ)
+  [j,c]
+end
+φ_to_jc(state_collection) = φ -> φ_to_jc(φ,state_collection)
+pcfs = CustomEmbeddedPDEConstrainedFunctionals(φ_to_jc,state_collection,Ωs,φh)
 
 
 ## Evolution Method
@@ -126,7 +125,7 @@ for (it,uh,φh,state) in optimiser
   idx = findall(isapprox(0.0;atol=10^-10),x_φ)
   !isempty(idx) && @warn "Boundary intersects nodes!"
   if iszero(it % iter_mod)
-    writevtk(Ω,path*"Omega$it",cellfields=["φ"=>φh,"|∇(φ)|"=>(norm ∘ ∇(φh)),"uh"=>uh,"velh"=>FEFunction(V_φ,state.vel),"χ"=>Ωs.χ])
+    writevtk(Ω,path*"Omega$it",cellfields=["φ"=>φh,"χ"=>Ωs.χ])
     writevtk(Ωs.Ωin,path*"Omega_in$it",cellfields=["uh"=>uh])
   end
   write_history(path*"/history.txt",optimiser.history)
@@ -134,3 +133,4 @@ end
 it = get_history(optimiser).niter; uh = get_state(pcfs)
 writevtk(Ω,path*"Omega$it",cellfields=["φ"=>φh,"|∇(φ)|"=>(norm ∘ ∇(φh)),"uh"=>uh,"χ"=>Ωs.χ])
 writevtk(Ωs.Ωin,path*"Omega_in$it",cellfields=["uh"=>uh])
+end
