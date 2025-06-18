@@ -220,7 +220,7 @@ end
 function Base.iterate(m::HilbertianProjection)
   history, params = m.history, m.params
   φh = m.φ0
-  V_φ = get_aux_space(get_state_map(m.problem))
+  V_φ = φh.fe_space#get_aux_space(get_state_map(m.problem))
 
   ## Reinitialise as SDF
   reinit!(m.ls_evolver,φh,params.γ_reinit)
@@ -265,7 +265,7 @@ function Base.iterate(m::HilbertianProjection,state)
 
   ## Line search
   U_reg = m.vel_ext.U_reg
-  V_φ = get_aux_space(get_state_map(m.problem))
+  V_φ = φh.fe_space #get_aux_space(get_state_map(m.problem))
   interpolate!(FEFunction(U_reg,θ),vel,V_φ)
   J, C, dJ, dC, γ = _linesearch!(m,state,γ)
 

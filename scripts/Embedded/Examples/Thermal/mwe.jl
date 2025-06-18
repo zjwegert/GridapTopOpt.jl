@@ -48,6 +48,9 @@ j_val, j_pullback = rrule(J,u.free_values,φh.free_values)   # Compute functiona
 _, _, dFdφ     = j_pullback(1)
 sum(dFdφ)
 
+dsds
+
+
 end
 
 

@@ -18,7 +18,7 @@ vf = 0.4
 α_coeff = max_steps*γ
 iter_mod = 1
 
-_model = simplexify(CartesianDiscreteModel((0,1,0,1),(n,n)))
+_model = (CartesianDiscreteModel((0,1,0,1),(n,n)))
 # base_model = UnstructuredDiscreteModel(_model)
 # ref_model = refine(base_model, refinement_method = "barycentric")
 # model = ref_model.model
@@ -82,7 +82,7 @@ dVol(q,u,φ) = ∫(-1/vol_D*q/(abs(Ωs.n_Γ ⋅ ∇(φ))))Ωs.dΓ
 state_collection = GridapTopOpt.EmbeddedCollection_in_φh(model,φh) do _φh
   V = TestFESpace(Ωs.Ωact,reffe_scalar;dirichlet_tags=["Gamma_D"])
   U = TrialFESpace(V,0.0)
-  state_map = AffineFEStateMap(a,l,U,V,V_φ,_φh)
+  state_map = AffineFEStateMap(a,l,U,V,V_φ)
   (;
     :state_map => state_map,
     :J => StateParamMap(J,state_map),
@@ -90,36 +90,43 @@ state_collection = GridapTopOpt.EmbeddedCollection_in_φh(model,φh) do _φh
   )
 end
 
-function φ_to_jc(φ,state_collection)
+function φ_to_jc(φ)
   u = state_collection.state_map(φ)
   j = state_collection.J(u,φ)
   c = state_collection.C[1](u,φ)
   [j,c]
 end
-φ_to_jc(state_collection) = φ -> φ_to_jc(φ,state_collection)
+#φ_to_jc(state_collection) = φ -> φ_to_jc(φ,state_collection)
 pcfs = CustomEmbeddedPDEConstrainedFunctionals(φ_to_jc,state_collection,Ωs,φh)
 
 
-## Evolution Method
-evo = CutFEMEvolve(V_φ,Ωs,dΩ,h;max_steps,γg=0.1)
-reinit1 = StabilisedReinit(V_φ,Ωs,dΩ,h;stabilisation_method=ArtificialViscosity(3.0))
-reinit2 = StabilisedReinit(V_φ,Ωs,dΩ,h;stabilisation_method=GridapTopOpt.InteriorPenalty(V_φ,γg=2.0))
-reinit = GridapTopOpt.MultiStageStabilisedReinit([reinit1,reinit2])
-ls_evo = UnfittedFEEvolution(evo,reinit)
+# ## Evolution Method
+# evo = CutFEMEvolve(V_φ,Ωs,dΩ,h;max_steps,γg=0.1)
+# reinit1 = StabilisedReinit(V_φ,Ωs,dΩ,h;stabilisation_method=ArtificialViscosity(3.0))
+# reinit2 = StabilisedReinit(V_φ,Ωs,dΩ,h;stabilisation_method=GridapTopOpt.InteriorPenalty(V_φ,γg=2.0))
+# reinit = GridapTopOpt.MultiStageStabilisedReinit([reinit1,reinit2])
+# ls_evo = UnfittedFEEvolution(evo,reinit)
+
+
+Ω = dΩ.quad.trian
+model = get_background_model(Ω)
+el_size = el_Δ #model.grid.node_coords.data.partition 
+max_steps = floor(Int,order*minimum(el_size)/10)
+tol = 1/(5order^2)/minimum(el_size)
+α_coeff = 4max_steps*γ * α_coeff
+ls_evo = HamiltonJacobiEvolution(FirstOrderStencil(2,Float64),model,V_φ,tol,max_steps)
+# 
+
+
 
 ## Hilbertian extension-regularisation problems
 α = α_coeff*(h_refine/order)^2
 a_hilb(p,q) =∫(α*∇(p)⋅∇(q) + p*q)dΩ;
 vel_ext = VelocityExtension(a_hilb,U_reg,V_reg)
 
-## Optimiser
-converged(m) = GridapTopOpt.default_al_converged(
-  m;
-  L_tol = 0.01*h_refine,
-  C_tol = 0.01
-)
-optimiser = AugmentedLagrangian(pcfs,ls_evo,vel_ext,φh;debug=true,
-  γ,verbose=true,constraint_names=[:Vol],converged)
+
+optimiser = HilbertianProjection(pcfs,ls_evo,vel_ext,φh;debug=true,
+  γ,verbose=true,constraint_names=[:Vol])
 for (it,uh,φh,state) in optimiser
   x_φ = get_free_dof_values(φh)
   idx = findall(isapprox(0.0;atol=10^-10),x_φ)
@@ -133,4 +140,5 @@ end
 it = get_history(optimiser).niter; uh = get_state(pcfs)
 writevtk(Ω,path*"Omega$it",cellfields=["φ"=>φh,"|∇(φ)|"=>(norm ∘ ∇(φh)),"uh"=>uh,"χ"=>Ωs.χ])
 writevtk(Ωs.Ωin,path*"Omega_in$it",cellfields=["uh"=>uh])
+
 end
