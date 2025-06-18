@@ -92,7 +92,7 @@ writevtk(model,path*"model")
 ```
 
 !!! warning
-    Non-TET/TRI polytopes are simplexified by GridapEmbedded when cutting. As a result,derivative information will not be correct when using a mesh that isn't made of TRI/TET. Please use a mesh with TRI/TET polytopes to ensure correctness of derivative results.
+    Non-TET/TRI polytopes are simplexified by GridapEmbedded when cutting. As a result, derivative information from AD will not be correct when using a mesh that isn't made of TRI/TET. Please use a mesh with TRI/TET polytopes to ensure correctness of derivative results.
 
 ## FESpace for level-set function and derivatives
 In example, we consider piecewise linear cuts defined via a level-set function. As such, the level-set function should be discretised using continuous piecewise-linear finite elements. In addition, we use the same space for the derivatives, except we also constrain the derivative space so that the shape derivatives are zero on $\overline{\Omega}_D$ and $\Gamma_N$.

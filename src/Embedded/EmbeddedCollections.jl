@@ -30,7 +30,7 @@ struct EmbeddedCollection
       bgmodel::Union{<:DiscreteModel,<:DistributedDiscreteModel})
     @warn check_polytopes(bgmodel) """
       Non-TET/TRI polytopes are simplexified by GridapEmbedded when cutting. As a result,
-      derivative information will not be correct when using a mesh that isn't made of TRI/TET.
+      derivative information from AD will not be correct when using a mesh that isn't made of TRI/TET.
 
       Please use a mesh with TRI/TET polytopes to ensure correctness of derivative results.
     """
