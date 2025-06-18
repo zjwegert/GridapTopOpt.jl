@@ -4,6 +4,9 @@
     This page is still under construction! Please refer to the tutorial
     for a discussion of functionality.
 
+!!! warning
+    Non-TET/TRI polytopes are simplexified by GridapEmbedded when cutting. As a result,derivative information will not be correct when using a mesh that isn't made of TRI/TET. Please use a mesh with TRI/TET polytopes to ensure correctness of derivative results.
+
 ## Isolated volumes
 ```@autodocs
 Modules = [GridapTopOpt]

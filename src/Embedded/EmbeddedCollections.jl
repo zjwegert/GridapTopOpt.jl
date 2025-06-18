@@ -26,6 +26,25 @@ struct EmbeddedCollection
   recipes :: Vector{<:Function}
   objects :: Dict{Symbol,Any}
   bgmodel :: Union{<:DiscreteModel,<:DistributedDiscreteModel}
+  function EmbeddedCollection(recipes::Vector{<:Function},objects::Dict{Symbol,Any},
+      bgmodel::Union{<:DiscreteModel,<:DistributedDiscreteModel})
+    @warn check_polytopes(bgmodel) """
+      Non-TET/TRI polytopes are simplexified by GridapEmbedded when cutting. As a result,
+      derivative information will not be correct when using a mesh that isn't made of TRI/TET.
+
+      Please use a mesh with TRI/TET polytopes to ensure correctness of derivative results.
+    """
+    new(recipes, objects, bgmodel)
+  end
+end
+
+function check_polytopes(bgmodel)
+  polytopes = get_polytopes(bgmodel)
+  return all(p -> p == TRI || p == TET, polytopes)
+end
+
+function check_polytopes(bgmodel::DistributedDiscreteModel)
+  map(check_polytopes, local_views(bgmodel))
 end
 
 function EmbeddedCollection(recipes::Function,bgmodel)
