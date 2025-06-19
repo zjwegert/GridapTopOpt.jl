@@ -29,7 +29,7 @@ struct EmbeddedCollection
   function EmbeddedCollection(recipes::Vector{<:Function},objects::Dict{Symbol,Any},
       bgmodel::Union{<:DiscreteModel,<:DistributedDiscreteModel})
 
-    if ~check_polytopes(bgmodel)
+    if ~all(check_polytopes(bgmodel))
       i_am_main(get_parts(bgmodel)) && @warn """
       Non-TET/TRI polytopes are simplexified by GridapEmbedded when cutting. As a result,
       derivative information from AD will not be correct when using a mesh that isn't made of TRI/TET.
