@@ -28,14 +28,13 @@ struct EmbeddedCollection
   bgmodel :: Union{<:DiscreteModel,<:DistributedDiscreteModel}
   function EmbeddedCollection(recipes::Vector{<:Function},objects::Dict{Symbol,Any},
       bgmodel::Union{<:DiscreteModel,<:DistributedDiscreteModel})
+    map(check_polytopes(bgmodel)) do check_poly
+      check_poly && i_am_main(get_parts(bgmodel)) && @warn """
+        Non-TET/TRI polytopes are simplexified by GridapEmbedded when cutting. As a result,
+        derivative information from AD will not be correct when using a mesh that isn't made of TRI/TET.
 
-    if ~all(check_polytopes(bgmodel))
-      i_am_main(get_parts(bgmodel)) && @warn """
-      Non-TET/TRI polytopes are simplexified by GridapEmbedded when cutting. As a result,
-      derivative information from AD will not be correct when using a mesh that isn't made of TRI/TET.
-
-      Please use a mesh with TRI/TET polytopes to ensure correctness of derivative results.
-    """
+        Please use a mesh with TRI/TET polytopes to ensure correctness of derivative results.
+      """
     end
     new(recipes, objects, bgmodel)
   end
