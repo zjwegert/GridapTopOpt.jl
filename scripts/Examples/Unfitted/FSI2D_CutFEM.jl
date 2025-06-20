@@ -18,11 +18,11 @@ using GridapTopOpt: StaggeredStateParamMap
   Optimisation problem:
       Min J(Ωₛ) = ∫ ε(d) ⊙ σ(ε(d)) dΩ
        Ωₛ
-    s.t., Vol(Ωₛ) = 0.1,
-          R₁((u,p),(v,q)) = 0, ⟶ ⎡(u,p)∈U×Q [=H¹(Ωf;u(Γ_D)=uᵢₙ)×L²(Ωf)],
-                                 ⎣a_f(u,v) + b_f(v,p) + b_f(u,q) + j_fu(u,v) + j_fp(p,q) + i_f(p,q) = 0, ∀(v,q)∈V×Q,
-          R₂((u,p),d.s) = 0.   ⟶ ⎡d∈V=H¹(Ωₛ;u(Γ_D)=0),
-                                 ⎣∫ ε(s) ⊙ σ ∘ ε(d) dΩₛ + j(d,s) + i(d,s) - ∫ n ⋅ σf(u,p)) ⋅ s dΓ = 0, ∀s∈V.
+    s.t., Vol(Ωₛ) = 0.07,
+          R₁((u,p),(v,q)) = 0, -> ⎡(u,p)∈U×Q [=H¹(Ωf;u(Γ_D)=uᵢₙ)×L²(Ωf)],
+                                  ⎣a_f(u,v) + b_f(v,p) + b_f(u,q) + j_fu(u,v) + j_fp(p,q) + i_f(p,q) = 0, ∀(v,q)∈V×Q,
+          R₂((u,p),d.s) = 0.   -> ⎡d∈V=H¹(Ωₛ;u(Γ_D)=0),
+                                  ⎣∫ ε(s) ⊙ σ ∘ ε(d) dΩₛ + j(d,s) + i(d,s) - ∫ n ⋅ σf(u,p)) ⋅ s dΓ = 0, ∀s∈V.
 
   - For R₁ above, a_f(u,v) is the velocity bilinear form, b_f(v,p) and b_f(u,q) are the
     velocity-pressure coupling terms, j_fu(u,v) is the velocity ghost penalty term over
@@ -55,16 +55,16 @@ function main(model,geo_params;ls=LUSolver(),hilb_ls=LUSolver())
   hmin = minimum(get_element_diameters(model))
 
   # Params
-  vf = 0.1
-  γ_evo =  0.1
+  vf = 0.07
+  γ_evo =  0.2#15
   max_steps = 1/hmin/10
-  iter_mod = 10
+  iter_mod = 5
   D = 2
 
   # Cut the background model
   reffe_scalar = ReferenceFE(lagrangian,Float64,1)
   V_φ = TestFESpace(model,reffe_scalar)
-  V_reg = TestFESpace(model,reffe_scalar;dirichlet_tags=["Omega_NonDesign","Gamma_Bottom"])
+  V_reg = TestFESpace(model,reffe_scalar;dirichlet_tags=["Omega_NonDesign","Gamma_Bottom","Gamma_s_D"])
   U_reg = TrialFESpace(V_reg)
 
   _e = 1/3*hmin
@@ -74,7 +74,7 @@ function main(model,geo_params;ls=LUSolver(),hilb_ls=LUSolver())
   fin(x) = f0(x,l*(1+5_e),a*(1+5_e))
   fsolid(x) = min(f0(x,l*(1+_e),b*(1+_e)),f0(x,w*(1+_e),a*(1+_e)))
   fholes((x,y),q,r) = max(f1((x,y),q,r),f1((x-1/q,y),q,r))
-  lsf(x) = min(max(fin(x),fholes(x,25,0.2)),fsolid(x))
+  lsf(x) = min(max(fin(x),fholes(x,18,0.6)),fsolid(x))
   φh = interpolate(lsf,V_φ)
   writevtk(Ω_act,files_path*"Omega_act_φh",
     cellfields=["φ"=>φh,"|∇(φ)|"=>(norm ∘ ∇(φh))])
@@ -202,7 +202,7 @@ function main(model,geo_params;ls=LUSolver(),hilb_ls=LUSolver())
   end
   λs, μs = lame_parameters(0.1,0.05)
   # Stabilization
-  α_Gd = 1e-7
+  α_Gd = 1e-3
   k_d = 1.0
   γ_Gd(h) = α_Gd*(λs + μs)*h^3
   γ_Gd_h = mean(γ_Gd ∘ hₕ)
@@ -224,7 +224,7 @@ function main(model,geo_params;ls=LUSolver(),hilb_ls=LUSolver())
 
   ## Optimisation functionals
   vol_D = sum(∫(1)dΩ_act)
-  iso_vol_frac(φ) = ∫(1000Ω.ψ_s)Ω.dΩs
+  iso_vol_frac(φ) = ∫(Ω.ψ_s/hmin^2)Ω.dΩs
   J_comp(((u,p),d),φ) = ∫(ε(d) ⊙ (σ ∘ ε(d)))Ω.dΩs + iso_vol_frac(φ)
   Vol(((u,p),d),φ) = ∫(1/vol_D)Ω.dΩs - ∫(vf/vol_D)dΩ_act
   dVol(q,(u,p,d),φ) = ∫(-1/vol_D*q/(abs(Ω.n_Γ ⋅ ∇(φ))))Ω.dΓ
@@ -249,24 +249,20 @@ function main(model,geo_params;ls=LUSolver(),hilb_ls=LUSolver())
   evolve_nls = NewtonSolver(ls;maxiter=1,verbose=true)
   reinit_nls = NewtonSolver(ls;maxiter=20,rtol=1.e-14,verbose=true)
 
-  evo = CutFEMEvolve(V_φ,Ω,dΩ_act,hₕ;max_steps,γg=0.1,ode_ls=ls,ode_nl=evolve_nls)
-  reinit = StabilisedReinit(V_φ,Ω,dΩ_act,hₕ;stabilisation_method=ArtificialViscosity(0.5),nls=reinit_nls)
-  ls_evo = UnfittedFEEvolution(evo,reinit)
+  evo = CutFEMEvolve(V_φ,Ω,dΩ_act,hₕ;max_steps,γg=0.5,ode_ls=ls,ode_nl=evolve_nls)
+  reinit1 = StabilisedReinit(V_φ,Ω,dΩ_act,hₕ;stabilisation_method=ArtificialViscosity(1.0),nls=reinit_nls)
+  reinit2 = StabilisedReinit(V_φ,Ω,dΩ_act,hₕ;stabilisation_method=InteriorPenalty(V_φ;γg=1.0),nls=reinit_nls)
+  ls_evo = UnfittedFEEvolution(evo,GridapTopOpt.MultiStageStabilisedReinit([reinit1,reinit2]))
 
   ## Hilbertian extension-regularisation problems
-  α_coeff = γ_evo*max_steps
-  _α(hₕ) = (α_coeff*hₕ)^2
+  alpha = 4
+  _α(hₕ) = (alpha*hₕ)^2
   a_hilb(p,q) =∫((_α ∘ hₕ)*∇(p)⋅∇(q) + p*q)dΩ_act;
   vel_ext = VelocityExtension(a_hilb,U_reg,V_reg;ls=hilb_ls)
 
   ## Optimiser
-  converged(m) = GridapTopOpt.default_al_converged(
-    m;
-    L_tol = 0.01hmin,
-    C_tol = 0.05vf
-  )
-  optimiser = AugmentedLagrangian(pcf,ls_evo,vel_ext,φh;
-    γ=γ_evo,verbose=true,constraint_names=[:Vol],converged)
+  optimiser = AugmentedLagrangian(pcf,ls_evo,vel_ext,φh;maxiter=300,
+    γ=γ_evo,verbose=true,constraint_names=[:Vol],converged,Λ_update_tol = 0.01vf)
   for (it,(uh,ph,dh),φh) in optimiser
     if iszero(it % iter_mod)
       writevtk(Ω_act,files_path*"Omega_act_$it",
@@ -295,37 +291,34 @@ end
 ## Build refined model
 function build_cells_to_refine(model)
   # Create refinement map
-  cells_to_refine_1 = convert(Vector{Bool},get_face_tag_index(get_face_labeling(model),"Omega_NonDesign",2))
-  cells_to_refine_2 = convert(Vector{Bool},get_face_tag_index(get_face_labeling(model),"RefineBox",2))
-  cells_to_refine = findall(cells_to_refine_1 .|| cells_to_refine_2)
-  return cells_to_refine
+  tagged_to_marked_cells = get_face_tag_index(get_face_labeling(model),"RefineBox",2)
+  return findall(convert(Vector{Bool},tagged_to_marked_cells))
 end
 
-function build_model(nx,ny;L=2.0,H=0.5,x0=0.5,l=0.4,w=0.05,a=0.3,b=0.05)
+function build_model(nx,ny;L=1.0,H=0.5,x0=0.5,l=0.4,w=0.05,a=0.3,b=0.05)
   geo_params = (;L,H,x0,l,w,a,b)
   base_model = UnstructuredDiscreteModel(CartesianDiscreteModel((0,L,0,H),(nx,ny)))
   f_Γ_Top(x) = x[2] == H
   f_Γ_Bottom(x) = x[2] == 0.0
   f_Γ_D(x) = x[1] == 0.0
   f_Γ_N(x) = x[1] == L
-  f_box(x) = 0.0 <= x[2] <= a + eps() && (x0 - l/2 - eps() <= x[1] <= x0 + l/2 + eps())
+  f_box(x) = 0.0 <= x[2] <= 1.1a + eps() && (x0 - 1.1*l/2 - eps() <= x[1] <= x0 + 1.1*l/2 + eps())
   f_NonDesign(x) = ((x0 - w/2 - eps() <= x[1] <= x0 + w/2 + eps() && 0.0 <= x[2] <= a + eps()) ||
     (x0 - l/2 - eps() <= x[1] <= x0 + l/2 + eps() && 0.0 <= x[2] <= b + eps()))
-  update_labels!(1,base_model,f_Γ_Top,"Gamma_Top")
-  update_labels!(2,base_model,f_Γ_Bottom,"Gamma_Bottom")
-  update_labels!(3,base_model,f_Γ_D,"Gamma_f_D")
-  update_labels!(4,base_model,f_Γ_N,"Gamma_f_N")
-  update_labels!(5,base_model,f_box,"RefineBox")
-  update_labels!(6,base_model,f_NonDesign,"Omega_NonDesign")
-  update_labels!(7,base_model,x->f_NonDesign(x) && f_Γ_Bottom(x),"Gamma_s_D")
+  update_labels!(1,base_model,f_box,"RefineBox")
   ref_model = refine(base_model, refinement_method = "barycentric")
   ref_model = refine(ref_model; cells_to_refine=build_cells_to_refine(ref_model))
   ref_model = refine(ref_model; cells_to_refine=build_cells_to_refine(ref_model))
-  ref_model = refine(ref_model; cells_to_refine=build_cells_to_refine(ref_model))
   model = get_model(ref_model)
+  update_labels!(2,model,f_Γ_Top,"Gamma_Top")
+  update_labels!(3,model,f_Γ_Bottom,"Gamma_Bottom")
+  update_labels!(4,model,f_Γ_D,"Gamma_f_D")
+  update_labels!(5,model,f_Γ_N,"Gamma_f_N")
+  update_labels!(6,model,f_NonDesign,"Omega_NonDesign")
+  update_labels!(7,model,x->f_NonDesign(x) && f_Γ_Bottom(x),"Gamma_s_D")
   return model, geo_params
 end
 
 ## Run serial
-model, geo_params = build_model(4*20,20,b=1/20,w=1/20)
+model, geo_params = build_model(2*30,30,b=1/30,w=1/30)
 main(model,geo_params)

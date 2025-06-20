@@ -1,15 +1,15 @@
 """
     struct HamiltonJacobiEvolution{O}
 
-A standard forward Euler in time finite difference method for solving the 
-Hamilton-Jacobi evolution equation and reinitialisation equation 
-on order `O` finite elements in serial or parallel. 
+A standard forward Euler in time finite difference method for solving the
+Hamilton-Jacobi evolution equation and reinitialisation equation
+on order `O` finite elements in serial or parallel.
 
 Based on the scheme by Osher and Fedkiw ([link](https://doi.org/10.1007/b98879)).
 
 # Parameters
 
-- `stencil::Stencil`: Spatial finite difference stencil for a single step HJ 
+- `stencil::Stencil`: Spatial finite difference stencil for a single step HJ
   equation and reinitialisation equation.
 - `model`: A `CartesianDiscreteModel`.
 - `space`: FE space for level-set function
@@ -29,9 +29,9 @@ end
 """
     HamiltonJacobiEvolution(stencil::Stencil,model,space,tol,max_steps,max_steps_reinit)
 
-Create an instance of `HamiltonJacobiEvolution` given a stencil, model, FE space, and 
+Create an instance of `HamiltonJacobiEvolution` given a stencil, model, FE space, and
 additional optional arguments. This automatically creates the DoF permutation
-to handle high-order finite elements. 
+to handle high-order finite elements.
 """
 function HamiltonJacobiEvolution(
   stencil::Stencil,
@@ -41,6 +41,12 @@ function HamiltonJacobiEvolution(
   max_steps=100,
   max_steps_reinit=2000
 )
+  @check isa(model,CartesianDiscreteModel) || isa(model,DistributedDiscreteModel) """
+    We expect `model` to be a `CartesianDiscreteModel` or `DistributedDiscreteModel`
+    for the current implementation of finite differencing on arbitrary order Lagrangian
+    finite elements.
+  """
+
   # Parameters
   order, isperiodic, Δ, ndof = get_stencil_params(model,space)
   params = (;isperiodic,Δ,ndof,max_steps,max_steps_reinit,tol)
@@ -166,7 +172,7 @@ function reinit!(s::HamiltonJacobiEvolution{O},φ::PVector,γ) where O
 
   # Apply operations across partitions
   step = 1; err = maximum(abs,φ); fill!(φ_tmp,0.0)
-  while (err > tol) && (step <= max_steps) 
+  while (err > tol) && (step <= max_steps)
     # Step of 1st order upwind reinitialisation equation
     map(local_views(φ_tmp),local_views(_φ),local_views(vel_tmp),stencil_cache,ndof) do φ_tmp,_φ,vel_tmp,stencil_cache,S
       φ_tmp_mat   = reshape(φ_tmp,S)
@@ -200,7 +206,7 @@ function reinit!(s::HamiltonJacobiEvolution{O},φ::Vector,γ) where O
 
   # Apply operations across partitions
   step = 1; err = maximum(abs,φ); fill!(φ_tmp,0.0)
-  while (err > tol) && (step <= max_steps) 
+  while (err > tol) && (step <= max_steps)
     # Step of 1st order upwind reinitialisation equation
     φ_tmp_mat   = reshape(φ_tmp,ndof)
     φ_mat       = reshape(_φ,ndof)
@@ -237,7 +243,7 @@ function get_stencil_params(model::DistributedDiscreteModel,space::DistributedFE
   order, isperiodic, Δ, ndof = map(local_views(model),local_views(space)) do model, space
     get_stencil_params(model,space)
   end |> PartitionedArrays.tuple_of_arrays
-  
+
   isperiodic = getany(isperiodic)
   order = getany(order)
   Δ = getany(Δ)
@@ -246,8 +252,8 @@ end
 
 Gridap.ReferenceFEs.get_order(f::Gridap.Fields.LinearCombinationFieldVector) = get_order(f.fields)
 
-# Create dof permutation vector to enable finite differences on 
-#  higher order Lagrangian finite elements on a Cartesian mesh.  
+# Create dof permutation vector to enable finite differences on
+#  higher order Lagrangian finite elements on a Cartesian mesh.
 function create_dof_permutation(model::CartesianDiscreteModel{Dc},
                                 space::UnconstrainedFESpace,
                                 order::Integer) where Dc
@@ -257,7 +263,7 @@ function create_dof_permutation(model::CartesianDiscreteModel{Dc},
     return terms
   end
   desc = get_cartesian_descriptor(model)
-  
+
   periodic = desc.isperiodic
   ncells   = desc.partition
   ndofs    = order .* ncells .+ 1 .- periodic
@@ -330,7 +336,7 @@ function permute!(x_out,x_in,perm)
   return x_out
 end
 
-function permute!(x_out::PVector,x_in::PVector,perm) 
+function permute!(x_out::PVector,x_in::PVector,perm)
   map(permute!,partition(x_out),partition(x_in),perm)
   return x_out
 end
@@ -341,7 +347,7 @@ function permute_inv!(x_out,x_in,perm)
   end
   return x_out
 end
-function permute_inv!(x_out::PVector,x_in::PVector,perm) 
+function permute_inv!(x_out::PVector,x_in::PVector,perm)
   map(permute_inv!,partition(x_out),partition(x_in),perm)
   return x_out
 end
