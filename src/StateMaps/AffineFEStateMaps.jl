@@ -40,14 +40,15 @@ struct AffineFEStateMap{A,B,C,D,E,F} <: AbstractFEStateMap
   """
   function AffineFEStateMap(
       biform::Function,liform::Function,
-      U,V,V_φ;
+      U,V,V_φ,φh;
       assem_U = SparseMatrixAssembler(U,V),
       assem_adjoint = SparseMatrixAssembler(V,U),
       assem_deriv = SparseMatrixAssembler(V_φ,V_φ),
       ls::LinearSolver = LUSolver(),
       adjoint_ls::LinearSolver = LUSolver()
     )
-    φh = zero(V_φ)
+    # TODO: I really want to get rid of the φh argument...
+
     spaces = (U,V,V_φ)
 
     ## Pullback cache

@@ -495,15 +495,11 @@ function evaluate_functionals!(pcf::CustomPDEConstrainedFunctionals,φ_bg::Abstr
   φh_bg = FEFunction(pcf.V_φ,φ_bg)
   φh = interpolate(φh_bg,get_aux_space(pcf.state_map))
   φ = φh.free_values
-  update_collection_with_φh!(pcf.embedded_collection,φh_bg)
   obj = φ_to_jc(φ)
   j = obj[1]
   c = obj[2:end]
   return j,c
 end
-
-
-
 
 struct CustomEmbeddedPDEConstrainedFunctionals{N,A} <:  AbstractPDEConstrainedFunctionals{N}
   φ_to_jc :: Function
