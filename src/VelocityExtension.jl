@@ -68,16 +68,16 @@ trial space `U_reg`, and test space `V_reg`.
 - `ls::LinearSolver`: A linear solver
 """
 function VelocityExtension(
-    biform::Function,
-    U_reg::FESpace,
-    V_reg::FESpace;
+    biform :: Function,
+    U_reg  :: FESpace,
+    V_reg  :: FESpace;
     assem = SparseMatrixAssembler(U_reg,V_reg),
-    ls::LinearSolver = LUSolver())
+    ls     :: LinearSolver = LUSolver())
   ## Assembly
-  K  = assemble_matrix(biform,assem,U_reg,V_reg)
-  ns = numerical_setup(symbolic_setup(ls,K),K)
-  x  = allocate_in_domain(K)
-  b = allocate_in_range(K)
+  K     = assemble_matrix(biform,assem,U_reg,V_reg)
+  ns    = numerical_setup(symbolic_setup(ls,K),K)
+  x     = allocate_in_domain(K)
+  b     = allocate_in_range(K)
   cache = (ns,x,b)
   return VelocityExtension(K,U_reg,cache)
 end
@@ -93,6 +93,15 @@ function project!(vel_ext::VelocityExtension,dFh::CellField,V_φ)
   interpolate!(dFh,b,U_reg)
   solve!(x,ns,b)
   interpolate!(FEFunction(U_reg,x),get_free_dof_values(dFh),V_φ)
+
+  ## TODO: The above is broken in serial. A dirty fix is to do a bunch
+  ##       non-inplace interpolations as below. Alternatively, we could
+  ##       create a "non-ghosted" interpolation by turning off ghosts.
+  # dFh_Ureg = interpolate(FEFunction(V_φ,get_free_dof_values(dFh)),U_reg)
+  # copy!(b,get_free_dof_values(dFh_Ureg))
+  # solve!(x,ns,b)
+  # xh_V_φ = interpolate(FEFunction(U_reg,x),V_φ)
+  # copy!(get_free_dof_values(dFh),get_free_dof_values(xh_V_φ))
   return dFh
 end
 

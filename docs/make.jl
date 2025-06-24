@@ -10,7 +10,7 @@ using GridapTopOpt
 makedocs(
     sitename = "GridapTopOpt.jl",
     format = Documenter.HTML(
-      # prettyurls = false, # <- uncomment for live documentation
+      prettyurls = true,
       collapselevel = 1,
     ),
     warnonly = [:cross_references,:missing_docs],
