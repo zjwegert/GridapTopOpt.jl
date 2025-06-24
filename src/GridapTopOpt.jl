@@ -1,4 +1,3 @@
-__precompile__(false)
 module GridapTopOpt
 
 using GridapPETSc, GridapPETSc.PETSC
