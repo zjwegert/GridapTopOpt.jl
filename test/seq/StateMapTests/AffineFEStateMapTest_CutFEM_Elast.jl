@@ -127,7 +127,12 @@ function main(n;verbose=true)
     state_collection.J(u,φ)
   end
 
-  cpcfs = CustomEmbeddedPDEConstrainedFunctionals(φ_to_j,state_collection,Ω_data,φh)
+  function custom_embedded_φ_to_j(φ)
+    u = state_collection.state_map(φ)
+    state_collection.J(u,φ)
+  end
+
+  cpcfs = CustomEmbeddedPDEConstrainedFunctionals(custom_embedded_φ_to_j,state_collection,Ω_data,φh)
   _,_,cdF,_ = evaluate!(cpcfs,φh)
   @test cdF ≈ _dF
 
@@ -138,6 +143,6 @@ function main(n;verbose=true)
   @test rel_error < 1e-6
 end
 
-main(10;verbose=true)
+main(7;verbose=true)
 
 end
