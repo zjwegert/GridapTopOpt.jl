@@ -42,7 +42,7 @@ function StateParamMap(
   # TODO: Can we make F a dummy functional?
 
   if T <: Nothing
-    _∂F∂u(q,u,φ) = gradient(x->F(x,φ),u)
+    _∂F∂u(q,u,φ) = Gridap.gradient(x->F(x,φ),u)
   else
     _∂F∂u = ∂F∂u
   end

@@ -25,7 +25,7 @@ using GridapDistributed: DistributedDiscreteModel, DistributedTriangulation,
   DistributedFESpace, DistributedDomainContribution, to_parray_of_arrays,
   allocate_in_domain, DistributedCellField, DistributedMultiFieldCellField,
   DistributedMultiFieldFEBasis, BlockPMatrix, BlockPVector, change_ghost,
-  gradient, jacobian, DistributedMultiFieldFEFunction, DistributedSingleFieldFEFunction
+  DistributedMultiFieldFEFunction, DistributedSingleFieldFEFunction
 
 using PartitionedArrays
 using PartitionedArrays: getany, tuple_of_arrays, matching_ghost_indices
@@ -42,7 +42,6 @@ using GridapEmbedded.Interfaces: SubFacetData, SubCellTriangulation, SubFacetTri
 using GridapEmbedded.LevelSetCutters: DifferentiableTriangulation
 
 using Zygote
-using Gridap: gradient, jacobian
 
 using JLD2: save_object, load_object, jldsave
 

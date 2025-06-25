@@ -290,6 +290,7 @@ function Base.iterate(m::HilbertianProjection)
   history, params = m.history, m.params
   φh = m.φ0
   V_φ = get_aux_space(get_state_map(m.problem))
+  uhd = zero(V_φ)
 
   ## Reinitialise as SDF
   reinit!(m.ls_evolver,φh,params.γ_reinit)
@@ -301,20 +302,20 @@ function Base.iterate(m::HilbertianProjection)
   φ_tmp = copy(vel)
 
   ## Hilbertian extension-regularisation
-  project!(m.vel_ext,FEFunction(V_φ,dJ),V_φ)
-  project!(m.vel_ext,map(dCi->FEFunction(V_φ,dCi),dC),V_φ)
+  project!(m.vel_ext,dJ,V_φ,uhd)
+  project!(m.vel_ext,dC,V_φ,uhd)
   θ = update_descent_direction!(m.projector,dJ,C,dC,m.vel_ext.K,V_φ)
 
   # Update history and build state
   push!(history,(J,C...,params.γ))
-  state = (;it=1,J,C,θ,dJ,dC,uh,φh,vel,φ_tmp,params.γ,os_it=-1)
+  state = (;it=1,J,C,θ,dJ,dC,uh,φh,uhd,vel,φ_tmp,params.γ,os_it=-1)
   vars  = params.debug ? (0,uh,φh,state) : (0,uh,φh)
   return vars, state
 end
 
 # ith iteration
 function Base.iterate(m::HilbertianProjection,state)
-  it, J, C, θ, dJ, dC, uh, φh, vel, φ_tmp, γ, os_it = state
+  it, J, C, θ, dJ, dC, uh, φh, uhd, vel, φ_tmp, γ, os_it = state
   history, params = m.history, m.params
 
   ## Periodicially call GC
@@ -339,14 +340,14 @@ function Base.iterate(m::HilbertianProjection,state)
   J, C, dJ, dC, γ = _linesearch!(m,state,γ)
 
   ## Hilbertian extension-regularisation
-  project!(m.vel_ext,FEFunction(V_φ,dJ),V_φ)
-  project!(m.vel_ext,map(dCi->FEFunction(V_φ,dCi),dC),V_φ)
+  project!(m.vel_ext,dJ,V_φ,uhd)
+  project!(m.vel_ext,dC,V_φ,uhd)
   θ = update_descent_direction!(m.projector,dJ,C,dC,m.vel_ext.K,V_φ)
 
   ## Update history and build state
   push!(history,(J,C...,γ))
   uh = get_state(m.problem)
-  state = (;it=it+1, J, C, θ, dJ, dC, uh, φh, vel, φ_tmp, γ, os_it)
+  state = (;it=it+1, J, C, θ, dJ, dC, uh, φh, uhd, vel, φ_tmp, γ, os_it)
   vars  = params.debug ? (it,uh,φh,state) : (it,uh,φh)
   return vars, state
 end

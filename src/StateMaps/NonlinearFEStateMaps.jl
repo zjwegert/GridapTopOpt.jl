@@ -127,7 +127,7 @@ end
 
 function NonlinearFEStateMap(res::Function,U,V,V_φ,φh;jac=nothing,kwargs...)
   if isnothing(jac)
-    jac = (u,du,v,φh) -> jacobian(res,[u,v,φh],1)
+    jac = (u,du,v,φh) -> Gridap.jacobian(res,[u,v,φh],1)
   end
   NonlinearFEStateMap(res,jac,U,V,V_φ,φh;kwargs...)
 end

@@ -145,6 +145,7 @@ end
 function Base.iterate(m::AugmentedLagrangian)
   φh, history, params = m.φ0, m.history, m.params
   V_φ = get_aux_space(get_state_map(m.problem))
+  uhd = zero(V_φ)
 
   ## Reinitialise as SDF
   reinit!(m.ls_evolver,φh,params.γ_reinit)
@@ -165,17 +166,17 @@ function Base.iterate(m::AugmentedLagrangian)
   for (λi,Λi,Ci,dCi) in zip(λ,Λ,C,dC)
     dL .+= -λi*dCi .+ Λi*Ci*dCi
   end
-  project!(m.vel_ext,FEFunction(V_φ,dL),V_φ)
+  project!(m.vel_ext,dL,V_φ,uhd)
 
   # Update history and build state
   push!(history,(L,J,C...,params.γ,λ...,Λ...))
-  state = (;it=1,L,J,C,dL,dJ,dC,uh,φh,λ,Λ,params.γ,os_it=-1)
+  state = (;it=1,L,J,C,dL,dJ,dC,uh,φh,uhd,λ,Λ,params.γ,os_it=-1)
   vars  = params.debug ? (0,uh,φh,state) : (0,uh,φh)
   return vars, state
 end
 
 function Base.iterate(m::AugmentedLagrangian,state)
-  it, L, J, C, dL, dJ, dC, uh, φh, λ, Λ, γ, os_it = state
+  it, L, J, C, dL, dJ, dC, uh, φh, uhd, λ, Λ, γ, os_it = state
   params, history = m.params, m.history
   Λ_max,ζ,update_mod,reinit_mod,_,γ_reinit,os_γ_mult,Λ_update_tol,_,_ = params
 
@@ -221,11 +222,11 @@ function Base.iterate(m::AugmentedLagrangian,state)
   for (λi,Λi,Ci,dCi) in zip(λ,Λ,C,dC)
     dL .+= -λi*dCi .+ Λi*Ci*dCi
   end
-  project!(m.vel_ext,FEFunction(V_φ,dL),V_φ)
+  project!(m.vel_ext,dL,V_φ,uhd)
 
   ## Update history and build state
   push!(history,(L,J,C...,γ,λ...,Λ...))
-  state = (;it=it+1,L,J,C,dL,dJ,dC,uh,φh,λ,Λ,γ,os_it)
+  state = (;it=it+1,L,J,C,dL,dJ,dC,uh,φh,uhd,λ,Λ,γ,os_it)
   vars  = params.debug ? (it,uh,φh,state) : (it,uh,φh)
   return vars, state
 end

@@ -446,7 +446,7 @@ struct CustomPDEConstrainedFunctionals{N,A} <:  AbstractPDEConstrainedFunctional
     # Pre-allocaitng
     grad = Zygote.jacobian(φ_to_jc, φh.free_values)
     dJ = grad[1][1,:]
-    dC = [collect(row) for row in eachrow(grad[1][2:end,:])]    
+    dC = [collect(row) for row in eachrow(grad[1][2:end,:])]
 
     N = length(dC)
     A = typeof(state_map)
@@ -534,8 +534,6 @@ function Fields.evaluate!(pcf::CustomEmbeddedPDEConstrainedFunctionals,φh)
   return j,c,dJ,dC
 end
 
-get_state(m::CustomEmbeddedPDEConstrainedFunctionals) = get_state(m.embedded_collection.state_map)
-
 function evaluate_functionals!(pcf::CustomEmbeddedPDEConstrainedFunctionals,φh::FEFunction)
   φ = φh.free_values
   return evaluate_functionals!(pcf,φ)
@@ -546,7 +544,7 @@ function evaluate_functionals!(pcf::CustomEmbeddedPDEConstrainedFunctionals,φ::
   state_collection = pcf.embedded_collection
   Ωs = pcf.Ωs
   update_collection!(Ωs,φh)
-  update_collection_with_φh!(state_collection,φh) 
+  update_collection_with_φh!(state_collection,φh)
   obj = φ_to_jc(φh.free_values)
   j = obj[1]
   c = obj[2:end]
