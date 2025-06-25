@@ -51,6 +51,10 @@ function main(verbose)
     pcf.J(u,φ)
   end
 
+  cpcf = CustomPDEConstrainedFunctionals(φ_to_j,φ_to_u,φh)
+  _,_,cdF,_ = evaluate!(cpcf,φh)
+  @test cdF ≈ _dF
+
   fdm_grad = FiniteDiff.finite_difference_gradient(φ_to_j, get_free_dof_values(φh))
   rel_error = norm(_dF - fdm_grad, Inf)/norm(fdm_grad,Inf)
 

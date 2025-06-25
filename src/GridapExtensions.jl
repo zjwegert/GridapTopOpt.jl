@@ -12,7 +12,7 @@ end
 
 function instantiate_caches(x,nls::NewtonRaphsonSolver,op::NonlinearOperator)
   b = residual(op, x)
-  A = Gridap.jacobian(op, x)
+  A = jacobian(op, x)
   dx = similar(b)
   ss = symbolic_setup(nls.ls, A)
   ns = numerical_setup(ss,A)
@@ -21,7 +21,7 @@ end
 
 function instantiate_caches(x,nls::NewtonSolver,op::NonlinearOperator)
   b  = residual(op, x)
-  A  = Gridap.jacobian(op, x)
+  A  = jacobian(op, x)
   dx = allocate_in_domain(A); fill!(dx,zero(eltype(dx)))
   ss = symbolic_setup(nls.ls, A)
   ns = numerical_setup(ss,A,x)

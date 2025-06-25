@@ -127,6 +127,10 @@ function main(n;verbose=true)
     state_collection.J(u,φ)
   end
 
+  cpcfs = CustomEmbeddedPDEConstrainedFunctionals(φ_to_j,state_collection,Ω_data,φh)
+  _,_,cdF,_ = evaluate!(cpcfs,φh)
+  @test cdF ≈ _dF
+
   fdm_grad = FiniteDiff.finite_difference_gradient(φ_to_j, get_free_dof_values(φh))
   rel_error = norm(_dF - fdm_grad,Inf)/norm(fdm_grad,Inf)
 

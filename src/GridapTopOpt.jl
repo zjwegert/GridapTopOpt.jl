@@ -42,6 +42,7 @@ using GridapEmbedded.Interfaces: SubFacetData, SubCellTriangulation, SubFacetTri
 using GridapEmbedded.LevelSetCutters: DifferentiableTriangulation
 
 using Zygote
+using Gridap: gradient, jacobian
 
 using JLD2: save_object, load_object, jldsave
 
