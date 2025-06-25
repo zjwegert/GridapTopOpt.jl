@@ -41,6 +41,9 @@ using GridapEmbedded.LevelSetCutters, GridapEmbedded.Interfaces
 using GridapEmbedded.Interfaces: SubFacetData, SubCellTriangulation, SubFacetTriangulation
 using GridapEmbedded.LevelSetCutters: DifferentiableTriangulation
 
+using Zygote
+using Gridap: gradient, jacobian
+
 using JLD2: save_object, load_object, jldsave
 
 import Base: +
@@ -67,6 +70,8 @@ export DifferentiableTriangulation
 include("StateMaps/StateMaps.jl")
 export PDEConstrainedFunctionals
 export EmbeddedPDEConstrainedFunctionals
+export CustomPDEConstrainedFunctionals
+export CustomEmbeddedPDEConstrainedFunctionals
 export AffineFEStateMap
 export NonlinearFEStateMap
 export RepeatingAffineFEStateMap
