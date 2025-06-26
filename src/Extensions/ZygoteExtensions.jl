@@ -28,6 +28,24 @@ function _withjacobian(f, x::PVector, args...)
   (val=y, grad)
 end
 
+# function Zygote.withjacobian(f, x::PVector, args...)
+#   @check eltype(args) <: PVector "Additional args must be PVectors"
+#   y, back = pullback(Zygote._jvec∘f, x, args...)
+#   out = map((x,args...)) do x
+#     T = promote_type(eltype(x), eltype(y))
+#     dx = [similar(x,T) for _ in eachindex(y)]
+#   end
+#   delta = Zygote._eyelike(y)
+#   for k in LinearIndices(y)
+#     grads = back(delta[:,k])
+#     for (dx, grad) in zip(out, grads)
+#       copyto!(dx[k], grad)
+#     end
+#   end
+#   (val=y, grad=out)
+# end
+
+
 ## Some new API to unify output of grads from jacobian
 
 function tuplify(x::NTuple{N,<:Matrix}) where N
