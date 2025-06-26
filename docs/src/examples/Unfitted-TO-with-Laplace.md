@@ -64,7 +64,7 @@ n = 50            # Initial mesh size (pre-refinement)
 max_steps = n/5   # Time-steps for evolution equation
 vf = 0.3          # Volume fraction
 α_coeff = 2       # Regularisation coefficient extension-regularisation
-iter_mod = 1      # Write output every iter_mod iterations
+iter_mod = 10     # Write output every iter_mod iterations
 ```
 
 Here, we deictate that the initial mesh size is $50^2$ quadrilateral elements, the time steps for the evolution equation is set to $n/5$, the required volume fraction is 0.3, the reguarisation coefficent for the Hilbertian extension-regularisation is 2, and we data files at each iteration.

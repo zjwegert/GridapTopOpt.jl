@@ -26,10 +26,10 @@ function main()
   mkpath(path)
   # Params
   n = 50            # Initial mesh size (pre-refinement)
-  max_steps = 10/n  # Time-steps for evolution equation
+  max_steps = n/5   # Time-steps for evolution equation
   vf = 0.3          # Volume fraction
   α_coeff = 2       # Regularisation coefficient extension-regularisation
-  iter_mod = 1      # Write output every iter_mod iterations
+  iter_mod = 10     # Write output every iter_mod iterations
 
   # Model and some refinement
   _model = CartesianDiscreteModel((0,1,0,1),(n,n))
