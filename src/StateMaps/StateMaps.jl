@@ -7,7 +7,7 @@ include("StaggeredFEStateMaps.jl")
 include("PDEConstrainedFunctionals.jl")
 
 """
-    Gridap.gradient(F,uh::Vector,K::Int)
+    Gridap.gradient(F,uh::Vector{<:CellField},K::Int)
 
 Given a function `F` that returns a DomainContribution when called, and a vector of
 `FEFunctions` `uh`, evaluate the partial derivative of `F` with respect to `uh[K]`.
@@ -29,7 +29,7 @@ function Gridap.gradient(F,uh::Vector{<:CellField},K::Int)
 end
 
 """
-    Gridap.jacobian(F,uh::Vector,K::Int)
+    Gridap.jacobian(F,uh::Vector{<:CellField},K::Int)
 
 Given a function `F` that returns a DomainContribution when called, and a
 vector of `FEFunctions` or `CellField` `uh`, evaluate the Jacobian

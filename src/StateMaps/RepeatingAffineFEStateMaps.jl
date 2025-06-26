@@ -26,7 +26,7 @@ struct RepeatingAffineFEStateMap{A,B,C,D,E,F,G} <: AbstractFEStateMap
 
   @doc """
       RepeatingAffineFEStateMap(
-        nblocks::Int,a::Function,l::Vector{<:Function},
+        nblocks::Int,biform::Function,liforms::Vector{<:Function},
         U0,V0,V_φ,φh;
         assem_U = SparseMatrixAssembler(U0,V0),
         assem_adjoint = SparseMatrixAssembler(V0,U0),
