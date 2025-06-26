@@ -353,7 +353,7 @@ function Base.iterate(m::HilbertianProjection,state)
 end
 
 function _linesearch!(m::HilbertianProjection{WithAutoDiff},state,γ)
-  it, J, C, θ, dJ, dC, uh, φh, vel, φ_tmp, _, os_it = state
+  it, J, C, θ, dJ, dC, uh, φh, uhd, vel, φ_tmp, _, os_it = state
 
   params = m.params; history = m.history
   ls_enabled = params.ls_enabled; reinit_mod = params.reinit_mod
@@ -395,7 +395,7 @@ function _linesearch!(m::HilbertianProjection{WithAutoDiff},state,γ)
 end
 
 function _linesearch!(m::HilbertianProjection{NoAutoDiff},state,γ)
-  it, J, C, θ, dJ, dC, uh, φh, vel, φ_tmp, _, os_it = state
+  it, J, C, θ, dJ, dC, uh, φh, uhd, vel, φ_tmp, _, os_it = state
 
   params = m.params; history = m.history
   ls_enabled = params.ls_enabled; reinit_mod = params.reinit_mod
