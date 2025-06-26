@@ -6,9 +6,9 @@ using GridapTopOpt, GridapSolvers
 
 using GridapTopOpt: StateParamMap
 
-function main()
+function main(AD_case)
   # Params
-  n = 50            # Initial mesh size (pre-refinement)
+  n = 10            # Initial mesh size (pre-refinement)
   max_steps = 10/n  # Time-steps for evolution equation
   vf = 0.3          # Volume fraction
   α_coeff = 2       # Regularisation coefficient extension-regularisation
@@ -17,8 +17,8 @@ function main()
   _model = CartesianDiscreteModel((0,1,0,1),(n,n))
   base_model = UnstructuredDiscreteModel(_model)
   ref_model = refine(base_model, refinement_method = "barycentric")
-  ref_model = refine(ref_model)
-  ref_model = refine(ref_model)
+  #ref_model = refine(ref_model)
+  #ref_model = refine(ref_model)
   model = get_model(ref_model)
   h = minimum(get_element_diameters(model))
   hₕ = get_element_diameter_field(model)
@@ -90,15 +90,28 @@ function main()
     update_collection!(Ωs,_φh)
     V = TestFESpace(Ωs.Ωact,reffe_scalar;dirichlet_tags=["Omega_D"])
     U = TrialFESpace(V,0.0)
-    state_map = AffineFEStateMap(a,l,U,V,V_φ,U_reg,_φh)
+    state_map = AffineFEStateMap(a,l,U,V,V_φ,_φh)
     (;
       :state_map => state_map,
       :J => StateParamMap(J,state_map),
       :C => map(Ci -> StateParamMap(Ci,state_map),[Vol,])
     )
   end
-  pcfs = EmbeddedPDEConstrainedFunctionals(state_collection;analytic_dC=(dVol,))
-
+  
+  pcfs = if AD_case == :with_ad
+    EmbeddedPDEConstrainedFunctionals(state_collection;analytic_dC=(dVol,))
+  elseif AD_case == :custom_pcf
+  function φ_to_jc(φ)
+    u = state_collection.state_map(φ)
+    j = state_collection.J(u,φ)
+    c = map(constrainti -> constrainti(u,φ),state_collection.C)
+    [j,c...]
+  end
+  CustomEmbeddedPDEConstrainedFunctionals(φ_to_jc,state_collection,Ωs,φh)
+  else
+    @error "AD case not defined"
+  end 
+   
   ## Evolution Method
   evo = CutFEMEvolve(V_φ,Ωs,dΩ_bg,hₕ;max_steps,γg=0.1)
   reinit = StabilisedReinit(V_φ,Ωs,dΩ_bg,hₕ;stabilisation_method=ArtificialViscosity(2.0))
@@ -119,5 +132,7 @@ function main()
   true
 end
 
-@test main()
+@test main(:with_ad)
+@test main(:custom_pcf)
+
 end

@@ -74,7 +74,7 @@ function main(;order,AD_case)
   ls_evo = HamiltonJacobiEvolution(FirstOrderStencil(2,Float64),model,V_φ,tol,max_steps)
 
   ## Setup solver and FE operators
-  state_map = AffineFEStateMap(a,l,U,V,V_φ,U_reg,φh)
+  state_map = AffineFEStateMap(a,l,U,V,V_φ,φh)
   pcfs = if AD_case == :no_ad
     PDEConstrainedFunctionals(J,[Vol],state_map,analytic_dJ=dJ,analytic_dC=[dVol])
   elseif AD_case == :with_ad
@@ -83,6 +83,16 @@ function main(;order,AD_case)
     PDEConstrainedFunctionals(J,[Vol],state_map,analytic_dJ=dJ)
   elseif AD_case == :partial_ad2
     PDEConstrainedFunctionals(J,[Vol],state_map,analytic_dC=[dVol])
+  elseif AD_case == :custom_pcf
+    objective = GridapTopOpt.StateParamMap(J,state_map)
+    constraints = map(Ci -> GridapTopOpt.StateParamIntegrandWithMeasure(Ci,state_map),[Vol])
+    function φ_to_jc(φ)
+      u = state_map(φ)
+      j = objective(u,φ)
+      c = map(constrainti -> constrainti(u,φ),constraints)
+      [j,c...]
+    end
+    CustomPDEConstrainedFunctionals(φ_to_jc,state_map,φh)  
   else
     @error "AD case not defined"
   end
@@ -110,5 +120,6 @@ end
 @test main(;order=1,AD_case=:partial_ad1)
 @test main(;order=1,AD_case=:partial_ad2)
 @test main(;order=1,AD_case=:no_ad)
+@test main(;order=1,AD_case=:custom_pcf)
 
 end # module

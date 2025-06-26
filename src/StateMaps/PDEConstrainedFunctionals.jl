@@ -204,7 +204,7 @@ function Fields.evaluate!(pcf::PDEConstrainedFunctionals,φh;kwargs...)
   analytic_dC  = pcf.analytic_dC
   U = get_trial_space(get_state_map(pcf))
 
-  U_reg = get_deriv_space(get_state_map(pcf))
+  V_φ = get_aux_space(get_state_map(pcf))
   deriv_assem = get_deriv_assembler(get_state_map(pcf))
 
   ## Foward problem
@@ -224,7 +224,7 @@ function Fields.evaluate!(pcf::PDEConstrainedFunctionals,φh;kwargs...)
     # Analytic shape derivative
     j_val = F(uh,φh)
     _dF(q) = dF_analytic(q,uh,φh)
-    assemble_vector!(_dF,dF,deriv_assem,U_reg)
+    assemble_vector!(_dF,dF,deriv_assem,V_φ)
     return j_val
   end
   j = ∇!(J,dJ,analytic_dJ)
@@ -369,7 +369,7 @@ function Fields.evaluate!(pcf::EmbeddedPDEConstrainedFunctionals,φh;update_spac
   state_map   = get_state_map(pcf)
   U           = get_trial_space(state_map)
 
-  U_reg = get_deriv_space(state_map)
+  V_φ = get_aux_space(state_map)
   deriv_assem = get_deriv_assembler(state_map)
 
   ## Foward problem
@@ -389,7 +389,7 @@ function Fields.evaluate!(pcf::EmbeddedPDEConstrainedFunctionals,φh;update_spac
     # Analytic shape derivative
     j_val = F(uh,φh)
     _dF(q) = dF_analytic(q,uh,φh)
-    assemble_vector!(_dF,dF,deriv_assem,U_reg)
+    assemble_vector!(_dF,dF,deriv_assem,V_φ)
     return j_val
   end
   j = ∇!(J,dJ,analytic_dJ)
@@ -427,4 +427,126 @@ end
 function Base.show(io::IO,::MIME"text/plain",f::AbstractPDEConstrainedFunctionals{N}) where N
   print(io,"$(nameof(typeof(f))):
     num_constraints: $N")
+end
+
+struct CustomPDEConstrainedFunctionals{N,A} <:  AbstractPDEConstrainedFunctionals{N}
+  φ_to_jc :: Function
+  dJ :: Vector{Float64}
+  dC :: Vector{Vector{Float64}}
+  analytic_dJ
+  analytic_dC
+  state_map :: A
+
+    function CustomPDEConstrainedFunctionals(
+      φ_to_jc :: Function,
+      state_map :: AbstractFEStateMap,
+      φh;
+    )
+
+    # Pre-allocaitng
+    grad = Zygote.jacobian(φ_to_jc, φh.free_values)
+    dJ = grad[1][1,:]
+    dC = [collect(row) for row in eachrow(grad[1][2:end,:])]
+
+    N = length(dC)
+    A = typeof(state_map)
+    analytic_dJ = nothing
+    analytic_dC = fill(nothing,N)
+
+    return new{N,A}(φ_to_jc,dJ,dC,analytic_dJ,analytic_dC,state_map)
+  end
+end
+
+function Fields.evaluate!(pcf::CustomPDEConstrainedFunctionals,φh)
+  φ_to_jc,dJ,dC = pcf.φ_to_jc,pcf.dJ,pcf.dC
+
+  obj,grad = Zygote.withjacobian(φ_to_jc, φh.free_values)
+  j = obj[1]
+  c = obj[2:end]
+  copy!(dJ,grad[1][1,:])
+  copy!(dC,[collect(row) for row in eachrow(grad[1][2:end,:])])
+
+  return j,c,dJ,dC
+end
+
+get_state(m::CustomPDEConstrainedFunctionals) = get_state(m.state_map)
+get_state_map(m::CustomPDEConstrainedFunctionals) = m.state_map
+
+function evaluate_functionals!(pcf::CustomPDEConstrainedFunctionals,φh::FEFunction)
+  φ = φh.free_values
+  return evaluate_functionals!(pcf,φ)
+end
+
+function evaluate_functionals!(pcf::CustomPDEConstrainedFunctionals,φ::AbstractVector)
+  φ_to_jc =  pcf.φ_to_jc
+  obj = φ_to_jc(φ)
+  j = obj[1]
+  c = obj[2:end]
+  return j,c
+end
+
+struct CustomEmbeddedPDEConstrainedFunctionals{N,A} <:  AbstractPDEConstrainedFunctionals{N}
+  φ_to_jc :: Function
+  dJ :: Vector{Float64}
+  dC :: Vector{Vector{Float64}}
+  analytic_dJ
+  analytic_dC
+  embedded_collection :: EmbeddedCollection
+  Ωs :: EmbeddedCollection
+
+    function CustomEmbeddedPDEConstrainedFunctionals(
+      φ_to_jc :: Function,
+      embedded_collection :: EmbeddedCollection,
+      Ωs,
+      φh;
+    )
+    update_collection!(Ωs,φh)
+    update_collection_with_φh!(embedded_collection,φh)
+
+    # Pre-allocaitng
+    grad = Zygote.jacobian(φ_to_jc,φh.free_values)
+    dJ = grad[1][1,:]
+    dC = [collect(row) for row in eachrow(grad[1][2:end,:])]
+
+    N = length(dC)
+    A = typeof(embedded_collection.state_map)
+    analytic_dJ = nothing
+    analytic_dC = fill(nothing,N)
+
+    return new{N,A}(φ_to_jc,dJ,dC,analytic_dJ,analytic_dC,embedded_collection,Ωs)
+  end
+end
+
+get_state_map(m::CustomEmbeddedPDEConstrainedFunctionals) = m.embedded_collection.state_map
+get_state(m::CustomEmbeddedPDEConstrainedFunctionals) = get_state(get_state_map(m))
+
+function Fields.evaluate!(pcf::CustomEmbeddedPDEConstrainedFunctionals,φh)
+  φ_to_jc,dJ,dC = pcf.φ_to_jc,pcf.dJ,pcf.dC
+  state_collection = pcf.embedded_collection
+  Ωs = pcf.Ωs
+  update_collection!(Ωs,φh)
+  update_collection_with_φh!(state_collection,φh)
+  obj,grad = Zygote.withjacobian(φ_to_jc, φh.free_values)
+  j = obj[1]
+  c = obj[2:end]
+  copy!(dJ,grad[1][1,:])
+  copy!(dC,[collect(row) for row in eachrow(grad[1][2:end,:])])
+  return j,c,dJ,dC
+end
+
+function evaluate_functionals!(pcf::CustomEmbeddedPDEConstrainedFunctionals,φh::FEFunction)
+  φ = φh.free_values
+  return evaluate_functionals!(pcf,φ)
+end
+
+function evaluate_functionals!(pcf::CustomEmbeddedPDEConstrainedFunctionals,φ::AbstractVector)
+  φ_to_jc =  pcf.φ_to_jc
+  state_collection = pcf.embedded_collection
+  Ωs = pcf.Ωs
+  update_collection!(Ωs,φh)
+  update_collection_with_φh!(state_collection,φh)
+  obj = φ_to_jc(φh.free_values)
+  j = obj[1]
+  c = obj[2:end]
+  return j,c
 end

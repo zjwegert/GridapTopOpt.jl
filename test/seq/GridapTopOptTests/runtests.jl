@@ -8,7 +8,7 @@ using Test
 @time @testset "Nonlinear Neohook with Jacobian - ALM" begin include("NeohookAnalyticJacALMTests.jl") end
 @time @testset "Inverse Homogenisation - ALM" begin include("InverseHomogenisationALMTests.jl") end
 @time @testset "Inverter - HPM" begin include("InverterHPMTests.jl") end
-@time @testset "PZMultiFieldRepeatingState - ALM" begin include("PZMultiFieldRepeatingStateTests.jl") end
+@time @testset "PZMultiFieldRepeatingState - HPM" begin include("PZMultiFieldRepeatingStateTests.jl") end
 @time @testset "Thermal Cut FEM" begin include("ThermalCutFEMTest.jl") end
 @time @testset "FSI CutFEM" begin include("FSICutFEMTest.jl") end
 
