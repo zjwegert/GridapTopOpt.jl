@@ -1,3 +1,5 @@
+module AffineFEStateMap_ZygoteJacobiansTestMPI
+
 using Gridap, Gridap.FESpaces, Gridap.CellData, Gridap.Helpers
 using GridapDistributed, PartitionedArrays
 using GridapTopOpt
@@ -50,29 +52,40 @@ function main(model)
   return out1, out2, V_φ
 end
 
-mesh_parts = (2,2)
-# ranks = distribute(LinearIndices((prod(2,2),)))
-ranks = with_debug() do distribute
-  ranks = distribute(LinearIndices((prod(mesh_parts),)))
+function run_test(ranks,model_serial)
+  out1,out2,V = main(model_serial);
+
+  model = GridapTopOpt.ordered_distributed_model_from_serial_model(ranks,model_serial);
+  dout1,dout2,dV = main(model);
+
+  @test out1.val ≈ dout1.val
+  @test out2.val ≈ dout2.val
+
+  gradh_1 = FEFunction(V,out1.grad[1])
+  dgradh_1 = FEFunction(dV,dout1.grad[1])
+  deriv_test1 = GridapTopOpt.test_serial_and_distributed_fields(dgradh_1,dV,gradh_1,V)
+
+  gradh_2_1 = FEFunction(V,out2.grad[1][1])
+  dgradh_2_1 = FEFunction(dV,dout2.grad[1][1])
+  deriv_test21 = GridapTopOpt.test_serial_and_distributed_fields(dgradh_2_1,dV,gradh_2_1,V)
+
+  gradh_2_2 = FEFunction(V,out2.grad[1][2])
+  dgradh_2_2 = FEFunction(dV,dout2.grad[1][2])
+  deriv_test22 = GridapTopOpt.test_serial_and_distributed_fields(dgradh_2_2,dV,gradh_2_2,V)
+
+  map_main(deriv_test1,deriv_test21,deriv_test22) do deriv_test1,deriv_test21,deriv_test22
+    @test deriv_test1
+    @test deriv_test21
+    @test deriv_test22
+    nothing
+  end
 end
 
-model_serial = CartesianDiscreteModel((0,1,0,1),(8,8));
-out1,out2,V = main(model_serial);
+with_mpi() do distribute
+  mesh_parts = (2,2)
+  ranks = distribute(LinearIndices((prod(mesh_parts),)))
+  model_serial = CartesianDiscreteModel((0,1,0,1),(8,8));
+  run_test(ranks,model_serial)
+end
 
-model = GridapTopOpt.ordered_distributed_model_from_serial_model(ranks,model_serial);
-dout1,dout2,dV = main(model);
-
-@test out1.val ≈ dout1.val
-@test out2.val ≈ dout2.val
-
-gradh_1 = FEFunction(V,out1.grad[1])
-dgradh_1 = FEFunction(dV,dout1.grad[1])
-deriv_test = GridapTopOpt.test_serial_and_distributed_fields(dgradh_1,dV,gradh_1,V)
-
-gradh_2_1 = FEFunction(V,out2.grad[1][1])
-dgradh_2_1 = FEFunction(dV,dout2.grad[1][1])
-deriv_test = GridapTopOpt.test_serial_and_distributed_fields(dgradh_2_1,dV,gradh_2_1,V)
-
-gradh_2_2 = FEFunction(V,out2.grad[1][2])
-dgradh_2_2 = FEFunction(dV,dout2.grad[1][2])
-deriv_test = GridapTopOpt.test_serial_and_distributed_fields(dgradh_2_1,dV,gradh_2_1,V)
+end

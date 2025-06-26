@@ -1,6 +1,3 @@
-### Gridap/Zygote adjoint
-Zygote.@adjoint FEFunction(U,u) = FEFunction(U,u), y->(nothing,y)
-
 ### PartitionedArrays extensions
 
 import Base: size
@@ -18,32 +15,30 @@ end
 
 # This could be Zygote.withjacobian, but the output isn't compatible with the
 # default Zygote API (eltype(grad)<:Matrix), so we define a new function instead.
+#
+# TODO: I'm not super happy about creating several PVectors in the below, but
+#       it is the easiest way to get a nice structure in `grad` that conforms to
+#       the serial version. Perhaps adjust in future.
+#
+#       Note that this is almost the same as `Zygote.withjacobian` except we return
+#       Tuples of Tuples of PVectors instead of Tuples of Matrices. The latter
+#       isn't compatible unless we use BlockPMatrix? - maybe this is better in future...
 function _withjacobian(f, x::PVector, args...)
   @check eltype(args) <: PVector "Additional args must be PVectors"
   y, back = Zygote.pullback(Zygote._jvec∘f, x, args...)
-  delta = Zygote._eyelike(y)
-  grad = map(Tuple(LinearIndices(y))) do k
-    back(delta[:,k])
+  out = map((x,args...)) do x
+    T = promote_type(eltype(x), eltype(y))
+    dx = Tuple([similar(x,T) for _ in eachindex(y)])
   end
-  (val=y, grad)
+  delta = Zygote._eyelike(y)
+  for k in LinearIndices(y)
+    grads = back(delta[:,k])
+    for (dx, grad) in zip(out, grads)
+      copyto!(dx[k], grad)
+    end
+  end
+  (val=y, grad=out)
 end
-
-# function Zygote.withjacobian(f, x::PVector, args...)
-#   @check eltype(args) <: PVector "Additional args must be PVectors"
-#   y, back = pullback(Zygote._jvec∘f, x, args...)
-#   out = map((x,args...)) do x
-#     T = promote_type(eltype(x), eltype(y))
-#     dx = [similar(x,T) for _ in eachindex(y)]
-#   end
-#   delta = Zygote._eyelike(y)
-#   for k in LinearIndices(y)
-#     grads = back(delta[:,k])
-#     for (dx, grad) in zip(out, grads)
-#       copyto!(dx[k], grad)
-#     end
-#   end
-#   (val=y, grad=out)
-# end
 
 
 ## Some new API to unify output of grads from jacobian
