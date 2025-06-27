@@ -45,10 +45,10 @@ function StateParamMap(
     _∂F∂u = ∂F∂u
   end
 
-  ## Dev note (commit ?????)
+  ## Dev note (commit fd65d0a):
   # In the past we used the following code to allocate vectors for the derivatives.
   # This was required because we needed these to be RHS vectors for VelocityExtension
-  # problem. As of v0.3.0 (commmit ?????), this is no longer required because VelocityExtension
+  # problem. As of v0.3.0 (commmit fd65d0a), this is no longer required because VelocityExtension
   # expects dF to be a vector of DOFs. This is then mapped onto an appropriate RHS vector
   # using `_interpolate_onto_rhs!`.
   #

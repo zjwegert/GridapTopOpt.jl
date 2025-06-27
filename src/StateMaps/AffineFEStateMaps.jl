@@ -53,8 +53,6 @@ struct AffineFEStateMap{A,B,C,D,E,F} <: AbstractFEStateMap
 
     ## Pullback cache
     uhd = zero(U)
-    # vecdata = collect_cell_vector(V_φ,∇(biform,[uhd,uhd,φh],3) - ∇(liform,[uhd,φh],2))
-    # dudφ_vec = allocate_vector(assem_deriv,vecdata)
     dudφ_vec = get_free_dof_values(zero(V_φ))
     plb_caches = (dudφ_vec,assem_deriv)
 
