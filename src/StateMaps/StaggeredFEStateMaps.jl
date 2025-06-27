@@ -59,17 +59,18 @@ struct StaggeredAffineFEStateMap{NB,SB,A,B,C,D,E,F} <: AbstractFEStateMap
     """
 
     ## Pullback cache (this is a temporary solution before we refactor ChainRules)
-    uhd = zero(op.trial)
-    xhs, λᵀs_∂Rs∂φ = (), ()
-    for k in 1:NB
-      xh_k = get_solution(op,uhd,k)
-      _a(uk,vk,φ) = op.biforms[k](xhs,uk,vk,φ)
-      _l(vk,φ) = op.liforms[k](xhs,vk,φ)
-      λᵀk_∂Rk∂φ = ∇((uk,vk,φ) -> _a(uk,vk,φ) - _l(vk,φ),[xh_k,xh_k,φh],3)
-      xhs, λᵀs_∂Rs∂φ = (xhs...,xh_k), (λᵀs_∂Rs∂φ...,λᵀk_∂Rk∂φ)
-    end
-    vecdata = collect_cell_vector(V_φ,sum(λᵀs_∂Rs∂φ))
-    Σ_λᵀs_∂Rs∂φ = allocate_vector(assem_deriv,vecdata)
+    # uhd = zero(op.trial)
+    # xhs, λᵀs_∂Rs∂φ = (), ()
+    # for k in 1:NB
+    #   xh_k = get_solution(op,uhd,k)
+    #   _a(uk,vk,φ) = op.biforms[k](xhs,uk,vk,φ)
+    #   _l(vk,φ) = op.liforms[k](xhs,vk,φ)
+    #   λᵀk_∂Rk∂φ = ∇((uk,vk,φ) -> _a(uk,vk,φ) - _l(vk,φ),[xh_k,xh_k,φh],3)
+    #   xhs, λᵀs_∂Rs∂φ = (xhs...,xh_k), (λᵀs_∂Rs∂φ...,λᵀk_∂Rk∂φ)
+    # end
+    # vecdata = collect_cell_vector(V_φ,sum(λᵀs_∂Rs∂φ))
+    # Σ_λᵀs_∂Rs∂φ = allocate_vector(assem_deriv,vecdata)
+    Σ_λᵀs_∂Rs∂φ = get_free_dof_values(zero(V_φ))
     plb_caches = (Σ_λᵀs_∂Rs∂φ,assem_deriv)
 
     ## Forward cache
@@ -255,16 +256,17 @@ mutable struct StaggeredNonlinearFEStateMap{NB,SB,A,B,C,D,E,F} <: AbstractFEStat
     """
 
     ## Pullback cache (this is a temporary solution before we refactor ChainRules)
-    uhd = zero(op.trial)
-    xhs, λᵀs_∂Rs∂φ = (), ()
-    for k in 1:NB
-      xh_k = get_solution(op,uhd,k)
-      res(uk,vk,φh) = op.residuals[k](xhs,uk,vk,φh)
-      λᵀk_∂Rk∂φ = ∇(res,[xh_k,xh_k,φh],3)
-      xhs, λᵀs_∂Rs∂φ = (xhs...,xh_k), (λᵀs_∂Rs∂φ...,λᵀk_∂Rk∂φ)
-    end
-    vecdata = collect_cell_vector(V_φ,sum(λᵀs_∂Rs∂φ))
-    Σ_λᵀs_∂Rs∂φ = allocate_vector(assem_deriv,vecdata)
+    # uhd = zero(op.trial)
+    # xhs, λᵀs_∂Rs∂φ = (), ()
+    # for k in 1:NB
+    #   xh_k = get_solution(op,uhd,k)
+    #   res(uk,vk,φh) = op.residuals[k](xhs,uk,vk,φh)
+    #   λᵀk_∂Rk∂φ = ∇(res,[xh_k,xh_k,φh],3)
+    #   xhs, λᵀs_∂Rs∂φ = (xhs...,xh_k), (λᵀs_∂Rs∂φ...,λᵀk_∂Rk∂φ)
+    # end
+    # vecdata = collect_cell_vector(V_φ,sum(λᵀs_∂Rs∂φ))
+    # Σ_λᵀs_∂Rs∂φ = allocate_vector(assem_deriv,vecdata)
+    Σ_λᵀs_∂Rs∂φ = get_free_dof_values(zero(V_φ))
     plb_caches = (Σ_λᵀs_∂Rs∂φ,assem_deriv)
 
     ## Forward cache
@@ -580,10 +582,11 @@ function StaggeredStateParamMap(
   assem_U::Vector{<:Assembler},assem_deriv::Assembler
 )
   @assert length(trials) == length(assem_U)
-  φ₀, u₀s = interpolate(x->-sqrt((x[1]-1/2)^2+(x[2]-1/2)^2)+0.2,V_φ), zero.(trials)
+  # φ₀, u₀s = interpolate(x->-sqrt((x[1]-1/2)^2+(x[2]-1/2)^2)+0.2,V_φ), zero.(trials)
 
-  ∂F∂φ_vecdata = collect_cell_vector(V_φ,∇((φ->F((u₀s...,),φ)))(φ₀))
-  ∂F∂φ_vec = allocate_vector(assem_deriv,∂F∂φ_vecdata)
+  # ∂F∂φ_vecdata = collect_cell_vector(V_φ,∇((φ->F((u₀s...,),φ)))(φ₀))
+  # ∂F∂φ_vec = allocate_vector(assem_deriv,∂F∂φ_vecdata)
+  ∂F∂φ_vec = get_free_dof_values(zero(V_φ))
   assems = (assem_U,assem_deriv)
   spaces = (trials,combine_fespaces(trials),V_φ)
   caches = ∂F∂φ_vec

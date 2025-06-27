@@ -70,11 +70,12 @@ struct RepeatingAffineFEStateMap{A,B,C,D,E,F,G} <: AbstractFEStateMap
 
     ## Pullback cache
     uhd = zero(U0)
-    contr = nblocks * ∇(biform,[uhd,uhd,φh],3)
-    for liform in liforms
-      contr = contr - ∇(liform,[uhd,φh],2)
-    end
-    dudφ_vec = allocate_vector(assem_deriv,collect_cell_vector(V_φ,contr))
+    # contr = nblocks * ∇(biform,[uhd,uhd,φh],3)
+    # for liform in liforms
+    #   contr = contr - ∇(liform,[uhd,φh],2)
+    # end
+    # dudφ_vec = allocate_vector(assem_deriv,collect_cell_vector(V_φ,contr))
+    dudφ_vec = get_free_dof_values(zero(V_φ))
     plb_caches = (dudφ_vec,assem_deriv)
 
     ## Forward cache

@@ -38,8 +38,6 @@ function StateParamMap(
   assem_U::Assembler,assem_deriv::Assembler;
   ∂F∂u::T = nothing
 ) where T<:Union{Function,Nothing}
-  φ₀, u₀ = interpolate(x->-sqrt((x[1]-1/2)^2+(x[2]-1/2)^2)+0.2,V_φ), zero(U)
-  # TODO: Can we make F a dummy functional?
 
   if T <: Nothing
     _∂F∂u(q,u,φ) = Gridap.gradient(x->F(x,φ),u)
@@ -47,10 +45,25 @@ function StateParamMap(
     _∂F∂u = ∂F∂u
   end
 
-  ∂j∂u_vecdata = collect_cell_vector(U,_∂F∂u(get_fe_basis(U),u₀,φ₀))
-  ∂j∂φ_vecdata = collect_cell_vector(V_φ,∇(F,[u₀,φ₀],2))
-  ∂j∂u_vec = allocate_vector(assem_U,∂j∂u_vecdata)
-  ∂j∂φ_vec = allocate_vector(assem_deriv,∂j∂φ_vecdata)
+  ## Dev note (commit ?????)
+  # In the past we used the following code to allocate vectors for the derivatives.
+  # This was required because we needed these to be RHS vectors for VelocityExtension
+  # problem. As of v0.3.0 (commmit ?????), this is no longer required because VelocityExtension
+  # expects dF to be a vector of DOFs. This is then mapped onto an appropriate RHS vector
+  # using `_interpolate_onto_rhs!`.
+  #
+  # In `u_to_j_pullback` below, we do in-place assembly via `assemble_vector!` on these
+  # allocated vectors. This is a bit naughty but works!
+  #######
+  # φ₀, u₀ = interpolate(x->-sqrt((x[1]-1/2)^2+(x[2]-1/2)^2)+0.2,V_φ), zero(U)
+  # ∂j∂u_vecdata = collect_cell_vector(U,_∂F∂u(get_fe_basis(U),u₀,φ₀))
+  # ∂j∂φ_vecdata = collect_cell_vector(V_φ,∇(F,[u₀,φ₀],2))
+  # ∂j∂u_vec = allocate_vector(assem_U,∂j∂u_vecdata)
+  # ∂j∂φ_vec = allocate_vector(assem_deriv,∂j∂φ_vecdata)
+  #######
+
+  ∂j∂u_vec = get_free_dof_values(zero(U))
+  ∂j∂φ_vec = get_free_dof_values(zero(V_φ))
   assems = (assem_U,assem_deriv)
   spaces = (U,V_φ)
   caches = (∂j∂u_vec,∂j∂φ_vec,_∂F∂u)

@@ -99,7 +99,8 @@ function project!(vel_ext::VelocityExtension,dF::AbstractVector,V_φ,uhd)
   ns, x, b, bh_tmp = vel_ext.cache
   U_reg = vel_ext.U_reg
 
-  _interpolate_rhs_onto_rhs!(b,U_reg,bh_tmp,dF,V_φ,uhd)
+  # _interpolate_rhs_onto_rhs!(b,U_reg,bh_tmp,dF,V_φ,uhd) # Not required because dF contains the correct ghosts)
+  _interpolate_onto_rhs!(b,U_reg,bh_tmp,dF,V_φ)
   solve!(x,ns,b)
   _interpolate_onto_rhs!(dF,V_φ,uhd,x,U_reg)
 

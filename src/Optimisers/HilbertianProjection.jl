@@ -13,19 +13,20 @@ struct HilbertianProjectionMap{A}
     θ  = allocate_in_domain(vel_ext.K)
     dC = [allocate_in_domain(vel_ext.K) for _ = 1:nC]
     θ_aux = allocate_in_domain(vel_ext.K)
+    uhd = zero(vel_ext.U_reg)
     orth_caches = return_cache(orthog,dC,vel_ext.K)
-    caches = (θ,θ_aux,dC,orth_caches)
+    caches = (θ,θ_aux,dC,orth_caches,uhd)
     params = (;λ,α_min,α_max,debug)
     return new{typeof(vel_ext.K)}(orthog,vel_ext,caches,params)
   end
 end
 
 function update_descent_direction!(m::HilbertianProjectionMap,dV,C,dC,K,V_φ)
-  θ, θ_aux, dC_aux, orthog_cache = m.caches
+  θ, θ_aux, dC_aux, orthog_cache, uhd = m.caches
   U_reg = m.vel_ext.U_reg
-  interpolate!(FEFunction(V_φ,dV),θ,U_reg)
+  _interpolate_onto_rhs!(θ,U_reg,uhd,dV,V_φ) # Required because θ is a vector from allocate_in_domain(vel_ext.K)
   for i ∈ eachindex(dC)
-    interpolate!(FEFunction(V_φ,dC[i]),dC_aux[i],U_reg)
+    _interpolate_onto_rhs!(dC_aux[i],U_reg,uhd,dC[i],V_φ)
   end
   return _update_descent_direction!(m,θ,C,dC_aux,K,θ_aux,orthog_cache)
 end
@@ -289,7 +290,7 @@ end
 function Base.iterate(m::HilbertianProjection)
   history, params = m.history, m.params
   φh = m.φ0
-  V_φ = get_aux_space(get_state_map(m.problem))
+  V_φ = get_ls_space(m.ls_evolver)
   uhd = zero(V_φ)
 
   ## Reinitialise as SDF
@@ -335,7 +336,7 @@ function Base.iterate(m::HilbertianProjection,state)
 
   ## Line search
   U_reg = m.vel_ext.U_reg
-  V_φ = get_aux_space(get_state_map(m.problem))
+  V_φ = get_ls_space(m.ls_evolver)
   interpolate!(FEFunction(U_reg,θ),vel,V_φ)
   J, C, dJ, dC, γ = _linesearch!(m,state,γ)
 
