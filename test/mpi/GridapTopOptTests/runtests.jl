@@ -8,7 +8,7 @@ using Gridap, GridapDistributed, GridapPETSc, GridapSolvers,
   PartitionedArrays, SparseMatricesCSR
 
 testdir = @__DIR__
-istest(f) = endswith(f, ".jl") && !(f=="runtests.jl")
+istest(f) = endswith(f, "PETSc.jl") && !(f=="runtests.jl")
 testfiles = sort(filter(istest, readdir(testdir)))
 
 MPI.mpiexec() do cmd

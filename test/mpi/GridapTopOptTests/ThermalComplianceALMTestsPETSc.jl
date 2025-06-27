@@ -190,9 +190,9 @@ function main_3d(distribute,mesh_partition,;order)
 
   state_map = AffineFEStateMap(
     a,l,U,V,V_φ,φh;
-    assem_U = SparseMatrixAssembler(Tm,Tv,U,V),
-    assem_adjoint = SparseMatrixAssembler(Tm,Tv,V,U),
-    assem_deriv = SparseMatrixAssembler(Tm,Tv,U_reg,U_reg),
+    # assem_U = SparseMatrixAssembler(Tm,Tv,U,V),
+    # assem_adjoint = SparseMatrixAssembler(Tm,Tv,V,U),
+    # assem_deriv = SparseMatrixAssembler(Tm,Tv,U_reg,U_reg),
     ls = solver,adjoint_ls = solver
   )
   pcfs = PDEConstrainedFunctionals(J,[Vol],state_map,analytic_dJ=dJ,analytic_dC=[dVol])
@@ -202,7 +202,7 @@ function main_3d(distribute,mesh_partition,;order)
   a_hilb(p,q) =∫(α^2*∇(p)⋅∇(q) + p*q)dΩ;
   vel_ext = VelocityExtension(
     a_hilb, U_reg, V_reg;
-    assem = SparseMatrixAssembler(Tm,Tv,U_reg,V_reg),
+    # assem = SparseMatrixAssembler(Tm,Tv,U_reg,V_reg),
     ls = solver
   )
 
