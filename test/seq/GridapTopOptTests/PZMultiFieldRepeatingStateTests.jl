@@ -8,7 +8,7 @@ using Gridap.TensorValues, Gridap.Helpers, Gridap.MultiField
 
 ## Parameters
 function main(;AD,use_mfs=false)
-  el_size = (20,20)
+  el_size = (10,10)
   order = 1
   xmax,ymax=(1.0,1.0)
   dom = (0,xmax,0,ymax)

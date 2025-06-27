@@ -429,59 +429,179 @@ function Base.show(io::IO,::MIME"text/plain",f::AbstractPDEConstrainedFunctional
     num_constraints: $N")
 end
 
+############## Zygote Compat ##############
+"""
+    CustomPDEConstrainedFunctionals{N,A} <:  AbstractPDEConstrainedFunctionals{N}
+
+A version of `PDEConstrainedFunctionals` that allows for an arbitrary mapping
+`φ_to_jc` that is used to compute the objective and constraints given the primal variable.
+
+Under the hood, we use Zygote to compute the Jacobian of this mapping with the rrules defined
+throughout GridapTopOpt.
+
+# Parameters
+
+- `φ_to_jc`: A function that defines the mapping from the primal variable `φ` to the
+  objective and constraints. This should accept AbstractVector `φ` (the free values
+  of `φh`) and output a scalar. In side this function, you should compute your states
+  and evaluate your objectives and constraints that should be written as `GridapTopOpt.StateParamMap`.
+  For example,
+  ```julia
+  using GridapTopOpt: StateParamMap
+  ...
+  J = StateParamMap(j,state_map)
+  C = StateParamMap(c,state_map)
+  function φ_to_jc(φ)
+    u = state_map(φ)
+    [J(u,φ),C(u,φ)^2]
+  end
+  pcfs = CustomPDEConstrainedFunctionals(φ_to_jc,state_map,φh)
+  ```
+- `analytic_dJ`: Either a `Function` (if using analytic derivative) or nothing if using AD.
+- `analytic_dC`: A vector of `Nothing` or `Function` depending on whether using analytic derivatives or AD.
+- `state_map::A`: The state map for the problem. NOTE: this is a place holder for the optimiser
+  output and in theory you could use many different state maps inside `φ_to_jc`.
+
+
+!!! warning
+    The expected functions for `analytic_dJ` and entries of `analytic_dC` are different to
+    usual. Here, you should define a function that takes an `AbstractVector` input corresponding to
+    the derivative and the primal variable dofs `φ` and assembles the derivative into the
+    `AbstractVector` input. For example,
+    ```julia
+    function analytic_dJ!(dJ,φ)
+      φh = FEFunction(V_φ,φ)
+      uh = get_state(state_map)
+      _dJ(q) = ∫(q*f(uh,φh))dΩ
+      Gridap.FESpaces.assemble_vector!(_dJ,dJ,V_φ)
+    end
+    ```
+    This functionality is subject to change in future!
+"""
 struct CustomPDEConstrainedFunctionals{N,A} <:  AbstractPDEConstrainedFunctionals{N}
   φ_to_jc :: Function
-  dJ :: Vector{Float64}
-  dC :: Vector{Vector{Float64}}
   analytic_dJ
   analytic_dC
   state_map :: A
 
+    @doc"""
+        CustomPDEConstrainedFunctionals(
+          φ_to_jc :: Function,
+          num_constraints,
+          state_map :: AbstractFEStateMap;
+          analytic_dJ = nothing,
+          analytic_dC = fill(nothing,num_constraints)
+        )
+
+    Create an instance of `CustomPDEConstrainedFunctionals`. Here,
+    `num_constraints` specifies the number of constraints.
+    """
     function CustomPDEConstrainedFunctionals(
       φ_to_jc :: Function,
-      state_map :: AbstractFEStateMap,
-      φh;
+      num_constraints,
+      state_map :: AbstractFEStateMap;
+      analytic_dJ = nothing,
+      analytic_dC = fill(nothing,num_constraints)
     )
-
-    # Pre-allocaitng
-    grad = Zygote.jacobian(φ_to_jc, φh.free_values)
-    dJ = grad[1][1,:]
-    dC = [collect(row) for row in eachrow(grad[1][2:end,:])]
-
-    N = length(dC)
-    A = typeof(state_map)
-    analytic_dJ = nothing
-    analytic_dC = fill(nothing,N)
-
-    return new{N,A}(φ_to_jc,dJ,dC,analytic_dJ,analytic_dC,state_map)
+    return new{num_constraints,typeof(state_map)}(φ_to_jc,analytic_dJ,analytic_dC,state_map)
   end
 end
 
-function Fields.evaluate!(pcf::CustomPDEConstrainedFunctionals,φh)
-  φ_to_jc,dJ,dC = pcf.φ_to_jc,pcf.dJ,pcf.dC
+function Fields.evaluate!(pcf::CustomPDEConstrainedFunctionals{N},φh) where N
+  φ_to_jc = pcf.φ_to_jc
+  analytic_dJ!, analytic_dC! = pcf.analytic_dJ, pcf.analytic_dC
 
-  obj,grad = Zygote.withjacobian(φ_to_jc, φh.free_values)
-  j = obj[1]
-  c = obj[2:end]
-  copy!(dJ,grad[1][1,:])
-  copy!(dC,[collect(row) for row in eachrow(grad[1][2:end,:])])
+  # Compute derivatives
+  ignore_pullback = findall(!isnothing,vcat(analytic_dJ!, analytic_dC!))
+  val, grad = val_and_jacobian(φ_to_jc, get_free_dof_values(φh);ignore_pullback)
+
+  # Unpack
+  j = val[1]
+  c = val[2:end]
+  dJ = grad[1][1]
+  dC = grad[1][2:end]
+
+  # Analytic derivatives
+  function _compute_dF!(dF,analytic_dF!::Function)
+    analytic_dF!(dF,get_free_dof_values(φh))
+    nothing
+  end
+  function _compute_dF!(dF,analytic_dF!::Nothing)
+    nothing
+  end
+  _compute_dF!(dJ,analytic_dJ!)
+  map(_compute_dF!,dC,analytic_dC!)
 
   return j,c,dJ,dC
 end
 
-get_state(m::CustomPDEConstrainedFunctionals) = get_state(m.state_map)
+function Fields.evaluate!(pcf::CustomPDEConstrainedFunctionals{0},φh)
+  φ_to_jc = pcf.φ_to_jc
+  analytic_dJ!, analytic_dC! = pcf.analytic_dJ, pcf.analytic_dC
+
+  # Compute derivatives
+  ignore_pullback = findall(!isnothing,vcat(analytic_dJ!, analytic_dC!))
+  val, _grad = val_and_jacobian(φ_to_jc, get_free_dof_values(φh);ignore_pullback)
+
+  # Unpack
+  j = val[1]
+  c = Vector{eltype(val)}()
+  grad = first(_grad)
+  dJ = grad[1]
+  dC = Vector{eltype(grad)}();
+
+  # Analytic derivative
+  function _compute_dF!(dF,analytic_dF!::Function)
+    analytic_dF!(dF,get_free_dof_values(φh))
+    nothing
+  end
+  function _compute_dF!(dF,analytic_dF!::Nothing)
+    nothing
+  end
+  _compute_dF!(dJ,pcf.analytic_dJ)
+
+  return j,c,dJ,dC
+end
+
+function get_state(m::CustomPDEConstrainedFunctionals)
+  @warn """
+    For CustomPDEConstrainedFunctionals, get_state only returns the StateMap used in
+    the constructor for the CustomPDEConstrainedFunctionals. This means that uh in
+    ```
+    for (it,uh,φh) in optimiser
+      ...
+    end
+    ```
+    will correspond to this particular state map.
+
+    There may be cases where you have multiple StateMaps inside a map φ_to_jc. If
+    this is the case, you should get your states directly from your StateMaps in
+    the driver script.
+
+    This functionality may change in future.
+  """ maxlog=1
+  get_state(m.state_map)
+end
 get_state_map(m::CustomPDEConstrainedFunctionals) = m.state_map
 
-function evaluate_functionals!(pcf::CustomPDEConstrainedFunctionals,φh::FEFunction)
-  φ = φh.free_values
+function evaluate_functionals!(pcf::CustomPDEConstrainedFunctionals,φh)
+  φ = get_free_dof_values(φh)
   return evaluate_functionals!(pcf,φ)
 end
 
-function evaluate_functionals!(pcf::CustomPDEConstrainedFunctionals,φ::AbstractVector)
+function evaluate_functionals!(pcf::CustomPDEConstrainedFunctionals{N},φ::AbstractVector) where N
   φ_to_jc =  pcf.φ_to_jc
-  obj = φ_to_jc(φ)
-  j = obj[1]
-  c = obj[2:end]
+  val = φ_to_jc(φ)
+  j = val[1]
+  c = val[2:end];
+  return j,c
+end
+
+function evaluate_functionals!(pcf::CustomPDEConstrainedFunctionals{0},φ::AbstractVector)
+  φ_to_jc =  pcf.φ_to_jc
+  val = φ_to_jc(φ)
+  j = val[1]
+  c = Vector{eltype(val)}();
   return j,c
 end
 

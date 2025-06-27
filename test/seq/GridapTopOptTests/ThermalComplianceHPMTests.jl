@@ -19,7 +19,7 @@ function main(;order,AD_case)
   prop_Γ_N = 0.2
   prop_Γ_D = 0.2
   dom = (0,xmax,0,ymax)
-  el_size = (20,20)
+  el_size = (10,10)
   γ = 0.1
   γ_reinit = 0.5
   max_steps = floor(Int,order*minimum(el_size)/10)
@@ -89,10 +89,28 @@ function main(;order,AD_case)
     function φ_to_jc(φ)
       u = state_map(φ)
       j = objective(u,φ)
-      c = map(constrainti -> constrainti(u,φ),constraints)
+      c = map(constraint -> constraint(u,φ),constraints)
       [j,c...]
     end
-    CustomPDEConstrainedFunctionals(φ_to_jc,state_map,φh)  
+    CustomPDEConstrainedFunctionals(φ_to_jc,length(constraints),state_map)
+  elseif AD_case == :custom_pcf_analyticVol
+    objective = GridapTopOpt.StateParamMap(J,state_map)
+    constraints = map(Ci -> GridapTopOpt.StateParamIntegrandWithMeasure(Ci,state_map),[Vol])
+    function φ_to_jc2(φ)
+      u = state_map(φ)
+      j = objective(u,φ)
+      c = map(constraint -> constraint(u,φ),constraints)
+      [j,c...]
+    end
+    function analytic_dC1!(dC,φ)
+      println("!!         analytic_dC1! called")
+      φh = FEFunction(V_φ,φ)
+      uh = get_state(state_map)
+      _dC(q) = dVol(q,uh,φh)
+      Gridap.FESpaces.assemble_vector!(_dC,dC,V_φ)
+    end
+    CustomPDEConstrainedFunctionals(φ_to_jc2,length(constraints),state_map;
+      analytic_dC=[analytic_dC1!])
   else
     @error "AD case not defined"
   end
@@ -121,5 +139,6 @@ end
 @test main(;order=1,AD_case=:partial_ad2)
 @test main(;order=1,AD_case=:no_ad)
 @test main(;order=1,AD_case=:custom_pcf)
+@test main(;order=1,AD_case=:custom_pcf_analyticVol)
 
 end # module

@@ -51,7 +51,7 @@ function main(verbose)
     pcf.J(u,φ)
   end
 
-  cpcf = CustomPDEConstrainedFunctionals(φ_to_j,φ_to_u,φh)
+  cpcf = CustomPDEConstrainedFunctionals(φ_to_j,0,φ_to_u)
   _,_,cdF,_ = evaluate!(cpcf,φh)
   @test cdF ≈ _dF
 
