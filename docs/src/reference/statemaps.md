@@ -78,8 +78,7 @@ GridapTopOpt.get_deriv_assembler
 ```
 
 ### Partial derivatives
-
-```@docs
-GridapTopOpt.gradient(F,uh::Vector{<:CellField},K::Int)
-GridapTopOpt.jacobian(F,uh::Vector{<:CellField},K::Int)
+```@autodocs
+Modules = [GridapTopOpt]
+Pages = ["StateMaps/StateMaps.jl"]
 ```
