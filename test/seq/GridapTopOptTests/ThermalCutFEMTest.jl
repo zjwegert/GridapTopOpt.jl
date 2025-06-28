@@ -97,21 +97,21 @@ function main(AD_case)
       :C => map(Ci -> StateParamMap(Ci,state_map),[Vol,])
     )
   end
-  
+
   pcfs = if AD_case == :with_ad
     EmbeddedPDEConstrainedFunctionals(state_collection;analytic_dC=(dVol,))
   elseif AD_case == :custom_pcf
-  function φ_to_jc(φ)
-    u = state_collection.state_map(φ)
-    j = state_collection.J(u,φ)
-    c = map(constrainti -> constrainti(u,φ),state_collection.C)
-    [j,c...]
-  end
-  CustomEmbeddedPDEConstrainedFunctionals(φ_to_jc,state_collection,Ωs,φh)
+    function φ_to_jc(φ)
+      u = state_collection.state_map(φ)
+      j = state_collection.J(u,φ)
+      c = map(constrainti -> constrainti(u,φ),state_collection.C)
+      [j,c...]
+    end
+    CustomEmbeddedPDEConstrainedFunctionals(φ_to_jc,1,state_collection)
   else
     @error "AD case not defined"
-  end 
-   
+  end
+
   ## Evolution Method
   evo = CutFEMEvolve(V_φ,Ωs,dΩ_bg,hₕ;max_steps,γg=0.1)
   reinit = StabilisedReinit(V_φ,Ωs,dΩ_bg,hₕ;stabilisation_method=ArtificialViscosity(2.0))
