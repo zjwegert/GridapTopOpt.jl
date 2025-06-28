@@ -25,6 +25,10 @@ These can be assembled into a set of linear systems:
     A_k u_k = b_k
 
 where `A_k` and `b_k` only depend on the previous variables `u_1,...,u_{k-1}`.
+
+!!! warning
+    The current implementation of the rrules is not compatible with Zygote.
+    This will be fixed in a future release.
 """
 struct StaggeredAffineFEStateMap{NB,SB,A,B,C,D,E,F} <: AbstractFEStateMap
   biforms    :: Vector{<:Function}
@@ -207,6 +211,10 @@ we expect a set of residual/jacobian pairs that also depend on φ:
 
 !!! info
     This is mutable for now, in future we will refactor ChainRules to remove storage of caches
+
+!!! warning
+    The current implementation of the rrules is not compatible with Zygote.
+    This will be fixed in a future release.
 """
 mutable struct StaggeredNonlinearFEStateMap{NB,SB,A,B,C,D,E,F} <: AbstractFEStateMap
   const residuals         :: Vector{<:Function}
@@ -586,6 +594,8 @@ end
 
 # The following is a hack to get this working in the current GridapTopOpt ChainRules API.
 #   This will be refactored in the future
+#
+# TODO: This should be refactored when we refactor StateParamMap
 function ChainRulesCore.rrule(u_to_j::StaggeredStateParamMap,uh,φh)
   F = u_to_j.F
   trials,_,V_φ = u_to_j.spaces
@@ -614,4 +624,33 @@ function ChainRulesCore.rrule(u_to_j::StaggeredStateParamMap,u::AbstractVector,�
   uh = FEFunction(trial,u)
   φh = FEFunction(V_φ,φ)
   return ChainRulesCore.rrule(u_to_j,uh,φh)
+end
+
+## Backwards compat
+function StaggeredAffineFEStateMap(
+    op::StaggeredAffineFEOperator,∂Rk∂xhi::Tuple{Vararg{Tuple{Vararg{Function}}}},V_φ,U_reg,φh; kwargs...)
+  @warn _msg_v0_3_0 maxlog=1
+  return StaggeredAffineFEStateMap(op,∂Rk∂xhi,V_φ,φh; kwargs...)
+end
+
+function StaggeredAffineFEStateMap(op::StaggeredAffineFEOperator,V_φ,U_reg,φh; kwargs...)
+  @warn _msg_v0_3_0 maxlog=1
+  return StaggeredAffineFEStateMap(op,V_φ,φh; kwargs...)
+end
+
+function StaggeredNonlinearFEStateMap(
+    op::StaggeredNonlinearFEOperator,∂Rk∂xhi::Tuple{Vararg{Tuple{Vararg{Function}}}},V_φ,U_reg,φh; kwargs...)
+  @warn _msg_v0_3_0 maxlog=1
+  return StaggeredNonlinearFEStateMap(op,∂Rk∂xhi,V_φ,φh; kwargs...)
+end
+
+function StaggeredNonlinearFEStateMap(op::StaggeredNonlinearFEOperator,V_φ,U_reg,φh; kwargs...)
+  @warn _msg_v0_3_0 maxlog=1
+  return StaggeredNonlinearFEStateMap(op,V_φ,φh; kwargs...)
+end
+
+function StaggeredStateParamMap(F,∂F∂xhi::Tuple{Vararg{Function}},trials::Vector{<:FESpace},V_φ::FESpace,
+    U_reg::FESpace,assem_U::Vector{<:Assembler},assem_deriv::Assembler)
+  @warn _msg_v0_3_0 maxlog=1
+  return StaggeredStateParamMap(F,∂F∂xhi,trials,V_φ,assem_U,assem_deriv)
 end

@@ -5,19 +5,19 @@ using GridapEmbedded, GridapEmbedded.LevelSetCutters
 using GridapSolvers, GridapSolvers.BlockSolvers, GridapSolvers.NonlinearSolvers
 using GridapGmsh
 using GridapTopOpt
+using PartitionedArrays, GridapDistributed
 
 using FiniteDiff,Test
 
-function main(n;verbose=true)
+function main(_model,isserial)
   # Params
   vf = 0.3
   D = 2
 
   # Load mesh
-  _model = CartesianDiscreteModel((0,1,0,1),(n,n))
   base_model = UnstructuredDiscreteModel(_model)
   ref_model = refine(base_model, refinement_method = "barycentric")
-  model = ref_model.model
+  model = get_model(ref_model)
   f_Γ_D(x) = x[1] ≈ 0.0
   f_Γ_N(x) = (x[1] ≈ 1 && 0.4 - eps() <= x[2] <= 0.6 + eps())
   update_labels!(1,model,f_Γ_D,"Gamma_D")
@@ -50,7 +50,7 @@ function main(n;verbose=true)
     Γg = GhostSkeleton(cutgeo)
     Ω_act = Triangulation(cutgeo,ACTIVE)
     # Isolated volumes
-    φ_cell_values = get_cell_dof_values(_φh)
+    φ_cell_values = isserial ? get_cell_dof_values(_φh) : map(get_cell_dof_values,local_views(_φh))
     ψ,_ = GridapTopOpt.get_isolated_volumes_mask_polytopal(model,φ_cell_values,["Gamma_D"])
     (;
       :Ω_act => Ω_act,
@@ -65,8 +65,6 @@ function main(n;verbose=true)
       :ψ     => ψ
     )
   end
-  # writevtk(get_triangulation(φh),path*"initial_islands",cellfields=["φh"=>φh,"ψ"=>Ω_data.ψ])
-  # writevtk(Ω_data.Ω,path*"Omega_initial")
 
   # Setup spaces
   uin((x,y)) = 0.3VectorValue(-y,x)
@@ -121,28 +119,65 @@ function main(n;verbose=true)
   pcfs = EmbeddedPDEConstrainedFunctionals(state_collection;analytic_dC=(dVol,))
   _,_,_dF,_ = evaluate!(pcfs,φh)
 
-  function φ_to_j(φ)
-    update_collection!(Ω_data,FEFunction(V_φ,φ))
-    u = state_collection.state_map(φ)
-    state_collection.J(u,φ)
+  if !isserial
+
+    function custom_embedded_φ_to_j(φ)
+      u = state_collection.state_map(φ)
+      state_collection.J(u,φ)
+    end
+
+    cpcfs = CustomEmbeddedPDEConstrainedFunctionals(custom_embedded_φ_to_j,0,state_collection)
+    _,_,cdF,_ = evaluate!(cpcfs,φh)
+    @test cdF ≈ _dF
+
+    function custom_embedded_φ_to_j_v2(φ)
+      u = state_collection.state_map(φ)
+      [state_collection.J(u,φ),state_collection.C[1](u,φ)]
+    end
+
+    cpcfs = CustomEmbeddedPDEConstrainedFunctionals(custom_embedded_φ_to_j_v2,1,state_collection)
+    _,_,cdF,cdC = evaluate!(cpcfs,φh)
+    @test cdF ≈ _dF
+
+    function analytic_dVol!(dV,φ)
+      φh = FEFunction(V_φ,φ)
+      dh = get_state(state_collection.state_map)
+      _dC(q) = dVol(q,dh,φh)
+      Gridap.FESpaces.assemble_vector!(_dC,dV,V_φ)
+    end
+    cpcfs = CustomEmbeddedPDEConstrainedFunctionals(custom_embedded_φ_to_j_v2,1,state_collection;analytic_dC=[analytic_dVol!,])
+    _,_,cdF,cdC_2 = evaluate!(cpcfs,φh)
+    @test cdF ≈ _dF
+    @test cdC[1] ≈ cdC_2[1]
   end
 
-  function custom_embedded_φ_to_j(φ)
-    u = state_collection.state_map(φ)
-    state_collection.J(u,φ)
-  end
-
-  cpcfs = CustomEmbeddedPDEConstrainedFunctionals(custom_embedded_φ_to_j,state_collection,Ω_data,φh)
-  _,_,cdF,_ = evaluate!(cpcfs,φh)
-  @test cdF ≈ _dF
-
-  fdm_grad = FiniteDiff.finite_difference_gradient(φ_to_j, get_free_dof_values(φh))
-  rel_error = norm(_dF - fdm_grad,Inf)/norm(fdm_grad,Inf)
-
-  verbose && println("Relative error in gradient: $rel_error")
-  @test rel_error < 1e-6
+  return _dF,V_φ
 end
 
-main(7;verbose=true)
+function run_test(distribute,mesh_partition)
+  ranks = distribute(LinearIndices((prod(mesh_partition),)))
+
+  model_serial = CartesianDiscreteModel((0,1,0,1),(7,7));
+  dF_serial,V_deriv_serial = main(model_serial,true);
+
+  model = GridapTopOpt.ordered_distributed_model_from_serial_model(ranks,model_serial);
+  dF,V_deriv = main(model,false);
+
+  @test length(dF_serial) == length(dF)
+  @test norm(dF_serial) ≈ norm(dF)
+
+  dFh = FEFunction(V_deriv,dF)
+  dFh_serial = FEFunction(V_deriv_serial,dF_serial)
+  deriv_test = GridapTopOpt.test_serial_and_distributed_fields(dFh,V_deriv,dFh_serial,V_deriv_serial)
+
+  map_main(deriv_test) do deriv_test
+    @test deriv_test
+    nothing
+  end
+end
+
+with_mpi() do distribute
+  run_test(distribute,(2,2))
+end
 
 end

@@ -48,6 +48,34 @@ function driver(model,verbose)
   pcf = PDEConstrainedFunctionals(F,φ_to_u)
   _,_,dF,_ = evaluate!(pcf,φh);
 
+  function φ_to_j(φ)
+    u = φ_to_u(φ)
+    pcf.J(u,φ)
+  end
+
+  cpcf = CustomPDEConstrainedFunctionals(φ_to_j,0,φ_to_u)
+  _,_,cdF,_ = evaluate!(cpcf,φh)
+  @test cdF ≈ dF
+
+  function φ_to_j_v2(φ)
+    u = φ_to_u(φ)
+    [pcf.J(u,φ)]
+  end
+
+  cpcf = CustomPDEConstrainedFunctionals(φ_to_j_v2,0,φ_to_u)
+  _,_,cdF,_ = evaluate!(cpcf,φh)
+  @test cdF ≈ dF
+
+  function φ_to_j3(φ)
+    u = φ_to_u(φ)
+    [pcf.J(u,φ),pcf.J(u,φ)^2]
+  end
+
+  cpcf = CustomPDEConstrainedFunctionals(φ_to_j3,1,φ_to_u)
+  evaluate!(cpcf,φh)
+  cpcf = CustomPDEConstrainedFunctionals(φ_to_j3,1,φ_to_u;analytic_dC=[(dC,φ)->dC])
+  evaluate!(cpcf,φh)
+
   return dF,V_φ
 end
 
@@ -60,7 +88,7 @@ function main(distribute,mesh_partition)
   model = ordered_distributed_model_from_serial_model(ranks,model_serial);
   dF,V_deriv = driver(model,false);
 
-  @test length(dF_serial) ≈ length(dF)
+  @test length(dF_serial) == length(dF)
   @test norm(dF_serial) ≈ norm(dF)
 
   dFh = FEFunction(V_deriv,dF)

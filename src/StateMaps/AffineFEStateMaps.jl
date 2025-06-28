@@ -116,3 +116,9 @@ function adjoint_solve!(φ_to_u::AffineFEStateMap,du::AbstractVector)
   solve!(adjoint_x,adjoint_ns,du)
   return adjoint_x
 end
+
+## Backwards compat
+function AffineFEStateMap(biform::Function,liform::Function,U,V,V_φ,U_reg,φh; kwargs...)
+  @warn _msg_v0_3_0 maxlog=1
+  AffineFEStateMap(biform,liform,U,V,V_φ,φh; kwargs...)
+end

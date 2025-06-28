@@ -240,11 +240,11 @@ function Fields.evaluate!(pcf::PDEConstrainedFunctionals,φ::AbstractVector;kwar
 end
 
 """
-    mutable struct EmbeddedPDEConstrainedFunctionals{N} <: AbstractPDEConstrainedFunctionals{N}
+    struct EmbeddedPDEConstrainedFunctionals{N,T} <: AbstractPDEConstrainedFunctionals{N}
 
-A mutable version of `PDEConstrainedFunctionals` that allows `state_map` to be
-updated given new FE spaces for the forward problem. This is currently required
-for body-fitted mesh methods and unfitted methods.
+A version of `PDEConstrainedFunctionals` that has an `embedded_collection` to
+allow the `state_map` to be updated given new FE spaces for the forward problem.
+This is currently required for unfitted methods.
 """
 struct EmbeddedPDEConstrainedFunctionals{N,T} <: AbstractPDEConstrainedFunctionals{N}
   dJ
@@ -267,7 +267,7 @@ struct EmbeddedPDEConstrainedFunctionals{N,T} <: AbstractPDEConstrainedFunctiona
       analytic_dJ = nothing,
       analytic_dC = nothing)
 
-    @assert Set((:state_map,:J,:C)) == keys(embedded_collection.objects) """
+    @check Set((:state_map,:J,:C)) == keys(embedded_collection.objects) """
     Expected EmbeddedCollection to have objects ':state_map,:J,:C'. Ensure that you
     have updated the collection after adding new recipes.
 
@@ -464,7 +464,7 @@ throughout GridapTopOpt.
 
 
 !!! warning
-    The expected functions for `analytic_dJ` and entries of `analytic_dC` are different to
+    The expected function for `analytic_dJ` and functions of `analytic_dC` are different to
     usual. Here, you should define a function that takes an `AbstractVector` input corresponding to
     the derivative and the primal variable dofs `φ` and assembles the derivative into the
     `AbstractVector` input. For example,
@@ -472,7 +472,7 @@ throughout GridapTopOpt.
     function analytic_dJ!(dJ,φ)
       φh = FEFunction(V_φ,φ)
       uh = get_state(state_map)
-      _dJ(q) = ∫(q*f(uh,φh))dΩ
+      _dJ(q) = ∫(q*...)dΩ
       Gridap.FESpaces.assemble_vector!(_dJ,dJ,V_φ)
     end
     ```
@@ -605,68 +605,165 @@ function evaluate_functionals!(pcf::CustomPDEConstrainedFunctionals{0},φ::Abstr
   return j,c
 end
 
+########## Zygote + Unfitted ##########
+"""
+    struct CustomEmbeddedPDEConstrainedFunctionals{N,A} <: AbstractPDEConstrainedFunctionals{N}
+
+A version of `CustomPDEConstrainedFunctionals` that has an `embedded_collection` to
+allow the `state_map` to be updated given new FE spaces for the forward problem.
+This is currently required for unfitted methods.
+"""
 struct CustomEmbeddedPDEConstrainedFunctionals{N,A} <:  AbstractPDEConstrainedFunctionals{N}
   φ_to_jc :: Function
-  dJ :: Vector{Float64}
-  dC :: Vector{Vector{Float64}}
   analytic_dJ
   analytic_dC
   embedded_collection :: EmbeddedCollection
-  Ωs :: EmbeddedCollection
+    @doc"""
+        CustomEmbeddedPDEConstrainedFunctionals(
+          φ_to_jc :: Function,
+          num_constraints,
+          embedded_collection :: EmbeddedCollection;
+          analytic_dJ = nothing,
+          analytic_dC = fill(nothing,num_constraints)
+        )
 
+    Create an instance of `CustomEmbeddedPDEConstrainedFunctionals`. Here,
+    `num_constraints` specifies the number of constraints.
+    """
     function CustomEmbeddedPDEConstrainedFunctionals(
       φ_to_jc :: Function,
-      embedded_collection :: EmbeddedCollection,
-      Ωs,
-      φh;
+      num_constraints,
+      embedded_collection :: EmbeddedCollection;
+      analytic_dJ = nothing,
+      analytic_dC = fill(nothing,num_constraints)
     )
-    update_collection!(Ωs,φh)
-    update_collection_with_φh!(embedded_collection,φh)
 
-    # Pre-allocaitng
-    grad = Zygote.jacobian(φ_to_jc,φh.free_values)
-    dJ = grad[1][1,:]
-    dC = [collect(row) for row in eachrow(grad[1][2:end,:])]
+    @check Set((:state_map,:J,:C)) == keys(embedded_collection.objects) """
+    Expected EmbeddedCollection to have objects ':state_map,:J,:C'. Ensure that you
+    have updated the collection after adding new recipes.
 
-    N = length(dC)
+    You have $(keys(embedded_collection.objects))
+
+    Note:
+    - We require that this EmbeddedCollection is seperate to the one used for the
+      UnfittedEvolution. This is because updating the FEStateMap is more expensive than
+      cutting and there are instances where evolution and reinitialisation happen
+      at before recomputing the forward solution. As such, we cut an extra time
+      to avoid allocating the state map more often then required.
+    - For problems with no constraints `:C` must at least point to an empty list
+    """
     A = typeof(embedded_collection.state_map)
-    analytic_dJ = nothing
-    analytic_dC = fill(nothing,N)
-
-    return new{N,A}(φ_to_jc,dJ,dC,analytic_dJ,analytic_dC,embedded_collection,Ωs)
+    return new{num_constraints,A}(φ_to_jc,analytic_dJ,analytic_dC,embedded_collection)
   end
 end
 
-get_state_map(m::CustomEmbeddedPDEConstrainedFunctionals) = m.embedded_collection.state_map
-get_state(m::CustomEmbeddedPDEConstrainedFunctionals) = get_state(get_state_map(m))
+function Fields.evaluate!(
+    pcf::CustomEmbeddedPDEConstrainedFunctionals{N},φh;update_space::Bool=true) where N
+  update_space && update_collection_with_φh!(pcf.embedded_collection,φh)
+  φ_to_jc = pcf.φ_to_jc
+  analytic_dJ!, analytic_dC! = pcf.analytic_dJ, pcf.analytic_dC
 
-function Fields.evaluate!(pcf::CustomEmbeddedPDEConstrainedFunctionals,φh)
-  φ_to_jc,dJ,dC = pcf.φ_to_jc,pcf.dJ,pcf.dC
-  state_collection = pcf.embedded_collection
-  Ωs = pcf.Ωs
-  update_collection!(Ωs,φh)
-  update_collection_with_φh!(state_collection,φh)
-  obj,grad = Zygote.withjacobian(φ_to_jc, φh.free_values)
-  j = obj[1]
-  c = obj[2:end]
-  copy!(dJ,grad[1][1,:])
-  copy!(dC,[collect(row) for row in eachrow(grad[1][2:end,:])])
+  # Compute derivatives
+  ignore_pullback = findall(!isnothing,vcat(analytic_dJ!, analytic_dC!))
+  val, grad = val_and_jacobian(φ_to_jc, get_free_dof_values(φh);ignore_pullback)
+
+  # Unpack
+  j = val[1]
+  c = val[2:end]
+  dJ = grad[1][1]
+  dC = grad[1][2:end]
+
+  # Analytic derivatives
+  function _compute_dF!(dF,analytic_dF!::Function)
+    analytic_dF!(dF,get_free_dof_values(φh))
+    nothing
+  end
+  function _compute_dF!(dF,analytic_dF!::Nothing)
+    nothing
+  end
+  _compute_dF!(dJ,analytic_dJ!)
+  map(_compute_dF!,dC,analytic_dC!)
+
   return j,c,dJ,dC
 end
 
-function evaluate_functionals!(pcf::CustomEmbeddedPDEConstrainedFunctionals,φh::FEFunction)
-  φ = φh.free_values
-  return evaluate_functionals!(pcf,φ)
+function Fields.evaluate!(
+    pcf::CustomEmbeddedPDEConstrainedFunctionals{0},φh;update_space::Bool=true)
+  update_space && update_collection_with_φh!(pcf.embedded_collection,φh)
+  φ_to_jc = pcf.φ_to_jc
+  analytic_dJ!, analytic_dC! = pcf.analytic_dJ, pcf.analytic_dC
+
+  # Compute derivatives
+  ignore_pullback = findall(!isnothing,vcat(analytic_dJ!, analytic_dC!))
+  val, _grad = val_and_jacobian(φ_to_jc, get_free_dof_values(φh);ignore_pullback)
+
+  # Unpack
+  j = val[1]
+  c = Vector{eltype(val)}()
+  grad = first(_grad)
+  dJ = grad[1]
+  dC = Vector{eltype(grad)}();
+
+  # Analytic derivative
+  function _compute_dF!(dF,analytic_dF!::Function)
+    analytic_dF!(dF,get_free_dof_values(φh))
+    nothing
+  end
+  function _compute_dF!(dF,analytic_dF!::Nothing)
+    nothing
+  end
+  _compute_dF!(dJ,pcf.analytic_dJ)
+
+  return j,c,dJ,dC
 end
 
-function evaluate_functionals!(pcf::CustomEmbeddedPDEConstrainedFunctionals,φ::AbstractVector)
-  φ_to_jc =  pcf.φ_to_jc
-  state_collection = pcf.embedded_collection
-  Ωs = pcf.Ωs
-  update_collection!(Ωs,φh)
-  update_collection_with_φh!(state_collection,φh)
-  obj = φ_to_jc(φh.free_values)
-  j = obj[1]
-  c = obj[2:end]
+function Fields.evaluate!(pcf::CustomEmbeddedPDEConstrainedFunctionals,φ::AbstractVector;kwargs...)
+  V_φ = get_aux_space(get_state_map(pcf))
+  φh = FEFunction(V_φ,φ)
+  return evaluate!(pcf,φh;kwargs...)
+end
+
+function get_state(m::CustomEmbeddedPDEConstrainedFunctionals)
+  @warn """
+    For CustomEmbeddedPDEConstrainedFunctionals, get_state only returns the StateMap used in
+    the constructor for the embedded_collection. This means that uh in
+    ```
+    for (it,uh,φh) in optimiser
+      ...
+    end
+    ```
+    will correspond to this particular state map.
+
+    There may be cases where you have multiple StateMaps inside a map φ_to_jc. If
+    this is the case, you should get your states directly from your StateMaps in
+    the driver script.
+
+    This functionality may change in future.
+  """ maxlog=1
+  get_state(m.embedded_collection.state_map)
+end
+get_state_map(m::CustomEmbeddedPDEConstrainedFunctionals) = m.state_map
+
+function evaluate_functionals!(pcf::CustomEmbeddedPDEConstrainedFunctionals,φ::AbstractVector;kwargs...)
+  V_φ = get_aux_space(get_state_map(pcf))
+  φh  = FEFunction(V_φ,φ)
+  return evaluate_functionals!(pcf,φh;kwargs...)
+end
+
+function evaluate_functionals!(pcf::CustomEmbeddedPDEConstrainedFunctionals{N},
+    φh;update_space::Bool=true) where N
+  update_space && update_collection_with_φh!(pcf.embedded_collection,φh)
+  val = pcf.φ_to_jc(get_free_dof_values(φh))
+  j = val[1]
+  c = val[2:end];
+  return j,c
+end
+
+function evaluate_functionals!(pcf::CustomEmbeddedPDEConstrainedFunctionals{0},
+    φh;update_space::Bool=true)
+  update_space && update_collection_with_φh!(pcf.embedded_collection,φh)
+  val = pcf.φ_to_jc(get_free_dof_values(φh))
+  j = val[1]
+  c = Vector{eltype(val)}();
   return j,c
 end

@@ -30,20 +30,20 @@ end
 
 Create an instance of `StateParamMap`.
 
-Use the optional argument `∂F∂u` to specify the directional derivative of
-F(u,φ) with respect to the field u in the direction q as ∂F∂u(q,u,φ).
+Use the optional argument `∂F∂u` and/or `∂F∂φ`  to specify the directional derivative of
+F(u,φ) with respect to the field u in the direction q as ∂F∂u(q,u,φ) and/or with respect
+to the field φ in the direction q as ∂F∂φ(q,u,φ).
 """
 function StateParamMap(
   F,U::FESpace,V_φ::FESpace,
   assem_U::Assembler,assem_deriv::Assembler;
-  ∂F∂u::T = nothing
-) where T<:Union{Function,Nothing}
+  ∂F∂u::T = nothing,
+  ∂F∂φ::V = nothing
+) where {T<:Union{Function,Nothing},V<:Union{Function,Nothing}}
 
-  if T <: Nothing
-    _∂F∂u(q,u,φ) = Gridap.gradient(x->F(x,φ),u)
-  else
-    _∂F∂u = ∂F∂u
-  end
+  # Use analytic derivatives?
+  _∂F∂u(q,u,φ) = (T <: Nothing) ? Gridap.gradient(x->F(x,φ),u) : ∂F∂u(q,u,φ)
+  _∂F∂φ(q,u,φ) = (T <: Nothing) ? Gridap.gradient(x->F(u,x),u) : ∂F∂φ(q,u,φ)
 
   ## Dev note (commit fd65d0a):
   # In the past we used the following code to allocate vectors for the derivatives.
@@ -131,10 +131,17 @@ function ChainRulesCore.rrule(u_to_j::StateParamMap,u::AbstractVector,φ::Abstra
   return ChainRulesCore.rrule(u_to_j,uh,φh)
 end
 
-# Backwards compat
-const StateParamIntegrandWithMeasure = StateParamMap
-
 # IO
 function Base.show(io::IO,object::AbstractStateParamMap)
   print(io,"$(nameof(typeof(object)))")
+end
+
+# Backwards compat
+const StateParamIntegrandWithMeasure = StateParamMap
+
+function StateParamMap(
+    F,U::FESpace,V_φ::FESpace,U_reg,assem_U::Assembler,assem_deriv::Assembler;kwargs...)
+  @warn _msg_v0_3_0 maxlog=1
+  return StateParamMap(
+    F,U::FESpace,V_φ::FESpace,assem_U::Assembler,assem_deriv::Assembler;kwargs...)
 end

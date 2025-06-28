@@ -55,6 +55,16 @@ function main(verbose)
   _,_,cdF,_ = evaluate!(cpcf,φh)
   @test cdF ≈ _dF
 
+  function φ_to_j2(φ)
+    u = φ_to_u(φ)
+    [pcf.J(u,φ),pcf.J(u,φ)^2]
+  end
+
+  cpcf = CustomPDEConstrainedFunctionals(φ_to_j2,1,φ_to_u)
+  evaluate!(cpcf,φh)
+  cpcf = CustomPDEConstrainedFunctionals(φ_to_j2,1,φ_to_u;analytic_dC=[(dC,φ)->dC])
+  evaluate!(cpcf,φh)
+
   fdm_grad = FiniteDiff.finite_difference_gradient(φ_to_j, get_free_dof_values(φh))
   rel_error = norm(_dF - fdm_grad, Inf)/norm(fdm_grad,Inf)
 

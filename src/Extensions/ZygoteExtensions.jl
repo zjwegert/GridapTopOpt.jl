@@ -1,8 +1,16 @@
 ### PartitionedArrays extensions
 
-import Base: size
-size(a::PartitionedArrays.PBroadcasted)=(length(a.own_values)+length(a.ghost_values),)
-size(a::PartitionedArrays.PBroadcasted{A,Nothing,C}) where {A,C}= (length(a.own_values),)
+import Base: size, broadcasted
+using PartitionedArrays: PBroadcasted
+size(a::PBroadcasted)=(length(a.own_values)+length(a.ghost_values),)
+size(a::PBroadcasted{A,Nothing,C}) where {A,C}= (length(a.own_values),)
+
+Base.:*(a::AbstractThunk,b::PVector) = a*b
+Base.:*(b::PVector,a::AbstractThunk) = b*a
+Base.:/(b::PVector,a::AbstractThunk) = b/unthunk(a)
+LinearAlgebra.rmul!(a::PVector,v::AbstractThunk) = rmul!(a,unthunk(v))
+Base.broadcasted(f, a::AbstractThunk, b::Union{PVector,PBroadcasted}) = broadcasted(f,unthunk(a),b)
+Base.broadcasted(f, a::Union{PVector,PBroadcasted}, b::AbstractThunk) = broadcasted(f,a::Union{PVector,PBroadcasted},unthunk(b))
 
 ### Zygote extensions to enable compat with PartitionedArrays
 

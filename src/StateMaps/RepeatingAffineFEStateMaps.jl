@@ -54,8 +54,7 @@ struct RepeatingAffineFEStateMap{A,B,C,D,E,F,G} <: AbstractFEStateMap
     assem_adjoint = SparseMatrixAssembler(V0,U0),
     assem_deriv = SparseMatrixAssembler(V_φ,V_φ),
     ls::LinearSolver = LUSolver(),
-    adjoint_ls::LinearSolver = LUSolver()
-  )
+    adjoint_ls::LinearSolver = LUSolver())
     @check nblocks == length(liforms)
 
     spaces_0 = (U0,V0)
@@ -218,4 +217,11 @@ function adjoint_solve!(φ_to_u::RepeatingAffineFEStateMap,du::AbstractBlockVect
     solve!(xi,adjoint_ns,dui)
   end
   return adjoint_x
+end
+
+## Backwards compat
+function RepeatingAffineFEStateMap(nblocks::Int,biform::Function,liforms::Vector{<:Function},
+    U0,V0,V_φ,U_reg,φh;kwargs...)
+  @warn _msg_v0_3_0 maxlog=1
+  return RepeatingAffineFEStateMap(nblocks,biform,liforms,U0,V0,V_φ,φh;kwargs...)
 end
