@@ -22,7 +22,7 @@ function main()
   prop_Γ_N = 0.2
   prop_Γ_D = 0.2
   dom = (0,xmax,0,ymax)
-  el_size = (20,20)
+  el_size = (10,10)
   γ = 0.1
   γ_reinit = 0.5
   max_steps = floor(Int,order*minimum(el_size)/10)
@@ -77,7 +77,7 @@ function main()
   ls_evo = HamiltonJacobiEvolution(FirstOrderStencil(2,Float64),model,V_φ,tol,max_steps)
 
   ## Setup solver and FE operators
-  state_map = NonlinearFEStateMap(res,U,V,V_φ,U_reg,φh)
+  state_map = NonlinearFEStateMap(res,U,V,V_φ,φh)
   pcfs = PDEConstrainedFunctionals(J,[Vol],state_map,analytic_dC=[dVol])
 
   ## Hilbertian extension-regularisation problems

@@ -73,6 +73,15 @@ function get_dof_Δ(m::HamiltonJacobiEvolution)
   return m.params.Δ
 end
 
+"""
+    get_ls_space(m::HamiltonJacobiEvolution)
+
+Return the finite element space used for the level-set function.
+"""
+function get_ls_space(m::HamiltonJacobiEvolution)
+  m.space
+end
+
 # Compute the time step for the `HamiltonJacobiEvolution`.
 function compute_Δt(::HamiltonJacobiEvolution,Δ,γ,φ,vel)
   T = eltype(γ)

@@ -106,10 +106,10 @@ function main(mesh_partition,distribute,el_size,path)
   nl_solver = NewtonSolver(lin_solver;maxiter=50,rtol=10^-8,verbose=i_am_main(ranks))
 
   state_map = NonlinearFEStateMap(
-    res,U,V,V_φ,U_reg,φh,dΩ,dΓ_N;
+    res,U,V,V_φ,φh,dΩ,dΓ_N;
     assem_U = SparseMatrixAssembler(Tm,Tv,U,V),
     assem_adjoint = SparseMatrixAssembler(Tm,Tv,V,U),
-    assem_deriv = SparseMatrixAssembler(Tm,Tv,U_reg,U_reg),
+    assem_deriv = SparseMatrixAssembler(Tm,Tv,V_φ,V_φ),
     nls = nl_solver, adjoint_ls = lin_solver
   )
   pcfs = PDEConstrainedFunctionals(Obj,[Vol],state_map,analytic_dC=[dVol])

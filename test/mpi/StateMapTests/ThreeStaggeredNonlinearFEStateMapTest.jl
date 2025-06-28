@@ -26,8 +26,6 @@ function driver(model,verbose,analytic_partials)
 
   V_φ = TestFESpace(model,reffe)
   φh = interpolate(1,V_φ)
-  V_reg = TestFESpace(model,reffe)
-  U_reg = TrialFESpace(V_reg)
 
   F(u::Function) = x -> (u(x) + 1) * u(x)
   F(u) = (u + 1) * u
@@ -58,9 +56,9 @@ function driver(model,verbose,analytic_partials)
     ∂R3∂xh1(du1,(u1,(u2,u3)),u4,v4,φ) = ∫(0du1)dΩ
     ∂R3∂xh2((du2,du3),(u1,(u2,u3)),u4,v4,φ) = ∫(du3 * (φ * F(u4) - F(sol[4])) * v4)dΩ
     ∂Rk∂xhi = ((∂R2∂xh1,),(∂R3∂xh1,∂R3∂xh2))
-    φ_to_u = StaggeredNonlinearFEStateMap(op,∂Rk∂xhi,V_φ,U_reg,φh;solver)
+    φ_to_u = StaggeredNonlinearFEStateMap(op,∂Rk∂xhi,V_φ,φh;solver)
   else
-    φ_to_u = StaggeredNonlinearFEStateMap(op,V_φ,U_reg,φh;solver)
+    φ_to_u = StaggeredNonlinearFEStateMap(op,V_φ,φh;solver)
   end
 
   ## Test solution
@@ -92,7 +90,7 @@ function driver(model,verbose,analytic_partials)
   end
   _,_,dF,_ = evaluate!(pcf,φh)
 
-  return dF,U_reg
+  return dF,V_φ
 end
 
 function main(distribute,mesh_partition,analytic_partials)

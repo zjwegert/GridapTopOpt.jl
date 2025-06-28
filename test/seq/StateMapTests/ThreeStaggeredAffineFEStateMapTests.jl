@@ -15,8 +15,6 @@ function main(;verbose,analytic_partials)
   V_φ = TestFESpace(model,reffe)
   φf(x) = x[1]*x[2]+1
   φh = interpolate(φf,V_φ)
-  V_reg = TestFESpace(model,reffe)
-  U_reg = TrialFESpace(V_reg)
 
   V = FESpace(model,reffe;dirichlet_tags="boundary")
 
@@ -50,9 +48,9 @@ function main(;verbose,analytic_partials)
     ∂R3∂xh1(du1,(u1,(u2,u3)),u4,v4,φ) = ∫(φ * (du1 + u2) * u4 * v4)dΩ - ∫(φ *φ * rhs[4] * (du1 + u2) * v4)dΩ
     ∂R3∂xh2((du2,du3),(u1,(u2,u3)),u4,v4,φ) = ∫(φ * (u1 + du2) * u4 * v4)dΩ - ∫(φ *φ * rhs[4] * (u1 + du2) * v4)dΩ
     ∂Rk∂xhi = ((∂R2∂xh1,),(∂R3∂xh1,∂R3∂xh2))
-    φ_to_u = StaggeredAffineFEStateMap(op,∂Rk∂xhi,V_φ,U_reg,φh)
+    φ_to_u = StaggeredAffineFEStateMap(op,∂Rk∂xhi,V_φ,φh)
   else
-    φ_to_u = StaggeredAffineFEStateMap(op,V_φ,U_reg,φh)
+    φ_to_u = StaggeredAffineFEStateMap(op,V_φ,φh)
   end
 
   # Test solution

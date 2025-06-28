@@ -261,7 +261,7 @@ function main(ranks)
     (UP,VQ),(R,T) = build_spaces(Ω.Ω_act_s,Ω.Ω_act_f)
     solver = StaggeredFESolver([fluid_ls,elast_ls]);
     op = StaggeredAffineFEOperator([a_fluid,a_solid],[l_fluid,l_solid],[UP,R],[VQ,T])
-    state_map = StaggeredAffineFEStateMap(op,V_φ,U_reg,_φh;solver,adjoint_solver=solver)
+    state_map = StaggeredAffineFEStateMap(op,V_φ,_φh;solver,adjoint_solver=solver)
     (;
       :state_map => state_map,
       :J => StaggeredStateParamMap(J_comp,state_map),

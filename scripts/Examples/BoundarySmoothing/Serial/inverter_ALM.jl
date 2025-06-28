@@ -88,7 +88,7 @@ function main(path="./results/inverter_ALM/")
   ls_evo = HamiltonJacobiEvolution(FirstOrderStencil(2,Float64),model,V_φ,tol,max_steps)
 
   ## Setup solver and FE operators
-  state_map = AffineFEStateMap(a,l,U,V,V_φ,U_reg,φh)
+  state_map = AffineFEStateMap(a,l,U,V,V_φ,φh)
   pcfs = PDEConstrainedFunctionals(J,[Vol,UΓ_out],state_map,analytic_dC=[dVol,nothing])
 
   ## Hilbertian extension-regularisation problems

@@ -23,11 +23,13 @@ makedocs(
         "Introductory examples" => "examples/index.md",
         "Topology optimisation on unfitted meshes" => "examples/Unfitted-TO-with-Laplace.md",
         "FSI with CutFEM" => "examples/Fluid-structure_interaction_with_CutFEM.md",
+        "Topology optimisation with Zygote" => "examples/TO-with-Zygote.md"
       ],
       "Breaking changes" => "breaking-changes.md",
       "Reference" => [
         "reference/optimisers.md",
         "reference/statemaps.md",
+        "reference/zygote.md",
         "LevelSetEvolution" => [
           "reference/levelsetevolution/index.md",
           "reference/levelsetevolution/finitediff.md",

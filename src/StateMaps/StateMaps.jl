@@ -7,7 +7,7 @@ include("StaggeredFEStateMaps.jl")
 include("PDEConstrainedFunctionals.jl")
 
 """
-    Gridap.gradient(F,uh::Vector,K::Int)
+    Gridap.gradient(F,uh::Vector{<:CellField},K::Int)
 
 Given a function `F` that returns a DomainContribution when called, and a vector of
 `FEFunctions` `uh`, evaluate the partial derivative of `F` with respect to `uh[K]`.
@@ -29,7 +29,7 @@ function Gridap.gradient(F,uh::Vector{<:CellField},K::Int)
 end
 
 """
-    Gridap.jacobian(F,uh::Vector,K::Int)
+    Gridap.jacobian(F,uh::Vector{<:CellField},K::Int)
 
 Given a function `F` that returns a DomainContribution when called, and a
 vector of `FEFunctions` or `CellField` `uh`, evaluate the Jacobian
@@ -40,3 +40,12 @@ function Gridap.jacobian(F,uh::Vector{<:CellField},K::Int)
   _f(uk) = F(uh[1:K-1]...,uk,uh[K+1:end]...)
   return Gridap.jacobian(_f,uh[K])
 end
+
+# Backwards compat msgs
+_msg_v0_3_0 = """
+  Inclusion of `U_reg` in the arguments of this constructor has been deprecated
+  in v0.3.0 and derivatives are now on the correct tangent space (V_φ). See
+  patch notes for futher information.
+
+  This method will be removed in a future release.
+"""

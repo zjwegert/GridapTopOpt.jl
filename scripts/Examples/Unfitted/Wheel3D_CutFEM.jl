@@ -148,7 +148,7 @@ function main(ranks)
   state_collection = EmbeddedCollection_in_φh(model,φh) do _φh
     update_collection!(Ω_data,_φh)
     U,V = build_spaces(Ω_data.Ω_act)
-    state_map = AffineFEStateMap(a,l,U,V,V_φ,U_reg,_φh;ls=elast_ls,adjoint_ls=elast_ls)
+    state_map = AffineFEStateMap(a,l,U,V,V_φ,_φh;ls=elast_ls,adjoint_ls=elast_ls)
     (;
       :state_map => state_map,
       :J => StateParamMap(J_comp,state_map),

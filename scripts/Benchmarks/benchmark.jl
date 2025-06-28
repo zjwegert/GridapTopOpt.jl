@@ -82,10 +82,10 @@ function nl_elast(mesh_partition,ranks,el_size,order,verbose)
   lin_solver = ElasticitySolver(V)
   nl_solver = NewtonSolver(lin_solver;maxiter=50,rtol=10^-8,verbose)
   state_map = NonlinearFEStateMap(
-    res,U,V,V_φ,U_reg,φh;
+    res,U,V,V_φ,φh;
     assem_U = SparseMatrixAssembler(Tm,Tv,U,V),
     assem_adjoint = SparseMatrixAssembler(Tm,Tv,V,U),
-    assem_deriv = SparseMatrixAssembler(Tm,Tv,U_reg,U_reg),
+    assem_deriv = SparseMatrixAssembler(Tm,Tv,V_φ,V_φ),
     nls = nl_solver, adjoint_ls = lin_solver
   )
   # Objective and constraints
@@ -158,10 +158,10 @@ function therm(mesh_partition,ranks,el_size,order,verbose)
   Tv = Vector{PetscScalar}
   solver = PETScLinearSolver()
   state_map = AffineFEStateMap(
-    a,l,U,V,V_φ,U_reg,φh;
+    a,l,U,V,V_φ,φh;
     assem_U = SparseMatrixAssembler(Tm,Tv,U,V),
     assem_adjoint = SparseMatrixAssembler(Tm,Tv,V,U),
-    assem_deriv = SparseMatrixAssembler(Tm,Tv,U_reg,U_reg),
+    assem_deriv = SparseMatrixAssembler(Tm,Tv,V_φ,V_φ),
     ls = solver,adjoint_ls = solver
   )
   # Objective and constraints
@@ -234,10 +234,10 @@ function elast(mesh_partition,ranks,el_size,order,verbose)
   Tv = Vector{PetscScalar}
   solver = ElasticitySolver(V)
   state_map = AffineFEStateMap(
-    a,l,U,V,V_φ,U_reg,φh;
+    a,l,U,V,V_φ,φh;
     assem_U = SparseMatrixAssembler(Tm,Tv,U,V),
     assem_adjoint = SparseMatrixAssembler(Tm,Tv,V,U),
-    assem_deriv = SparseMatrixAssembler(Tm,Tv,U_reg,U_reg),
+    assem_deriv = SparseMatrixAssembler(Tm,Tv,V_φ,V_φ),
     ls = solver,adjoint_ls = solver
   )
   # Objective and constraints
@@ -339,10 +339,10 @@ function inverter_HPM(mesh_partition,ranks,el_size,order,verbose)
   solver = ElasticitySolver(V)
 
   state_map = AffineFEStateMap(
-    a,l,U,V,V_φ,U_reg,φh;
+    a,l,U,V,V_φ,φh;
     assem_U = SparseMatrixAssembler(Tm,Tv,U,V),
     assem_adjoint = SparseMatrixAssembler(Tm,Tv,V,U),
-    assem_deriv = SparseMatrixAssembler(Tm,Tv,U_reg,U_reg),
+    assem_deriv = SparseMatrixAssembler(Tm,Tv,V_φ,V_φ),
     ls = solver, adjoint_ls = solver
   )
   pcfs = PDEConstrainedFunctionals(J,[Vol,UΓ_out],state_map,analytic_dC=[dVol,nothing])

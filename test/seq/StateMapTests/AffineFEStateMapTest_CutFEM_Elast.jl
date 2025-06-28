@@ -30,8 +30,6 @@ function main(n;verbose=true)
   # Cut the background model
   reffe_scalar = ReferenceFE(lagrangian,Float64,1)
   V_φ = TestFESpace(model,reffe_scalar)
-  V_reg = TestFESpace(model,reffe_scalar)#;dirichlet_tags=["Gamma_N"])
-  U_reg = TrialFESpace(V_reg)
 
   f((x,y),q,r) = - cos(q*π*x)*cos(q*π*y)/q - r/q
   lsf(x) = f(x,4,0.1)
@@ -112,7 +110,7 @@ function main(n;verbose=true)
   state_collection = GridapTopOpt.EmbeddedCollection_in_φh(model,φh) do _φh
     update_collection!(Ω_data,_φh)
     U,V = build_spaces(Ω_data.Ω_act)
-    state_map = AffineFEStateMap(a,l,U,V,V_φ,U_reg,_φh)
+    state_map = AffineFEStateMap(a,l,U,V,V_φ,_φh)
     (;
       :state_map => state_map,
       :J => GridapTopOpt.StateParamMap(J_comp,state_map),
@@ -129,6 +127,35 @@ function main(n;verbose=true)
     state_collection.J(u,φ)
   end
 
+  function custom_embedded_φ_to_j(φ)
+    u = state_collection.state_map(φ)
+    state_collection.J(u,φ)
+  end
+
+  cpcfs = CustomEmbeddedPDEConstrainedFunctionals(custom_embedded_φ_to_j,0,state_collection)
+  _,_,cdF,_ = evaluate!(cpcfs,φh)
+  @test cdF ≈ _dF
+
+  function custom_embedded_φ_to_j_v2(φ)
+    u = state_collection.state_map(φ)
+    [state_collection.J(u,φ),state_collection.C[1](u,φ)]
+  end
+
+  cpcfs = CustomEmbeddedPDEConstrainedFunctionals(custom_embedded_φ_to_j_v2,1,state_collection)
+  _,_,cdF,cdC = evaluate!(cpcfs,φh)
+  @test cdF ≈ _dF
+
+  function analytic_dVol!(dV,φ)
+    φh = FEFunction(V_φ,φ)
+    dh = get_state(state_collection.state_map)
+    _dC(q) = dVol(q,dh,φh)
+    Gridap.FESpaces.assemble_vector!(_dC,dV,V_φ)
+  end
+  cpcfs = CustomEmbeddedPDEConstrainedFunctionals(custom_embedded_φ_to_j_v2,1,state_collection;analytic_dC=[analytic_dVol!,])
+  _,_,cdF,cdC_2 = evaluate!(cpcfs,φh)
+  @test cdF ≈ _dF
+  @test cdC[1] ≈ cdC_2[1]
+
   fdm_grad = FiniteDiff.finite_difference_gradient(φ_to_j, get_free_dof_values(φh))
   rel_error = norm(_dF - fdm_grad,Inf)/norm(fdm_grad,Inf)
 
@@ -136,6 +163,6 @@ function main(n;verbose=true)
   @test rel_error < 1e-6
 end
 
-main(10;verbose=true)
+main(7;verbose=true)
 
 end

@@ -44,7 +44,8 @@ struct UnfittedFEEvolution{A<:Evolver,B<:Reinitialiser,C<:Real} <: LevelSetEvolu
   function UnfittedFEEvolution(evolver::A,reinitialiser::B) where {A,B}
     h_evo = get_element_diameters(evolver)
     h_reinit = get_element_diameters(reinitialiser)
-    @assert h_evo === h_reinit "Element sizes for evolution and reinitialisation should be the same."
+    @check h_evo === h_reinit "Element sizes for evolution and reinitialisation should be the same."
+    @check get_space(evolver) === get_space(reinitialiser) "LS FE space for evolution and reinitialisation should be the same."
     hmin = get_hmin(evolver)
     new{A,B,typeof(hmin)}(evolver,reinitialiser,hmin)
   end
@@ -92,6 +93,10 @@ function get_dof_Δ(s::UnfittedFEEvolution)
   V_φ = get_space(s.evolver)
   hmin = s.min_element_diameter
   return hmin/get_order(V_φ)
+end
+
+function get_ls_space(s::UnfittedFEEvolution)
+  return get_space(s.evolver)
 end
 
 ## Helpers

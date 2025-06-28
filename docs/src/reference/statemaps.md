@@ -27,61 +27,27 @@ GridapTopOpt.AbstractFEStateMap
 ```
 
 ### `AffineFEStateMap`
-```@docs
-GridapTopOpt.AffineFEStateMap
-GridapTopOpt.AffineFEStateMap(
-      biform::Function,liform::Function,
-      U,V,V_φ,U_reg,φh;
-      assem_U = SparseMatrixAssembler(U,V),
-      assem_adjoint = SparseMatrixAssembler(V,U),
-      assem_deriv = SparseMatrixAssembler(U_reg,U_reg),
-      ls::LinearSolver = LUSolver(),
-      adjoint_ls::LinearSolver = LUSolver()
-    )
+```@autodocs
+Modules = [GridapTopOpt]
+Pages = ["StateMaps/AffineFEStateMaps.jl"]
 ```
 
 ### `NonlinearFEStateMap`
-```@docs
-GridapTopOpt.NonlinearFEStateMap
-GridapTopOpt.NonlinearFEStateMap(
-    res::Function,jac::Function,U,V,V_φ,U_reg,φh;
-    assem_U = SparseMatrixAssembler(U,V),
-    assem_adjoint = SparseMatrixAssembler(V,U),
-    assem_deriv = SparseMatrixAssembler(U_reg,U_reg),
-    nls::NonlinearSolver = NewtonSolver(LUSolver();maxiter=50,rtol=1.e-8,verbose=true),
-    adjoint_ls::LinearSolver = LUSolver()
-  )
-GridapTopOpt.NonlinearFEStateMap(
-    res::Function,jac::Function,adjoint_jac::Function,U,V,V_φ,U_reg,φh;
-    assem_U = SparseMatrixAssembler(U,V),
-    assem_adjoint = SparseMatrixAssembler(V,U),
-    assem_deriv = SparseMatrixAssembler(U_reg,U_reg),
-    nls::NonlinearSolver = NewtonSolver(LUSolver();maxiter=50,rtol=1.e-8,verbose=true),
-    adjoint_ls::LinearSolver = LUSolver()
-  )
+```@autodocs
+Modules = [GridapTopOpt]
+Pages = ["StateMaps/NonlinearFEStateMaps.jl"]
 ```
 
 ### `RepeatingAffineFEStateMap`
-```@docs
-GridapTopOpt.RepeatingAffineFEStateMap
-GridapTopOpt.RepeatingAffineFEStateMap(
-    nblocks::Int,biform::Function,liforms::Vector{<:Function},
-    U0,V0,V_φ,U_reg,φh;
-    assem_U = SparseMatrixAssembler(U0,V0),
-    assem_adjoint = SparseMatrixAssembler(V0,U0),
-    assem_deriv = SparseMatrixAssembler(U_reg,U_reg),
-    ls::LinearSolver = LUSolver(),
-    adjoint_ls::LinearSolver = LUSolver()
-  )
+```@autodocs
+Modules = [GridapTopOpt]
+Pages = ["StateMaps/RepeatingAffineFEStateMaps.jl"]
 ```
 
 ### `StaggeredAffineFEStateMap` and `StaggeredNonlinearFEStateMap`
-```@docs
-GridapTopOpt.StaggeredAffineFEStateMap
-```
-
-```@docs
-GridapTopOpt.StaggeredNonlinearFEStateMap
+```@autodocs
+Modules = [GridapTopOpt]
+Pages = ["StateMaps/StaggeredFEStateMaps.jl"]
 ```
 
 ## Advanced
@@ -112,8 +78,7 @@ GridapTopOpt.get_deriv_assembler
 ```
 
 ### Partial derivatives
-
-```@docs
-GridapTopOpt.gradient
-GridapTopOpt.jacobian
+```@autodocs
+Modules = [GridapTopOpt]
+Pages = ["StateMaps/StateMaps.jl"]
 ```

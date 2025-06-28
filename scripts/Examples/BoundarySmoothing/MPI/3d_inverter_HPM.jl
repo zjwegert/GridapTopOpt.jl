@@ -107,10 +107,10 @@ function main(mesh_partition,distribute,el_size,path)
   solver = ElasticitySolver(V)
 
   state_map = AffineFEStateMap(
-    a,l,U,V,V_φ,U_reg,φh,dΩ,dΓ_in,dΓ_out;
+    a,l,U,V,V_φ,φh,dΩ,dΓ_in,dΓ_out;
     assem_U = SparseMatrixAssembler(Tm,Tv,U,V),
     assem_adjoint = SparseMatrixAssembler(Tm,Tv,V,U),
-    assem_deriv = SparseMatrixAssembler(Tm,Tv,U_reg,U_reg),
+    assem_deriv = SparseMatrixAssembler(Tm,Tv,V_φ,V_φ),
     ls = solver, adjoint_ls = solver
   )
   pcfs = PDEConstrainedFunctionals(J,[Vol,UΓ_out],state_map,analytic_dC=[dVol,nothing])

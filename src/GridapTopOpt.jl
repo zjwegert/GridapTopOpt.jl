@@ -25,7 +25,7 @@ using GridapDistributed: DistributedDiscreteModel, DistributedTriangulation,
   DistributedFESpace, DistributedDomainContribution, to_parray_of_arrays,
   allocate_in_domain, DistributedCellField, DistributedMultiFieldCellField,
   DistributedMultiFieldFEBasis, BlockPMatrix, BlockPVector, change_ghost,
-  gradient, jacobian, DistributedMultiFieldFEFunction, DistributedSingleFieldFEFunction
+  DistributedMultiFieldFEFunction, DistributedSingleFieldFEFunction
 
 using PartitionedArrays
 using PartitionedArrays: getany, tuple_of_arrays, matching_ghost_indices
@@ -41,6 +41,7 @@ using GridapEmbedded.LevelSetCutters, GridapEmbedded.Interfaces
 using GridapEmbedded.Interfaces: SubFacetData, SubCellTriangulation, SubFacetTriangulation
 using GridapEmbedded.LevelSetCutters: DifferentiableTriangulation
 
+using Zygote
 using JLD2: save_object, load_object, jldsave
 
 import Base: +
@@ -48,8 +49,9 @@ import Gridap: solve!
 import PartitionedArrays: default_find_rcv_ids
 import GridapDistributed: remove_ghost_cells
 
+include("Extensions/ZygoteExtensions.jl")
 __init__() = begin
-  include((@__DIR__)*"/GridapExtensions.jl")
+  include((@__DIR__)*"/Extensions/GridapExtensions.jl")
   include((@__DIR__)*"/LevelSetEvolution/UnfittedEvolution/MutableRungeKutta.jl") # <- commented out in "LevelSetEvolution/LevelSetEvolution.jl"
 
   function default_find_rcv_ids(::MPIArray)
@@ -67,6 +69,8 @@ export DifferentiableTriangulation
 include("StateMaps/StateMaps.jl")
 export PDEConstrainedFunctionals
 export EmbeddedPDEConstrainedFunctionals
+export CustomPDEConstrainedFunctionals
+export CustomEmbeddedPDEConstrainedFunctionals
 export AffineFEStateMap
 export NonlinearFEStateMap
 export RepeatingAffineFEStateMap

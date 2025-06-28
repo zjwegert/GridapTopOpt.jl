@@ -23,7 +23,7 @@ function main(distribute,mesh_partition)
   ## Parameters
   order = 1
   dom = (0,1,0,0.5)
-  el_size = (10,10)
+  el_size = (20,20)
   γ = 0.1
   γ_reinit = 0.5
   max_steps = floor(Int,order*minimum(el_size)/10)
@@ -92,7 +92,7 @@ function main(distribute,mesh_partition)
   ls_evo = HamiltonJacobiEvolution(FirstOrderStencil(2,Float64),model,V_φ,tol,max_steps)
 
   ## Setup solver and FE operators
-  state_map = AffineFEStateMap(a,l,U,V,V_φ,U_reg,φh)
+  state_map = AffineFEStateMap(a,l,U,V,V_φ,φh)
   pcfs = PDEConstrainedFunctionals(J,[Vol,UΓ_out],state_map,analytic_dC=[dVol,nothing])
 
   ## Hilbertian extension-regularisation problems

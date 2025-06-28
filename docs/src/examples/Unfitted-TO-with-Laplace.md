@@ -251,4 +251,4 @@ Solving this problem results in the following iteration history:
 </p>
 ```
 
-The full script for this problem can be found [here](../../../scripts/Examples/Unfitted/Thermal2D_CutFEM.jl).
+The full script for this problem can be found in `scripts/Examples/Unfitted/Thermal2D_CutFEM.jl`.
