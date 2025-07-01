@@ -49,7 +49,6 @@ import Gridap: solve!
 import PartitionedArrays: default_find_rcv_ids
 import GridapDistributed: remove_ghost_cells
 
-include("Extensions/ZygoteExtensions.jl")
 __init__() = begin
   include((@__DIR__)*"/Extensions/GridapExtensions.jl")
   include((@__DIR__)*"/LevelSetEvolution/UnfittedEvolution/MutableRungeKutta.jl") # <- commented out in "LevelSetEvolution/LevelSetEvolution.jl"
@@ -120,5 +119,7 @@ include("Benchmarks.jl")
 include("Io.jl")
 export save, load, load!
 export psave, pload, pload!
+
+include("Extensions/ZygoteExtensions.jl")
 
 end

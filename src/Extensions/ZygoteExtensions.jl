@@ -2,6 +2,7 @@
 
 import Base: size, broadcasted
 using PartitionedArrays: PBroadcasted
+using GridapDistributed: BlockPArray, BlockPBroadcasted
 size(a::PBroadcasted)=(length(a.own_values)+length(a.ghost_values),)
 size(a::PBroadcasted{A,Nothing,C}) where {A,C}= (length(a.own_values),)
 
@@ -10,7 +11,16 @@ Base.:*(b::PVector,a::AbstractThunk) = b*unthunk(a)
 Base.:/(b::PVector,a::AbstractThunk) = b/unthunk(a)
 LinearAlgebra.rmul!(a::PVector,v::AbstractThunk) = rmul!(a,unthunk(v))
 Base.broadcasted(f, a::AbstractThunk, b::Union{PVector,PBroadcasted}) = broadcasted(f,unthunk(a),b)
-Base.broadcasted(f, a::Union{PVector,PBroadcasted}, b::AbstractThunk) = broadcasted(f,a::Union{PVector,PBroadcasted},unthunk(b))
+Base.broadcasted(f, a::Union{PVector,PBroadcasted}, b::AbstractThunk) = broadcasted(f,a,unthunk(b))
+
+# adjoint_solve!(a::AbstractFEStateMap,b::AbstractThunk) = adjoint_solve!(a,unthunk(b))
+
+# Base.:*(a::AbstractThunk,b::BlockPArray) = unthunk(a)*b
+# Base.:*(b::BlockPArray,a::AbstractThunk) = b*unthunk(a)
+# Base.:/(b::BlockPArray,a::AbstractThunk) = b/unthunk(a)
+# LinearAlgebra.rmul!(a::BlockPArray,v::AbstractThunk) = rmul!(a,unthunk(v))
+# Base.broadcasted(f, a::AbstractThunk, b::Union{BlockPArray,BlockPBroadcasted}) = broadcasted(f,unthunk(a),b)
+# Base.broadcasted(f, a::Union{BlockPArray,BlockPBroadcasted}, b::AbstractThunk) = broadcasted(f,a,unthunk(b))
 
 ### Zygote extensions to enable compat with PartitionedArrays
 
