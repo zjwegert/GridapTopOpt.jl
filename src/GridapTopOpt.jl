@@ -25,7 +25,7 @@ using GridapDistributed: DistributedDiscreteModel, DistributedTriangulation,
   DistributedFESpace, DistributedDomainContribution, to_parray_of_arrays,
   allocate_in_domain, DistributedCellField, DistributedMultiFieldCellField,
   DistributedMultiFieldFEBasis, BlockPMatrix, BlockPVector, change_ghost,
-  DistributedMultiFieldFEFunction, DistributedSingleFieldFEFunction
+  DistributedMultiFieldFEFunction, DistributedSingleFieldFEFunction, DistributedMultiFieldFESpace
 
 using PartitionedArrays
 using PartitionedArrays: getany, tuple_of_arrays, matching_ghost_indices
@@ -121,5 +121,6 @@ export save, load, load!
 export psave, pload, pload!
 
 include("Extensions/ZygoteExtensions.jl")
+export combine_fields
 
 end

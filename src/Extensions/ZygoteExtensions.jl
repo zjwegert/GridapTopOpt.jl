@@ -13,14 +13,42 @@ LinearAlgebra.rmul!(a::PVector,v::AbstractThunk) = rmul!(a,unthunk(v))
 Base.broadcasted(f, a::AbstractThunk, b::Union{PVector,PBroadcasted}) = broadcasted(f,unthunk(a),b)
 Base.broadcasted(f, a::Union{PVector,PBroadcasted}, b::AbstractThunk) = broadcasted(f,a,unthunk(b))
 
-# adjoint_solve!(a::AbstractFEStateMap,b::AbstractThunk) = adjoint_solve!(a,unthunk(b))
+### GridapDistributed extensions
+Base.:*(a::AbstractThunk,b::BlockPArray) = unthunk(a)*b
+Base.:*(b::BlockPArray,a::AbstractThunk) = b*unthunk(a)
+Base.:/(b::BlockPArray,a::AbstractThunk) = b/unthunk(a)
+LinearAlgebra.rmul!(a::BlockPArray,v::AbstractThunk) = rmul!(a,unthunk(v))
+Base.broadcasted(f, a::AbstractThunk, b::Union{BlockPArray,BlockPBroadcasted}) = broadcasted(f,unthunk(a),b)
+Base.broadcasted(f, a::Union{BlockPArray,BlockPBroadcasted}, b::AbstractThunk) = broadcasted(f,a,unthunk(b))
 
-# Base.:*(a::AbstractThunk,b::BlockPArray) = unthunk(a)*b
-# Base.:*(b::BlockPArray,a::AbstractThunk) = b*unthunk(a)
-# Base.:/(b::BlockPArray,a::AbstractThunk) = b/unthunk(a)
-# LinearAlgebra.rmul!(a::BlockPArray,v::AbstractThunk) = rmul!(a,unthunk(v))
-# Base.broadcasted(f, a::AbstractThunk, b::Union{BlockPArray,BlockPBroadcasted}) = broadcasted(f,unthunk(a),b)
-# Base.broadcasted(f, a::Union{BlockPArray,BlockPBroadcasted}, b::AbstractThunk) = broadcasted(f,a,unthunk(b))
+### GridapTopOpt extensions
+adjoint_solve!(a::AbstractFEStateMap,b::AbstractThunk) = adjoint_solve!(a,unthunk(b))
+
+### MultiField extensions (these should go in Gridap)
+function combine_fields(V::DistributedMultiFieldFESpace{<:ConsecutiveMultiFieldStyle},u...)
+  uhs = FEFunction.(V,u) # This could be done better, needed for ghosts
+  us = get_free_dof_values.(uhs)
+  _u = map(combine_fields,local_views(V),map(local_views,us)...)
+  PVector(_u,partition(get_free_dof_ids(V)))
+end
+function combine_fields(::MultiFieldFESpace{<:ConsecutiveMultiFieldStyle},u...)
+  reduce(vcat,u)
+end
+function combine_fields(V::DistributedMultiFieldFESpace{<:BlockMultiFieldStyle},u...)
+  gids = map(get_free_dof_ids,blocks(V))
+  BlockPVector([u...],gids)
+end
+function combine_fields(::MultiFieldFESpace{<:BlockMultiFieldStyle},u...)
+  mortar([u...])
+end
+function ChainRulesCore.rrule(::typeof(combine_fields),V,u...)
+  function pullback(y)
+    # Unpack y into contributions from each seperate field in u
+    ys = map(i->restrict_to_field(V,y,i),Base.OneTo(length(V)))
+    return (NoTangent(),NoTangent(),ys...)
+  end
+  return combine_fields(V,u...), y->pullback(y)
+end
 
 ### Zygote extensions to enable compat with PartitionedArrays
 

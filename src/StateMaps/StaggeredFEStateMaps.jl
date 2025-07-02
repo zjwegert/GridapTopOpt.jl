@@ -26,9 +26,39 @@ These can be assembled into a set of linear systems:
 
 where `A_k` and `b_k` only depend on the previous variables `u_1,...,u_{k-1}`.
 
-!!! warning
-    The current implementation of the rrules is not compatible with Zygote.
-    This will be fixed in a future release.
+!!! note
+    Staggered-type problems can be handled purely with Zygote and the other
+    existing StateMap implementations. This is preferred over the StaggeredStateMaps
+    implementations.
+
+    For example,
+    ```julia
+    ## Weak forms
+    a1(u1,v1,φ) = ...
+    l1(v1,φ) = ...
+    # Treat (u1,φ) as the primal variable
+    a2(u2,v2,(u1,φ)) = ...
+    l2(v2,(u1,φ)) = ...
+
+    ## Build StateMaps
+    φ_to_u1 = AffineFEStateMap(a1,l1,U1,V,V_φ,φh)
+    # u1φ_to_u2 has a MultiFieldFESpace V_u1φ of primal vars
+    u1φ_to_u2 = AffineFEStateMap(a2,l2,U2,V,V_u1φ,interpolate([1,φh],V_u1φ))
+    # The StateParamMap F needs to take a MultiFieldFEFunction u1u2h ∈ U_u1u2
+    F = GridapTopOpt.StateParamMap(F,U_u1u2,V_φ,assem_U_u1u2,assem_V_φ)
+
+    function φ_to_j(φ)
+      u1 = φ_to_u1(φ)
+      u1φ = combine_fields(V_u1φ,u1,φ) # Combine vectors of DOFs
+      u2 = u1φ_to_u2(u1φ)
+      u1u2 = combine_fields(U_u1u2,u1,u2)
+      F(u1u2,φ)
+    end
+
+    pcf = CustomPDEConstrainedFunctionals(...)
+    ```
+
+    StaggeredStateMaps will remain in GridapTopOpt for backwards compatibility.
 """
 struct StaggeredAffineFEStateMap{NB,SB,A,B,C,D,E,F} <: AbstractFEStateMap
   biforms    :: Vector{<:Function}
@@ -209,12 +239,12 @@ we expect a set of residual/jacobian pairs that also depend on φ:
   jac_k((u_1,...,u_{k-1},φ),u_k,du_k,dv_k) = ∫(...)
   res_k((u_1,...,u_{k-1},φ),u_k,v_k) = ∫(...)
 
-!!! info
-    This is mutable for now, in future we will refactor ChainRules to remove storage of caches
+!!! note
+    Staggered-type problems can be handled purely with Zygote and the other
+    existing StateMap implementations. This is preferred over the StaggeredStateMaps
+    implementations. See [`StaggeredAffineFEStateMap`](@ref)
 
-!!! warning
-    The current implementation of the rrules is not compatible with Zygote.
-    This will be fixed in a future release.
+    StaggeredStateMaps will remain in GridapTopOpt for backwards compatibility.
 """
 mutable struct StaggeredNonlinearFEStateMap{NB,SB,A,B,C,D,E,F} <: AbstractFEStateMap
   const residuals         :: Vector{<:Function}
