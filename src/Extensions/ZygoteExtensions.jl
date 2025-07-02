@@ -32,7 +32,8 @@ function combine_fields(V::DistributedMultiFieldFESpace{<:ConsecutiveMultiFieldS
   PVector(_u,partition(get_free_dof_ids(V)))
 end
 function combine_fields(::MultiFieldFESpace{<:ConsecutiveMultiFieldStyle},u...)
-  reduce(vcat,u)
+  # Avoid memory allocs from reduce(vcat,u)
+  mortar([u...])
 end
 function combine_fields(V::DistributedMultiFieldFESpace{<:BlockMultiFieldStyle},u...)
   gids = map(get_free_dof_ids,blocks(V))
