@@ -531,6 +531,8 @@ function Fields.evaluate!(pcf::CustomPDEConstrainedFunctionals{N},φh) where N
   ignore_pullback = findall(!isnothing,vcat(analytic_dJ!, analytic_dC!))
   val, grad = val_and_jacobian(φ_to_jc, get_free_dof_values(φh);ignore_pullback)
 
+  @check length(val) == N + 1 "Expected $(N+1) constraints, φ_to_jc returned $(length(val))"
+
   # Unpack
   j = val[1]
   c = val[2:end]
@@ -558,6 +560,8 @@ function Fields.evaluate!(pcf::CustomPDEConstrainedFunctionals{0},φh)
   # Compute derivatives
   ignore_pullback = findall(!isnothing,vcat(analytic_dJ!, analytic_dC!))
   val, _grad = val_and_jacobian(φ_to_jc, get_free_dof_values(φh);ignore_pullback)
+
+  @check length(val) == 1 "Expected 0 constraints, φ_to_jc returned $(length(val))"
 
   # Unpack
   j = val[1]
@@ -587,6 +591,7 @@ end
 function evaluate_functionals!(pcf::CustomPDEConstrainedFunctionals{N},φ::AbstractVector) where N
   φ_to_jc =  pcf.φ_to_jc
   val = φ_to_jc(φ)
+  @check length(val) == N + 1 "Expected $(N+1) constraints, φ_to_jc returned $(length(val))"
   j = val[1]
   c = val[2:end];
   return j,c
@@ -595,6 +600,7 @@ end
 function evaluate_functionals!(pcf::CustomPDEConstrainedFunctionals{0},φ::AbstractVector)
   φ_to_jc =  pcf.φ_to_jc
   val = φ_to_jc(φ)
+  @check length(val) == 1 "Expected 0 constraints, φ_to_jc returned $(length(val))"
   j = val[1]
   c = Vector{eltype(val)}();
   return j,c
@@ -657,7 +663,7 @@ end
 get_state(m::CustomEmbeddedPDEConstrainedFunctionals) = get_state(m.state_map)
 get_state(::CustomEmbeddedPDEConstrainedFunctionals{N,Nothing}) where N = nothing
 
-function Fields.evaluate!(pcf::CustomEmbeddedPDEConstrainedFunctionals,φh;update_space::Bool=true)
+function Fields.evaluate!(pcf::CustomEmbeddedPDEConstrainedFunctionals{N},φh;update_space::Bool=true) where N
   update_space && update_collection_with_φh!(pcf.embedded_collection,φh)
   φ_to_jc = pcf.φ_to_jc
   analytic_dJ!, analytic_dC! = pcf.analytic_dJ, pcf.analytic_dC
@@ -665,6 +671,8 @@ function Fields.evaluate!(pcf::CustomEmbeddedPDEConstrainedFunctionals,φh;updat
   # Compute derivatives
   ignore_pullback = findall(!isnothing,vcat(analytic_dJ!, analytic_dC!))
   val, grad = val_and_jacobian(φ_to_jc, get_free_dof_values(φh);ignore_pullback)
+
+  @check length(val) == N + 1 "Expected $(N+1) constraints, φ_to_jc returned $(length(val))"
 
   # Unpack
   j = val[1]
@@ -695,6 +703,8 @@ function Fields.evaluate!(pcf::CustomEmbeddedPDEConstrainedFunctionals{0},φh;up
   ignore_pullback = findall(!isnothing,vcat(analytic_dJ!, analytic_dC!))
   val, _grad = val_and_jacobian(φ_to_jc, get_free_dof_values(φh);ignore_pullback)
 
+  @check length(val) == 1 "Expected 0 constraints, φ_to_jc returned $(length(val))"
+
   # Unpack
   j = val[1]
   c = Vector{eltype(val)}()
@@ -715,9 +725,10 @@ function Fields.evaluate!(pcf::CustomEmbeddedPDEConstrainedFunctionals{0},φh;up
   return j,c,dJ,dC
 end
 
-function evaluate_functionals!(pcf::CustomEmbeddedPDEConstrainedFunctionals,φh;update_space::Bool=true)
+function evaluate_functionals!(pcf::CustomEmbeddedPDEConstrainedFunctionals{N},φh;update_space::Bool=true) where N
   update_space && update_collection_with_φh!(pcf.embedded_collection,φh)
   val = pcf.φ_to_jc(get_free_dof_values(φh))
+  @check length(val) == N + 1 "Expected $(N+1) constraints, φ_to_jc returned $(length(val))"
   j = val[1]
   c = val[2:end];
   return j,c
@@ -726,6 +737,7 @@ end
 function evaluate_functionals!(pcf::CustomEmbeddedPDEConstrainedFunctionals{0},φh;update_space::Bool=true)
   update_space && update_collection_with_φh!(pcf.embedded_collection,φh)
   val = pcf.φ_to_jc(get_free_dof_values(φh))
+  @check length(val) == 1 "Expected 0 constraints, φ_to_jc returned $(length(val))"
   j = val[1]
   c = Vector{eltype(val)}();
   return j,c
