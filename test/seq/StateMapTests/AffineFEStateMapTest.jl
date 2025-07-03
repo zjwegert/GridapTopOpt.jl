@@ -51,7 +51,7 @@ function main(verbose)
     pcf.J(u,φ)
   end
 
-  cpcf = CustomPDEConstrainedFunctionals(φ_to_j,0,φ_to_u)
+  cpcf = CustomPDEConstrainedFunctionals(φ_to_j,0;state_map=φ_to_u)
   _,_,cdF,_ = evaluate!(cpcf,φh)
   @test cdF ≈ _dF
 
@@ -60,9 +60,9 @@ function main(verbose)
     [pcf.J(u,φ),pcf.J(u,φ)^2]
   end
 
-  cpcf = CustomPDEConstrainedFunctionals(φ_to_j2,1,φ_to_u)
+  cpcf = CustomPDEConstrainedFunctionals(φ_to_j2,1;state_map=φ_to_u)
   evaluate!(cpcf,φh)
-  cpcf = CustomPDEConstrainedFunctionals(φ_to_j2,1,φ_to_u;analytic_dC=[(dC,φ)->dC])
+  cpcf = CustomPDEConstrainedFunctionals(φ_to_j2,1;state_map=φ_to_u,analytic_dC=[(dC,φ)->dC])
   evaluate!(cpcf,φh)
 
   fdm_grad = FiniteDiff.finite_difference_gradient(φ_to_j, get_free_dof_values(φh))

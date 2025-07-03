@@ -511,7 +511,7 @@ struct CustomPDEConstrainedFunctionals{N,A} <:  AbstractPDEConstrainedFunctional
     """
     function CustomPDEConstrainedFunctionals(
       φ_to_jc :: Function,
-      num_constraints; # <- can we get this from lowered φ_to_jc
+      num_constraints;
       state_map :: Union{Nothing,AbstractFEStateMap,Vector{<:AbstractFEStateMap}} = nothing,
       analytic_dJ = nothing,
       analytic_dC = fill(nothing,num_constraints)

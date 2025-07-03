@@ -92,7 +92,7 @@ function main(;order,AD_case)
       c = map(constraint -> constraint(u,φ),constraints)
       [j,c...]
     end
-    CustomPDEConstrainedFunctionals(φ_to_jc,length(constraints),state_map)
+    CustomPDEConstrainedFunctionals(φ_to_jc,length(constraints);state_map)
   elseif AD_case == :custom_pcf_analyticVol
     objective = GridapTopOpt.StateParamMap(J,state_map)
     constraints = map(Ci -> GridapTopOpt.StateParamIntegrandWithMeasure(Ci,state_map),[Vol])
@@ -109,7 +109,7 @@ function main(;order,AD_case)
       _dC(q) = dVol(q,uh,φh)
       Gridap.FESpaces.assemble_vector!(_dC,dC,V_φ)
     end
-    CustomPDEConstrainedFunctionals(φ_to_jc2,length(constraints),state_map;
+    CustomPDEConstrainedFunctionals(φ_to_jc2,length(constraints);state_map,
       analytic_dC=[analytic_dC1!])
   else
     @error "AD case not defined"

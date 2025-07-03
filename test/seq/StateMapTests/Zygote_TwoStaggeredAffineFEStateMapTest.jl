@@ -73,7 +73,7 @@ function main(model)
       _F(u1u2,φ)
     end
 
-    cpcf = CustomPDEConstrainedFunctionals(φ_to_j2,0,φ_to_u1)
+    cpcf = CustomPDEConstrainedFunctionals(φ_to_j2,0;state_map=φ_to_u1)
     _,_,_dF2,_ = evaluate!(cpcf,φh);
 
     @test _dF ≈ _dF2
