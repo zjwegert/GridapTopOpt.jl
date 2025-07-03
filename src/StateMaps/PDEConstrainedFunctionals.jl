@@ -476,7 +476,7 @@ throughout GridapTopOpt.
       Gridap.FESpaces.assemble_vector!(_dJ,dJ,V_φ)
     end
     ```
-    This functionality is subject to change in future!
+    This functionality is subject to change.
 """
 struct CustomPDEConstrainedFunctionals{N,A} <:  AbstractPDEConstrainedFunctionals{N}
   φ_to_jc :: Function
@@ -487,25 +487,41 @@ struct CustomPDEConstrainedFunctionals{N,A} <:  AbstractPDEConstrainedFunctional
     @doc"""
         CustomPDEConstrainedFunctionals(
           φ_to_jc :: Function,
-          num_constraints,
-          state_map :: AbstractFEStateMap;
+          num_constraints;
+          state_map :: Union{Nothing,AbstractFEStateMap,Vector{<:AbstractFEStateMap}},
           analytic_dJ = nothing,
           analytic_dC = fill(nothing,num_constraints)
         )
 
     Create an instance of `CustomPDEConstrainedFunctionals`. Here,
     `num_constraints` specifies the number of constraints.
+
+    !!! note
+        The `state_map` field is used to get the current state of the forward problems
+        for the uh output in
+        ```julia
+        for (it, uh, φh) in optimiser
+          ...
+        end
+        ```
+        If you take state_map=nothing, then `get_state`, and the corresponding
+        output of uh above will be `nothing`.
+
+        This functionality is subject to change.
     """
     function CustomPDEConstrainedFunctionals(
       φ_to_jc :: Function,
-      num_constraints,
-      state_map :: AbstractFEStateMap;
+      num_constraints; # <- can we get this from lowered φ_to_jc
+      state_map :: Union{Nothing,AbstractFEStateMap,Vector{<:AbstractFEStateMap}} = nothing,
       analytic_dJ = nothing,
       analytic_dC = fill(nothing,num_constraints)
     )
     return new{num_constraints,typeof(state_map)}(φ_to_jc,analytic_dJ,analytic_dC,state_map)
   end
 end
+
+get_state(m::CustomPDEConstrainedFunctionals) = get_state(m.state_map)
+get_state(::CustomPDEConstrainedFunctionals{N,Nothing}) where N = nothing
 
 function Fields.evaluate!(pcf::CustomPDEConstrainedFunctionals{N},φh) where N
   φ_to_jc = pcf.φ_to_jc
@@ -563,27 +579,6 @@ function Fields.evaluate!(pcf::CustomPDEConstrainedFunctionals{0},φh)
   return j,c,dJ,dC
 end
 
-function get_state(m::CustomPDEConstrainedFunctionals)
-  @warn """
-    For CustomPDEConstrainedFunctionals, get_state only returns the StateMap used in
-    the constructor for the CustomPDEConstrainedFunctionals. This means that uh in
-    ```
-    for (it,uh,φh) in optimiser
-      ...
-    end
-    ```
-    will correspond to this particular state map.
-
-    There may be cases where you have multiple StateMaps inside a map φ_to_jc. If
-    this is the case, you should get your states directly from your StateMaps in
-    the driver script.
-
-    This functionality may change in future.
-  """ maxlog=1
-  get_state(m.state_map)
-end
-get_state_map(m::CustomPDEConstrainedFunctionals) = m.state_map
-
 function evaluate_functionals!(pcf::CustomPDEConstrainedFunctionals,φh)
   φ = get_free_dof_values(φh)
   return evaluate_functionals!(pcf,φ)
@@ -629,6 +624,21 @@ struct CustomEmbeddedPDEConstrainedFunctionals{N,A} <:  AbstractPDEConstrainedFu
 
     Create an instance of `CustomEmbeddedPDEConstrainedFunctionals`. Here,
     `num_constraints` specifies the number of constraints.
+
+    !!! note
+        If you have one or more `state_map` objects in `embedded_collection`, you should
+        include these as a vector under the `:state_map` key of the `embedded_collection`.
+        This is used in the optimiser to get the current state of the maps for the uh
+        output in
+        ```julia
+        for (it, uh, φh) in optimiser
+          ...
+        end
+        ```
+        If you do not have a `:state_map` in the `embedded_collection`, then `get_state`,
+        and the corresponding output of uh above will be `nothing`.
+
+        This functionality is subject to change.
     """
     function CustomEmbeddedPDEConstrainedFunctionals(
       φ_to_jc :: Function,
@@ -638,27 +648,16 @@ struct CustomEmbeddedPDEConstrainedFunctionals{N,A} <:  AbstractPDEConstrainedFu
       analytic_dC = fill(nothing,num_constraints)
     )
 
-    @check Set((:state_map,:J,:C)) == keys(embedded_collection.objects) """
-    Expected EmbeddedCollection to have objects ':state_map,:J,:C'. Ensure that you
-    have updated the collection after adding new recipes.
-
-    You have $(keys(embedded_collection.objects))
-
-    Note:
-    - We require that this EmbeddedCollection is seperate to the one used for the
-      UnfittedEvolution. This is because updating the FEStateMap is more expensive than
-      cutting and there are instances where evolution and reinitialisation happen
-      at before recomputing the forward solution. As such, we cut an extra time
-      to avoid allocating the state map more often then required.
-    - For problems with no constraints `:C` must at least point to an empty list
-    """
-    A = typeof(embedded_collection.state_map)
+    state_map = :state_map ∈ keys(embedded_collection.objects) ? embedded_collection.state_map : nothing;
+    A = typeof(state_map)
     return new{num_constraints,A}(φ_to_jc,analytic_dJ,analytic_dC,embedded_collection)
   end
 end
 
-function Fields.evaluate!(
-    pcf::CustomEmbeddedPDEConstrainedFunctionals{N},φh;update_space::Bool=true) where N
+get_state(m::CustomEmbeddedPDEConstrainedFunctionals) = get_state(m.state_map)
+get_state(::CustomEmbeddedPDEConstrainedFunctionals{N,Nothing}) where N = nothing
+
+function Fields.evaluate!(pcf::CustomEmbeddedPDEConstrainedFunctionals,φh;update_space::Bool=true)
   update_space && update_collection_with_φh!(pcf.embedded_collection,φh)
   φ_to_jc = pcf.φ_to_jc
   analytic_dJ!, analytic_dC! = pcf.analytic_dJ, pcf.analytic_dC
@@ -687,8 +686,7 @@ function Fields.evaluate!(
   return j,c,dJ,dC
 end
 
-function Fields.evaluate!(
-    pcf::CustomEmbeddedPDEConstrainedFunctionals{0},φh;update_space::Bool=true)
+function Fields.evaluate!(pcf::CustomEmbeddedPDEConstrainedFunctionals{0},φh;update_space::Bool=true)
   update_space && update_collection_with_φh!(pcf.embedded_collection,φh)
   φ_to_jc = pcf.φ_to_jc
   analytic_dJ!, analytic_dC! = pcf.analytic_dJ, pcf.analytic_dC
@@ -717,41 +715,7 @@ function Fields.evaluate!(
   return j,c,dJ,dC
 end
 
-function Fields.evaluate!(pcf::CustomEmbeddedPDEConstrainedFunctionals,φ::AbstractVector;kwargs...)
-  V_φ = get_aux_space(get_state_map(pcf))
-  φh = FEFunction(V_φ,φ)
-  return evaluate!(pcf,φh;kwargs...)
-end
-
-function get_state(m::CustomEmbeddedPDEConstrainedFunctionals)
-  @warn """
-    For CustomEmbeddedPDEConstrainedFunctionals, get_state only returns the StateMap used in
-    the constructor for the embedded_collection. This means that uh in
-    ```
-    for (it,uh,φh) in optimiser
-      ...
-    end
-    ```
-    will correspond to this particular state map.
-
-    There may be cases where you have multiple StateMaps inside a map φ_to_jc. If
-    this is the case, you should get your states directly from your StateMaps in
-    the driver script.
-
-    This functionality may change in future.
-  """ maxlog=1
-  get_state(m.embedded_collection.state_map)
-end
-get_state_map(m::CustomEmbeddedPDEConstrainedFunctionals) = m.state_map
-
-function evaluate_functionals!(pcf::CustomEmbeddedPDEConstrainedFunctionals,φ::AbstractVector;kwargs...)
-  V_φ = get_aux_space(get_state_map(pcf))
-  φh  = FEFunction(V_φ,φ)
-  return evaluate_functionals!(pcf,φh;kwargs...)
-end
-
-function evaluate_functionals!(pcf::CustomEmbeddedPDEConstrainedFunctionals{N},
-    φh;update_space::Bool=true) where N
+function evaluate_functionals!(pcf::CustomEmbeddedPDEConstrainedFunctionals,φh;update_space::Bool=true)
   update_space && update_collection_with_φh!(pcf.embedded_collection,φh)
   val = pcf.φ_to_jc(get_free_dof_values(φh))
   j = val[1]
@@ -759,8 +723,7 @@ function evaluate_functionals!(pcf::CustomEmbeddedPDEConstrainedFunctionals{N},
   return j,c
 end
 
-function evaluate_functionals!(pcf::CustomEmbeddedPDEConstrainedFunctionals{0},
-    φh;update_space::Bool=true)
+function evaluate_functionals!(pcf::CustomEmbeddedPDEConstrainedFunctionals{0},φh;update_space::Bool=true)
   update_space && update_collection_with_φh!(pcf.embedded_collection,φh)
   val = pcf.φ_to_jc(get_free_dof_values(φh))
   j = val[1]

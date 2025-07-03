@@ -13,6 +13,8 @@ Return the solution/state `u` to the FE problem.
 """
 get_state(::AbstractFEStateMap) = @abstractmethod
 
+get_state(m::Vector{<:AbstractFEStateMap}) = get_state.(m)
+
 """
     get_spaces(m::AbstractFEStateMap)
 
