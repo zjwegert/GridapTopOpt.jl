@@ -660,7 +660,7 @@ struct CustomEmbeddedPDEConstrainedFunctionals{N,A} <:  AbstractPDEConstrainedFu
   end
 end
 
-get_state(m::CustomEmbeddedPDEConstrainedFunctionals) = get_state(m.state_map)
+get_state(m::CustomEmbeddedPDEConstrainedFunctionals) = get_state(m.embedded_collection.state_map)
 get_state(::CustomEmbeddedPDEConstrainedFunctionals{N,Nothing}) where N = nothing
 
 function Fields.evaluate!(pcf::CustomEmbeddedPDEConstrainedFunctionals{N},φh;update_space::Bool=true) where N
