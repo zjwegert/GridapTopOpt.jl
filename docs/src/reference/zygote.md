@@ -43,4 +43,11 @@ pcf = CustomPDEConstrainedFunctionals(...)
 ## GridapTopOpt + GridapEmbedded + Zygote
 ```@docs
 GridapTopOpt.CustomEmbeddedPDEConstrainedFunctionals
+GridapTopOpt.CustomEmbeddedPDEConstrainedFunctionals(
+          φ_to_jc :: Function,
+          num_constraints,
+          embedded_collection :: EmbeddedCollection;
+          analytic_dJ = nothing,
+          analytic_dC = fill(nothing,num_constraints)
+        )
 ```
