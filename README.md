@@ -18,4 +18,4 @@ In order to give credit to the `GridapTopOpt` contributors, we ask that you plea
 
 ### Unfitted methods
 When using unfitted methods, we ask that you please reference the following manuscripts:
-> Wegert, Z.J., Manyer, J., Mallon, C.N. et al. Level-set topology optimisation with unfitted finite elements and automatic shape differentiation. arXiv:2504.09748 [math] (2025). [http://arxiv.org/abs/2504.09748](http://arxiv.org/abs/2504.09748)
+> Wegert, Z.J., Manyer, J., Mallon, C.N. et al. Level-set topology optimisation with unfitted finite elements and automatic shape differentiation. Accepted for publication in Computer Methods in Applied Mechanics and Engineering (2025). [http://arxiv.org/abs/2504.09748](http://arxiv.org/abs/2504.09748)
