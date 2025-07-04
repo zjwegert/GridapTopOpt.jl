@@ -153,7 +153,7 @@ The `do` statement above provides a recipe for the `EmbeddedCollection` to gener
 
 ## Isolated volume marking and automatic differentation
 In the above, we use `get_isolated_volumes_mask_polytopal` to create a cell field that marks cells based on whether they are connected to `Omega_D`. In addition, we wrap the cut triangulations inside [`DifferentiableTriangulation`](https://gridap.github.io/GridapEmbedded.jl/stable/GeometricalDerivatives/#Geometrical-Derivatives). This is a wrapper around an embedded triangulation (i.e SubCellTriangulation or SubFacetTriangulation) implementing all the necessary methods to compute derivatives with respect to deformations of the embedded mesh. To do so, it propagates dual numbers into the geometric maps mapping cut subcells/subfacets to the background mesh. We refer to this article for the mathematical discussion:
-> Wegert, Z.J., Manyer, J., Mallon, C.N. et al. Level-set topology optimisation with unfitted finite elements and automatic shape differentiation. arXiv:2504.09748 [math] \(2025\). [http://arxiv.org/abs/2504.09748](http://arxiv.org/abs/2504.09748)
+> Wegert, Z.J., Manyer, J., Mallon, C.N. et al. Level-set topology optimisation with unfitted finite elements and automatic shape differentiation. Accepted for publication in Computer Methods in Applied Mechanics and Engineering (2025). [http://arxiv.org/abs/2504.09748](http://arxiv.org/abs/2504.09748)
 
 ## FE problem
 Now that all the measures are defined, lets define the weak form, optimisation functionals, and the FE operators. First, we can define the weak form and optimisation functionals as
