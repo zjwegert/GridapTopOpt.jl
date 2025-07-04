@@ -1,7 +1,7 @@
 name = "GridapTopOpt"
 uuid = "27dd0110-1916-4fd6-8b4b-1bc109db1170"
-authors = ["Zach Wegert <zach.wegert@hdr.qut.edu.au>", "JordiManyer <jordi.manyer@monash.edu>"]
-version = "0.2.2"
+authors = ["Zachary Wegert <zach.wegert@hdr.qut.edu.au>", "Jordi Manyer <jordi.manyer@monash.edu>", "Connor Mallon <connor.mallon@qut.edu.au>", "Santiago Badia <santiago.badia@monash.edu>", "Vivien Challis <vivien.challis@qut.edu.au>"]
+version = "0.3.0"
 
 [deps]
 BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
@@ -26,6 +26,7 @@ PartitionedArrays = "5a9dfac6-5c52-46f7-8278-5e2210713be9"
 Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
 STLCutters = "284f087d-c8bb-44c4-af3c-39d0e1f330a5"
 SparseMatricesCSR = "a0a7dd2c-ebf4-11e9-1f05-cf50bc540ca1"
+Zygote = "e88e6eb3-aa80-5325-afca-941959d7151f"
 
 [compat]
 BenchmarkTools = "1"
@@ -47,6 +48,7 @@ MPI = "0.20"
 PartitionedArrays = "0.3.3"
 STLCutters = "0.3"
 SparseMatricesCSR = "0.6.7"
+Zygote = "0.7.10"
 julia = "1.9"
 
 [extras]
@@ -55,4 +57,3 @@ Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
 test = ["Test"]
-

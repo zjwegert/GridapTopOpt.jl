@@ -14,8 +14,6 @@ function main(verbose)
 
   V_φ = TestFESpace(model,reffe)
   φh = interpolate(1,V_φ)
-  V_reg = TestFESpace(model,reffe)
-  U_reg = TrialFESpace(V_reg)
 
   V = FESpace(model,reffe;dirichlet_tags="boundary")
 
@@ -33,7 +31,7 @@ function main(verbose)
   # Create operator from components
   lsolver = LUSolver()
   solver = NewtonSolver(lsolver;rtol=1.e-10,verbose)
-  φ_to_u = NonlinearFEStateMap(r,U,V,V_φ,U_reg,φh;nls=solver)
+  φ_to_u = NonlinearFEStateMap(r,U,V,V_φ,φh;nls=solver)
 
   ## Test solution
   GridapTopOpt.forward_solve!(φ_to_u,φh)

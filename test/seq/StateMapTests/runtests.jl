@@ -12,6 +12,7 @@ using Test
   include("ThreeStaggeredAffineFEStateMapTests.jl")
   include("ThreeStaggeredNonlinearFEStateMapTest.jl")
   include("AffineFEStateMapTest_CutFEM_Elast.jl")
+  include("Zygote_TwoStaggeredAffineFEStateMapTest.jl")
 
   include("TwoStaggeredAffineFEStateMapTest_ADTypeUnstableBug.jl")
   include("NonSymmetricThreeStaggeredNonlinearFEStateMapTest.jl")

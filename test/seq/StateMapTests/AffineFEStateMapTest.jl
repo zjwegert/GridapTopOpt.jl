@@ -15,8 +15,6 @@ function main(verbose)
   V_φ = TestFESpace(model,reffe)
   φf(x) = x[1]*x[2]+1
   φh = interpolate(φf,V_φ)
-  V_reg = TestFESpace(model,reffe)
-  U_reg = TrialFESpace(V_reg)
 
   V = FESpace(model,reffe;dirichlet_tags="boundary")
 
@@ -31,7 +29,7 @@ function main(verbose)
   l1(v1,φ) = ∫(φ* φ * _rhs * v1)dΩ
 
   # Create operator from components
-  φ_to_u = AffineFEStateMap(a1,l1,U,V,V_φ,U_reg,φh)
+  φ_to_u = AffineFEStateMap(a1,l1,U,V,V_φ,φh)
 
   # Test solution
   GridapTopOpt.forward_solve!(φ_to_u,φh)
@@ -52,6 +50,20 @@ function main(verbose)
     u = φ_to_u(φ)
     pcf.J(u,φ)
   end
+
+  cpcf = CustomPDEConstrainedFunctionals(φ_to_j,0;state_map=φ_to_u)
+  _,_,cdF,_ = evaluate!(cpcf,φh)
+  @test cdF ≈ _dF
+
+  function φ_to_j2(φ)
+    u = φ_to_u(φ)
+    [pcf.J(u,φ),pcf.J(u,φ)^2]
+  end
+
+  cpcf = CustomPDEConstrainedFunctionals(φ_to_j2,1;state_map=φ_to_u)
+  evaluate!(cpcf,φh)
+  cpcf = CustomPDEConstrainedFunctionals(φ_to_j2,1;state_map=φ_to_u,analytic_dC=[(dC,φ)->dC])
+  evaluate!(cpcf,φh)
 
   fdm_grad = FiniteDiff.finite_difference_gradient(φ_to_j, get_free_dof_values(φh))
   rel_error = norm(_dF - fdm_grad, Inf)/norm(fdm_grad,Inf)

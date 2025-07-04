@@ -87,7 +87,7 @@ function main(path="./results/hyperelastic_compliance_neohook_ALM/")
   ls_evo = HamiltonJacobiEvolution(FirstOrderStencil(2,Float64),model,V_φ,tol,max_steps)
 
   ## Setup solver and FE operators
-  state_map = NonlinearFEStateMap(res,U,V,V_φ,U_reg,φh)
+  state_map = NonlinearFEStateMap(res,U,V,V_φ,φh)
   pcfs = PDEConstrainedFunctionals(Obj,[Vol],state_map,analytic_dC=[dVol])
 
   ## Hilbertian extension-regularisation problems

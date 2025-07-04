@@ -81,10 +81,10 @@ function main(distribute,mesh_partition;order,AD)
   solver = PETScLinearSolver()
 
   state_map = AffineFEStateMap(
-    a,l,U,V,V_φ,U_reg,φh;
+    a,l,U,V,V_φ,φh;
     assem_U = SparseMatrixAssembler(Tm,Tv,U,V),
     assem_adjoint = SparseMatrixAssembler(Tm,Tv,V,U),
-    assem_deriv = SparseMatrixAssembler(Tm,Tv,U_reg,U_reg),
+    assem_deriv = SparseMatrixAssembler(Tm,Tv,V_φ,V_φ),
     ls = solver,adjoint_ls = solver
   )
   pcfs = if AD
@@ -189,10 +189,10 @@ function main_3d(distribute,mesh_partition,;order)
   solver = PETScLinearSolver()
 
   state_map = AffineFEStateMap(
-    a,l,U,V,V_φ,U_reg,φh;
+    a,l,U,V,V_φ,φh;
     assem_U = SparseMatrixAssembler(Tm,Tv,U,V),
     assem_adjoint = SparseMatrixAssembler(Tm,Tv,V,U),
-    assem_deriv = SparseMatrixAssembler(Tm,Tv,U_reg,U_reg),
+    assem_deriv = SparseMatrixAssembler(Tm,Tv,V_φ,V_φ),
     ls = solver,adjoint_ls = solver
   )
   pcfs = PDEConstrainedFunctionals(J,[Vol],state_map,analytic_dJ=dJ,analytic_dC=[dVol])
