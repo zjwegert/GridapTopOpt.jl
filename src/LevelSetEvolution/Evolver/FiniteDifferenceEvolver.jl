@@ -20,7 +20,7 @@ with ``\\phi(0,\\boldsymbol{x})=\\phi_0(\\boldsymbol{x})`` and ``\\boldsymbol{x}
 - `perm`: A permutation vector
 - `params`: Tuple of additional params
 """
-struct FiniteDifferenceEvolver{O} <: LevelSetEvolution
+struct FiniteDifferenceEvolver{O} <: Evolver
   stencil :: Stencil
   model
   space
