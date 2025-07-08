@@ -85,7 +85,6 @@ function get_ls_space(s::LevelSetEvolution)
 end
 
 include("Utilities/Helpers.jl")
-include("Utilities/MutableRungeKutta.jl")
 include("Stencil/Stencil.jl")
 include("Evolver/Evolver.jl")
 include("Reinitialiser/Reinitialiser.jl")
