@@ -81,7 +81,7 @@ end
 Return the finite element space used for the level-set function.
 """
 function get_ls_space(s::LevelSetEvolution)
-  get_min_dof_spacing(get_evolver(s))
+  get_ls_space(get_evolver(s))
 end
 
 include("Utilities/Helpers.jl")
