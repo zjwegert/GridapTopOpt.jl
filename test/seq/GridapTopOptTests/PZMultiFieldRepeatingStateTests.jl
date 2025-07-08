@@ -123,7 +123,7 @@ function main(;AD,use_mfs=false)
   vel_ext = VelocityExtension(a_hilb,U_reg,V_reg)
 
   # ## Optimiser
-  optimiser = HilbertianProjection(pcfs,stencil,vel_ext,φh;γ,γ_reinit,verbose=true)
+  optimiser = HilbertianProjection(pcfs,stencil,vel_ext,φh;γ,verbose=true)
   vars, state = iterate(optimiser)
   vars, state = iterate(optimiser,state)
   true

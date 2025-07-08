@@ -222,6 +222,5 @@ end
 ## Backwards compat
 function RepeatingAffineFEStateMap(nblocks::Int,biform::Function,liforms::Vector{<:Function},
     U0,V0,V_φ,U_reg,φh;kwargs...)
-  @warn _msg_v0_3_0 maxlog=1
-  return RepeatingAffineFEStateMap(nblocks,biform,liforms,U0,V0,V_φ,φh;kwargs...)
+  @error _msg_v0_3_0(RepeatingAffineFEStateMap)
 end

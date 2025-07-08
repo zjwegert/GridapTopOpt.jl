@@ -659,28 +659,23 @@ end
 ## Backwards compat
 function StaggeredAffineFEStateMap(
     op::StaggeredAffineFEOperator,∂Rk∂xhi::Tuple{Vararg{Tuple{Vararg{Function}}}},V_φ,U_reg,φh; kwargs...)
-  @warn _msg_v0_3_0 maxlog=1
-  return StaggeredAffineFEStateMap(op,∂Rk∂xhi,V_φ,φh; kwargs...)
+  @error _msg_v0_3_0(StaggeredAffineFEStateMap)
 end
 
 function StaggeredAffineFEStateMap(op::StaggeredAffineFEOperator,V_φ,U_reg,φh; kwargs...)
-  @warn _msg_v0_3_0 maxlog=1
-  return StaggeredAffineFEStateMap(op,V_φ,φh; kwargs...)
+  @error _msg_v0_3_0(StaggeredAffineFEStateMap)
 end
 
 function StaggeredNonlinearFEStateMap(
     op::StaggeredNonlinearFEOperator,∂Rk∂xhi::Tuple{Vararg{Tuple{Vararg{Function}}}},V_φ,U_reg,φh; kwargs...)
-  @warn _msg_v0_3_0 maxlog=1
-  return StaggeredNonlinearFEStateMap(op,∂Rk∂xhi,V_φ,φh; kwargs...)
+  @error _msg_v0_3_0(StaggeredAffineFEStateMap)
 end
 
 function StaggeredNonlinearFEStateMap(op::StaggeredNonlinearFEOperator,V_φ,U_reg,φh; kwargs...)
-  @warn _msg_v0_3_0 maxlog=1
-  return StaggeredNonlinearFEStateMap(op,V_φ,φh; kwargs...)
+  @error _msg_v0_3_0(StaggeredAffineFEStateMap)
 end
 
 function StaggeredStateParamMap(F,∂F∂xhi::Tuple{Vararg{Function}},trials::Vector{<:FESpace},V_φ::FESpace,
     U_reg::FESpace,assem_U::Vector{<:Assembler},assem_deriv::Assembler)
-  @warn _msg_v0_3_0 maxlog=1
-  return StaggeredStateParamMap(F,∂F∂xhi,trials,V_φ,assem_U,assem_deriv)
+  @error _msg_v0_3_0(StaggeredAffineFEStateMap)
 end

@@ -42,10 +42,10 @@ function Gridap.jacobian(F,uh::Vector{<:CellField},K::Int)
 end
 
 # Backwards compat msgs
-_msg_v0_3_0 = """
-  Inclusion of `U_reg` in the arguments of this constructor has been deprecated
+_msg_v0_3_0(a) = """
+  Inclusion of `U_reg` in the arguments of $a has been deprecated
   in v0.3.0 and derivatives are now on the correct tangent space (V_φ). See
-  patch notes for futher information.
+  patch notes for futher information. Please remove U_reg from your arguments.
 
   This method will be removed in a future release.
 """

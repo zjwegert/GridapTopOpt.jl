@@ -4,12 +4,6 @@
     This page is still under construction! Please refer to the tutorial
     for a discussion of functionality.
 
-## `UnfittedEvolution`
-
-```@docs
-GridapTopOpt.UnfittedFEEvolution
-```
-
 ## Level-set evolution
 In the following, we use the approach for evolution proposed by [Burman et al. (2018)](https://doi.org/10.1016/j.cma.2017.09.005) to update the level-set function. Namely, we evolve the level-set function by solving a transport equation
 ```math
@@ -26,11 +20,11 @@ where $g_\Omega$ is the regularised sensitivity resulting from the [Hilbertian e
 ```math
 \int_D\left[v\frac{\partial\phi}{\partial t}+v\boldsymbol{\beta}\cdot\boldsymbol{\nabla}\phi\right]~\mathrm{d}\boldsymbol{x}+\sum_{F\in\mathscr{S}_h}\int_Fc_eh_F^2\lvert\boldsymbol{n}_F\cdot\boldsymbol{\beta}\rvert\llbracket \boldsymbol{n}_F\cdot\boldsymbol{\nabla}\phi\rrbracket\llbracket\boldsymbol{n}_F\cdot\boldsymbol{\nabla}v\rrbracket~\mathrm{d}s=0,~\forall v\in W^h,
 ```
-where $\mathscr{S}_h$ is the set of interior mesh facets, $h_F$ is the average element diameters of the elements sharing a facet, $\boldsymbol{n}_F$ is the normal to the facet $F$, $\llbracket v\rrbracket = v^+-v^-$ is the jump in a function $v$ over the facet $F$, and $c_e$ is a stabilisation coefficient. Further discussion regarding solving this can be found at [Wegert et al. (2025)](https://arxiv.org/abs/2504.09748).
+where $\mathscr{S}_h$ is the set of interior mesh facets, $h_F$ is the average element diameters of the elements sharing a facet, $\boldsymbol{n}_F$ is the normal to the facet $F$, $\llbracket v\rrbracket = v^+-v^-$ is the jump in a function $v$ over the facet $F$, and $c_e$ is a stabilisation coefficient. Further discussion regarding solving this can be found at [Wegert et al. (2025)](https://doi.org/10.1016/j.cma.2025.118203).
 
 ```@autodocs
 Modules = [GridapTopOpt]
-Pages = ["LevelSetEvolution/UnfittedEvolution/CutFEMEvolve.jl"]
+Pages = ["LevelSetEvolution/UnfittedEvolution/CutFEMEvolver.jl"]
 ```
 
 ## Level-set reinitialisation
@@ -46,11 +40,11 @@ To steady state using an approach based on the one proposed by [Mallon et al. (2
 ```math
     \int_Dv\boldsymbol{w}\cdot\boldsymbol{\nabla}\phi-v\operatorname{sign}(\phi_0)~\mathrm{d}\boldsymbol{x}+\int_\Gamma \frac{\gamma_d}{h}\phi v~\mathrm{d}s+j(\phi,v)=0,~\forall v\in W^h,
 ```
-where $\boldsymbol{w}=\operatorname{sign}(\phi_0)\frac{\boldsymbol{\nabla}\phi}{\lVert\boldsymbol{\nabla}\phi\rVert}$. Further discussion regarding solving this can be found at [Wegert et al. (2025)](https://arxiv.org/abs/2504.09748).
+where $\boldsymbol{w}=\operatorname{sign}(\phi_0)\frac{\boldsymbol{\nabla}\phi}{\lVert\boldsymbol{\nabla}\phi\rVert}$. Further discussion regarding solving this can be found at [Wegert et al. (2025)](https://doi.org/10.1016/j.cma.2025.118203).
 
 ```@autodocs
 Modules = [GridapTopOpt]
-Pages = ["LevelSetEvolution/UnfittedEvolution/StabilisedReinit.jl"]
+Pages = ["LevelSetEvolution/UnfittedEvolution/StabilisedReinitialiser.jl"]
 ```
 
 ### Custom `UnfittedEvolution`

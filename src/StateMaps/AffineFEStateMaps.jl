@@ -119,6 +119,5 @@ end
 
 ## Backwards compat
 function AffineFEStateMap(biform::Function,liform::Function,U,V,V_φ,U_reg,φh; kwargs...)
-  @warn _msg_v0_3_0 maxlog=1
-  AffineFEStateMap(biform,liform,U,V,V_φ,φh; kwargs...)
+  @error _msg_v0_3_0(AffineFEStateMap)
 end

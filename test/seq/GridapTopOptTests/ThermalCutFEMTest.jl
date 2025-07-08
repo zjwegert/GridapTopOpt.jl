@@ -113,9 +113,9 @@ function main(AD_case)
   end
 
   ## Evolution Method
-  evo = CutFEMEvolve(V_φ,Ωs,dΩ_bg,hₕ;max_steps,γg=0.1)
-  reinit = StabilisedReinit(V_φ,Ωs,dΩ_bg,hₕ;stabilisation_method=ArtificialViscosity(2.0))
-  ls_evo = UnfittedFEEvolution(evo,reinit)
+  evo = CutFEMEvolver(V_φ,Ωs,dΩ_bg,hₕ;max_steps,γg=0.1)
+  reinit = StabilisedReinitialiser(V_φ,Ωs,dΩ_bg,hₕ;stabilisation_method=ArtificialViscosity(2.0))
+  ls_evo = LevelSetEvolution(evo,reinit)
   reinit!(ls_evo,φh)
 
   ## Hilbertian extension-regularisation problems

@@ -212,9 +212,9 @@ function main(distribute,mesh_partition)
   evolve_nls = NewtonSolver(LUSolver();maxiter=1,verbose=i_am_main(ranks))
   reinit_nls = NewtonSolver(LUSolver();maxiter=20,rtol=1.e-14,verbose=i_am_main(ranks))
 
-  evo = CutFEMEvolve(V_φ,Ω,dΩ_act,hₕ;max_steps,γg=0.01,ode_ls=LUSolver(),ode_nl=evolve_nls)
-  reinit = StabilisedReinit(V_φ,Ω,dΩ_act,hₕ;stabilisation_method=ArtificialViscosity(0.5),nls=reinit_nls)
-  ls_evo = UnfittedFEEvolution(evo,reinit)
+  evo = CutFEMEvolver(V_φ,Ω,dΩ_act,hₕ;max_steps,γg=0.01,ode_ls=LUSolver(),ode_nl=evolve_nls)
+  reinit = StabilisedReinitialiser(V_φ,Ω,dΩ_act,hₕ;stabilisation_method=ArtificialViscosity(0.5),nls=reinit_nls)
+  ls_evo = LevelSetEvolution(evo,reinit)
 
   ## Hilbertian extension-regularisation problems
   α_coeff = γ_evo*max_steps

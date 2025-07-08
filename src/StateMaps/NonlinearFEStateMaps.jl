@@ -172,16 +172,13 @@ end
 
 ## Backwards compat
 function NonlinearFEStateMap(res::Function,jac::Function,U,V,V_φ,U_reg,φh; kwargs...)
-  @warn _msg_v0_3_0 maxlog=1
-  NonlinearFEStateMap(res,jac,U,V,V_φ,φh; kwargs...)
+  @error _msg_v0_3_0(NonlinearFEStateMap)
 end
 
 function NonlinearFEStateMap(res::Function,jac::Function,adjoint_jac::Function,U,V,V_φ,U_reg,φh; kwargs...)
-  @warn _msg_v0_3_0 maxlog=1
-  NonlinearFEStateMap(res,jac,adjoint_jac,U,V,V_φ,φh; kwargs...)
+  @error _msg_v0_3_0(NonlinearFEStateMap)
 end
 
 function NonlinearFEStateMap(res::Function,U,V,V_φ,U_reg,φh;jac=nothing,kwargs...)
-  @warn _msg_v0_3_0 maxlog=1
-  NonlinearFEStateMap(res,U,V,V_φ,φh;jac,kwargs...)
+  @error _msg_v0_3_0(NonlinearFEStateMap)
 end

@@ -99,7 +99,9 @@ function main(mesh_partition,distribute,el_size,path)
   UΓ_out(u,φ) = ∫((u⋅-e₁-δₓ)/vol_Γ_out)dΓ_out
 
   ## Finite difference solver and level set function
-  ls_evo = HamiltonJacobiEvolution(FirstOrderStencil(3,Float64),model,V_φ,tol,max_steps)
+  evo = FiniteDifferenceEvolver(FirstOrderStencil(3,Float64),model,V_φ;max_steps)
+  reinit = FiniteDifferenceReinitialiser(FirstOrderStencil(3,Float64),model,V_φ;tol,γ_reinit)
+  ls_evo = LevelSetEvolution(evo,reinit)
 
   ## Setup solver and FE operators
   Tm = SparseMatrixCSR{0,PetscScalar,PetscInt}
@@ -126,7 +128,7 @@ function main(mesh_partition,distribute,el_size,path)
 
   ## Optimiser
   ls_enabled=false # Setting to true will use a line search instead of oscillation detection
-  optimiser = HilbertianProjection(pcfs,ls_evo,vel_ext,φh;γ,γ_reinit,ls_enabled,α_min=0.7,
+  optimiser = HilbertianProjection(pcfs,ls_evo,vel_ext,φh;γ,ls_enabled,α_min=0.7,
     ls_γ_max=0.05,verbose=i_am_main(ranks),constraint_names=[:Vol,:UΓ_out])
   for (it, uh, φh) in optimiser
     data = ["φ"=>φh,"H(φ)"=>(H ∘ φh),"|∇(φ)|"=>(norm ∘ ∇(φh)),"uh"=>uh]

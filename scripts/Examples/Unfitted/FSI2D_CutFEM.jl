@@ -249,10 +249,10 @@ function main(model,geo_params;ls=LUSolver(),hilb_ls=LUSolver())
   evolve_nls = NewtonSolver(ls;maxiter=1,verbose=true)
   reinit_nls = NewtonSolver(ls;maxiter=20,rtol=1.e-14,verbose=true)
 
-  evo = CutFEMEvolve(V_φ,Ω,dΩ_act,hₕ;max_steps,γg=0.5,ode_ls=ls,ode_nl=evolve_nls)
-  reinit1 = StabilisedReinit(V_φ,Ω,dΩ_act,hₕ;stabilisation_method=ArtificialViscosity(1.0),nls=reinit_nls)
-  reinit2 = StabilisedReinit(V_φ,Ω,dΩ_act,hₕ;stabilisation_method=InteriorPenalty(V_φ;γg=1.0),nls=reinit_nls)
-  ls_evo = UnfittedFEEvolution(evo,GridapTopOpt.MultiStageStabilisedReinit([reinit1,reinit2]))
+  evo = CutFEMEvolver(V_φ,Ω,dΩ_act,hₕ;max_steps,γg=0.5,ode_ls=ls,ode_nl=evolve_nls)
+  reinit1 = StabilisedReinitialiser(V_φ,Ω,dΩ_act,hₕ;stabilisation_method=ArtificialViscosity(1.0),nls=reinit_nls)
+  reinit2 = StabilisedReinitialiser(V_φ,Ω,dΩ_act,hₕ;stabilisation_method=InteriorPenalty(V_φ;γg=1.0),nls=reinit_nls)
+  ls_evo = LevelSetEvolution(evo,GridapTopOpt.MultiStageStabilisedReinit([reinit1,reinit2]))
 
   ## Hilbertian extension-regularisation problems
   alpha = 4

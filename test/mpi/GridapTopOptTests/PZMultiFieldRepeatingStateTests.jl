@@ -118,7 +118,7 @@ function main(distribute,mesh_partition;AD)
   vel_ext = VelocityExtension(a_hilb,U_reg,V_reg)
 
   # ## Optimiser
-  optimiser = HilbertianProjection(pcfs,stencil,vel_ext,φh;γ,γ_reinit,verbose=i_am_main(ranks))
+  optimiser = HilbertianProjection(pcfs,stencil,vel_ext,φh;γ,verbose=i_am_main(ranks))
   vars, state = iterate(optimiser)
   vars, state = iterate(optimiser,state)
   true

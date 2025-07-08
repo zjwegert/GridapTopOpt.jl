@@ -137,11 +137,14 @@ function Base.show(io::IO,object::AbstractStateParamMap)
 end
 
 # Backwards compat
-const StateParamIntegrandWithMeasure = StateParamMap
-
+function StateParamIntegrandWithMeasure(args...)
+  error(
+    """
+    As of v0.4.0, StateParamIntegrandWithMeasure was deprecated in favour of StateParamMap.
+    """
+  )
+end
 function StateParamMap(
     F,U::FESpace,V_φ::FESpace,U_reg,assem_U::Assembler,assem_deriv::Assembler;kwargs...)
-  @warn _msg_v0_3_0 maxlog=1
-  return StateParamMap(
-    F,U::FESpace,V_φ::FESpace,assem_U::Assembler,assem_deriv::Assembler;kwargs...)
+  @error _msg_v0_3_0(StateParamMap)
 end

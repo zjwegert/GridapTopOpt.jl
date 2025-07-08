@@ -73,7 +73,9 @@ function main(distribute,mesh_partition;order,AD)
   dVol(q,u,φ) = ∫(-1/vol_D*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
 
   ## Finite difference solver and level set function
-  ls_evo = HamiltonJacobiEvolution(FirstOrderStencil(2,Float64),model,V_φ,tol,max_steps)
+  evo = FiniteDifferenceEvolver(FirstOrderStencil(2,Float64),model,V_φ;max_steps)
+  reinit = FiniteDifferenceReinitialiser(FirstOrderStencil(2,Float64),model,V_φ;tol,γ_reinit)
+  ls_evo = LevelSetEvolution(evo,reinit)
 
   ## Setup solver and FE operators
   state_map = AffineFEStateMap(a,l,U,V,V_φ,φh)
@@ -90,7 +92,7 @@ function main(distribute,mesh_partition;order,AD)
 
   ## Optimiser
   optimiser = AugmentedLagrangian(pcfs,ls_evo,vel_ext,φh;
-    γ,γ_reinit,verbose=i_am_main(ranks),constraint_names=[:Vol])
+    γ,verbose=i_am_main(ranks),constraint_names=[:Vol])
 
   # Do a few iterations
   vars, state = iterate(optimiser)
@@ -167,7 +169,9 @@ function main_3d(distribute,mesh_partition,;order)
   dVol(q,u,φ) = ∫(-1/vol_D*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
 
   ## Finite difference solver and level set function
-  ls_evo = HamiltonJacobiEvolution(FirstOrderStencil(3,Float64),model,V_φ,tol,max_steps)
+  evo = FiniteDifferenceEvolver(FirstOrderStencil(3,Float64),model,V_φ;max_steps)
+  reinit = FiniteDifferenceReinitialiser(FirstOrderStencil(3,Float64),model,V_φ;tol,γ_reinit)
+  ls_evo = LevelSetEvolution(evo,reinit)
 
   ## Setup solver and FE operators
   state_map = AffineFEStateMap(a,l,U,V,V_φ,φh)
@@ -180,7 +184,7 @@ function main_3d(distribute,mesh_partition,;order)
 
   ## Optimiser
   optimiser = AugmentedLagrangian(pcfs,ls_evo,vel_ext,φh;
-    γ,γ_reinit,verbose=i_am_main(ranks),constraint_names=[:Vol])
+    γ,verbose=i_am_main(ranks),constraint_names=[:Vol])
 
   # Do a few iterations
   vars, state = iterate(optimiser)

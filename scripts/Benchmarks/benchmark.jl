@@ -106,7 +106,7 @@ function nl_elast(mesh_partition,ranks,el_size,order,verbose)
   scheme = FirstOrderStencil(length(el_size),Float64)
   ls_evo = HamiltonJacobiEvolution(scheme,model,V_φ,tol,max_steps)
   # Optimiser
-  return AugmentedLagrangian(pcfs,ls_evo,vel_ext,φh;γ,γ_reinit,verbose)
+  return AugmentedLagrangian(pcfs,ls_evo,vel_ext,φh;γ,verbose)
 end
 
 function therm(mesh_partition,ranks,el_size,order,verbose)
@@ -184,7 +184,7 @@ function therm(mesh_partition,ranks,el_size,order,verbose)
   scheme = FirstOrderStencil(length(el_size),Float64)
   ls_evo = HamiltonJacobiEvolution(scheme,model,V_φ,tol,max_steps)
   # Optimiser
-  return AugmentedLagrangian(pcfs,ls_evo,vel_ext,φh;γ,γ_reinit,verbose)
+  return AugmentedLagrangian(pcfs,ls_evo,vel_ext,φh;γ,verbose)
 end
 
 function elast(mesh_partition,ranks,el_size,order,verbose)
@@ -260,7 +260,7 @@ function elast(mesh_partition,ranks,el_size,order,verbose)
   scheme = FirstOrderStencil(length(el_size),Float64)
   ls_evo = HamiltonJacobiEvolution(scheme,model,V_φ,tol,max_steps)
   # Optimiser
-  return AugmentedLagrangian(pcfs,ls_evo,vel_ext,φh;γ,γ_reinit,verbose)
+  return AugmentedLagrangian(pcfs,ls_evo,vel_ext,φh;γ,verbose)
 end
 
 function inverter_HPM(mesh_partition,ranks,el_size,order,verbose)
@@ -331,7 +331,9 @@ function inverter_HPM(mesh_partition,ranks,el_size,order,verbose)
   UΓ_out(u,φ) = ∫((u⋅-e₁-δₓ)/vol_Γ_out)dΓ_out
 
   ## Finite difference solver
-  ls_evo = HamiltonJacobiEvolution(FirstOrderStencil(3,Float64),model,V_φ,tol,max_steps)
+  evo = FiniteDifferenceEvolver(FirstOrderStencil(3,Float64),model,V_φ;max_steps)
+  reinit = FiniteDifferenceReinitialiser(FirstOrderStencil(3,Float64),model,V_φ;tol,γ_reinit)
+  ls_evo = LevelSetEvolution(evo,reinit)
 
   ## Setup solver and FE operators
   Tm = SparseMatrixCSR{0,PetscScalar,PetscInt}
@@ -357,7 +359,7 @@ function inverter_HPM(mesh_partition,ranks,el_size,order,verbose)
   )
 
   ## Optimiser
-  return HilbertianProjection(pcfs,ls_evo,vel_ext,φh;γ,γ_reinit,verbose=verbose)
+  return HilbertianProjection(pcfs,ls_evo,vel_ext,φh;γ,verbose=verbose)
 end
 
 with_mpi() do distribute
@@ -421,37 +423,47 @@ with_mpi() do distribute
     else
       bfwd = i_am_main(ranks) && zeros(NREPS)
     end
-    ## Benchmark advection
-    reinit!(optim.ls_evolver,optim.φ0,optim.params.γ_reinit)
-    if occursin("badv",BMARK_TYPE)
-      vh = interpolate(FEFunction(get_deriv_space(optim.problem.state_map),optim.problem.dJ),
-        get_aux_space(optim.problem.state_map))
-      v = get_free_dof_values(vh)
-      badv = benchmark_advection(optim.ls_evolver, get_free_dof_values(optim.φ0), v, 0.1, ranks; nreps=NREPS)
-    else
-      badv = i_am_main(ranks) && zeros(NREPS)
-    end
-    ## Benchmark velocity extension
-    if occursin("bvelext",BMARK_TYPE)
-      bvelext = benchmark_velocity_extension(optim.vel_ext, optim.problem.dJ, ranks; nreps=NREPS)
-    else
-      bvelext = i_am_main(ranks) && zeros(NREPS)
-    end
-    ## HPM
-    if occursin("bhpm",BMARK_TYPE)
-      @assert typeof(optim) <: HilbertianProjection
-      J, C, dJ, dC = Gridap.evaluate!(optim.problem,optim.φ0)
-      optim.projector,dJ,C,dC,optim.vel_ext.K
-      bhpm = benchmark_hilbertian_projection_map(optim.projector,dJ,C,dC,optim.vel_ext.K,ranks)
-    else
-      bhpm = i_am_main(ranks) && zeros(NREPS)
-    end
+
+    ######################################
+    ###               TODO
+    ### These methods are very out of date
+    ### and will not function with latest
+    ### releases. They must be reworked in
+    ### future.
+    ######################################
+    # ## Benchmark advection
+    # reinit!(optim.ls_evolver,optim.φ0,optim.params.γ_reinit)
+    # if occursin("badv",BMARK_TYPE)
+    #   vh = interpolate(FEFunction(get_deriv_space(optim.problem.state_map),optim.problem.dJ),
+    #     get_aux_space(optim.problem.state_map))
+    #   v = get_free_dof_values(vh)
+    #   badv = benchmark_advection(optim.ls_evolver, get_free_dof_values(optim.φ0), v, 0.1, ranks; nreps=NREPS)
+    # else
+    #   badv = i_am_main(ranks) && zeros(NREPS)
+    # end
+    # ## Benchmark velocity extension
+    # if occursin("bvelext",BMARK_TYPE)
+    #   bvelext = benchmark_velocity_extension(optim.vel_ext, optim.problem.dJ, ranks; nreps=NREPS)
+    # else
+    #   bvelext = i_am_main(ranks) && zeros(NREPS)
+    # end
+    # ## HPM
+    # if occursin("bhpm",BMARK_TYPE)
+    #   @assert typeof(optim) <: HilbertianProjection
+    #   J, C, dJ, dC = Gridap.evaluate!(optim.problem,optim.φ0)
+    #   optim.projector,dJ,C,dC,optim.vel_ext.K
+    #   bhpm = benchmark_hilbertian_projection_map(optim.projector,dJ,C,dC,optim.vel_ext.K,ranks)
+    # else
+    #   bhpm = i_am_main(ranks) && zeros(NREPS)
+    # end
     ## Write results
     if i_am_main(ranks)
       open(WRITE_DIR*NAME*".txt","w") do f
-        bcontent = "startup,bopt(0),bopt(1),bfwd,badv,breinit,bvelext,bhpm\n"
+        # bcontent = "startup,bopt(0),bopt(1),bfwd,badv,breinit,bvelext,bhpm\n"
+        bcontent = "startup,bopt(0),bopt(1),bfwd\n"
         for i = 1:NREPS
-          bcontent *= "$(bstart[i]),$(bopt0[i]),$(bopt1[i]),$(bfwd[i]),$(badv[i]),$(breinit[i]),$(bvelext[i]),$(bhpm[i])\n"
+          # bcontent *= "$(bstart[i]),$(bopt0[i]),$(bopt1[i]),$(bfwd[i]),$(badv[i]),$(breinit[i]),$(bvelext[i]),$(bhpm[i])\n"
+          bcontent *= "$(bstart[i]),$(bopt0[i]),$(bopt1[i]),$(bfwd[i])\n"
         end
         write(f,bcontent)
       end

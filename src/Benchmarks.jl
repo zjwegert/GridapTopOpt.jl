@@ -126,70 +126,78 @@ function benchmark_forward_problem(m::AbstractFEStateMap, φh, ranks; nreps = 10
   return benchmark(f, (m,φh), ranks; nreps, reset!)
 end
 
-"""
-    benchmark_advection(stencil::LevelSetEvolution, φ0, v0, γ, ranks; nreps)
+######################################
+###               TODO
+### These methods are very out of date
+### and will not function with latest
+### releases. They must be reworked in
+### future.
+######################################
 
-Benchmark solving the Hamilton-Jacobi evolution equation given a `stencil`,
-level-set function `φ0`, velocity function `v0`, and time step coefficient `γ`.
-See [`evolve!`](@ref) for input types.
-"""
-function benchmark_advection(stencil::LevelSetEvolution, φ0, v0, γ, ranks; nreps = 10)
-  function f(stencil,φ,v,γ)
-    evolve!(stencil,φ,v,γ)
-  end
-  function reset!(stencil,φ,v,γ)
-    copy!(φ,φ0)
-    copy!(v,v0)
-  end
-  φ = copy(φ0)
-  v = copy(v0)
-  return benchmark(f, (stencil,φ,v,γ), ranks; nreps, reset!)
-end
+# """
+#     benchmark_advection(stencil::LevelSetEvolution, φ0, v0, γ, ranks; nreps)
 
-"""
-    benchmark_reinitialisation(stencil::LevelSetEvolution, φ0, γ_reinit, ranks; nreps)
+# Benchmark solving the Hamilton-Jacobi evolution equation given a `stencil`,
+# level-set function `φ0`, velocity function `v0`, and time step coefficient `γ`.
+# See [`evolve!`](@ref) for input types.
+# """
+# function benchmark_advection(stencil::LevelSetEvolution, φ0, v0, γ, ranks; nreps = 10)
+#   function f(stencil,φ,v,γ)
+#     evolve!(stencil,φ,v,γ)
+#   end
+#   function reset!(stencil,φ,v,γ)
+#     copy!(φ,φ0)
+#     copy!(v,v0)
+#   end
+#   φ = copy(φ0)
+#   v = copy(v0)
+#   return benchmark(f, (stencil,φ,v,γ), ranks; nreps, reset!)
+# end
 
-Benchmark solving the reinitialisation equation given a `stencil`, level-set function
-`φ0`, and time step coefficient `γ`. See [`reinit!`](@ref) for input types.
-"""
-function benchmark_reinitialisation(stencil::LevelSetEvolution, φ0, γ_reinit, ranks; nreps = 10)
-  function f(stencil,φ,γ_reinit)
-    reinit!(stencil,φ,γ_reinit)
-  end
-  function reset!(stencil,φ,γ_reinit)
-    copy!(φ,φ0)
-  end
-  φ = copy(φ0)
-  return benchmark(f, (stencil,φ,γ_reinit), ranks; nreps, reset!)
-end
+# """
+#     benchmark_reinitialisation(stencil::LevelSetEvolution, φ0, γ_reinit, ranks; nreps)
 
-"""
-    benchmark_velocity_extension(ext::VelocityExtension, v0, ranks; nreps)
+# Benchmark solving the reinitialisation equation given a `stencil`, level-set function
+# `φ0`, and time step coefficient `γ`. See [`reinit!`](@ref) for input types.
+# """
+# function benchmark_reinitialisation(stencil::LevelSetEvolution, φ0, γ_reinit, ranks; nreps = 10)
+#   function f(stencil,φ,γ_reinit)
+#     reinit!(stencil,φ,γ_reinit)
+#   end
+#   function reset!(stencil,φ,γ_reinit)
+#     copy!(φ,φ0)
+#   end
+#   φ = copy(φ0)
+#   return benchmark(f, (stencil,φ,γ_reinit), ranks; nreps, reset!)
+# end
 
-Benchmark the Hilbertian velocity-extension method `ext` given a RHS `v0`.
-See [`project!`](@ref) for input types.
-"""
-function benchmark_velocity_extension(ext::VelocityExtension, v0, ranks; nreps = 10)
-  function f(ext,v)
-    project!(ext,v)
-  end
-  function reset!(ext,v)
-    copy!(v,v0)
-  end
-  v = copy(v0)
-  return benchmark(f, (ext,v), ranks; nreps, reset!)
-end
+# """
+#     benchmark_velocity_extension(ext::VelocityExtension, v0, ranks; nreps)
 
-"""
-    benchmark_hilbertian_projection_map(m::HilbertianProjectionMap, dV, C, dC, K, ranks; nreps)
+# Benchmark the Hilbertian velocity-extension method `ext` given a RHS `v0`.
+# See [`project!`](@ref) for input types.
+# """
+# function benchmark_velocity_extension(ext::VelocityExtension, v0, ranks; nreps = 10)
+#   function f(ext,v)
+#     project!(ext,v)
+#   end
+#   function reset!(ext,v)
+#     copy!(v,v0)
+#   end
+#   v = copy(v0)
+#   return benchmark(f, (ext,v), ranks; nreps, reset!)
+# end
 
-Benchmark `update_descent_direction!` for `HilbertianProjectionMap` given a objective
-sensitivity `dV`, constraint values C, constraint sensitivities `dC`, and stiffness
-matrix `K` for the velocity-extension.
-"""
-function benchmark_hilbertian_projection_map(m::HilbertianProjectionMap, dV, C, dC, K, ranks; nreps = 10)
-  function f(m,dV,C,dC,K)
-    update_descent_direction!(m,dV,C,dC,K)
-  end
-  return benchmark(f, (m,dV,C,dC,K), ranks; nreps)
-end
+# """
+#     benchmark_hilbertian_projection_map(m::HilbertianProjectionMap, dV, C, dC, K, ranks; nreps)
+
+# Benchmark `update_descent_direction!` for `HilbertianProjectionMap` given a objective
+# sensitivity `dV`, constraint values C, constraint sensitivities `dC`, and stiffness
+# matrix `K` for the velocity-extension.
+# """
+# function benchmark_hilbertian_projection_map(m::HilbertianProjectionMap, dV, C, dC, K, ranks; nreps = 10)
+#   function f(m,dV,C,dC,K)
+#     update_descent_direction!(m,dV,C,dC,K)
+#   end
+#   return benchmark(f, (m,dV,C,dC,K), ranks; nreps)
+# end

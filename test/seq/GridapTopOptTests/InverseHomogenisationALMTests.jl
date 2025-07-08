@@ -71,7 +71,9 @@ function main(;AD)
   dVol(q,u,φ) = ∫(-1/vol_D*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
 
   ## Finite difference solver and level set function
-  ls_evo = HamiltonJacobiEvolution(FirstOrderStencil(2,Float64),model,V_φ,tol,max_steps)
+  evo = FiniteDifferenceEvolver(FirstOrderStencil(2,Float64),model,V_φ;max_steps)
+  reinit = FiniteDifferenceReinitialiser(FirstOrderStencil(2,Float64),model,V_φ;tol,γ_reinit)
+  ls_evo = LevelSetEvolution(evo,reinit)
 
   ## Setup solver and FE operators
   state_map = RepeatingAffineFEStateMap(3,a,l,U,V,V_φ,φh)
@@ -88,7 +90,7 @@ function main(;AD)
 
   ## Optimiser
   optimiser = AugmentedLagrangian(pcfs,ls_evo,vel_ext,φh;
-    γ,γ_reinit,verbose=true,constraint_names=[:Vol])
+    γ,verbose=true,constraint_names=[:Vol])
 
   # Do a few iterations
   vars, state = iterate(optimiser)
