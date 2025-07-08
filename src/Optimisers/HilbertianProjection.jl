@@ -1,7 +1,7 @@
 # Projection map
 struct HilbertianProjectionMap{A}
   orthog  :: OrthogonalisationMap
-  vel_ext :: AbstractVelocityExtension{A}
+  vel_ext :: AbstractVelocityExtension
   caches
   params
   function HilbertianProjectionMap(
@@ -373,7 +373,7 @@ function _linesearch!(m::HilbertianProjection{WithAutoDiff},state,γ)
   while !done && (ls_it <= ls_max_iters)
     # Advect  & Reinitialise
     _,evo_cache = evolve!(m.ls_evolver,φ,vel,γ,evo_cache)
-    iszero(it % reinit_mod) && (_,reinit_cache = reinit!(m.ls_evolver,φ,reinit_cache))
+    iszero(it % reinit_mod) && (p,reinit_cache = reinit!(m.ls_evolver,φ,reinit_cache))
 
     ~ls_enabled && break
 
@@ -415,7 +415,7 @@ function _linesearch!(m::HilbertianProjection{NoAutoDiff},state,γ)
   while !done && (ls_it <= ls_max_iters)
     # Advect  & Reinitialise
     _,evo_cache = evolve!(m.ls_evolver,φ,vel,γ,evo_cache)
-    iszero(it % reinit_mod) && (_,reinit_cache = reinit!(m.ls_evolver,φ,reinit_cache))
+    iszero(it % reinit_mod) && (p,reinit_cache = reinit!(m.ls_evolver,φ,reinit_cache))
 
     # Check enabled
     if ~ls_enabled
