@@ -152,6 +152,6 @@ function reinit!(s::FiniteDifferenceReinitialiser{O},φ::Vector) where O
   return φ
 end
 
-function reinit!(s::FiniteDifferenceEvolver,φh,args...)
+function reinit!(s::FiniteDifferenceReinitialiser,φh,args...)
   reinit!(s,get_free_dof_values(φh),args...)
 end
