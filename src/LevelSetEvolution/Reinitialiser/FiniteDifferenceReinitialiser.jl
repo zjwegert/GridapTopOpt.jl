@@ -120,7 +120,7 @@ function reinit!(s::FiniteDifferenceReinitialiser{O},φ::PVector) where O
   return φ
 end
 
-function reinit!(s::HamiltonJacobiEvolution{O},φ::Vector) where O
+function reinit!(s::FiniteDifferenceReinitialiser{O},φ::Vector) where O
   φ_tmp, vel_tmp, perm_caches, stencil_cache = s.cache
   γ_reinit, Δ, isperiodic, ndof  = s.params.γ_reinit,s.params.Δ,s.params.isperiodic,s.params.ndof
   tol, max_steps, correct_ls = s.params.tol, s.params.max_steps_reinit, s.params.correct_ls
