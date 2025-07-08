@@ -76,7 +76,7 @@ function main(;order,AD)
   ls_evo = LevelSetEvolution(evo,reinit)
 
   ## Setup solver and FE operators
-  state_map = AffineFEStateMap(a,l,U,V,V_φ,φh)
+  state_map = AffineFEStateMap(a,l,U,V,V_φ)
   pcfs = if AD
     PDEConstrainedFunctionals(J,[Vol],state_map,analytic_dJ=dJ,analytic_dC=[dVol])
   else
@@ -171,7 +171,7 @@ function main_3d(;order)
   ls_evo = LevelSetEvolution(evo,reinit)
 
   ## Setup solver and FE operators
-  state_map = AffineFEStateMap(a,l,U,V,V_φ,φh)
+  state_map = AffineFEStateMap(a,l,U,V,V_φ)
   pcfs = PDEConstrainedFunctionals(J,[Vol],state_map,analytic_dJ=dJ,analytic_dC=[dVol])
 
   ## Hilbertian extension-regularisation problems

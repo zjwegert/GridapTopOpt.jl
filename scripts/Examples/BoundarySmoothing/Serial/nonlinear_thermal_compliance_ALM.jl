@@ -78,7 +78,7 @@ function main(path="./results/nonlinear_thermal_compliance_ALM/")
   ls_evo = LevelSetEvolution(evo,reinit)
 
   ## Setup solver and FE operators
-  state_map = NonlinearFEStateMap(res,U,V,V_φ,φh)
+  state_map = NonlinearFEStateMap(res,U,V,V_φ)
   pcfs = PDEConstrainedFunctionals(J,[Vol],state_map,analytic_dC=[dVol])
 
   ## Hilbertian extension-regularisation problems

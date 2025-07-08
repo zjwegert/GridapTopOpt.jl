@@ -135,6 +135,10 @@ function dRdφ(φ_to_u::AbstractFEStateMap,u::AbstractVector,v::AbstractVector,�
   return dRdφ(φ_to_u,uh,vh,φh)
 end
 
+function get_plb_cache(::AbstractFEStateMap)
+  @abstractmethod
+end
+
 """
     pullback(φ_to_u::AbstractFEStateMap,uh,φh,du;updated)
 
@@ -145,7 +149,7 @@ Compute `∂F∂u*dudφ` at `φh` and `uh` using the adjoint method. I.e., let
 and solve the adjoint problem `dRduᵀ*λ = ∂F∂uᵀ` using [`adjoint_solve!`](@ref).
 """
 function pullback(φ_to_u::AbstractFEStateMap,uh,φh,du;updated=false)
-  dudφ_vec, assem_deriv = φ_to_u.plb_caches
+  dudφ_vec, assem_deriv = get_plb_cache(φ_to_u)
   V_φ = get_deriv_space(φ_to_u)
 
   ## Adjoint Solve
@@ -186,6 +190,30 @@ end
 function ChainRulesCore.rrule(φ_to_u::AbstractFEStateMap,φ::AbstractVector)
   φh = FEFunction(get_aux_space(φ_to_u),φ)
   return ChainRulesCore.rrule(φ_to_u,φh)
+end
+
+## Caching
+mutable struct FEStateMapCache
+  cache_built::Bool
+  solvers::Tuple
+  fwd_cache::Tuple
+  adj_cache::Tuple
+  plb_cache::Tuple
+end
+
+function FEStateMapCache(fwd_solver,adjoint_solver)
+  FEStateMapCache(false,(fwd_solver,adjoint_solver),(),(),())
+end
+
+is_cache_built(c::FEStateMapCache) = c.cache_built
+
+"""
+    build_cache!(φ_to_u::AbstractFEStateMap,φh)
+
+Build the FEStateMapCache (see AffineFEStateMap for an example)
+"""
+function build_cache!(φ_to_u::AbstractFEStateMap,φh)
+  @abstractmethod
 end
 
 # IO

@@ -146,5 +146,5 @@ function StateParamIntegrandWithMeasure(args...)
 end
 function StateParamMap(
     F,U::FESpace,V_φ::FESpace,U_reg,assem_U::Assembler,assem_deriv::Assembler;kwargs...)
-  @error _msg_v0_3_0(StateParamMap)
+  error(_msg_v0_3_0(StateParamMap))
 end

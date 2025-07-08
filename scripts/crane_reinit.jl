@@ -37,22 +37,22 @@ Vx = TestFESpace(model,ReferenceFE(lagrangian,VectorValue{2,Float64},order))
 t = h^2
 A(u,v,φ) = ∫(u ⋅ v + t*(∇(u) ⊙ ∇(v)))dΩ
 L(v,φ) = ∫(Γ_n ⋅ v)dΓ
-φ_to_x = AffineFEStateMap(A,L,Vx,Vx,V_φ,φh)
+φ_to_x = AffineFEStateMap(A,L,Vx,Vx,V_φ)
 
 # Step 2
 _y(x) = -x/norm(x)
-x_to_y = AffineFEStateMap((u,v,x)->∫(u⋅v)dΩ,(v,x)->∫(v⋅(_y∘x))dΩ,Vx,Vx,Vx,zero(Vx))
+x_to_y = AffineFEStateMap((u,v,x)->∫(u⋅v)dΩ,(v,x)->∫(v⋅(_y∘x))dΩ,Vx,Vx,Vx)
 
 # Step 3
-γd = 20.0
+γd = 10.0
 A2(u,v,y) = ∫(∇(u)⋅∇(v))dΩ + ∫((γd/h)*v*u)dΓ
 L2(v,y) = ∫(v*(∇ ⋅ y))dΩ + ∫(-(n⋅y)*v)d∂Ω
-y_to_sdf = AffineFEStateMap(A2,L2,V_φ,V_φ,Vx,zero(Vx))
+y_to_sdf = AffineFEStateMap(A2,L2,V_φ,V_φ,Vx)
 
 function φ_to_sdf(φ)
   x   = φ_to_x(φ)
   y   = x_to_y(x)
-  sdf = y_to_sdf(y)
+  return y_to_sdf(y)
 end
 
 sdfh = FEFunction(V_φ,φ_to_sdf(get_free_dof_values(φh)))

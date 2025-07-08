@@ -75,7 +75,7 @@ function main(path="./results/inverse_homenisation_ALM/")
   ls_evo = LevelSetEvolution(evo,reinit)
 
   ## Setup solver and FE operators
-  state_map = RepeatingAffineFEStateMap(3,a,l,U,V,V_φ,φh)
+  state_map = RepeatingAffineFEStateMap(3,a,l,U,V,V_φ)
   pcfs = PDEConstrainedFunctionals(κ,[Vol],state_map;analytic_dJ=dκ,analytic_dC=[dVol])
 
   ## Hilbertian extension-regularisation problems

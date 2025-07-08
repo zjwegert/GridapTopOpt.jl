@@ -78,7 +78,7 @@ function main(distribute,mesh_partition;AD)
   ls_evo = LevelSetEvolution(evo,reinit)
 
   ## Setup solver and FE operators
-  state_map = RepeatingAffineFEStateMap(3,a,l,U,V,V_φ,φh)
+  state_map = RepeatingAffineFEStateMap(3,a,l,U,V,V_φ)
   pcfs = if AD
     PDEConstrainedFunctionals(κ,[Vol],state_map;analytic_dJ=dκ,analytic_dC=[dVol])
   else

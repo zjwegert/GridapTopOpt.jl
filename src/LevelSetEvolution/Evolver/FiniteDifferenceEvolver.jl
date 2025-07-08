@@ -106,7 +106,7 @@ function evolve!(s::FiniteDifferenceEvolver{O},φ::PVector,vel::PVector,γ,cache
   end
   φ = (O >= 2) ? permute_inv!(φ,_φ,s.perm) : _φ
   correct_ls && correct_ls!(φ)
-  return φ
+  return φ,cache
 end
 
 function evolve!(s::FiniteDifferenceEvolver{O},φ::Vector,vel::Vector,γ,cache) where O
@@ -127,9 +127,16 @@ function evolve!(s::FiniteDifferenceEvolver{O},φ::Vector,vel::Vector,γ,cache) 
   end
   φ = (O >= 2) ? permute_inv!(φ,_φ,s.perm) : _φ
   correct_ls && correct_ls!(φ)
-  return φ
+  return φ,cache
 end
 
+# Fix ambiguities
+function evolve!(m::FiniteDifferenceEvolver{O},φ::Vector,vel::Vector,γ,::Nothing) where O
+  evolve!(m,φ,vel,γ)
+end
+function evolve!(m::FiniteDifferenceEvolver{O},φ::PVector,vel::PVector,γ,::Nothing) where O
+  evolve!(m,φ,vel,γ)
+end
 function evolve!(s::FiniteDifferenceEvolver,φh,velh,args...)
   evolve!(s,get_free_dof_values(φh),get_free_dof_values(velh),args...)
 end

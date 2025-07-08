@@ -178,7 +178,7 @@ state_collection = EmbeddedCollection_in_φh(model,φh) do _φh
   update_collection!(Ωs,_φh)
   V = TestFESpace(Ωs.Ωact,reffe_scalar;dirichlet_tags=["Omega_D"])
   U = TrialFESpace(V,0.0)
-  state_map = AffineFEStateMap(a,l,U,V,V_φ,U_reg,_φh)
+  state_map = AffineFEStateMap(a,l,U,V,V_φ,U_reg)
   (;
     :state_map => state_map,
     :J => StateParamMap(J,state_map),

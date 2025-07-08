@@ -201,8 +201,10 @@ function Base.iterate(m::AugmentedLagrangian,state)
   end
 
   V_φ = get_ls_space(m.ls_evolver)
-  _,evo_cache = evolve!(m.ls_evolver,φh,dL,γ,evo_cache)
-  iszero(it % reinit_mod) && (p,reinit_cache = reinit!(m.ls_evolver,φh,reinit_cache))
+  _,evo_cache = evolve!(m.ls_evolver,get_free_dof_values(φh),dL,γ,evo_cache)
+  if iszero(it % reinit_mod)
+    _,reinit_cache = reinit!(m.ls_evolver,φh,reinit_cache)
+  end
 
   ## Calculate objective, constraints, and shape derivatives
   J, C, dJ, dC = evaluate!(m.problem,φh)

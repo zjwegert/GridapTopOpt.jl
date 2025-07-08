@@ -82,7 +82,7 @@ function nl_elast(mesh_partition,ranks,el_size,order,verbose)
   lin_solver = ElasticitySolver(V)
   nl_solver = NewtonSolver(lin_solver;maxiter=50,rtol=10^-8,verbose)
   state_map = NonlinearFEStateMap(
-    res,U,V,V_φ,φh;
+    res,U,V,V_φ;
     assem_U = SparseMatrixAssembler(Tm,Tv,U,V),
     assem_adjoint = SparseMatrixAssembler(Tm,Tv,V,U),
     assem_deriv = SparseMatrixAssembler(Tm,Tv,V_φ,V_φ),
@@ -158,7 +158,7 @@ function therm(mesh_partition,ranks,el_size,order,verbose)
   Tv = Vector{PetscScalar}
   solver = PETScLinearSolver()
   state_map = AffineFEStateMap(
-    a,l,U,V,V_φ,φh;
+    a,l,U,V,V_φ;
     assem_U = SparseMatrixAssembler(Tm,Tv,U,V),
     assem_adjoint = SparseMatrixAssembler(Tm,Tv,V,U),
     assem_deriv = SparseMatrixAssembler(Tm,Tv,V_φ,V_φ),
@@ -234,7 +234,7 @@ function elast(mesh_partition,ranks,el_size,order,verbose)
   Tv = Vector{PetscScalar}
   solver = ElasticitySolver(V)
   state_map = AffineFEStateMap(
-    a,l,U,V,V_φ,φh;
+    a,l,U,V,V_φ;
     assem_U = SparseMatrixAssembler(Tm,Tv,U,V),
     assem_adjoint = SparseMatrixAssembler(Tm,Tv,V,U),
     assem_deriv = SparseMatrixAssembler(Tm,Tv,V_φ,V_φ),
@@ -341,7 +341,7 @@ function inverter_HPM(mesh_partition,ranks,el_size,order,verbose)
   solver = ElasticitySolver(V)
 
   state_map = AffineFEStateMap(
-    a,l,U,V,V_φ,φh;
+    a,l,U,V,V_φ;
     assem_U = SparseMatrixAssembler(Tm,Tv,U,V),
     assem_adjoint = SparseMatrixAssembler(Tm,Tv,V,U),
     assem_deriv = SparseMatrixAssembler(Tm,Tv,V_φ,V_φ),

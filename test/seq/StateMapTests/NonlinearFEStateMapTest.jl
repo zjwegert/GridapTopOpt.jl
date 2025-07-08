@@ -31,7 +31,7 @@ function main(verbose)
   # Create operator from components
   lsolver = LUSolver()
   solver = NewtonSolver(lsolver;rtol=1.e-10,verbose)
-  φ_to_u = NonlinearFEStateMap(r,U,V,V_φ,φh;nls=solver)
+  φ_to_u = NonlinearFEStateMap(r,U,V,V_φ;nls=solver)
 
   ## Test solution
   GridapTopOpt.forward_solve!(φ_to_u,φh)

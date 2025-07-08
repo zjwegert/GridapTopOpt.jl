@@ -93,7 +93,7 @@ function main(distribute,mesh_partition)
     update_collection!(Ωs,_φh)
     V = TestFESpace(Ωs.Ωact,reffe_scalar;dirichlet_tags=["Omega_D"])
     U = TrialFESpace(V,0.0)
-    state_map = AffineFEStateMap(a,l,U,V,V_φ,_φh)
+    state_map = AffineFEStateMap(a,l,U,V,V_φ)
     (;
       :state_map => state_map,
       :J => StateParamMap(J,state_map),

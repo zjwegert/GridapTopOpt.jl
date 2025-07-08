@@ -58,10 +58,8 @@ function main(model)
     _a2(u2,v2,(u1,φ)) = a2((u1,),u2,v2,φ)
     _l2(v2,(u1,φ)) = l2((u1,),v2,φ)
     # StateMaps
-    φ_to_u1 = AffineFEStateMap(_a1,_l1,U1,V,V_φ,φh)
-    u1φ_to_u2 = AffineFEStateMap(_a2,_l2,U2,V,V_u1φ,interpolate([1,φh],V_u1φ))
-      # note, interpolate([1,φh],V_u1φ) is choosen because the assembled matrix
-      #  is non-singular for these inputs.
+    φ_to_u1 = AffineFEStateMap(_a1,_l1,U1,V,V_φ)
+    u1φ_to_u2 = AffineFEStateMap(_a2,_l2,U2,V,V_u1φ)
     # StateParamMap
     _F = GridapTopOpt.StateParamMap(F,U_u1u2,V_φ,assem_U,assem_V_φ)
 

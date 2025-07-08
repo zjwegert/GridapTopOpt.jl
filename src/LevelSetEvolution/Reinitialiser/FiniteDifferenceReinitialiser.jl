@@ -80,15 +80,15 @@ end
 function reinit!(s::FiniteDifferenceReinitialiser{O},φ::AbstractVector) where O
   # Create caches
   stencil,perm,ndof=s.stencil,s.perm,s.params.ndof
-  cache  = allocate_caches(stencil,φ,vel,perm,O,ndof)
+  cache  = allocate_caches(stencil,φ,φ,perm,O,ndof)
   # Evolve
-  reinit!(s,φ,vel,cache)
+  reinit!(s,φ,cache)
 end
 
-function reinit!(s::FiniteDifferenceReinitialiser{O},φ::PVector) where O
-  φ_tmp, vel_tmp, perm_caches, stencil_cache = s.cache
+function reinit!(s::FiniteDifferenceReinitialiser{O},φ::PVector,cache) where O
+  φ_tmp, vel_tmp, perm_caches, stencil_cache = cache
   γ_reinit, Δ, isperiodic, ndof  = s.params.γ_reinit,s.params.Δ,s.params.isperiodic,s.params.ndof
-  tol, max_steps, correct_ls = s.params.tol, s.params.max_steps_reinit, s.params.correct_ls
+  tol, max_steps, correct_ls = s.params.tol, s.params.max_steps, s.params.correct_ls
 
   _φ = (O >= 2) ? permute!(perm_caches[1],φ,s.perm) : φ
 
@@ -117,13 +117,13 @@ function reinit!(s::FiniteDifferenceReinitialiser{O},φ::PVector) where O
   end
   φ = (O >= 2) ? permute_inv!(φ,_φ,s.perm) : _φ
   correct_ls && correct_ls!(φ)
-  return φ
+  return φ,cache
 end
 
-function reinit!(s::FiniteDifferenceReinitialiser{O},φ::Vector) where O
-  φ_tmp, vel_tmp, perm_caches, stencil_cache = s.cache
+function reinit!(s::FiniteDifferenceReinitialiser{O},φ::Vector,cache) where O
+  φ_tmp, vel_tmp, perm_caches, stencil_cache = cache
   γ_reinit, Δ, isperiodic, ndof  = s.params.γ_reinit,s.params.Δ,s.params.isperiodic,s.params.ndof
-  tol, max_steps, correct_ls = s.params.tol, s.params.max_steps_reinit, s.params.correct_ls
+  tol, max_steps, correct_ls = s.params.tol, s.params.max_steps, s.params.correct_ls
 
   _φ = (O >= 2) ? permute!(perm_caches[1],φ,s.perm) : φ
 
@@ -149,7 +149,7 @@ function reinit!(s::FiniteDifferenceReinitialiser{O},φ::Vector) where O
   end
   φ = (O >= 2) ? permute_inv!(φ,_φ,s.perm) : _φ
   correct_ls && correct_ls!(φ)
-  return φ
+  return φ,cache
 end
 
 function reinit!(s::FiniteDifferenceReinitialiser,φh,args...)

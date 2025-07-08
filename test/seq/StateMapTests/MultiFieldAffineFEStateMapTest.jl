@@ -31,7 +31,7 @@ function main(verbose)
   l1((v1,v2),φ) = ∫(rhs[1] * v1 + v2*rhs[2])dΩ
 
   # Create operator from components
-  φ_to_u = AffineFEStateMap(a1,l1,UB,VB,V_φ,φh)
+  φ_to_u = AffineFEStateMap(a1,l1,UB,VB,V_φ)
 
   # Test solution
   GridapTopOpt.forward_solve!(φ_to_u,φh)

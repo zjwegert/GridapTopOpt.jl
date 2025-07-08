@@ -89,12 +89,6 @@ function get_ls_space(s::CutFEMEvolver)
   s.space
 end
 
-function evolve!(s::CutFEMEvolver,φ::AbstractVector,vel::AbstractVector,args...)
-  φh = FEFunction(get_ls_space(s),φ)
-  velh = FEFunction(get_ls_space(s),vel)
-  evolve!(s,φh,velh,args...)
-end
-
 function evolve!(s::CutFEMEvolver,φh,velh,γ)
   ode_solver = s.ode_solver
   params = s.params
@@ -130,8 +124,19 @@ function evolve!(s::CutFEMEvolver,φh,velh,γ)
   return get_free_dof_values(φh), cache
 end
 
+# Avoid ambiguities
 function evolve!(s::CutFEMEvolver,φh,velh,γ,::Nothing)
   evolve!(s,φh,velh,γ)
+end
+function evolve!(s::CutFEMEvolver,φ::AbstractVector,vel::AbstractVector,γ,::Nothing)
+  φh = FEFunction(get_ls_space(s),φ)
+  velh = FEFunction(get_ls_space(s),vel)
+  evolve!(s,φh,velh,γ,nothing)
+end
+function evolve!(s::CutFEMEvolver,φ::AbstractVector,vel::AbstractVector,args...)
+  φh = FEFunction(get_ls_space(s),φ)
+  velh = FEFunction(get_ls_space(s),vel)
+  evolve!(s,φh,velh,args...)
 end
 
 ## Disabled due to above

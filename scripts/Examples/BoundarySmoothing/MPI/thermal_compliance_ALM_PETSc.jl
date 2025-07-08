@@ -83,7 +83,7 @@ function main(mesh_partition,distribute,el_size,path)
   solver = PETScLinearSolver()
 
   state_map = AffineFEStateMap(
-    a,l,U,V,V_φ,φh;
+    a,l,U,V,V_φ;
     assem_U = SparseMatrixAssembler(Tm,Tv,U,V),
     assem_adjoint = SparseMatrixAssembler(Tm,Tv,V,U),
     assem_deriv = SparseMatrixAssembler(Tm,Tv,V_φ,V_φ),

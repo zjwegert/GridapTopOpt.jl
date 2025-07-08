@@ -373,7 +373,9 @@ function _linesearch!(m::HilbertianProjection{WithAutoDiff},state,γ)
   while !done && (ls_it <= ls_max_iters)
     # Advect  & Reinitialise
     _,evo_cache = evolve!(m.ls_evolver,φ,vel,γ,evo_cache)
-    iszero(it % reinit_mod) && (p,reinit_cache = reinit!(m.ls_evolver,φ,reinit_cache))
+    if iszero(it % reinit_mod)
+      _,reinit_cache = reinit!(m.ls_evolver,φ,reinit_cache)
+    end
 
     ~ls_enabled && break
 
@@ -415,7 +417,9 @@ function _linesearch!(m::HilbertianProjection{NoAutoDiff},state,γ)
   while !done && (ls_it <= ls_max_iters)
     # Advect  & Reinitialise
     _,evo_cache = evolve!(m.ls_evolver,φ,vel,γ,evo_cache)
-    iszero(it % reinit_mod) && (p,reinit_cache = reinit!(m.ls_evolver,φ,reinit_cache))
+    if iszero(it % reinit_mod)
+      _,reinit_cache = reinit!(m.ls_evolver,φ,reinit_cache)
+    end
 
     # Check enabled
     if ~ls_enabled

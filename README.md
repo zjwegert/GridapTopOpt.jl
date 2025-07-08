@@ -6,7 +6,7 @@ GridapTopOpt is computational toolbox for level set-based topology optimisation 
 
 > Wegert, Z.J., Manyer, J., Mallon, C.N. et al. GridapTopOpt.jl: a scalable Julia toolbox for level set-based topology optimisation. Struct Multidisc Optim 68, 22 (2025). [https://doi.org/10.1007/s00158-024-03927-3](https://doi.org/10.1007/s00158-024-03927-3)
 
-*Please note, there have been several breaking releases since the above publication was first submitted, please see [Breaking Releases](https://zjwegert.github.io/GridapTopOpt.jl/stable/breaking-changes/) for a breakdown of these.*
+_Please note, there have been several breaking releases since the above publication was first submitted, please see [Breaking Releases](https://zjwegert.github.io/GridapTopOpt.jl/stable/breaking-changes/) for a breakdown of these._
 
 ## Documentation
 

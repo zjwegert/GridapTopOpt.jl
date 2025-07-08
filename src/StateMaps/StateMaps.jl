@@ -43,9 +43,19 @@ end
 
 # Backwards compat msgs
 _msg_v0_3_0(a) = """
-  Inclusion of `U_reg` in the arguments of $a has been deprecated
-  in v0.3.0 and derivatives are now on the correct tangent space (V_φ). See
-  patch notes for futher information. Please remove U_reg from your arguments.
+  - Inclusion of `U_reg` in the arguments of $a has been deprecated in v0.3.0
+    and derivatives are now on the correct tangent space (V_φ). See patch notes
+    for futher information.
+  - Inclusion of φh in the arguments of $a has been deprecated in v0.4.0.
+
+  Please remove U_reg and φh from your arguments.
+
+  This method will be removed in a future release.
+"""
+_msg_v0_4_0(a) = """
+  Inclusion of φh in the arguments of $a has been deprecated in v0.4.0.
+
+  Please remove φh from your arguments.
 
   This method will be removed in a future release.
 """
