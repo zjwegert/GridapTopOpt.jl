@@ -99,6 +99,7 @@ export FiniteDifferenceReinitialiser
 export CutFEMEvolver
 export IdentityReinitialiser
 export StabilisedReinitialiser
+export MultiStageStabilisedReinitialiser
 export ArtificialViscosity
 export InteriorPenalty
 export HeatReinitialiser

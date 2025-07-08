@@ -43,7 +43,7 @@ function main(distribute,mesh_partition)
   reinit2 = StabilisedReinitialiser(V_φ,Ωs,dΩ,h;
     stabilisation_method=InteriorPenalty(V_φ),
     nls = GridapSolvers.NewtonSolver(LUSolver();maxiter=50,rtol=1.e-14,verbose=i_am_main(ranks)))
-  ls_reinit = GridapTopOpt.MultiStageStabilisedReinit([reinit1,reinit2])
+  ls_reinit = GridapTopOpt.MultiStageStabilisedReinitialiser([reinit1,reinit2])
   evo = LevelSetEvolution(ls_evo,ls_reinit)
   reinit!(evo,φh);
 
