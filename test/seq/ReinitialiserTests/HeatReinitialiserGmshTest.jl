@@ -19,7 +19,7 @@ function main_gmsh(;vtk=false)
   a = 0.3;
   b = 0.01;
 
-  model = GmshDiscreteModel(pathof(GridapTopOpt)*"/../../test/meshes/mesh_finer.msh")
+  model = GmshDiscreteModel((@__DIR__)*"/../../meshes/mesh_finer.msh")
   vtk && writevtk(model,path*"model")
 
   # Cut the background model
