@@ -65,14 +65,14 @@ function main(;vtk=false)
 
   val, grad = GridapTopOpt.val_and_jacobian(φ_to_E,get_free_dof_values(φh))
 
-  function φ_to_E(φ)
+  function φ_to_E_fd(φ)
     update_collection!(reinit_method.Ωs,FEFunction(V_φ,φ))
     update_collection!(_Ωs,FEFunction(V_φ,φ))
     sdf = φ_to_sdf(φ)
     E(sdf,φ)/1e-8
   end
 
-  fdm_grad = FiniteDiff.finite_difference_gradient(φ_to_E, get_free_dof_values(φh))
+  fdm_grad = FiniteDiff.finite_difference_gradient(φ_to_E_fd, get_free_dof_values(φh))
   rel_error = norm(grad[1][1] - fdm_grad, Inf)/norm(fdm_grad,Inf)
   @test rel_error < 1e-6
   vtk && writevtk(Ω,"results/crane_sdf",cellfields=["φh_old"=>φh_old,"φh"=>φh,"|∇(φh)|"=>(norm ∘ ∇(φh)),
