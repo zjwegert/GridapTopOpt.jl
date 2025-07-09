@@ -208,11 +208,11 @@ end
 is_cache_built(c::FEStateMapCache) = c.cache_built
 
 """
-    build_cache!(φ_to_u::AbstractFEStateMap,φh)
+    build_cache!(::AbstractFEStateMap,φh)
 
 Build the FEStateMapCache (see AffineFEStateMap for an example)
 """
-function build_cache!(φ_to_u::AbstractFEStateMap,φh)
+function build_cache!(::AbstractFEStateMap,φh)
   @abstractmethod
 end
 

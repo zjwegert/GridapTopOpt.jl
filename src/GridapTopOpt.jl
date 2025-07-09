@@ -39,7 +39,7 @@ using GridapSolvers.BlockSolvers: combine_fespaces, get_solution
 using GridapEmbedded
 using GridapEmbedded.LevelSetCutters, GridapEmbedded.Interfaces
 using GridapEmbedded.Interfaces: SubFacetData, SubCellTriangulation, SubFacetTriangulation
-using GridapEmbedded.LevelSetCutters: DifferentiableTriangulation
+using GridapEmbedded.LevelSetCutters: DifferentiableTriangulation, update_trian!
 
 using Zygote
 using JLD2: save_object, load_object, jldsave
@@ -103,6 +103,7 @@ export MultiStageStabilisedReinitialiser
 export ArtificialViscosity
 export InteriorPenalty
 export HeatReinitialiser
+export get_lsf_to_sdf_map
 
 # For backwards compat/errors
 export CutFEMEvolve
@@ -132,5 +133,7 @@ export psave, pload, pload!
 
 include("Extensions/ZygoteExtensions.jl")
 export combine_fields
+
+include("Extensions/GridapEmbeddedExtensions.jl")
 
 end

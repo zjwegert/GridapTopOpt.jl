@@ -1,4 +1,4 @@
-module UnfittedEvolutionTestsMPI
+module EvolverTestsMPI
 
 using Test
 using MPI
