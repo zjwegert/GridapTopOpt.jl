@@ -1,7 +1,7 @@
 name = "GridapTopOpt"
 uuid = "27dd0110-1916-4fd6-8b4b-1bc109db1170"
 authors = ["Zachary Wegert <zach.wegert@hdr.qut.edu.au>", "Jordi Manyer <jordi.manyer@monash.edu>", "Connor Mallon <connor.mallon@qut.edu.au>", "Santiago Badia <santiago.badia@monash.edu>", "Vivien Challis <vivien.challis@qut.edu.au>"]
-version = "0.3.0"
+version = "0.4.0"
 
 [deps]
 BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"

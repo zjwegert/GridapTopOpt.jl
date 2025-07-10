@@ -23,7 +23,7 @@ end
 """
     struct LevelSetEvolution{A,B} <: AbstractLevelSetEvolution
 
-
+A wrapper to hold a level-set evolver and reinitialiser.
 """
 struct LevelSetEvolution{A,B} <: AbstractLevelSetEvolution
   evolver       :: A

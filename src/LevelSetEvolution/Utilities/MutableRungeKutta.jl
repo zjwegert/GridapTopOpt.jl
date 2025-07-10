@@ -8,7 +8,7 @@ import Gridap.ODEs: allocate_odecache,ode_march!,allocate_odecache,
 # MutableDIMRungeKutta #
 ########################
 """
-    struct MutableDIMRungeKutta <: ODESolver end
+    mutable struct MutableDIMRungeKutta <: ODESolver end
 
 Diagonally-implicit Runge-Kutta ODE solver.
 ```
@@ -21,6 +21,7 @@ vx = x,
 u_(n+1) = u_n + dt * ∑_{1 ≤ i ≤ s} b[i] * slopes[i].
 ```
 """
+#
 mutable struct MutableDIMRungeKutta <: ODESolver
   sysslvr_nl::NonlinearSolver
   sysslvr_l::NonlinearSolver
