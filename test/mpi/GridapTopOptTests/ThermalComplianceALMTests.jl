@@ -14,7 +14,7 @@ using Gridap, Gridap.MultiField, GridapDistributed, GridapPETSc, GridapSolvers,
           ⎡u∈V=H¹(Ω;u(Γ_D)=0),
           ⎣∫ κ*∇(u)⋅∇(v) dΩ = ∫ v dΓ_N, ∀v∈V.
 """
-function main(distribute,mesh_partition;order,AD)
+function main(distribute,mesh_partition;order,AD,use_l=false)
   ranks = distribute(LinearIndices((prod(mesh_partition),)))
   ## Parameters
   xmax = ymax = 1.0
@@ -67,6 +67,11 @@ function main(distribute,mesh_partition;order,AD)
   l(v,φ) = ∫(v)dΓ_N
 
   ## Optimisation functionals
+  J(u,φ) = if use_l
+    ∫(u)dΓ_N
+  else
+    ∫((I ∘ φ)*κ*∇(u)⋅∇(u))dΩ
+  end
   J(u,φ) = ∫((I ∘ φ)*κ*∇(u)⋅∇(u))dΩ
   dJ(q,u,φ) = ∫(κ*∇(u)⋅∇(u)*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ;
   Vol(u,φ) = ∫(((ρ ∘ φ) - vf)/vol_D)dΩ;
@@ -197,6 +202,7 @@ with_mpi() do distribute
   @test main(distribute,(2,2);order=1,AD=true)
   @test main(distribute,(2,2);order=2,AD=true)
   @test main(distribute,(2,2);order=1,AD=false)
+  @test main(distribute,(2,2);order=1,AD=false,use_l=true) # Issue #46
   @test main_3d(distribute,(2,2,1);order=1)
 end
 

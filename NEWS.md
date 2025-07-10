@@ -20,7 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Disabled out-of-date methods in Benchmarks.
 - Overhauled Breaking Changes section of Docs
 
-## [0.3.0] - 2025-7-3
+## [0.3.0] - 2025-7-4
 
 ### Added
 - Backwards AD via Zygote is now supported in serial and parallel. As of PR[#81](https://github.com/zjwegert/GridapTopOpt.jl/pull/80).
@@ -29,6 +29,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - StateMaps now always differentiate into a consistent space. As of PR[#81](https://github.com/zjwegert/GridapTopOpt.jl/pull/80).
 - Removed `U_reg` space from StateMaps. As of PR[#81](https://github.com/zjwegert/GridapTopOpt.jl/pull/80).
 - Refactored allocation of vectors in distributed. As of PR[#81](https://github.com/zjwegert/GridapTopOpt.jl/pull/80).
+
+### Fixed
+- Resolved Issue[#46](https://github.com/zjwegert/GridapTopOpt.jl/issues/46)
 
 ## [0.2.2] - 2025-6-19
 
