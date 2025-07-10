@@ -45,7 +45,7 @@ function main(;verbose,analytic_partials)
   op = StaggeredAffineFEOperator([a1,a2],[l1,l2],[UB1,UB2],[VB1,VB2])
 
   if analytic_partials
-    ∂R2∂xh1((du1,du2),((u1,u2),),u3,v3,φ) = ∫(φ * (du1 + du2) * u3 * v3)dΩ2 - ∫(φ * φ * rhs[3] * (du1 + du2) * v3)dΩ2
+    ∂R2∂xh1((du1,du2),((u1,u2),),u3,v3,φ) = ∫(φ * (du1*1 + du2) * u3 * v3)dΩ2 - ∫(φ * φ * rhs[3] * (du1*1 + du2) * v3)dΩ2
     ∂Rk∂xhi = ((∂R2∂xh1,),)
     φ_to_u = StaggeredAffineFEStateMap(op,∂Rk∂xhi,V_φ,φh)
   else
@@ -69,7 +69,7 @@ function main(;verbose,analytic_partials)
   F(((u1,u2),u3),φ) = ∫(u1 + u2 + u3 + φ)dΩ
 
   if analytic_partials
-    ∂F∂u12((du1,du2),((u1,u2),u3),φ) = ∫(du1 + du2)dΩ
+    ∂F∂u12((du1,du2),((u1,u2),u3),φ) = ∫(du1*1 + du2)dΩ
     ∂F∂u3(du3,((u1,u2),u3),φ) = ∫(du3)dΩ
     pcf = PDEConstrainedFunctionals(F,(∂F∂u12,∂F∂u3),φ_to_u)
   else
