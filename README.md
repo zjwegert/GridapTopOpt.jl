@@ -6,6 +6,24 @@ GridapTopOpt is computational toolbox for level set-based topology optimisation 
 
 > Wegert, Z.J., Manyer, J., Mallon, C.N. et al. GridapTopOpt.jl: a scalable Julia toolbox for level set-based topology optimisation. Struct Multidisc Optim 68, 22 (2025). [https://doi.org/10.1007/s00158-024-03927-3](https://doi.org/10.1007/s00158-024-03927-3)
 
+## Getting Started
+
+Any additional dependencies along with GridapTopOpt can be installed in an existing Julia environment using Julia REPL. Follow these steps:
+
+- Open Julia REPL.
+- Press `]` to enter package mode.
+- Then run the following command:
+
+```julia
+add GridapTopOpt, Gridap, GridapDistributed, GridapPETSc, GridapSolvers, PartitionedArrays, SparseMatricesCSR
+```
+
+Once installed, use the package with this command:
+
+```julia
+using GridapTopOpt
+```
+
 ## Documentation
 
 - [**STABLE**](https://zjwegert.github.io/GridapTopOpt.jl/stable) &mdash; **Documentation for the most recently tagged version.**
