@@ -134,6 +134,4 @@ export psave, pload, pload!
 include("Extensions/ZygoteExtensions.jl")
 export combine_fields
 
-include("Extensions/GridapEmbeddedExtensions.jl")
-
 end
