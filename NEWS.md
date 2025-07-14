@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.4.0] - 2025-7-??
+## [0.4.0] - 2025-7-15
 
 ### Added
 - Added `Evolver` and `Reinitialiser` as part of full `LevelSetEvolution` refactor.
@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - Refactored caching in StateMaps to remove constructor dependence on primal variable.
+- Refactored `LevelSetEvolution` to split evolution and reinitialisation method.
 - Deprecated `γ_reinit` from optimiser options.
 - Deprecated `StateParamIntegrandWithMeasure` with an error.
 - Warning when passing `U_reg` to state maps has been replaced with an error to fully deprecate methods.
