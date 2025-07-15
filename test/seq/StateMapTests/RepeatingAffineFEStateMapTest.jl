@@ -29,7 +29,7 @@ function main(verbose)
   l2(v1,φ) = ∫(φ * φ * rhs * v1)dΩ
 
   # Create operator from components
-  φ_to_u = RepeatingAffineFEStateMap(2,a1,[l1,l2],U,V,V_φ,φh)
+  φ_to_u = RepeatingAffineFEStateMap(2,a1,[l1,l2],U,V,V_φ)
 
   # Test solution
   GridapTopOpt.forward_solve!(φ_to_u,φh)

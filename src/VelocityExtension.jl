@@ -56,9 +56,6 @@ struct VelocityExtension{A,B,C} <: AbstractVelocityExtension
   cache :: C
 end
 
-## TODO: In future, I want the cache to be an output of project!, like
-#        the rest of Gridap.
-
 """
     VelocityExtension(biform,U_reg,V_reg;assem,ls)
 

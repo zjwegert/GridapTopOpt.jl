@@ -71,10 +71,12 @@ function main(;order,AD_case)
   dVol(q,u,φ) = ∫(-1/vol_D*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
 
   ## Finite difference solver and level set function
-  ls_evo = HamiltonJacobiEvolution(FirstOrderStencil(2,Float64),model,V_φ,tol,max_steps)
+  evo = FiniteDifferenceEvolver(FirstOrderStencil(2,Float64),model,V_φ;max_steps)
+  reinit = FiniteDifferenceReinitialiser(FirstOrderStencil(2,Float64),model,V_φ;tol,γ_reinit)
+  ls_evo = LevelSetEvolution(evo,reinit)
 
   ## Setup solver and FE operators
-  state_map = AffineFEStateMap(a,l,U,V,V_φ,φh)
+  state_map = AffineFEStateMap(a,l,U,V,V_φ)
   pcfs = if AD_case == :no_ad
     PDEConstrainedFunctionals(J,[Vol],state_map,analytic_dJ=dJ,analytic_dC=[dVol])
   elseif AD_case == :with_ad
@@ -85,7 +87,7 @@ function main(;order,AD_case)
     PDEConstrainedFunctionals(J,[Vol],state_map,analytic_dC=[dVol])
   elseif AD_case == :custom_pcf
     objective = GridapTopOpt.StateParamMap(J,state_map)
-    constraints = map(Ci -> GridapTopOpt.StateParamIntegrandWithMeasure(Ci,state_map),[Vol])
+    constraints = map(Ci -> GridapTopOpt.StateParamMap(Ci,state_map),[Vol])
     function φ_to_jc(φ)
       u = state_map(φ)
       j = objective(u,φ)
@@ -95,7 +97,7 @@ function main(;order,AD_case)
     CustomPDEConstrainedFunctionals(φ_to_jc,length(constraints);state_map)
   elseif AD_case == :custom_pcf_analyticVol
     objective = GridapTopOpt.StateParamMap(J,state_map)
-    constraints = map(Ci -> GridapTopOpt.StateParamIntegrandWithMeasure(Ci,state_map),[Vol])
+    constraints = map(Ci -> GridapTopOpt.StateParamMap(Ci,state_map),[Vol])
     function φ_to_jc2(φ)
       u = state_map(φ)
       j = objective(u,φ)
@@ -122,7 +124,7 @@ function main(;order,AD_case)
 
   ## Optimiser
   optimiser = HilbertianProjection(pcfs,ls_evo,vel_ext,φh;
-    γ,γ_reinit,verbose=true,constraint_names=[:Vol])
+    γ,verbose=true,constraint_names=[:Vol])
 
   AD_case ∈ (:with_ad,:partial_ad1,:partial_ad2) && @test typeof(optimiser) <: HilbertianProjection{WithAutoDiff}
   AD_case ∈ (:no_ad,) && @test typeof(optimiser) <: HilbertianProjection{NoAutoDiff}

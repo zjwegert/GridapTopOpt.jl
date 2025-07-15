@@ -41,9 +41,9 @@ where `A_k` and `b_k` only depend on the previous variables `u_1,...,u_{k-1}`.
     l2(v2,(u1,φ)) = ...
 
     ## Build StateMaps
-    φ_to_u1 = AffineFEStateMap(a1,l1,U1,V,V_φ,φh)
+    φ_to_u1 = AffineFEStateMap(a1,l1,U1,V,V_φ)
     # u1φ_to_u2 has a MultiFieldFESpace V_u1φ of primal vars
-    u1φ_to_u2 = AffineFEStateMap(a2,l2,U2,V,V_u1φ,interpolate([1,φh],V_u1φ))
+    u1φ_to_u2 = AffineFEStateMap(a2,l2,U2,V,V_u1φ)
     # The StateParamMap F needs to take a MultiFieldFEFunction u1u2h ∈ U_u1u2
     F = GridapTopOpt.StateParamMap(F,U_u1u2,V_φ,assem_U_u1u2,assem_V_φ)
 
@@ -59,6 +59,7 @@ where `A_k` and `b_k` only depend on the previous variables `u_1,...,u_{k-1}`.
     ```
 
     StaggeredStateMaps will remain in GridapTopOpt for backwards compatibility.
+    These methods will not be updated in future unless required due to breaking changes.
 """
 struct StaggeredAffineFEStateMap{NB,SB,A,B,C,D,E,F} <: AbstractFEStateMap
   biforms    :: Vector{<:Function}
@@ -166,6 +167,7 @@ end
 get_state(m::StaggeredAffineFEStateMap) = FEFunction(m.fwd_caches[2],m.fwd_caches[1])
 get_spaces(m::StaggeredAffineFEStateMap) = m.spaces
 get_assemblers(m::StaggeredAffineFEStateMap) = m.assems
+get_plb_cache(m::StaggeredAffineFEStateMap) = m.plb_caches
 
 function forward_solve!(φ_to_u::StaggeredAffineFEStateMap,φ::AbstractVector)
   φh = FEFunction(GridapTopOpt.get_aux_space(φ_to_u),φ)
@@ -245,6 +247,7 @@ we expect a set of residual/jacobian pairs that also depend on φ:
     implementations. See [`StaggeredAffineFEStateMap`](@ref)
 
     StaggeredStateMaps will remain in GridapTopOpt for backwards compatibility.
+    These methods will not be updated in future unless required due to breaking changes.
 """
 mutable struct StaggeredNonlinearFEStateMap{NB,SB,A,B,C,D,E,F} <: AbstractFEStateMap
   const residuals         :: Vector{<:Function}
@@ -359,6 +362,7 @@ end
 get_state(m::StaggeredNonlinearFEStateMap) = FEFunction(get_trial_space(m),m.fwd_caches[1])
 get_spaces(m::StaggeredNonlinearFEStateMap) = m.spaces
 get_assemblers(m::StaggeredNonlinearFEStateMap) = m.assems
+get_plb_cache(m::StaggeredNonlinearFEStateMap) = m.plb_caches
 
 function forward_solve!(φ_to_u::StaggeredNonlinearFEStateMap,φ::AbstractVector)
   φh = FEFunction(GridapTopOpt.get_aux_space(φ_to_u),φ)
@@ -659,28 +663,23 @@ end
 ## Backwards compat
 function StaggeredAffineFEStateMap(
     op::StaggeredAffineFEOperator,∂Rk∂xhi::Tuple{Vararg{Tuple{Vararg{Function}}}},V_φ,U_reg,φh; kwargs...)
-  @warn _msg_v0_3_0 maxlog=1
-  return StaggeredAffineFEStateMap(op,∂Rk∂xhi,V_φ,φh; kwargs...)
+  error(_msg_v0_3_0(StaggeredAffineFEStateMap))
 end
 
 function StaggeredAffineFEStateMap(op::StaggeredAffineFEOperator,V_φ,U_reg,φh; kwargs...)
-  @warn _msg_v0_3_0 maxlog=1
-  return StaggeredAffineFEStateMap(op,V_φ,φh; kwargs...)
+  error(_msg_v0_3_0(StaggeredAffineFEStateMap))
 end
 
 function StaggeredNonlinearFEStateMap(
     op::StaggeredNonlinearFEOperator,∂Rk∂xhi::Tuple{Vararg{Tuple{Vararg{Function}}}},V_φ,U_reg,φh; kwargs...)
-  @warn _msg_v0_3_0 maxlog=1
-  return StaggeredNonlinearFEStateMap(op,∂Rk∂xhi,V_φ,φh; kwargs...)
+  error(_msg_v0_3_0(StaggeredAffineFEStateMap))
 end
 
 function StaggeredNonlinearFEStateMap(op::StaggeredNonlinearFEOperator,V_φ,U_reg,φh; kwargs...)
-  @warn _msg_v0_3_0 maxlog=1
-  return StaggeredNonlinearFEStateMap(op,V_φ,φh; kwargs...)
+  error(_msg_v0_3_0(StaggeredAffineFEStateMap))
 end
 
 function StaggeredStateParamMap(F,∂F∂xhi::Tuple{Vararg{Function}},trials::Vector{<:FESpace},V_φ::FESpace,
     U_reg::FESpace,assem_U::Vector{<:Assembler},assem_deriv::Assembler)
-  @warn _msg_v0_3_0 maxlog=1
-  return StaggeredStateParamMap(F,∂F∂xhi,trials,V_φ,assem_U,assem_deriv)
+  error(_msg_v0_3_0(StaggeredAffineFEStateMap))
 end

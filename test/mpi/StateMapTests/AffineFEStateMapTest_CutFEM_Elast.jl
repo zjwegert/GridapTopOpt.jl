@@ -108,7 +108,7 @@ function main(_model,isserial)
   state_collection = GridapTopOpt.EmbeddedCollection_in_φh(model,φh) do _φh
     update_collection!(Ω_data,_φh)
     U,V = build_spaces(Ω_data.Ω_act)
-    state_map = AffineFEStateMap(a,l,U,V,V_φ,_φh)
+    state_map = AffineFEStateMap(a,l,U,V,V_φ)
     (;
       :state_map => state_map,
       :J => GridapTopOpt.StateParamMap(J_comp,state_map),

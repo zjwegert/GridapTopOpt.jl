@@ -27,7 +27,7 @@ function main(model)
   l1(v1,φ) = ∫(φ* φ * _rhs * v1)dΩ
 
   # Create operator from components
-  φ_to_u = AffineFEStateMap(a1,l1,U,V,V_φ,φh)
+  φ_to_u = AffineFEStateMap(a1,l1,U,V,V_φ)
 
   # Compute gradient
   F(u,φ) = ∫(u*φ+1)dΩ

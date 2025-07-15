@@ -35,9 +35,9 @@ function main(distribute,mesh_partition)
     )
   end
 
-  ls_evo = CutFEMEvolve(V_φ,Ωs,dΩ,h)
-  ls_reinit = StabilisedReinit(V_φ,Ωs,dΩ,h)
-  evo = UnfittedFEEvolution(ls_evo,ls_reinit)
+  ls_evo = CutFEMEvolver(V_φ,Ωs,dΩ,h)
+  ls_reinit = StabilisedReinitialiser(V_φ,Ωs,dΩ,h)
+  evo = LevelSetEvolution(ls_evo,ls_reinit)
 
   φ0 = copy(get_free_dof_values(φh))
   φh0 = FEFunction(V_φ,φ0)

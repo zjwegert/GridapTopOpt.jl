@@ -1,4 +1,4 @@
-module InteriorPenaltyStabilisedReinitTestMPI
+module MultiStageStabilisedReinitTestMPI
 using Test
 
 using GridapTopOpt
@@ -36,16 +36,20 @@ function main(distribute,mesh_partition)
     )
   end
 
-  ls_evo = CutFEMEvolve(V_φ,Ωs,dΩ,h)
-  ls_reinit = StabilisedReinit(V_φ,Ωs,dΩ,h;
+  ls_evo = CutFEMEvolver(V_φ,Ωs,dΩ,h)
+  reinit1 = StabilisedReinitialiser(V_φ,Ωs,dΩ,h;
+    stabilisation_method=ArtificialViscosity(1.5h),
+    nls = GridapSolvers.NewtonSolver(LUSolver();maxiter=50,rtol=1.e-14,verbose=i_am_main(ranks)))
+  reinit2 = StabilisedReinitialiser(V_φ,Ωs,dΩ,h;
     stabilisation_method=InteriorPenalty(V_φ),
     nls = GridapSolvers.NewtonSolver(LUSolver();maxiter=50,rtol=1.e-14,verbose=i_am_main(ranks)))
-  evo = UnfittedFEEvolution(ls_evo,ls_reinit)
+  ls_reinit = GridapTopOpt.MultiStageStabilisedReinitialiser([reinit1,reinit2])
+  evo = LevelSetEvolution(ls_evo,ls_reinit)
   reinit!(evo,φh);
 
   L2error(u) = sqrt(sum(∫(u ⋅ u)dΩ))
   # Check |∇(φh)|
-  abs(L2error(norm ∘ ∇(φh))-1) < 1e-4
+  @test abs(L2error(norm ∘ ∇(φh))-1) < 1e-4
 
   # Check φh error
   @test L2error(φh-φh0) < 1e-4

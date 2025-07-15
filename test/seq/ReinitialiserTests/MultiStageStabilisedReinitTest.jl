@@ -30,11 +30,11 @@ V_φ = TestFESpace(model,reffe_scalar)
   )
 end
 
-ls_evo = CutFEMEvolve(V_φ,Ωs,dΩ,h)
-reinit1 = StabilisedReinit(V_φ,Ωs,dΩ,h;stabilisation_method=ArtificialViscosity(1.5h))
-reinit2 = StabilisedReinit(V_φ,Ωs,dΩ,h;stabilisation_method=GridapTopOpt.InteriorPenalty(V_φ,γg=1.0))
-ls_reinit = GridapTopOpt.MultiStageStabilisedReinit([reinit1,reinit2])
-evo = UnfittedFEEvolution(ls_evo,ls_reinit)
+ls_evo = CutFEMEvolver(V_φ,Ωs,dΩ,h)
+reinit1 = StabilisedReinitialiser(V_φ,Ωs,dΩ,h;stabilisation_method=ArtificialViscosity(1.5h))
+reinit2 = StabilisedReinitialiser(V_φ,Ωs,dΩ,h;stabilisation_method=GridapTopOpt.InteriorPenalty(V_φ,γg=1.0))
+ls_reinit = GridapTopOpt.MultiStageStabilisedReinitialiser([reinit1,reinit2])
+evo = LevelSetEvolution(ls_evo,ls_reinit)
 reinit!(evo,φh);
 
 L2error(u) = sqrt(sum(∫(u ⋅ u)dΩ))

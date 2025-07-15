@@ -6,6 +6,8 @@ GridapTopOpt is computational toolbox for level set-based topology optimisation 
 
 > Wegert, Z.J., Manyer, J., Mallon, C.N. et al. GridapTopOpt.jl: a scalable Julia toolbox for level set-based topology optimisation. Struct Multidisc Optim 68, 22 (2025). [https://doi.org/10.1007/s00158-024-03927-3](https://doi.org/10.1007/s00158-024-03927-3)
 
+_Please note, there have been several breaking releases since the above publication was first submitted, please see [Breaking Releases](https://zjwegert.github.io/GridapTopOpt.jl/stable/breaking-changes/) for a breakdown of these._
+
 ## Documentation
 
 - [**STABLE**](https://zjwegert.github.io/GridapTopOpt.jl/stable) &mdash; **Documentation for the most recently tagged version.**
@@ -18,4 +20,4 @@ In order to give credit to the `GridapTopOpt` contributors, we ask that you plea
 
 ### Unfitted methods
 When using unfitted methods, we ask that you please reference the following manuscripts:
-> Wegert, Z.J., Manyer, J., Mallon, C.N. et al. Level-set topology optimisation with unfitted finite elements and automatic shape differentiation. Accepted for publication in Computer Methods in Applied Mechanics and Engineering (2025). [http://arxiv.org/abs/2504.09748](http://arxiv.org/abs/2504.09748)
+> Wegert, Z.J., Manyer, J., Mallon, C.N. et al. Level-set topology optimisation with unfitted finite elements and automatic shape differentiation. Comput Methods Appl Mech Engrg 445 (2025). [https://doi.org/10.1016/j.cma.2025.118203](https://doi.org/10.1016/j.cma.2025.118203)

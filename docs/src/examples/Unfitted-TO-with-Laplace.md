@@ -153,7 +153,7 @@ The `do` statement above provides a recipe for the `EmbeddedCollection` to gener
 
 ## Isolated volume marking and automatic differentation
 In the above, we use `get_isolated_volumes_mask_polytopal` to create a cell field that marks cells based on whether they are connected to `Omega_D`. In addition, we wrap the cut triangulations inside [`DifferentiableTriangulation`](https://gridap.github.io/GridapEmbedded.jl/stable/GeometricalDerivatives/#Geometrical-Derivatives). This is a wrapper around an embedded triangulation (i.e SubCellTriangulation or SubFacetTriangulation) implementing all the necessary methods to compute derivatives with respect to deformations of the embedded mesh. To do so, it propagates dual numbers into the geometric maps mapping cut subcells/subfacets to the background mesh. We refer to this article for the mathematical discussion:
-> Wegert, Z.J., Manyer, J., Mallon, C.N. et al. Level-set topology optimisation with unfitted finite elements and automatic shape differentiation. Accepted for publication in Computer Methods in Applied Mechanics and Engineering (2025). [http://arxiv.org/abs/2504.09748](http://arxiv.org/abs/2504.09748)
+> Wegert, Z.J., Manyer, J., Mallon, C.N. et al. Level-set topology optimisation with unfitted finite elements and automatic shape differentiation. Comput Methods Appl Mech Engrg 445 (2025). [https://doi.org/10.1016/j.cma.2025.118203](https://doi.org/10.1016/j.cma.2025.118203)
 
 ## FE problem
 Now that all the measures are defined, lets define the weak form, optimisation functionals, and the FE operators. First, we can define the weak form and optimisation functionals as
@@ -178,7 +178,7 @@ state_collection = EmbeddedCollection_in_φh(model,φh) do _φh
   update_collection!(Ωs,_φh)
   V = TestFESpace(Ωs.Ωact,reffe_scalar;dirichlet_tags=["Omega_D"])
   U = TrialFESpace(V,0.0)
-  state_map = AffineFEStateMap(a,l,U,V,V_φ,U_reg,_φh)
+  state_map = AffineFEStateMap(a,l,U,V,V_φ,U_reg)
   (;
     :state_map => state_map,
     :J => StateParamMap(J,state_map),
@@ -196,14 +196,14 @@ pcfs = EmbeddedPDEConstrainedFunctionals(state_collection;analytic_dC=(dVol,))
 ## Evolution
 We now define the evolution and reinitialisation methods for this problem. Here we use unfitted approaches to solve both of these problems
 
-To set these up, we provide `CutFEMEvolve` and `StabilisedReinit` as follows:
+To set these up, we provide `CutFEMEvolver` and `StabilisedReinitialiser` as follows:
 ```julia
-evo = CutFEMEvolve(V_φ,Ωs,dΩ_bg,hₕ;max_steps,γg=0.1)
-reinit = StabilisedReinit(V_φ,Ωs,dΩ_bg,hₕ;stabilisation_method=ArtificialViscosity(2.0))
+evo = CutFEMEvolver(V_φ,Ωs,dΩ_bg,hₕ;max_steps,γg=0.1)
+reinit = StabilisedReinitialiser(V_φ,Ωs,dΩ_bg,hₕ;stabilisation_method=ArtificialViscosity(2.0))
 ```
-We then define the `UnfittedFEEvolution` object that wraps these methods, and we reinitialise our initial level-set function via
+We then define the `LevelSetEvolution` object that wraps these methods, and we reinitialise our initial level-set function via
 ```julia
-ls_evo = UnfittedFEEvolution(evo,reinit)
+ls_evo = LevelSetEvolution(evo,reinit)
 reinit!(ls_evo,φh)
 ```
 

@@ -107,10 +107,12 @@ function main(;AD,use_mfs=false)
   DC1(q,uϕ,φ) = ∫(-1/vol_D*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
 
   ## Finite difference solver and level set function
-  stencil = HamiltonJacobiEvolution(FirstOrderStencil(2,Float64),model,V_φ,tol,max_steps)
+  evo = FiniteDifferenceEvolver(FirstOrderStencil(2,Float64),model,V_φ;max_steps)
+  reinit = FiniteDifferenceReinitialiser(FirstOrderStencil(2,Float64),model,V_φ;tol,γ_reinit)
+  ls_evo = LevelSetEvolution(evo,reinit)
 
   ## Setup solver and FE operators
-  state_map = RepeatingAffineFEStateMap(5,a,l,UP,VQ,V_φ,φh)
+  state_map = RepeatingAffineFEStateMap(5,a,l,UP,VQ,V_φ)
   pcfs = if AD
     PDEConstrainedFunctionals(J,[C1],state_map;analytic_dJ=DJ,analytic_dC=[DC1])
   else
@@ -123,7 +125,7 @@ function main(;AD,use_mfs=false)
   vel_ext = VelocityExtension(a_hilb,U_reg,V_reg)
 
   # ## Optimiser
-  optimiser = HilbertianProjection(pcfs,stencil,vel_ext,φh;γ,γ_reinit,verbose=true)
+  optimiser = HilbertianProjection(pcfs,ls_evo,vel_ext,φh;γ,verbose=true)
   vars, state = iterate(optimiser)
   vars, state = iterate(optimiser,state)
   true

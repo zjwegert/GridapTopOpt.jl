@@ -1,13 +1,13 @@
 # Projection map
 struct HilbertianProjectionMap{A}
   orthog  :: OrthogonalisationMap
-  vel_ext :: VelocityExtension{A}
+  vel_ext :: AbstractVelocityExtension
   caches
   params
   function HilbertianProjectionMap(
     nC :: Int,
     orthog::OrthogonalisationMap,
-    vel_ext::VelocityExtension;
+    vel_ext::AbstractVelocityExtension;
     λ=0.5, α_min=0.1, α_max=1.0, debug=false
   )
     θ  = allocate_in_domain(vel_ext.K)
@@ -123,8 +123,8 @@ A Hilbertian projection method as described by Wegert et al., 2023
 # Parameters
 
 - `problem::AbstractPDEConstrainedFunctionals{N}`: The objective and constraint setup.
-- `ls_evolver::LevelSetEvolution`: Solver for the evolution and reinitisation equations.
-- `vel_ext::VelocityExtension`: The velocity-extension method for extending
+- `ls_evolver::AbstractLevelSetEvolution`: Solver for the evolution and reinitisation equations.
+- `vel_ext::AbstractVelocityExtension`: The velocity-extension method for extending
   shape sensitivities onto the computational domain.
 - `projector::HilbertianProjectionMap`: Sensitivity information projector
 - `history::OptimiserHistory{Float64}`: Historical information for optimisation problem.
@@ -134,8 +134,8 @@ A Hilbertian projection method as described by Wegert et al., 2023
 """
 struct HilbertianProjection{A} <: Optimiser
   problem           :: AbstractPDEConstrainedFunctionals
-  ls_evolver        :: LevelSetEvolution
-  vel_ext           :: VelocityExtension
+  ls_evolver        :: AbstractLevelSetEvolution
+  vel_ext           :: AbstractVelocityExtension
   projector         :: HilbertianProjectionMap
   history           :: OptimiserHistory{Float64}
   converged         :: Function
@@ -145,18 +145,20 @@ struct HilbertianProjection{A} <: Optimiser
 
   @doc """
       HilbertianProjection(
-        problem :: AbstractPDEConstrainedFunctionals{N},
-        ls_evolver :: LevelSetEvolution,
-        vel_ext :: VelocityExtension,
+        problem    :: AbstractPDEConstrainedFunctionals{N},
+        ls_evolver :: AbstractLevelSetEvolution,
+        vel_ext    :: AbstractVelocityExtension,
         φ0;
         orthog = HPModifiedGramSchmidt(),
-        λ=0.5, α_min=0.1, α_max=1.0, γ=0.1, γ_reinit=0.5,
-        ls_max_iters = 10, ls_δ_inc = 1.1, ls_δ_dec = 0.7,
-        ls_ξ = 0.0025, ls_ξ_reduce_coef = 0.1, ls_ξ_reduce_abs_tol = 0.01,
+        λ=0.5, α_min=0.1, α_max=1.0, γ=0.1, reinit_mod = 1,
+        ls_enabled = true, ls_max_iters = 10, ls_δ_inc = 1.1, ls_δ_dec = 0.7,
+        ls_ξ = 1, ls_ξ_reduce_coef = 0.0025, ls_ξ_reduce_abs_tol = 0.01,
         ls_γ_min = 0.001, ls_γ_max = 0.1,
         maxiter = 1000, verbose=false, constraint_names = map(i -> Symbol("C_\$i"),1:N),
-        converged::Function = default_hp_converged, debug = false
-      ) where {N}
+        converged::Function = default_hp_converged, debug = false,
+        has_oscillations::Function = (ls_enabled ? (args...)->false : default_has_oscillations),
+        os_γ_mult = 0.5
+    ) where N
 
   Create an instance of `HilbertianProjection` with several adjustable defaults
   including the orthogonalisation method. By default the later is [`HPModifiedGramSchmidt`](@ref).
@@ -164,15 +166,14 @@ struct HilbertianProjection{A} <: Optimiser
   # Required
 
   - `problem::AbstractPDEConstrainedFunctionals{N}`: The objective and constraint setup.
-  - `ls_evolver::LevelSetEvolution`: Solver for the evolution and reinitisation equations.
-  - `vel_ext::VelocityExtension`: The velocity-extension method for extending
+  - `ls_evolver::AbstractLevelSetEvolution`: Solver for the evolution and reinitisation equations.
+  - `vel_ext::AbstractVelocityExtension`: The velocity-extension method for extending
     shape sensitivities onto the computational domain.
   - `φ0`: An initial level-set function defined as a FEFunction or GridapDistributed equivilent.
 
   # Algorithm defaults
 
   - `γ = 0.1`: Initial coeffient on the time step size for solving the Hamilton-Jacobi evolution equation.
-  - `γ_reinit = 0.5`: Coeffient on the time step size for solving the reinitisation equation.
   - `maxiter = 1000`: Maximum number of algorithm iterations.
   - `verbose=false`: Verbosity flag.
   - `constraint_names = map(i -> Symbol("C_\$i"),1:N)`: Constraint names for history output.
@@ -214,20 +215,23 @@ struct HilbertianProjection{A} <: Optimiser
   """
     function HilbertianProjection(
     problem    :: AbstractPDEConstrainedFunctionals{N},
-    ls_evolver :: LevelSetEvolution,
-    vel_ext    :: VelocityExtension,
+    ls_evolver :: AbstractLevelSetEvolution,
+    vel_ext    :: AbstractVelocityExtension,
     φ0;
     orthog = HPModifiedGramSchmidt(),
-    λ=0.5, α_min=0.1, α_max=1.0, γ=0.1, γ_reinit=0.5, reinit_mod = 1,
+    λ=0.5, α_min=0.1, α_max=1.0, γ=0.1, reinit_mod = 1,
     ls_enabled = true, ls_max_iters = 10, ls_δ_inc = 1.1, ls_δ_dec = 0.7,
     ls_ξ = 1, ls_ξ_reduce_coef = 0.0025, ls_ξ_reduce_abs_tol = 0.01,
     ls_γ_min = 0.001, ls_γ_max = 0.1,
     maxiter = 1000, verbose=false, constraint_names = map(i -> Symbol("C_$i"),1:N),
     converged::Function = default_hp_converged, debug = false,
     has_oscillations::Function = (ls_enabled ? (args...)->false : default_has_oscillations),
-    os_γ_mult = 0.5
+    os_γ_mult = 0.5,
+    γ_reinit=NaN
   ) where N
 
+    @assert isnan(γ_reinit) "γ_reinit has been removed from all optimisers. Please set this
+      in the corresponding reinitialiser (i.e., FiniteDifferenceReinitialiser)"
     @assert α_min <= α_max "We require α_min <= α_max"
 
     constraint_names = map(Symbol,constraint_names)
@@ -240,7 +244,7 @@ struct HilbertianProjection{A} <: Optimiser
     A = ((typeof(problem.analytic_dJ) <: Function) &&
       all(@. typeof(problem.analytic_dC) <: Function)) ? NoAutoDiff : WithAutoDiff;
 
-    params = (;debug,γ,γ_reinit,reinit_mod,ls_enabled,ls_max_iters,ls_δ_inc,ls_δ_dec,ls_ξ,
+    params = (;debug,γ,reinit_mod,ls_enabled,ls_max_iters,ls_δ_inc,ls_δ_dec,ls_ξ,
                ls_ξ_reduce_coef,ls_ξ_reduce_abs_tol,ls_γ_min,ls_γ_max,os_γ_mult)
     new{A}(problem,ls_evolver,vel_ext,projector,history,converged,has_oscillations,params,φ0)
   end
@@ -254,7 +258,7 @@ end
 
 function default_hp_converged(
   m::HilbertianProjection;
-  J_tol = 0.2*maximum(get_dof_Δ(m.ls_evolver)),
+  J_tol = 0.2*maximum(get_min_dof_spacing(m.ls_evolver)),
   C_tol = 0.001
 )
   h  = m.history
@@ -294,7 +298,7 @@ function Base.iterate(m::HilbertianProjection)
   uhd = zero(V_φ)
 
   ## Reinitialise as SDF
-  reinit!(m.ls_evolver,φh,params.γ_reinit)
+  _, reinit_cache = reinit!(m.ls_evolver,φh)
 
   ## Compute FE problem and shape derivatives
   J, C, dJ, dC = Gridap.evaluate!(m.problem,φh)
@@ -309,15 +313,16 @@ function Base.iterate(m::HilbertianProjection)
 
   # Update history and build state
   push!(history,(J,C...,params.γ))
-  state = (;it=1,J,C,θ,dJ,dC,uh,φh,uhd,vel,φ_tmp,params.γ,os_it=-1)
+  state = (;it=1,J,C,θ,dJ,dC,uh,φh,uhd,vel,φ_tmp,params.γ,os_it=-1,
+    reinit_cache,evo_cache=nothing)
   vars  = params.debug ? (0,uh,φh,state) : (0,uh,φh)
   return vars, state
 end
 
 # ith iteration
 function Base.iterate(m::HilbertianProjection,state)
-  it, J, C, θ, dJ, dC, uh, φh, uhd, vel, φ_tmp, γ, os_it = state
-  history, params = m.history, m.params
+  it,J,C,θ,dJ,dC,uh,φh,uhd,vel,φ_tmp,γ,os_it,reinit_cache,evo_cache = state
+  history,params = m.history,m.params
 
   ## Periodicially call GC
   iszero(it % 50) && GC.gc();
@@ -338,7 +343,7 @@ function Base.iterate(m::HilbertianProjection,state)
   U_reg = m.vel_ext.U_reg
   V_φ = get_ls_space(m.ls_evolver)
   interpolate!(FEFunction(U_reg,θ),vel,V_φ)
-  J, C, dJ, dC, γ = _linesearch!(m,state,γ)
+  J, C, dJ, dC, γ, reinit_cache, evo_cache = _linesearch!(m,state,γ)
 
   ## Hilbertian extension-regularisation
   project!(m.vel_ext,dJ,V_φ,uhd)
@@ -348,13 +353,14 @@ function Base.iterate(m::HilbertianProjection,state)
   ## Update history and build state
   push!(history,(J,C...,γ))
   uh = get_state(m.problem)
-  state = (;it=it+1, J, C, θ, dJ, dC, uh, φh, uhd, vel, φ_tmp, γ, os_it)
+  state = (;it=it+1, J, C, θ, dJ, dC, uh, φh, uhd, vel, φ_tmp,
+    γ, os_it, reinit_cache, evo_cache)
   vars  = params.debug ? (it,uh,φh,state) : (it,uh,φh)
   return vars, state
 end
 
 function _linesearch!(m::HilbertianProjection{WithAutoDiff},state,γ)
-  it, J, C, θ, dJ, dC, uh, φh, uhd, vel, φ_tmp, _, os_it = state
+  it,J,C,θ,dJ,dC,uh,φh,uhd,vel,φ_tmp,_,os_it,reinit_cache,evo_cache = state
 
   params = m.params; history = m.history
   ls_enabled = params.ls_enabled; reinit_mod = params.reinit_mod
@@ -366,8 +372,10 @@ function _linesearch!(m::HilbertianProjection{WithAutoDiff},state,γ)
   φ = get_free_dof_values(φh); copy!(φ_tmp,φ)
   while !done && (ls_it <= ls_max_iters)
     # Advect  & Reinitialise
-    evolve!(m.ls_evolver,φ,vel,γ)
-    iszero(it % reinit_mod) && reinit!(m.ls_evolver,φ,params.γ_reinit)
+    _,evo_cache = evolve!(m.ls_evolver,φ,vel,γ,evo_cache)
+    if iszero(it % reinit_mod)
+      _,reinit_cache = reinit!(m.ls_evolver,φ,reinit_cache)
+    end
 
     ~ls_enabled && break
 
@@ -392,11 +400,11 @@ function _linesearch!(m::HilbertianProjection{WithAutoDiff},state,γ)
   ## Calculate objective, constraints, and shape derivatives after line search
   J, C, dJ, dC = Gridap.evaluate!(m.problem,φh)
 
-  return J, C, dJ, dC, γ
+  return J, C, dJ, dC, γ, evo_cache, reinit_cache
 end
 
 function _linesearch!(m::HilbertianProjection{NoAutoDiff},state,γ)
-  it, J, C, θ, dJ, dC, uh, φh, uhd, vel, φ_tmp, _, os_it = state
+  it,J,C,θ,dJ,dC,uh,φh,uhd,vel,φ_tmp,_,os_it,reinit_cache,evo_cache = state
 
   params = m.params; history = m.history
   ls_enabled = params.ls_enabled; reinit_mod = params.reinit_mod
@@ -408,13 +416,15 @@ function _linesearch!(m::HilbertianProjection{NoAutoDiff},state,γ)
   φ = get_free_dof_values(φh); copy!(φ_tmp,φ)
   while !done && (ls_it <= ls_max_iters)
     # Advect  & Reinitialise
-    evolve!(m.ls_evolver,φ,vel,γ)
-    iszero(it % reinit_mod) && reinit!(m.ls_evolver,φ,params.γ_reinit)
+    _,evo_cache = evolve!(m.ls_evolver,φ,vel,γ,evo_cache)
+    if iszero(it % reinit_mod)
+      _,reinit_cache = reinit!(m.ls_evolver,φ,reinit_cache)
+    end
 
     # Check enabled
     if ~ls_enabled
       J, C, dJ, dC = Gridap.evaluate!(m.problem,φh)
-      return J, C, dJ, dC, γ
+      return J, C, dJ, dC, γ, evo_cache, reinit_cache
     end
 
     # Calcuate new objective and constraints
@@ -436,7 +446,7 @@ function _linesearch!(m::HilbertianProjection{NoAutoDiff},state,γ)
     end
   end
 
-  return J, C, dJ, dC, γ
+  return J, C, dJ, dC, γ, evo_cache, reinit_cache
 end
 
 function debug_print(orthog,dV,dC,dC_orthog,K,P,nullity,debug_code,debug)

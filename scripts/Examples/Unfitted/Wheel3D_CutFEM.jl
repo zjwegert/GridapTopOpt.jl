@@ -12,7 +12,7 @@ using GridapTopOpt: StateParamMap
 """
   This example appears in our manuscript:
     "Level-set topology optimisation with unfitted finite elements and automatic shape differentiation"
-    by Z.J. Wegert, J. Manyer, C. Mallon, S. Badia, V.J. Challis. (10.48550/arXiv.2504.09748)
+    by Z.J. Wegert, J. Manyer, C. Mallon, S. Badia, V.J. Challis. (10.1016/j.cma.2025.118203)
 
   (MPI) Three-dimensional minimum elastic compliance of a wheel using a CutFEM formulation based
     on Burman et al. (2018) [10.1016/j.cma.2017.09.005] & automatic shape differentiation.
@@ -148,7 +148,7 @@ function main(ranks)
   state_collection = EmbeddedCollection_in_φh(model,φh) do _φh
     update_collection!(Ω_data,_φh)
     U,V = build_spaces(Ω_data.Ω_act)
-    state_map = AffineFEStateMap(a,l,U,V,V_φ,_φh;ls=elast_ls,adjoint_ls=elast_ls)
+    state_map = AffineFEStateMap(a,l,U,V,V_φ;ls=elast_ls,adjoint_ls=elast_ls)
     (;
       :state_map => state_map,
       :J => StateParamMap(J_comp,state_map),
@@ -163,9 +163,9 @@ function main(ranks)
   evolve_nls = NewtonSolver(evolve_ls;maxiter=1,verbose=i_am_main(ranks))
   reinit_nls = NewtonSolver(PETScLinearSolver();maxiter=20,rtol=1.e-14,verbose=i_am_main(ranks))
 
-  evo = CutFEMEvolve(V_φ,Ω_data,dΩ_bg,hₕ;max_steps,γg=0.01,ode_ls=evolve_ls,ode_nl=evolve_nls)
-  reinit = StabilisedReinit(V_φ,Ω_data,dΩ_bg,hₕ;stabilisation_method=ArtificialViscosity(0.5),nls=reinit_nls)
-  ls_evo = UnfittedFEEvolution(evo,reinit)
+  evo = CutFEMEvolver(V_φ,Ω_data,dΩ_bg,hₕ;max_steps,γg=0.01,ode_ls=evolve_ls,ode_nl=evolve_nls)
+  reinit = StabilisedReinitialiser(V_φ,Ω_data,dΩ_bg,hₕ;stabilisation_method=ArtificialViscosity(0.5),nls=reinit_nls)
+  ls_evo = LevelSetEvolution(evo,reinit)
 
   ## Hilbertian extension-regularisation problems
   hilb_ls = CGAMGSolver()
