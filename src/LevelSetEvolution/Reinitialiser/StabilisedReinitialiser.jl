@@ -1,10 +1,10 @@
 abstract type StabilisationMethod end
 
 """
-    mutable struct StabilisedReinit{V,M} <: Reinitialiser
+    struct StabilisedReinitialiser{V,M} <: Reinitialiser
 
 Stabilised FE method for level-set reinitialisation. Artificial viscosity
-approach (`ArtificialViscosity`) based on Mallon et al. (2023). DOI: `10.48550/arXiv.2303.13672`.
+approach (`ArtificialViscosity`) based on Mallon et al. (2023). DOI: `10.1016/j.cma.2025.118203`.
 Interior jump penalty approach (`InteriorPenalty`) adapted from that work and replaces
 the artifical viscosity term with an interior jump penalty term.
 
@@ -16,13 +16,12 @@ the artifical viscosity term with an interior jump penalty term.
 - `space::C`: FE space for level-set function
 - `assembler::Assembler`: Assembler for LS FE space
 - `params::E`: Tuple of Nitsche parameter `γd` and mesh size `h`
-- `cache`: Cache for reinitialiser, initially `nothing`.
 
 # Note
 - We expect the EmbeddedCollection `Ωs` to contain `:dΓ`. If this is not
   available we add it to the recipe list in `Ωs` and a warning will appear.
 """
-mutable struct StabilisedReinit{A,B,C,D} <: Reinitialiser
+struct StabilisedReinitialiser{A,B,C,D} <: Reinitialiser
   nls::NonlinearSolver
   stabilisation_method::A
   Ωs::EmbeddedCollection
@@ -30,27 +29,29 @@ mutable struct StabilisedReinit{A,B,C,D} <: Reinitialiser
   space::C
   assembler::Assembler
   params::D
-  cache
   @doc """
-      StabilisedReinit(V_φ::C,Ωs::EmbeddedCollection,dΩ_bg::B,h;
+      StabilisedReinitialiser(V_φ::C,Ωs::EmbeddedCollection,dΩ_bg::B,h;
         γd = 20.0,
         nls = NewtonSolver(LUSolver();maxiter=20,rtol=1.e-14,verbose=true),
         assembler=SparseMatrixAssembler(V_φ,V_φ),
         stabilisation_method::A = InteriorPenalty(V_φ)
       ) where {A,B,C}
 
-  Create an instance of `StabilisedReinit` with the space for the level-set `V_φ`,
+  Create an instance of `StabilisedReinitialiser` with the space for the level-set `V_φ`,
   the `EmbeddedCollection` `Ωs` for the triangulation and measures, the measure
   `dΩ_bg` for the background mesh, and the mesh size `h`. The mesh size `h` can
   either be a scalar or a `CellField` object.
 
   The optional arguments are:
+  - `correct_ls`: Boolean for whether or not to ensure LS DOFs aren't zero
+    this MUST be true for differentiation in unfitted methods.
   - `γd`: Interface penalty parameter for the reinitialisation equation.
   - `nls`: Nonlinear solver for solving the reinitialisation equation.
   - `assembler`: Assembler for the finite element space.
   - `stabilisation_method`: A `StabilisationMethod` method for stabilising the problem.
   """
-  function StabilisedReinit(V_φ::C,Ωs::EmbeddedCollection,dΩ_bg::B,h;
+  function StabilisedReinitialiser(V_φ::C,Ωs::EmbeddedCollection,dΩ_bg::B,h;
+      correct_ls = true,
       γd = 20.0,
       nls = NewtonSolver(LUSolver();maxiter=20,rtol=1.e-14,verbose=true),
       assembler=SparseMatrixAssembler(V_φ,V_φ),
@@ -70,24 +71,14 @@ mutable struct StabilisedReinit{A,B,C,D} <: Reinitialiser
       end
       add_recipe!(Ωs,dΓ_recipe)
     end
-    params = (;γd,h)
-    new{A,B,C,typeof(params)}(nls,stabilisation_method,Ωs,
-    dΩ_bg,V_φ,assembler,params,nothing)
+    params = (;γd,h,correct_ls)
+    new{A,B,C,typeof(params)}(nls,stabilisation_method,Ωs,dΩ_bg,V_φ,assembler,params)
   end
 end
 
-get_nls(s::StabilisedReinit) = s.nls
-get_stabilisation_method(s::StabilisedReinit) = s.stabilisation_method
-get_assembler(s::StabilisedReinit) = s.assembler
-get_space(s::StabilisedReinit) = s.space
-get_embedded_collection(s::StabilisedReinit) = s.Ωs
-get_measure(s::StabilisedReinit) = s.dΩ_bg
-get_params(s::StabilisedReinit) = s.params
-get_element_diameters(s::StabilisedReinit) = s.params.h
-get_cache(s::StabilisedReinit) = s.cache
-
-function solve!(s::StabilisedReinit,φh,cache::Nothing)
+function reinit!(s::StabilisedReinitialiser,φh)
   nls, V_φ, assembler, = s.nls, s.space, s.assembler
+  correct_ls = s.params.correct_ls
   # Temp solution for later reinitialisation
   φ = get_free_dof_values(φh);
   φ_tmp = copy(φ)
@@ -96,20 +87,21 @@ function solve!(s::StabilisedReinit,φh,cache::Nothing)
   # Operator and cache
   op = get_algebraic_operator(FEOperator(res,jac,V_φ,V_φ,assembler))
   nls_cache = instantiate_caches(get_free_dof_values(φh),nls,op)
-  s.cache = (;nls_cache,φ_tmp)
+  cache = (;nls_cache,φ_tmp)
   # Solve
   solve!(φ_tmp,nls,op,nls_cache)
   if _get_solver_flag(nls.log) ∈ (SOLVER_CONVERGED_ATOL,SOLVER_CONVERGED_RTOL)
     copy!(get_free_dof_values(φh),φ_tmp)
     # Check LS
-    correct_ls!(φh)
+    correct_ls && correct_ls!(φh)
     update_collection!(s.Ωs,φh)
   end
-  return φh
+  return get_free_dof_values(φh),cache
 end
 
-function solve!(s::StabilisedReinit,φh,cache)
+function reinit!(s::StabilisedReinitialiser,φh,cache)
   nls, V_φ, assembler, = s.nls, s.space, s.assembler
+  correct_ls = s.params.correct_ls
   nls_cache, φ_tmp = cache
   # Update φ_tmp
   copy!(φ_tmp,get_free_dof_values(φh))
@@ -122,19 +114,24 @@ function solve!(s::StabilisedReinit,φh,cache)
   if _get_solver_flag(nls.log) ∈ (SOLVER_CONVERGED_ATOL,SOLVER_CONVERGED_RTOL)
     copy!(get_free_dof_values(φh),φ_tmp)
     # Check LS
-    correct_ls!(φh)
+    correct_ls && correct_ls!(φh)
     update_collection!(s.Ωs,φh)
   end
-  return φh
+  return get_free_dof_values(φh),cache
+end
+
+function reinit!(s::StabilisedReinitialiser,φ::AbstractVector,args...)
+  φh = FEFunction(get_ls_space(s),φ)
+  reinit!(s,φh,args...)
 end
 
 struct ArtificialViscosity <: StabilisationMethod
   stabilisation_coefficent::Number
 end
 
-function get_residual_and_jacobian(s::StabilisedReinit{ArtificialViscosity},φh,φh0)
+function get_residual_and_jacobian(s::StabilisedReinitialiser{ArtificialViscosity},φh,φh0)
   Ωs, dΩ_bg, = s.Ωs, s.dΩ_bg
-  γd, h = s.params
+  γd, h, _ = s.params
   ca = s.stabilisation_method.stabilisation_coefficent
   ϵ = 1e-20
 
@@ -165,9 +162,9 @@ function InteriorPenalty(V_φ::FESpace;γg=1.0)
   return InteriorPenalty(dΛ,γg)
 end
 
-function get_residual_and_jacobian(s::StabilisedReinit{InteriorPenalty},φh,φh0)
+function get_residual_and_jacobian(s::StabilisedReinitialiser{InteriorPenalty},φh,φh0)
   Ωs, dΩ_bg, = s.Ωs, s.dΩ_bg
-  γd, h = s.params
+  γd, h, _ = s.params
   ϵ = 1e-20
   dΛ = s.stabilisation_method.dΛ
   γg = s.stabilisation_method.γg
@@ -192,28 +189,26 @@ function get_residual_and_jacobian(s::StabilisedReinit{InteriorPenalty},φh,φh0
   return res,jac
 end
 
-struct MultiStageStabilisedReinit <: Reinitialiser
-  stages::Vector{StabilisedReinit}
-  function MultiStageStabilisedReinit(stages::Vector{<:StabilisedReinit})
-    h = get_element_diameters(first(stages))
-    V_φ = get_space(first(stages))
-    for stage in stages
-      @check h === get_element_diameters(stage)
-      @check V_φ === get_space(stage)
-    end
-    new(stages)
-  end
+struct MultiStageStabilisedReinitialiser <: Reinitialiser
+  stages::Vector{StabilisedReinitialiser}
 end
 
-get_cache(s::MultiStageStabilisedReinit) = get_cache.(s.stages)
-get_element_diameters(s::MultiStageStabilisedReinit) = get_element_diameters(first(s.stages))
-get_space(s::MultiStageStabilisedReinit) = get_space(first(s.stages))
-
-function solve!(s::MultiStageStabilisedReinit,φh,caches)
-  for (stage,cache) in zip(s.stages,caches)
-    solve!(stage,φh,cache)
+function reinit!(s::MultiStageStabilisedReinitialiser,φh)
+  wrapped_cache = ()
+  for stage in s.stages
+    _, cache = reinit!(stage,φh)
+    wrapped_cache = (wrapped_cache...,cache)
   end
-  return φh
+  return get_free_dof_values(φh),wrapped_cache
+end
+
+function reinit!(s::MultiStageStabilisedReinitialiser,φh,caches)
+  wrapped_cache = ()
+  for (stage,cache) in zip(s.stages,caches)
+    _, cache = reinit!(stage,φh,cache)
+    wrapped_cache = (wrapped_cache...,cache)
+  end
+  return get_free_dof_values(φh),wrapped_cache
 end
 
 ## Helper

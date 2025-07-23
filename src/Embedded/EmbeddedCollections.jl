@@ -40,7 +40,7 @@ function check_polytopes(bgmodel)
     derivative information from AD will not be correct when using a mesh that isn't made of TRI/TET.
 
     Please use a mesh with TRI/TET polytopes to ensure correctness of derivative results.
-  """
+  """ maxlog=1
 end
 
 function check_polytopes(bgmodel::DistributedDiscreteModel)

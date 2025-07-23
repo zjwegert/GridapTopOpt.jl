@@ -93,7 +93,7 @@ function main(distribute,mesh_partition)
     update_collection!(Ωs,_φh)
     V = TestFESpace(Ωs.Ωact,reffe_scalar;dirichlet_tags=["Omega_D"])
     U = TrialFESpace(V,0.0)
-    state_map = AffineFEStateMap(a,l,U,V,V_φ,_φh)
+    state_map = AffineFEStateMap(a,l,U,V,V_φ)
     (;
       :state_map => state_map,
       :J => StateParamMap(J,state_map),
@@ -106,9 +106,9 @@ function main(distribute,mesh_partition)
   evolve_nls = NewtonSolver(LUSolver();maxiter=1,verbose=i_am_main(ranks))
   reinit_nls = NewtonSolver(LUSolver();maxiter=20,rtol=1.e-14,verbose=i_am_main(ranks))
 
-  evo = CutFEMEvolve(V_φ,Ωs,dΩ_bg,hₕ;max_steps,γg=0.1,ode_ls=LUSolver(),ode_nl=evolve_nls)
-  reinit = StabilisedReinit(V_φ,Ωs,dΩ_bg,hₕ;stabilisation_method=ArtificialViscosity(2.0),nls=reinit_nls)
-  ls_evo = UnfittedFEEvolution(evo,reinit)
+  evo = CutFEMEvolver(V_φ,Ωs,dΩ_bg,hₕ;max_steps,γg=0.1,ode_ls=LUSolver(),ode_nl=evolve_nls)
+  reinit = StabilisedReinitialiser(V_φ,Ωs,dΩ_bg,hₕ;stabilisation_method=ArtificialViscosity(2.0),nls=reinit_nls)
+  ls_evo = LevelSetEvolution(evo,reinit)
   reinit!(ls_evo,φh)
 
   ## Hilbertian extension-regularisation problems

@@ -23,9 +23,9 @@ a2(u2,v2,(u1,φ)) = ...
 l2(v2,(u1,φ)) = ...
 
 ## Build StateMaps
-φ_to_u1 = AffineFEStateMap(a1,l1,U1,V,V_φ,φh)
+φ_to_u1 = AffineFEStateMap(a1,l1,U1,V,V_φ)
 # u1φ_to_u2 has a MultiFieldFESpace V_u1φ of primal vars
-u1φ_to_u2 = AffineFEStateMap(a2,l2,U2,V,V_u1φ,interpolate([1,φh],V_u1φ))
+u1φ_to_u2 = AffineFEStateMap(a2,l2,U2,V,V_u1φ)
 # The StateParamMap F needs to take a MultiFieldFEFunction u1u2h ∈ U_u1u2
 F = GridapTopOpt.StateParamMap(F,U_u1u2,V_φ,assem_U_u1u2,assem_V_φ)
 
@@ -43,4 +43,11 @@ pcf = CustomPDEConstrainedFunctionals(...)
 ## GridapTopOpt + GridapEmbedded + Zygote
 ```@docs
 GridapTopOpt.CustomEmbeddedPDEConstrainedFunctionals
+GridapTopOpt.CustomEmbeddedPDEConstrainedFunctionals(
+          φ_to_jc :: Function,
+          num_constraints,
+          embedded_collection :: EmbeddedCollection;
+          analytic_dJ = nothing,
+          analytic_dC = fill(nothing,num_constraints)
+        )
 ```

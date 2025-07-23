@@ -90,7 +90,7 @@ function main(AD_case)
     update_collection!(Ωs,_φh)
     V = TestFESpace(Ωs.Ωact,reffe_scalar;dirichlet_tags=["Omega_D"])
     U = TrialFESpace(V,0.0)
-    state_map = AffineFEStateMap(a,l,U,V,V_φ,_φh)
+    state_map = AffineFEStateMap(a,l,U,V,V_φ)
     (;
       :state_map => state_map,
       :J => StateParamMap(J,state_map),
@@ -113,9 +113,9 @@ function main(AD_case)
   end
 
   ## Evolution Method
-  evo = CutFEMEvolve(V_φ,Ωs,dΩ_bg,hₕ;max_steps,γg=0.1)
-  reinit = StabilisedReinit(V_φ,Ωs,dΩ_bg,hₕ;stabilisation_method=ArtificialViscosity(2.0))
-  ls_evo = UnfittedFEEvolution(evo,reinit)
+  evo = CutFEMEvolver(V_φ,Ωs,dΩ_bg,hₕ;max_steps,γg=0.1)
+  reinit = StabilisedReinitialiser(V_φ,Ωs,dΩ_bg,hₕ;stabilisation_method=ArtificialViscosity(2.0))
+  ls_evo = LevelSetEvolution(evo,reinit)
   reinit!(ls_evo,φh)
 
   ## Hilbertian extension-regularisation problems

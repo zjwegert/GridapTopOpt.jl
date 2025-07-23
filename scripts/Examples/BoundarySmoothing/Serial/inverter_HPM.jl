@@ -86,10 +86,12 @@ function main(path="./results/inverter_HPM/")
   UΓ_out(u,φ) = ∫((u⋅-e₁-δₓ)/vol_Γ_out)dΓ_out
 
   ## Finite difference solver and level set function
-  ls_evo = HamiltonJacobiEvolution(FirstOrderStencil(2,Float64),model,V_φ,tol,max_steps)
+  evo = FiniteDifferenceEvolver(FirstOrderStencil(2,Float64),model,V_φ;max_steps)
+  reinit = FiniteDifferenceReinitialiser(FirstOrderStencil(2,Float64),model,V_φ;tol,γ_reinit)
+  ls_evo = LevelSetEvolution(evo,reinit)
 
   ## Setup solver and FE operators
-  state_map = AffineFEStateMap(a,l,U,V,V_φ,φh)
+  state_map = AffineFEStateMap(a,l,U,V,V_φ)
   pcfs = PDEConstrainedFunctionals(J,[Vol,UΓ_out],state_map,analytic_dC=[dVol,nothing])
 
   ## Hilbertian extension-regularisation problems
@@ -100,7 +102,7 @@ function main(path="./results/inverter_HPM/")
   ## Optimiser
   ls_enabled=false # Setting to true will use a line search instead of oscillation detection
   optimiser = HilbertianProjection(pcfs,ls_evo,vel_ext,φh;
-    γ,γ_reinit,α_min=0.4,ls_enabled,verbose=true,constraint_names=[:Vol,:UΓ_out])
+    γ,α_min=0.4,ls_enabled,verbose=true,constraint_names=[:Vol,:UΓ_out])
   for (it,uh,φh) in optimiser
     data = ["φ"=>φh,"H(φ)"=>(H ∘ φh),"|∇(φ)|"=>(norm ∘ ∇(φh)),"uh"=>uh]
     iszero(it % iter_mod) && writevtk(Ω,path*"out$it",cellfields=data)

@@ -41,7 +41,7 @@ using GridapSolvers.BlockSolvers: combine_fespaces, get_solution
 using GridapEmbedded
 using GridapEmbedded.LevelSetCutters, GridapEmbedded.Interfaces
 using GridapEmbedded.Interfaces: SubFacetData, SubCellTriangulation, SubFacetTriangulation
-using GridapEmbedded.LevelSetCutters: DifferentiableTriangulation
+using GridapEmbedded.LevelSetCutters: DifferentiableTriangulation, update_trian!
 
 using Zygote
 using JLD2: save_object, load_object, jldsave
@@ -53,7 +53,7 @@ import GridapDistributed: remove_ghost_cells
 
 __init__() = begin
   include((@__DIR__)*"/Extensions/GridapExtensions.jl")
-  include((@__DIR__)*"/LevelSetEvolution/UnfittedEvolution/MutableRungeKutta.jl") # <- commented out in "LevelSetEvolution/LevelSetEvolution.jl"
+  include((@__DIR__)*"/LevelSetEvolution/Utilities/MutableRungeKutta.jl")
 
   function default_find_rcv_ids(::MPIArray)
     PartitionedArrays.find_rcv_ids_ibarrier
@@ -92,15 +92,26 @@ export get_element_diameter_field
 export isotropic_elast_tensor
 
 include("LevelSetEvolution/LevelSetEvolution.jl")
-export HamiltonJacobiEvolution
-export FirstOrderStencil
-export UnfittedFEEvolution
-export CutFEMEvolve
-export StabilisedReinit
-export ArtificialViscosity
-export InteriorPenalty
+export LevelSetEvolution
 export evolve!
 export reinit!
+export FirstOrderStencil
+export FiniteDifferenceEvolver
+export FiniteDifferenceReinitialiser
+export CutFEMEvolver
+export IdentityReinitialiser
+export StabilisedReinitialiser
+export MultiStageStabilisedReinitialiser
+export ArtificialViscosity
+export InteriorPenalty
+export HeatReinitialiser
+export get_lsf_to_sdf_map
+
+# For backwards compat/errors
+export CutFEMEvolve
+export StabilisedReinit
+export HamiltonJacobiEvolution
+export UnfittedFEEvolution
 
 include("Solvers.jl")
 export ElasticitySolver

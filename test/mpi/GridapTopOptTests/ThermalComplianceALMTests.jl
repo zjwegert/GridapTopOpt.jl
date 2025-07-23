@@ -14,7 +14,7 @@ using Gridap, Gridap.MultiField, GridapDistributed, GridapPETSc, GridapSolvers,
           ⎡u∈V=H¹(Ω;u(Γ_D)=0),
           ⎣∫ κ*∇(u)⋅∇(v) dΩ = ∫ v dΓ_N, ∀v∈V.
 """
-function main(distribute,mesh_partition;order,AD)
+function main(distribute,mesh_partition;order,AD,use_l=false)
   ranks = distribute(LinearIndices((prod(mesh_partition),)))
   ## Parameters
   xmax = ymax = 1.0
@@ -67,16 +67,23 @@ function main(distribute,mesh_partition;order,AD)
   l(v,φ) = ∫(v)dΓ_N
 
   ## Optimisation functionals
+  J(u,φ) = if use_l
+    ∫(u)dΓ_N
+  else
+    ∫((I ∘ φ)*κ*∇(u)⋅∇(u))dΩ
+  end
   J(u,φ) = ∫((I ∘ φ)*κ*∇(u)⋅∇(u))dΩ
   dJ(q,u,φ) = ∫(κ*∇(u)⋅∇(u)*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ;
   Vol(u,φ) = ∫(((ρ ∘ φ) - vf)/vol_D)dΩ;
   dVol(q,u,φ) = ∫(-1/vol_D*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
 
   ## Finite difference solver and level set function
-  ls_evo = HamiltonJacobiEvolution(FirstOrderStencil(2,Float64),model,V_φ,tol,max_steps)
+  evo = FiniteDifferenceEvolver(FirstOrderStencil(2,Float64),model,V_φ;max_steps)
+  reinit = FiniteDifferenceReinitialiser(FirstOrderStencil(2,Float64),model,V_φ;tol,γ_reinit)
+  ls_evo = LevelSetEvolution(evo,reinit)
 
   ## Setup solver and FE operators
-  state_map = AffineFEStateMap(a,l,U,V,V_φ,φh)
+  state_map = AffineFEStateMap(a,l,U,V,V_φ)
   pcfs = if AD
     PDEConstrainedFunctionals(J,[Vol],state_map,analytic_dJ=dJ,analytic_dC=[dVol])
   else
@@ -90,7 +97,7 @@ function main(distribute,mesh_partition;order,AD)
 
   ## Optimiser
   optimiser = AugmentedLagrangian(pcfs,ls_evo,vel_ext,φh;
-    γ,γ_reinit,verbose=i_am_main(ranks),constraint_names=[:Vol])
+    γ,verbose=i_am_main(ranks),constraint_names=[:Vol])
 
   # Do a few iterations
   vars, state = iterate(optimiser)
@@ -167,10 +174,12 @@ function main_3d(distribute,mesh_partition,;order)
   dVol(q,u,φ) = ∫(-1/vol_D*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
 
   ## Finite difference solver and level set function
-  ls_evo = HamiltonJacobiEvolution(FirstOrderStencil(3,Float64),model,V_φ,tol,max_steps)
+  evo = FiniteDifferenceEvolver(FirstOrderStencil(3,Float64),model,V_φ;max_steps)
+  reinit = FiniteDifferenceReinitialiser(FirstOrderStencil(3,Float64),model,V_φ;tol,γ_reinit)
+  ls_evo = LevelSetEvolution(evo,reinit)
 
   ## Setup solver and FE operators
-  state_map = AffineFEStateMap(a,l,U,V,V_φ,φh)
+  state_map = AffineFEStateMap(a,l,U,V,V_φ)
   pcfs = PDEConstrainedFunctionals(J,[Vol],state_map,analytic_dJ=dJ,analytic_dC=[dVol])
 
   ## Hilbertian extension-regularisation problems
@@ -180,7 +189,7 @@ function main_3d(distribute,mesh_partition,;order)
 
   ## Optimiser
   optimiser = AugmentedLagrangian(pcfs,ls_evo,vel_ext,φh;
-    γ,γ_reinit,verbose=i_am_main(ranks),constraint_names=[:Vol])
+    γ,verbose=i_am_main(ranks),constraint_names=[:Vol])
 
   # Do a few iterations
   vars, state = iterate(optimiser)
@@ -193,6 +202,7 @@ with_mpi() do distribute
   @test main(distribute,(2,2);order=1,AD=true)
   @test main(distribute,(2,2);order=2,AD=true)
   @test main(distribute,(2,2);order=1,AD=false)
+  @test main(distribute,(2,2);order=1,AD=false,use_l=true) # Issue #46
   @test main_3d(distribute,(2,2,1);order=1)
 end
 

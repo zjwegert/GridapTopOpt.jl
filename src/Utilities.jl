@@ -276,8 +276,12 @@ function get_element_diameters(model)
     return lazy_map(_get_tri_max_length,coords)
   elseif poly == TET
     return lazy_map(_get_tet_max_length,coords)
+  elseif poly == QUAD
+    return lazy_map(_get_quad_max_length,coords)
+  elseif poly == HEX
+    return lazy_map(_get_hex_max_length,coords)
   else
-    @notimplemented "Only triangles and tetrahedra are currently supported"
+    @notimplemented "Not implemented for $poly"
   end
 end
 
@@ -314,6 +318,19 @@ function _get_tri_max_length(coords)
   max(d12,d13,d23)
 end
 
+function _get_quad_max_length(coords)
+  # 3---4
+  # |   |
+  # |   |
+  # 1---2
+  d12 = norm(coords[1]-coords[2])
+  d13 = norm(coords[1]-coords[3])
+  d24 = norm(coords[2]-coords[4])
+  d34 = norm(coords[3]-coords[4])
+
+  max(d12,d13,d24,d34)
+end
+
 function _get_tet_max_length(coords)
   d12 = norm(coords[1]-coords[2])
   d13 = norm(coords[1]-coords[3])
@@ -323,6 +340,27 @@ function _get_tet_max_length(coords)
   d34 = norm(coords[3]-coords[4])
 
   max(d12,d13,d14,d23,d24,d34)
+end
+
+function _get_hex_max_length(coords)
+  #Front 3---4 Back 7---8
+  #      |   |      |   |
+  #      |   |      |   |
+  #      1---2      5---6
+  d12 = norm(coords[1]-coords[2])
+  d13 = norm(coords[1]-coords[3])
+  d24 = norm(coords[2]-coords[4])
+  d34 = norm(coords[3]-coords[4])
+  d15 = norm(coords[1]-coords[5])
+  d26 = norm(coords[2]-coords[6])
+  d37 = norm(coords[3]-coords[7])
+  d48 = norm(coords[4]-coords[8])
+  d56 = norm(coords[5]-coords[6])
+  d57 = norm(coords[5]-coords[7])
+  d68 = norm(coords[6]-coords[8])
+  d78 = norm(coords[7]-coords[8])
+
+  max(d12,d13,d24,d34,d15,d26,d37,d48,d56,d57,d68,d78)
 end
 
 # Test that a distributed and serial field are the same.
@@ -363,3 +401,7 @@ function test_serial_and_distributed_fields(fhd::DistributedMultiFieldCellField,
   result = map(i->test_serial_and_distributed_fields(fhd[i],Vd[i],fhs[i],Vs[i]),1:num_fields(fhd)) |> to_parray_of_arrays
   map(all,result)
 end
+
+# Triangulation dimensions
+_num_dims(space::FESpace) = num_cell_dims(get_triangulation(space))
+_num_dims(space::GridapDistributed.DistributedSingleFieldFESpace) = getany(map(_num_dims,local_views(space)))

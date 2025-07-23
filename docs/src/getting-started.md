@@ -4,7 +4,7 @@
 
 `GridapTopOpt.jl` and additional dependencies can be installed in an existing Julia environment using the package manager. This can be accessed in the Julia REPL (read-eval–print loop) by pressing `]`. We then add the required packages via:
 ```
-pkg> add GridapTopOpt, Gridap, GridapDistributed, GridapPETSc, GridapSolvers, PartitionedArrays, SparseMatricesCSR
+pkg> add GridapTopOpt, Gridap, GridapDistributed, GridapPETSc, GridapSolvers, GridapEmbedded, PartitionedArrays, SparseMatricesCSR
 ```
 Once installed, serial driver scripts can be run immediately, whereas parallel problems also require an MPI installation.
 
@@ -32,11 +32,12 @@ In order to get familiar with the library we recommend following the numerical e
 
 > Wegert, Z.J., Manyer, J., Mallon, C.N. et al. GridapTopOpt.jl: a scalable Julia toolbox for level set-based topology optimisation. Struct Multidisc Optim 68, 22 (2025). [https://doi.org/10.1007/s00158-024-03927-3](https://doi.org/10.1007/s00158-024-03927-3)
 
-In addition, there are several driver scripts available in `/scripts/..`
+_Please note, there have been several breaking releases since the above publication was first submitted, please see [Breaking Releases](https://zjwegert.github.io/GridapTopOpt.jl/stable/breaking-changes/) for a breakdown of these._
+
+In addition to these, there are several driver scripts available in `/scripts/..` along with some examples in this documentation.
 
 More general tutorials for familiarising ones self with Gridap are available via the [Gridap Tutorials](https://gridap.github.io/Tutorials/dev/).
 
 ## Known issues
 - PETSc's GAMG preconditioner breaks for split Dirichlet DoFs (e.g., x constrained while y free for a single node). There is no simple fix for this. We recommend instead using MUMPS or another preconditioner for this case.
-- Currently, our implementation of automatic differentiation does not support multiplication and division of optimisation functionals. We plan to add this in a future release of `GridapTopOpt.jl` -- Issue [#38](https://github.com/zjwegert/GridapTopOpt.jl/issues/38).
 - Analytic gradient breaks in parallel for integrals of certain measures -- Issue [#46](https://github.com/zjwegert/GridapTopOpt.jl/issues/46)

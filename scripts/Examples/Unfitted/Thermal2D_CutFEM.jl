@@ -26,10 +26,10 @@ function main()
   mkpath(path)
   # Params
   n = 50            # Initial mesh size (pre-refinement)
-  max_steps = 10/n  # Time-steps for evolution equation
+  max_steps = n/5   # Time-steps for evolution equation
   vf = 0.3          # Volume fraction
   α_coeff = 2       # Regularisation coefficient extension-regularisation
-  iter_mod = 1      # Write output every iter_mod iterations
+  iter_mod = 10     # Write output every iter_mod iterations
 
   # Model and some refinement
   _model = CartesianDiscreteModel((0,1,0,1),(n,n))
@@ -109,7 +109,7 @@ function main()
     update_collection!(Ωs,_φh)
     V = TestFESpace(Ωs.Ωact,reffe_scalar;dirichlet_tags=["Omega_D"])
     U = TrialFESpace(V,0.0)
-    state_map = AffineFEStateMap(a,l,U,V,V_φ,_φh)
+    state_map = AffineFEStateMap(a,l,U,V,V_φ)
     (;
       :state_map => state_map,
       :J => StateParamMap(J,state_map),
@@ -119,9 +119,9 @@ function main()
   pcfs = EmbeddedPDEConstrainedFunctionals(state_collection;analytic_dC=(dVol,))
 
   ## Evolution Method
-  evo = CutFEMEvolve(V_φ,Ωs,dΩ_bg,hₕ;max_steps,γg=0.1)
-  reinit = StabilisedReinit(V_φ,Ωs,dΩ_bg,hₕ;stabilisation_method=ArtificialViscosity(2.0))
-  ls_evo = UnfittedFEEvolution(evo,reinit)
+  evo = CutFEMEvolver(V_φ,Ωs,dΩ_bg,hₕ;max_steps,γg=0.1)
+  reinit = StabilisedReinitialiser(V_φ,Ωs,dΩ_bg,hₕ;stabilisation_method=ArtificialViscosity(2.0))
+  ls_evo = LevelSetEvolution(evo,reinit)
   reinit!(ls_evo,φh)
 
   ## Hilbertian extension-regularisation problems

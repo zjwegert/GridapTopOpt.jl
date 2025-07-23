@@ -87,10 +87,12 @@ function main()
   UΓ_out(u,φ) = ∫((u⋅-e₁-δₓ)/vol_Γ_out)dΓ_out
 
   ## Finite difference solver and level set function
-  ls_evo = HamiltonJacobiEvolution(FirstOrderStencil(2,Float64),model,V_φ,tol,max_steps)
+  evo = FiniteDifferenceEvolver(FirstOrderStencil(2,Float64),model,V_φ;max_steps)
+  reinit = FiniteDifferenceReinitialiser(FirstOrderStencil(2,Float64),model,V_φ;tol,γ_reinit)
+  ls_evo = LevelSetEvolution(evo,reinit)
 
   ## Setup solver and FE operators
-  state_map = AffineFEStateMap(a,l,U,V,V_φ,φh)
+  state_map = AffineFEStateMap(a,l,U,V,V_φ)
   pcfs = PDEConstrainedFunctionals(J,[Vol,UΓ_out],state_map,analytic_dC=[dVol,nothing])
 
   ## Hilbertian extension-regularisation problems
@@ -100,7 +102,7 @@ function main()
 
   ## Optimiser
   optimiser = HilbertianProjection(pcfs,ls_evo,vel_ext,φh;
-    γ,γ_reinit,verbose=true,debug=true,constraint_names=[:Vol,:UΓ_out])
+    γ,verbose=true,debug=true,constraint_names=[:Vol,:UΓ_out])
 
   # Do a few iterations
   vars, state = iterate(optimiser)

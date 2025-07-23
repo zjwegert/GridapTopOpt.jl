@@ -30,11 +30,7 @@ makedocs(
         "reference/optimisers.md",
         "reference/statemaps.md",
         "reference/zygote.md",
-        "LevelSetEvolution" => [
-          "reference/levelsetevolution/index.md",
-          "reference/levelsetevolution/finitediff.md",
-          "reference/levelsetevolution/unfitted.md"
-        ],
+        "reference/levelsetevolution.md",
         "reference/embedded.md",
         "reference/velext.md",
         "reference/io.md",
