@@ -43,7 +43,7 @@ function StateParamMap(
 
   # Use analytic derivatives?
   _∂F∂u(q,u,φ) = (T <: Nothing) ? Gridap.gradient(x->F(x,φ),u) : ∂F∂u(q,u,φ)
-  _∂F∂φ(q,u,φ) = (T <: Nothing) ? Gridap.gradient(x->F(u,x),u) : ∂F∂φ(q,u,φ)
+  _∂F∂φ(q,u,φ) = (T <: Nothing) ? Gridap.gradient(x->F(u,x),φ) : ∂F∂φ(q,u,φ)
 
   ## Dev note (commit fd65d0a):
   # In the past we used the following code to allocate vectors for the derivatives.
@@ -66,7 +66,7 @@ function StateParamMap(
   ∂j∂φ_vec = get_free_dof_values(zero(V_φ))
   assems = (assem_U,assem_deriv)
   spaces = (U,V_φ)
-  caches = (∂j∂u_vec,∂j∂φ_vec,_∂F∂u)
+  caches = (∂j∂u_vec,∂j∂φ_vec,_∂F∂u,_∂F∂φ)
   return StateParamMap(F,spaces,assems,caches)
 end
 
@@ -107,14 +107,14 @@ function ChainRulesCore.rrule(u_to_j::StateParamMap,uh,φh)
   F = u_to_j.F
   U,V_φ = u_to_j.spaces
   assem_U,assem_deriv = u_to_j.assems
-  ∂j∂u_vec,∂j∂φ_vec,∂F∂u = u_to_j.caches
+  ∂j∂u_vec,∂j∂φ_vec,∂F∂u,∂F∂φ = u_to_j.caches
 
   function u_to_j_pullback(dj)
     ## Compute ∂F/∂uh(uh,φh) and ∂F/∂φh(uh,φh)
     ∂j∂u = ∂F∂u(get_fe_basis(U),uh,φh)
     ∂j∂u_vecdata = collect_cell_vector(U,∂j∂u)
     assemble_vector!(∂j∂u_vec,assem_U,∂j∂u_vecdata)
-    ∂j∂φ = ∇(F,[uh,φh],2)
+    ∂j∂φ = ∂F∂φ(get_fe_basis(V_φ),uh,φh)
     ∂j∂φ_vecdata = collect_cell_vector(V_φ,∂j∂φ)
     assemble_vector!(∂j∂φ_vec,assem_deriv,∂j∂φ_vecdata)
     ∂j∂u_vec .*= dj

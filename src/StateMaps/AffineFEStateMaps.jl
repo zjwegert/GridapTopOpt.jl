@@ -11,13 +11,15 @@ element operators `AffineFEOperator`.
 - `spaces::C`: `Tuple` of finite element spaces.
 - `assems::D`: `Tuple` of assemblers
 - `cache::E`: An AffineFEStateMapCache
+- `update_opts::Tuple{Vararg{Bool}}`: Special options to optimise the state map update.
 """
 struct AffineFEStateMap{A,B,C,D,E} <: AbstractFEStateMap
-  biform     :: A
-  liform     :: B
-  spaces     :: C
-  assems     :: D
-  cache      :: E
+  biform      :: A
+  liform      :: B
+  spaces      :: C
+  assems      :: D
+  cache       :: E
+  update_opts :: Tuple{Vararg{Bool}}
 
   @doc """
       AffineFEStateMap(
@@ -26,14 +28,30 @@ struct AffineFEStateMap{A,B,C,D,E} <: AbstractFEStateMap
         assem_adjoint = SparseMatrixAssembler(V,U),
         assem_deriv = SparseMatrixAssembler(V_φ,V_φ),
         ls::LinearSolver = LUSolver(),
-        adjoint_ls::LinearSolver = LUSolver()
+        adjoint_ls::LinearSolver = LUSolver(),
+        reassemble_matrix::Bool = true,
+        reassemble_adjoint::Bool = true,
+        reassemble_adjoint_in_pullback::Bool = false,
+        precompute_uhd::Bool = false
       )
 
   Create an instance of `AffineFEStateMap` given the bilinear form `a` and linear
   form `l` as `Function` types, trial and test spaces `U` and `V`, the FE space `V_φ`
   for `φh` and derivatives, and the measures as additional arguments.
 
-  Optional arguments enable specification of assemblers and linear solvers.
+  Optional arguments enable specification of assemblers, linear solvers, and advanced options.
+
+  The advanced options should not be adjusted unless you know what you're doing! They are:
+  - `reassemble_matrix`: If `true`, the matrix is reassembled when the solver is called. By default, this is `true` and
+     is only false for special iterated problem (e.g., [*]).
+  - `reassemble_adjoint`: If `true`, the adjoint matrix is reassembled when the adjoint solver is built. By default,
+    this is `true` and is only false for special iterated problem (e.g., [*]).
+  - `reassemble_adjoint_in_pullback`: If `true`, the adjoint matrix is reassembled in the pullback. By default, this is `false` and
+    is only required for special iterated problem (e.g., transient with non-constant matrices).
+  - `precompute_uhd`: If `true`, the `uhd` vector is precomputed and stored in the cache. By default, this is `false` and
+    is only true when it is advantageous to avoid allocation of many `uhd` FEFunctions (e.g., transient problems with many time steps).
+
+  [*] Transient with constant matrices where we only update once
   """
   function AffineFEStateMap(
       biform::Function,liform::Function,U,V,V_φ;
@@ -41,13 +59,19 @@ struct AffineFEStateMap{A,B,C,D,E} <: AbstractFEStateMap
       assem_adjoint = SparseMatrixAssembler(V,U),
       assem_deriv = SparseMatrixAssembler(V_φ,V_φ),
       ls::LinearSolver = LUSolver(),
-      adjoint_ls::LinearSolver = LUSolver()
+      adjoint_ls::LinearSolver = LUSolver(),
+      reassemble_matrix::Bool = true,
+      reassemble_adjoint::Bool = true,
+      reassemble_adjoint_in_pullback::Bool = false,
+      precompute_uhd::Bool = false
     )
     spaces = (U,V,V_φ)
     assems = (;assem_U,assem_deriv,assem_adjoint)
     cache = FEStateMapCache(ls,adjoint_ls)
+    update_opts = (reassemble_matrix,reassemble_adjoint,
+      reassemble_adjoint_in_pullback,precompute_uhd)
     A,B,C,D,E = typeof(biform),typeof(liform),typeof(spaces),typeof(assems),typeof(cache)
-    return new{A,B,C,D,E}(biform,liform,spaces,assems,cache)
+    return new{A,B,C,D,E}(biform,liform,spaces,assems,cache,update_opts)
   end
 end
 
@@ -58,13 +82,14 @@ function build_cache!(state_map::AffineFEStateMap,φh)
   biform, liform = state_map.biform, state_map.liform
   cache = state_map.cache
   ls, adjoint_ls = cache.solvers[1], cache.solvers[2]
+  _,_,_,precompute_uhd = state_map.update_opts
 
   ## Pullback cache
   dudφ_vec = get_free_dof_values(zero(V_φ))
   cache.plb_cache = (dudφ_vec,assem_deriv)
 
   ## Forward cache
-  uhd = zero(U)
+  uhd = precompute_uhd ? nothing : zero(U);
   op = AffineFEOperator((u,v)->biform(u,v,φh),v->liform(v,φh),U,V,assem_U)
   K, b = get_matrix(op), get_vector(op)
   x  = allocate_in_domain(K); fill!(x,zero(eltype(x)))
@@ -102,12 +127,17 @@ function forward_solve!(φ_to_u::AffineFEStateMap,φh)
   if !is_cache_built(φ_to_u.cache)
     build_cache!(φ_to_u,φh)
   end
-  ns, K, b, x, uhd = φ_to_u.cache.fwd_cache
+  ns, K, b, x, _uhd = φ_to_u.cache.fwd_cache
+  reassemble_matrix,_,_,precompute_uhd = φ_to_u.update_opts
 
+  uhd = precompute_uhd ? zero(U) : _uhd;
+  l_fwd(v)   = liform(v,φh) - biform(uhd,v,φh)
   a_fwd(u,v) = biform(u,v,φh)
-  l_fwd(v)   = liform(v,φh)
-  assemble_matrix_and_vector!(a_fwd,l_fwd,K,b,assem_U,U,V,uhd)
-  numerical_setup!(ns,K)
+  if reassemble_matrix
+    assemble_matrix!(a_fwd,K,assem_U,U,V)
+    numerical_setup!(ns,K)
+  end
+  assemble_vector!(l_fwd,b,assem_U,V)
   solve!(x,ns,b)
   return x
 end
@@ -138,6 +168,22 @@ function adjoint_solve!(φ_to_u::AffineFEStateMap,du::AbstractVector)
   adjoint_ns, _, adjoint_x = φ_to_u.cache.adj_cache
   solve!(adjoint_x,adjoint_ns,du)
   return adjoint_x
+end
+
+function ChainRulesCore.rrule(φ_to_u::AffineFEStateMap,φh)
+  _,reassemble_adjoint,reassemble_adjoint_in_pullback,_ = φ_to_u.update_opts
+  u  = forward_solve!(φ_to_u,φh)
+  uh = FEFunction(get_trial_space(φ_to_u),u)
+  updated = (reassemble_adjoint && reassemble_adjoint_in_pullback) ? false : true
+  if reassemble_adjoint && !reassemble_adjoint_in_pullback
+    update_adjoint_caches!(φ_to_u,uh,φh)
+  end
+  return u, du -> pullback(φ_to_u,uh,φh,du;updated)
+end
+
+function ChainRulesCore.rrule(φ_to_u::AffineFEStateMap,φ::AbstractVector)
+  φh = FEFunction(get_aux_space(φ_to_u),φ)
+  return ChainRulesCore.rrule(φ_to_u,φh)
 end
 
 ## Backwards compat
