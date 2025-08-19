@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Breaking changes · GridapTopOpt.jl</title><meta name="title" content="Breaking changes · GridapTopOpt.jl"/><meta property="og:title" content="Breaking changes · GridapTopOpt.jl"/><meta property="twitter:title" content="Breaking changes · GridapTopOpt.jl"/><meta name="description" content="Documentation for GridapTopOpt.jl."/><meta property="og:description" content="Documentation for GridapTopOpt.jl."/><meta property="twitter:description" content="Documentation for GridapTopOpt.jl."/><script data-outdated-warner src="../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.050/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL=".."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../assets/documenter.js"></script><script src="../search_index.js"></script><script src="../siteinfo.js"></script><script src="../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-mocha.css" data-theme-name="catppuccin-mocha"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-macchiato.css" data-theme-name="catppuccin-macchiato"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-frappe.css" data-theme-name="catppuccin-frappe"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-latte.css" data-theme-name="catppuccin-latte"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><a class="docs-logo" href="../"><img src="../assets/logo.svg" alt="GridapTopOpt.jl logo"/></a><div class="docs-package-name"><span class="docs-autofit"><a href="../">GridapTopOpt.jl</a></span></div><button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)</button><ul class="docs-menu"><li><a class="tocitem" href="../">Home</a></li><li><a class="tocitem" href="../getting-started/">Getting Started</a></li><li><input class="collapse-toggle" id="menuitem-3" type="checkbox"/><label class="tocitem" for="menuitem-3"><span class="docs-label">Examples</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../examples/">Introductory examples</a></li><li><a class="tocitem" href="../examples/Unfitted-TO-with-Laplace/">Topology optimisation on unfitted meshes</a></li><li><a class="tocitem" href="../examples/Fluid-structure_interaction_with_CutFEM/">FSI with CutFEM</a></li><li><a class="tocitem" href="../examples/TO-with-Zygote/">Topology optimisation with Zygote</a></li></ul></li><li class="is-active"><a class="tocitem" href>Breaking changes</a><ul class="internal"><li class="toplevel"><a class="tocitem" href="#Details-of-all-breaking-changes"><span>Details of all breaking changes</span></a></li><li><a class="tocitem" href="#Updating-from-v0.2-to-v0.3/v0.4"><span>Updating from v0.2 to v0.3/v0.4</span></a></li><li><a class="tocitem" href="#Updating-from-v0.1-to-v0.2"><span>Updating from v0.1 to v0.2</span></a></li></ul></li><li><input class="collapse-toggle" id="menuitem-5" type="checkbox"/><label class="tocitem" for="menuitem-5"><span class="docs-label">Reference</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../reference/optimisers/">Optimisers</a></li><li><a class="tocitem" href="../reference/statemaps/">StateMaps</a></li><li><a class="tocitem" href="../reference/zygote/">Zygote &amp; GridapTopOpt Compatability</a></li><li><a class="tocitem" href="../reference/levelsetevolution/">LevelSetEvolution</a></li><li><a class="tocitem" href="../reference/embedded/">Embedded</a></li><li><a class="tocitem" href="../reference/velext/">Velocity extension</a></li><li><a class="tocitem" href="../reference/io/">IO</a></li><li><a class="tocitem" href="../reference/utilities/">Utilities</a></li><li><a class="tocitem" href="../reference/benchmarking/">Benchmarking</a></li></ul></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a><nav class="breadcrumb"><ul class="is-hidden-mobile"><li class="is-active"><a href>Breaking changes</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Breaking changes</a></li></ul></nav><div class="docs-right"><a class="docs-navbar-link" href="https://github.com/zjwegert/GridapTopOpt.jl" title="View the repository on GitHub"><span class="docs-icon fa-brands"></span><span class="docs-label is-hidden-touch">GitHub</span></a><a class="docs-navbar-link" href="https://github.com/zjwegert/GridapTopOpt.jl/blob/main/docs/src/breaking-changes.md" title="Edit source on GitHub"><span class="docs-icon fa-solid"></span></a><a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings"></a></div></header><article class="content" id="documenter-page"><h1 id="Breaking-Changes"><a class="docs-heading-anchor" href="#Breaking-Changes">Breaking Changes</a><a id="Breaking-Changes-1"></a><a class="docs-heading-anchor-permalink" href="#Breaking-Changes" title="Permalink"></a></h1><p>The following <code>git diff</code> shows a comparison between the script in <a href="https://link.springer.com/article/10.1007/s00158-024-03927-3#appendices">Appendix B</a> of the original <a href="https://link.springer.com/article/10.1007/s00158-024-03927-3">GridapTopOpt paper</a> and the most up-to-date version of the package. Details regarding all breaking changes can be found in the next section.</p><pre><code class="language-diff hljs">using GridapTopOpt, Gridap
+
+function main(write_dir)
+  # FE parameters
+  order = 1                                       # Finite element order
+  xmax,ymax = (1.0,1.0)                           # Domain size
+  dom = (0,xmax,0,ymax)                           # Bounding domain
+  el_size = (200,200)                             # Mesh partition size
+  prop_Γ_N = 0.2                                  # Γ_N size parameter
+  prop_Γ_D = 0.2                                  # Γ_D size parameter
+  f_Γ_N(x) = (x[1] ≈ xmax &amp;&amp;                      # Γ_N indicator function
+    ymax/2-ymax*prop_Γ_N/2 - eps() &lt;= x[2] &lt;= ymax/2+ymax*prop_Γ_N/2 + eps())
+  f_Γ_D(x) = (x[1] ≈ 0.0 &amp;&amp;                       # Γ_D indicator function
+    (x[2] &lt;= ymax*prop_Γ_D + eps() || x[2] &gt;= ymax-ymax*prop_Γ_D - eps()))
+  # FD parameters
+  γ = 0.1                                         # HJ eqn time step coeff
+  γ_reinit = 0.5                                  # Reinit. eqn time step coeff
+  max_steps = floor(Int,order*minimum(el_size)/10)# Max steps for advection
+  tol = 1/(5order^2)/minimum(el_size)		      # Reinitialisation tolerance
+  # Problem parameters
+  κ = 1                                           # Diffusivity
+  g = 1                                           # Heat flow in
+  vf = 0.4                                        # Volume fraction constraint
+  lsf_func = initial_lsf(4,0.2)                   # Initial level set function
+  iter_mod = 10                                   # VTK Output modulo
+  path = &quot;$write_dir/therm_comp_serial/&quot;          # Output path
+  mkpath(path)                                    # Create path
+  # Model
+  model = CartesianDiscreteModel(dom,el_size);
+  update_labels!(1,model,f_Γ_D,&quot;Gamma_D&quot;)
+  update_labels!(2,model,f_Γ_N,&quot;Gamma_N&quot;)
+  # Triangulation and measures
+  Ω = Triangulation(model)
+  Γ_N = BoundaryTriangulation(model,tags=&quot;Gamma_N&quot;)
+  dΩ = Measure(Ω,2*order)
+  dΓ_N = Measure(Γ_N,2*order)
+  # Spaces
+  reffe = ReferenceFE(lagrangian,Float64,order)
+  V = TestFESpace(model,reffe;dirichlet_tags=[&quot;Gamma_D&quot;])
+  U = TrialFESpace(V,0.0)
+  V_φ = TestFESpace(model,reffe)
+  V_reg = TestFESpace(model,reffe;dirichlet_tags=[&quot;Gamma_N&quot;])
+  U_reg = TrialFESpace(V_reg,0)
+  # Level set and interpolator
+  φh = interpolate(lsf_func,V_φ)
+  interp = SmoothErsatzMaterialInterpolation(η = 2*maximum(get_el_Δ(model)))
+  I,H,DH,ρ = interp.I,interp.H,interp.DH,interp.ρ
+  # Weak formulation
+- a(u,v,φ,dΩ,dΓ_N) = ∫((I ∘ φ)*κ*∇(u)⋅∇(v))dΩ
+- l(v,φ,dΩ,dΓ_N) = ∫(g*v)dΓ_N
++ a(u,v,φ) = ∫((I ∘ φ)*κ*∇(u)⋅∇(v))dΩ
++ l(v,φ) = ∫(g*v)dΓ_N
+- state_map = AffineFEStateMap(a,l,U,V,V_φ,U_reg,φh,dΩ,dΓ_N)
++ state_map = AffineFEStateMap(a,l,U,V,V_φ)
+  # Objective and constraints
+- J(u,φ,dΩ,dΓ_N) = ∫((I ∘ φ)*κ*∇(u)⋅∇(u))dΩ
+- dJ(q,u,φ,dΩ,dΓ_N) = ∫(κ*∇(u)⋅∇(u)*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
++ J(u,φ) = ∫((I ∘ φ)*κ*∇(u)⋅∇(u))dΩ
++ dJ(q,u,φ) = ∫(κ*∇(u)⋅∇(u)*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
+  vol_D = sum(∫(1)dΩ)
+- C1(u,φ,dΩ,dΓ_N) = ∫(((ρ ∘ φ) - vf)/vol_D)dΩ
+- dC1(q,u,φ,dΩ,dΓ_N) = ∫(-1/vol_D*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
++ C1(u,φ) = ∫(((ρ ∘ φ) - vf)/vol_D)dΩ
++ dC1(q,u,φ) = ∫(-1/vol_D*q*(DH ∘ φ)*(norm ∘ ∇(φ)))dΩ
+  pcfs = PDEConstrainedFunctionals(J,[C1],state_map,
+    analytic_dJ=dJ,analytic_dC=[dC1])
+  # Velocity extension
+  α = 4max_steps*γ*maximum(get_el_Δ(model))
+  a_hilb(p,q) =∫(α^2*∇(p)⋅∇(q) + p*q)dΩ
+  vel_ext = VelocityExtension(a_hilb,U_reg,V_reg)
+  # Finite difference scheme
+  scheme = FirstOrderStencil(length(el_size),Float64)
+- ls_evo = HamiltonJacobiEvolution(scheme,model,V_φ,tol,max_steps)
++ evo = FiniteDifferenceEvolver(scheme,model,V_φ;max_steps)
++ reinit = FiniteDifferenceReinitialiser(scheme,model,V_φ;tol,γ_reinit)
++ ls_evo = LevelSetEvolution(evo,reinit)
+  # Optimiser
+- optimiser = AugmentedLagrangian(pcfs,ls_evo,vel_ext,φh;γ,γ_reinit,
+-   verbose=true)
++ optimiser = AugmentedLagrangian(pcfs,ls_evo,vel_ext,φh;γ,verbose=true)
+  # Solve
+  for (it,uh,φh) in optimiser
+    data = [&quot;φ&quot;=&gt;φh,&quot;H(φ)&quot;=&gt;(H ∘ φh),&quot;|∇(φ)|&quot;=&gt;(norm ∘ ∇(φh)),&quot;uh&quot;=&gt;uh]
+    iszero(it % iter_mod) &amp;&amp; writevtk(Ω,path*&quot;out$it&quot;,cellfields=data)
+    write_history(path*&quot;/history.txt&quot;,get_history(optimiser))
+  end
+  # Final structure
+  it = get_history(optimiser).niter; uh = get_state(pcfs)
+  writevtk(Ω,path*&quot;out$it&quot;,cellfields=[&quot;φ&quot;=&gt;φh,
+    &quot;H(φ)&quot;=&gt;(H ∘ φh),&quot;|∇(φ)|&quot;=&gt;(norm ∘ ∇(φh)),&quot;uh&quot;=&gt;uh])
+end
+
+main(&quot;results/&quot;)</code></pre><h1 id="Details-of-all-breaking-changes"><a class="docs-heading-anchor" href="#Details-of-all-breaking-changes">Details of all breaking changes</a><a id="Details-of-all-breaking-changes-1"></a><a class="docs-heading-anchor-permalink" href="#Details-of-all-breaking-changes" title="Permalink"></a></h1><p>This page will be updated in the event that a breaking change is introduced into the source code.</p><h2 id="Updating-from-v0.2-to-v0.3/v0.4"><a class="docs-heading-anchor" href="#Updating-from-v0.2-to-v0.3/v0.4">Updating from v0.2 to v0.3/v0.4</a><a id="Updating-from-v0.2-to-v0.3/v0.4-1"></a><a class="docs-heading-anchor-permalink" href="#Updating-from-v0.2-to-v0.3/v0.4" title="Permalink"></a></h2><p>In v0.3 we added Zygote compatability for backwards differentiation in serial and parallel. In addition, in v0.4 we removed the requirement for <code>φh</code> to be passed to the constructors of StateMaps (excepting staggered maps). Below we list any breaking changes that will require changes to scripts implemented in v0.2:</p><ul><li><code>StateMaps</code> now always differentiate onto the space of the primal variable. See #76 for details. This introduces a breaking API change as <code>U_reg</code> and <code>φh</code> are removed from constructors of <code>StateMaps</code>. E.g.,<pre><code class="language-julia hljs">  AffineFEStateMap(a,l,U,V,V_φ,U_reg,φh)</code></pre>becomes<pre><code class="language-julia hljs">  AffineFEStateMap(a,l,U,V,V_φ)</code></pre>Backwards compatability has been added here to ensure that the old API produces a meaningful error.</li><li>The way that we allocate vectors for distributed has been reworked. Now, we always create derivatives using <code>zero(&lt;:FESpace)</code>, we then move this to the correct type of array when required. For example, if needing to interpolate onto a RHS vector (this doesn&#39;t have ghosts in distributed), we can use the functionality <code>_interpolate_onto_rhs!</code>. This change cleans up a lot of the constructors for <code>&lt;:StateMap</code> and <code>StateMapWithParam</code>. <strong>Any</strong> code implemented that relies on the old approach for allocating vectors should be adjusted accordingly.</li></ul><h2 id="Updating-from-v0.1-to-v0.2"><a class="docs-heading-anchor" href="#Updating-from-v0.1-to-v0.2">Updating from v0.1 to v0.2</a><a id="Updating-from-v0.1-to-v0.2-1"></a><a class="docs-heading-anchor-permalink" href="#Updating-from-v0.1-to-v0.2" title="Permalink"></a></h2><p>In v0.2 we made several quality of life changes and enabled compatability with GridapEmbedded. Below we list any breaking changes that will require changes to scripts implemented in v0.1:</p><ul><li>Automatic differentiation capability has now been added to GridapDistributed. As a result, the <code>IntegrandWithMeasure</code> structure has been removed. In addition functionals previously required the measures to be passed as arguments, e.g.,<pre><code class="nohighlight hljs">J(u,φ,dΩ,dΓ_N) = ∫(f(u,φ))dΩ + ∫(g(u,φ))dΓ_N</code></pre>This is no longer required and the above should instead be written as<pre><code class="nohighlight hljs">J(u,φ) = ∫(f(u,φ))dΩ + ∫(g(u,φ))dΓ_N</code></pre></li></ul></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../examples/TO-with-Zygote/">« Topology optimisation with Zygote</a><a class="docs-footer-nextpage" href="../reference/optimisers/">Optimisers »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.14.1 on <span class="colophon-date" title="Tuesday 19 August 2025 00:56">Tuesday 19 August 2025</span>. Using Julia version 1.11.6.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
