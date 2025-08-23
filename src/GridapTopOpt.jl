@@ -75,9 +75,11 @@ export NonlinearFEStateMap
 export RepeatingAffineFEStateMap
 export StaggeredAffineFEStateMap
 export StaggeredNonlinearFEStateMap
+export StateParamMap
 export get_state
 export evaluate_functionals!
 export evaluate_derivatives!
+export val_and_gradient
 
 include("Utilities.jl")
 export SmoothErsatzMaterialInterpolation
