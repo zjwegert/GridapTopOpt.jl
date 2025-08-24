@@ -8,13 +8,13 @@ GridapTopOpt is computational toolbox for level set-based topology optimisation 
 
 _Please note, there have been several breaking releases since the above publication was first submitted, please see [Breaking Releases](https://zjwegert.github.io/GridapTopOpt.jl/stable/breaking-changes/) for a breakdown of these._
 
-## Automatic Differentiation Features
-GridapTopOpt provides scalable automatic differentiation methods for generic PDE-constrained functionals and arbitrary maps of those functionals.
-
 ## Documentation
 
 - [**STABLE**](https://zjwegert.github.io/GridapTopOpt.jl/stable) &mdash; **Documentation for the most recently tagged version.**
 - [**DEVELOP**](https://zjwegert.github.io/GridapTopOpt.jl/dev) &mdash; *Documentation for the most recent in-development version.*
+
+## Automatic Differentiation Features
+GridapTopOpt provides scalable automatic differentiation methods for generic PDE-constrained functionals and arbitrary maps of those functionals. An introductory example is provided [here](https://zjwegert.github.io/GridapTopOpt.jl/dev/examples/AD-PDE-constrained-functions/).
 
 ## How to cite GridapTopOpt
 
