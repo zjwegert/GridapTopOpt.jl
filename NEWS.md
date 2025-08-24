@@ -4,14 +4,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+- Adjusted README.md to discuss AD and link to docs.
+- Now export `StateParamMap` and `val_and_gradient`.
+
 ## [0.4.1] - 2025-8-19
 
 ### Added
-- Added options to optimise the state map update for `AffineFEStateMap` and `NonlinearFEStateMap`
-- Added transient tests
+- Added options to optimise the state map update for `AffineFEStateMap` and `NonlinearFEStateMap`.
+- Added transient tests.
 
 ### Fixed
-- Bug fix in `StateParamMaps` to correctly use analytic gradient
+- Bug fix in `StateParamMaps` to correctly use analytic gradient.
 
 ## [0.4.0] - 2025-7-15
 

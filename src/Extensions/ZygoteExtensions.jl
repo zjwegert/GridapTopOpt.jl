@@ -66,8 +66,15 @@ end
 #   isn't compatible unless we use BlockPMatrix? - maybe this is better in future...
 #
 # - We specify `ignore_pullback` to allow us to avoid computing gradients for some terms.
-#   This is useful for when we hae an analytic derivative and don't want to compute the
+#   This is useful for when we have an analytic derivative and don't want to compute the
 #   adjoint because this requires a solution to an FE problem.
+"""
+    val_and_jacobian(f, args...;ignore_pullback=[])
+
+Compute the value and jacobian of f at args. Equivalent to `Zygote.withjacobian` except this is compatible with PartitionedArrays.
+
+Terms in the output of f can be ignored by specifying their indices in `ignore_pullback`. This is useful for when we have an analytic derivative.
+"""
 function val_and_jacobian(f, args...;ignore_pullback=[])
   y, back = Zygote.pullback(Zygote._jvec∘f, args...)
   out = map(args) do x
@@ -90,6 +97,11 @@ end
 
 
 # Equivalent `Zygote.withgradient` call that is compatible with PartitionedArrays
+"""
+    val_and_gradient(f, args...)
+
+Compute the value and gradient of f at args. Equivalent to `Zygote.withgradient` except this is compatible with PartitionedArrays.
+"""
 function val_and_gradient(f, args...)
   y, back = Zygote.pullback(f, args...)
   grad = back(Zygote.sensitivity(y))

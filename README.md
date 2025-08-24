@@ -13,6 +13,9 @@ _Please note, there have been several breaking releases since the above publicat
 - [**STABLE**](https://zjwegert.github.io/GridapTopOpt.jl/stable) &mdash; **Documentation for the most recently tagged version.**
 - [**DEVELOP**](https://zjwegert.github.io/GridapTopOpt.jl/dev) &mdash; *Documentation for the most recent in-development version.*
 
+## Automatic Differentiation Features
+GridapTopOpt provides scalable automatic differentiation methods for generic PDE-constrained functionals and arbitrary maps of those functionals. An introductory example is provided [here](https://zjwegert.github.io/GridapTopOpt.jl/dev/examples/AD-PDE-constrained-functions/).
+
 ## How to cite GridapTopOpt
 
 ### General use
