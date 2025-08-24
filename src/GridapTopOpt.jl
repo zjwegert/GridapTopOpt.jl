@@ -80,6 +80,7 @@ export get_state
 export evaluate_functionals!
 export evaluate_derivatives!
 export val_and_gradient
+export val_and_jacobian
 
 include("Utilities.jl")
 export SmoothErsatzMaterialInterpolation
