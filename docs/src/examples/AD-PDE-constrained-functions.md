@@ -10,12 +10,12 @@ $$J(u,\kappa) = \left(\int_\Omega(u(\kappa)-u_\textrm{obs})~\mathrm{d}\boldsymbo
 
 where $u_\textrm{obs}$ is some observed data and $u$ depends on $\kappa$ through Poisson's equation: find $u\in H^1_g(\Omega)$ such that $a(u,v) = l(v)$ for all $v\in H^1_0(\Omega)$ where
 
-$$
+```math
 \begin{aligned}
 a(u,v) &= \int_\Omega\kappa\nabla u\cdot\nabla v~\mathrm{d}\boldsymbol{x},\\
 l(v) &= \int_\Omega vf~\mathrm{d}\boldsymbol{x},
 \end{aligned}
-$$
+```
 
 and $f(x,y) = y$ and $g(x,y) = x$. The derivative of $J(u(\kappa),\kappa)$ with respect to $\kappa$ can be found using the following snippet:
 
