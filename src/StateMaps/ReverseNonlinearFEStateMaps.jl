@@ -141,8 +141,8 @@ function dRdφ(φ_to_u::ReverseNonlinearFEStateMap,uh,vh,φh)
   res = φ_to_u.res
   V_diff = φ_to_u.spaces[4]
   function _res(φ)
-    φh = FEFunction(V_diff, φ)
-    sum(res(uh,vh,φh))
+    _φh = FEFunction(V_diff, φ)
+    sum(res(uh,vh,_φh))
   end                                                                    
   return ReverseDiff.gradient(_res,φh.free_values)
 end
