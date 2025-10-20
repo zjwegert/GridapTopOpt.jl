@@ -35,7 +35,7 @@ struct EmbeddedCollection{A<:Union{WithCut,WithoutCut}}
       bgmodel::Union{<:DiscreteModel,<:DistributedDiscreteModel};
       compute_cut::Bool=true)
     check_polytopes(bgmodel)
-    T = compute_cut ? WithCut() : WithoutCut()
+    T = compute_cut ? WithCut : WithoutCut
     new{T}(recipes, objects, bgmodel)
   end
 end
