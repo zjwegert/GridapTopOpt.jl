@@ -1,6 +1,9 @@
 
+struct WithCut end
+struct WithoutCut end
+
 """
-    struct EmbeddedCollection
+    struct EmbeddedCollection{A<:Union{WithCut,WithoutCut}}
       recipes :: Vector{<:Function}
       objects :: Dict{Symbol,Any}
       bgmodel :: DiscreteModel
@@ -11,25 +14,29 @@ provides a way to update all the stored objects at once.
 
 ## Constructor
 
-- `EmbeddedCollection(recipes::Union{<:Function,Vector{<:Function}},bgmodel::DiscreteModel[,φh])`
+- `EmbeddedCollection(recipes::Union{<:Function,Vector{<:Function}},bgmodel::DiscreteModel[,φh];compute_cut::Bool=true)`
 
 If provided, `φh` will be used to compute the initial collection of objects. If not provided,
-the collection will remain empty until `update_collection!` is called.
+the collection will remain empty until `update_collection!` is called. The `compute_cut` flag indicates
+whether to compute cut geometries, if false, the recipes will be called with only `φh`.
 
 ## API:
 
 - `update_collection!(c::EmbeddedCollection,φh)`: Update the collection of objects using the level set function `φh`.
 - `add_recipe!(c::EmbeddedCollection,r::Function[,φh])`: Add a recipe to the collection. Update the collection if `φh` is provided.
-
+  The recipe `r` is expected to have the signature `r(cutgeo,cutgeo_facet,φh)` if `compute_cut = true` and
+  `r(φh)` if `compute_cut = false`.
 """
-struct EmbeddedCollection
+struct EmbeddedCollection{A<:Union{WithCut,WithoutCut}}
   recipes :: Vector{<:Function}
   objects :: Dict{Symbol,Any}
   bgmodel :: Union{<:DiscreteModel,<:DistributedDiscreteModel}
   function EmbeddedCollection(recipes::Vector{<:Function},objects::Dict{Symbol,Any},
-      bgmodel::Union{<:DiscreteModel,<:DistributedDiscreteModel})
+      bgmodel::Union{<:DiscreteModel,<:DistributedDiscreteModel};
+      compute_cut::Bool=true)
     check_polytopes(bgmodel)
-    new(recipes, objects, bgmodel)
+    T = compute_cut ? WithCut() : WithoutCut()
+    new{T}(recipes, objects, bgmodel)
   end
 end
 
@@ -62,12 +69,19 @@ end
 
 (c::EmbeddedCollection)(φh) = update_collection!(c,φh)
 
-function update_collection!(c::EmbeddedCollection,φh)
+function update_collection!(c::EmbeddedCollection{WithCut},φh)
   geo = DiscreteGeometry(φh,c.bgmodel)
   cutgeo = cut(c.bgmodel,geo)
   cutgeo_facet = cut_facets(c.bgmodel,geo)
   for r in c.recipes
     merge!(c.objects,pairs(r(cutgeo,cutgeo_facet,φh)))
+  end
+  return c
+end
+
+function update_collection!(c::EmbeddedCollection{WithoutCut},φh)
+  for r in c.recipes
+    merge!(c.objects,pairs(r(φh)))
   end
   return c
 end
