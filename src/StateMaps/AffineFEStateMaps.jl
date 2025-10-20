@@ -149,7 +149,7 @@ end
 
 function dRdφ(φ_to_u::AffineFEStateMap,uh,vh,φh)
   biform, liform = φ_to_u.biform, φ_to_u.liform
-  return ∇(biform,[uh,vh,φh],3) - ∇(liform,[vh,φh],2)
+  return __gradient(φ->biform(uh,vh,φ)-liform(vh,φ),φh;ad_type=:monolithic)
 end
 
 function update_adjoint_caches!(φ_to_u::AffineFEStateMap,uh,φh)

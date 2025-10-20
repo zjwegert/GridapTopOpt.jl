@@ -221,7 +221,7 @@ function dRdφ(φ_to_u::RepeatingAffineFEStateMap,uh,vh,φh)
   vh_blocks = repeated_blocks(V0,vh)
   res = DomainContribution()
   for (liform,uhi,vhi) in zip(liforms,uh_blocks,vh_blocks)
-    res = res + ∇(biform,[uhi,vhi,φh],3) - ∇(liform,[vhi,φh],2)
+    res = res + __gradient(x->biform(uhi,vhi,x)-liform(vhi,x),φh;ad_type=:monolithic)
   end
   return res
 end

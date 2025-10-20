@@ -147,7 +147,7 @@ end
 
 function dRdφ(φ_to_u::NonlinearFEStateMap,uh,vh,φh)
   res = φ_to_u.res
-  return ∇(res,[uh,vh,φh],3)
+  return ∇(res,[uh,vh,φh],3;ad_type=:monolithic)
 end
 
 function update_adjoint_caches!(φ_to_u::NonlinearFEStateMap,uh,φh)
