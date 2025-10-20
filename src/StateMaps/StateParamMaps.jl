@@ -40,8 +40,8 @@ problems. For SingleField FE problems, this does nothing. Options can be found i
 function StateParamMap(
   F,U::FESpace,V_φ::FESpace,
   assem_U::Assembler,assem_deriv::Assembler;
-  ∂F∂u::Function = (q,u,v) -> __gradient(x->F(x,φ),u;ad_type=:split),
-  ∂F∂φ::Function = (q,u,v) -> __gradient(x->F(x,φ),u;ad_type=:monolithic)
+  ∂F∂u::Function = (q,u,φ) -> __gradient(x->F(x,φ),u;ad_type=:split),
+  ∂F∂φ::Function = (q,u,φ) -> __gradient(x->F(u,x),φ;ad_type=:monolithic)
 )
   ## Dev note (commit fd65d0a):
   # In the past we used the following code to allocate vectors for the derivatives.
