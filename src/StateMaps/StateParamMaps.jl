@@ -41,7 +41,7 @@ can be found in Gridap.MultiField.
 function StateParamMap(
   F,U::FESpace,V_φ::FESpace,
   assem_U::Assembler,assem_deriv::Assembler;
-  ∂u_ad_type::Symbol=:monolithic,
+  ∂u_ad_type::Symbol=:split,
   ∂φ_ad_type::Symbol=:monolithic,
   ∂F∂u::Function = (q,u,φ) -> __gradient(x->F(x,φ),u;ad_type=∂u_ad_type),
   ∂F∂φ::Function = (q,u,φ) -> __gradient(x->F(u,x),φ;ad_type=∂φ_ad_type)
