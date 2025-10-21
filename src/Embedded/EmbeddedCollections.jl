@@ -54,16 +54,19 @@ function check_polytopes(bgmodel::DistributedDiscreteModel)
   map(check_polytopes, local_views(bgmodel))
 end
 
-function EmbeddedCollection(recipes::Function,bgmodel)
-  EmbeddedCollection(Function[recipes],Dict{Symbol,Any}(),bgmodel)
+function EmbeddedCollection(recipes::Function,bgmodel;
+      compute_cut::Bool=true)
+  EmbeddedCollection(Function[recipes],Dict{Symbol,Any}(),bgmodel;compute_cut)
 end
 
-function EmbeddedCollection(recipes::Vector{<:Function},bgmodel)
-  EmbeddedCollection(recipes,Dict{Symbol,Any}(),bgmodel)
+function EmbeddedCollection(recipes::Vector{<:Function},bgmodel;
+      compute_cut::Bool=true)
+  EmbeddedCollection(recipes,Dict{Symbol,Any}(),bgmodel;compute_cut)
 end
 
-function EmbeddedCollection(recipes::Union{<:Function,Vector{<:Function}},bgmodel,φ0)
-  c = EmbeddedCollection(recipes,bgmodel)
+function EmbeddedCollection(recipes::Union{<:Function,Vector{<:Function}},bgmodel,φ0;
+      compute_cut::Bool=true)
+  c = EmbeddedCollection(recipes,bgmodel;compute_cut)
   update_collection!(c,φ0)
 end
 

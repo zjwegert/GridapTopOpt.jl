@@ -72,7 +72,7 @@ struct NonlinearFEStateMap{A,B,C,D,E} <: AbstractFEStateMap
 end
 
 function NonlinearFEStateMap(res::Function,U,V,V_φ;kwargs...)
-  jac = (u,du,v,φh) -> Gridap.jacobian(res,[u,v,φh],1)
+  jac = (u,du,v,φh) -> Gridap.jacobian(res,[u,v,φh],1;ad_type=:monolithic)
   NonlinearFEStateMap(res,jac,U,V,V_φ;kwargs...)
 end
 
