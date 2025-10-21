@@ -401,6 +401,6 @@ function __gradient(f::Function,uh::SingleFieldFEFunctionTypes;ad_type::Symbol=:
   Gridap.gradient(f,uh)
 end
 
-function __gradient(f::Function,uh::MultiFieldFEFunctionTypes;ad_type::Symbol=:split)
+function __gradient(f::Function,uh::MultiFieldFEFunctionTypes;ad_type::Symbol=:monolithic)
   Gridap.gradient(f,uh;ad_type)
 end
