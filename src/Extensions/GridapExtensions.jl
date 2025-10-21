@@ -404,3 +404,11 @@ end
 function __gradient(f::Function,uh::MultiFieldFEFunctionTypes;ad_type::Symbol=:monolithic)
   Gridap.gradient(f,uh;ad_type)
 end
+
+function __jacobian(f::Function,uh::SingleFieldFEFunctionTypes;ad_type::Symbol=:monolithic)
+  Gridap.jacobian(f,uh)
+end
+
+function __jacobian(f::Function,uh::MultiFieldFEFunctionTypes;ad_type::Symbol=:monolithic)
+  Gridap.jacobian(f,uh;ad_type)
+end

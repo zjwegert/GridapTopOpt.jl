@@ -12,6 +12,7 @@ element operators `AffineFEOperator`.
 - `assems::D`: `Tuple` of assemblers
 - `cache::E`: An AffineFEStateMapCache
 - `update_opts::Tuple{Vararg{Bool}}`: Special options to optimise the state map update.
+- `∂ϕ_ad_type::Symbol`: The AD type used when computing derivatives with respect to `φh` for multi-field case.
 """
 struct AffineFEStateMap{A,B,C,D,E} <: AbstractFEStateMap
   biform      :: A
@@ -20,6 +21,7 @@ struct AffineFEStateMap{A,B,C,D,E} <: AbstractFEStateMap
   assems      :: D
   cache       :: E
   update_opts :: Tuple{Vararg{Bool}}
+  ∂ϕ_ad_type :: Symbol
 
   @doc """
       AffineFEStateMap(
@@ -32,7 +34,8 @@ struct AffineFEStateMap{A,B,C,D,E} <: AbstractFEStateMap
         reassemble_matrix::Bool = true,
         reassemble_adjoint::Bool = true,
         reassemble_adjoint_in_pullback::Bool = false,
-        precompute_uhd::Bool = false
+        precompute_uhd::Bool = false,
+        ∂ϕ_ad_type::Symbol = :monolithic
       )
 
   Create an instance of `AffineFEStateMap` given the bilinear form `a` and linear
@@ -40,6 +43,10 @@ struct AffineFEStateMap{A,B,C,D,E} <: AbstractFEStateMap
   for `φh` and derivatives, and the measures as additional arguments.
 
   Optional arguments enable specification of assemblers, linear solvers, and advanced options.
+
+  The optional argument `∂ϕ_ad_type` allows the user to specify the AD type used when computing
+  derivatives with respect to `φh` for multi-field problems. This can be either `:monolithic`
+  (default) or `:split`.
 
   The advanced options should not be adjusted unless you know what you're doing! They are:
   - `reassemble_matrix`: If `true`, the matrix is reassembled when the solver is called. By default, this is `true` and
@@ -63,7 +70,8 @@ struct AffineFEStateMap{A,B,C,D,E} <: AbstractFEStateMap
       reassemble_matrix::Bool = true,
       reassemble_adjoint::Bool = true,
       reassemble_adjoint_in_pullback::Bool = false,
-      precompute_uhd::Bool = false
+      precompute_uhd::Bool = false,
+      ∂ϕ_ad_type::Symbol = :monolithic
     )
     spaces = (U,V,V_φ)
     assems = (;assem_U,assem_deriv,assem_adjoint)
@@ -71,7 +79,7 @@ struct AffineFEStateMap{A,B,C,D,E} <: AbstractFEStateMap
     update_opts = (reassemble_matrix,reassemble_adjoint,
       reassemble_adjoint_in_pullback,precompute_uhd)
     A,B,C,D,E = typeof(biform),typeof(liform),typeof(spaces),typeof(assems),typeof(cache)
-    return new{A,B,C,D,E}(biform,liform,spaces,assems,cache,update_opts)
+    return new{A,B,C,D,E}(biform,liform,spaces,assems,cache,update_opts,∂ϕ_ad_type)
   end
 end
 
@@ -149,7 +157,8 @@ end
 
 function dRdφ(φ_to_u::AffineFEStateMap,uh,vh,φh)
   biform, liform = φ_to_u.biform, φ_to_u.liform
-  return __gradient(φ->biform(uh,vh,φ)-liform(vh,φ),φh;ad_type=:monolithic)
+  ad_type = φ_to_u.∂ϕ_ad_type
+  return __gradient(φ->biform(uh,vh,φ)-liform(vh,φ),φh;ad_type)
 end
 
 function update_adjoint_caches!(φ_to_u::AffineFEStateMap,uh,φh)

@@ -35,13 +35,16 @@ F(u,φ) with respect to the field u in the direction q as ∂F∂u(q,u,φ) and/o
 to the field φ in the direction q as ∂F∂φ(q,u,φ).
 
 Optional arguments `∂u_ad_type` and `∂φ_ad_type` specify the approach for AD for multifield
-problems. For SingleField FE problems, this does nothing. Options can be found in Gridap.MultiField.
+problems (either :split or :monolithic). For SingleField FE problems, this does nothing. Description of options
+can be found in Gridap.MultiField.
 """
 function StateParamMap(
   F,U::FESpace,V_φ::FESpace,
   assem_U::Assembler,assem_deriv::Assembler;
-  ∂F∂u::Function = (q,u,φ) -> __gradient(x->F(x,φ),u;ad_type=:monolithic),
-  ∂F∂φ::Function = (q,u,φ) -> __gradient(x->F(u,x),φ;ad_type=:monolithic)
+  ∂u_ad_type::Symbol=:monolithic,
+  ∂φ_ad_type::Symbol=:monolithic,
+  ∂F∂u::Function = (q,u,φ) -> __gradient(x->F(x,φ),u;ad_type=∂u_ad_type),
+  ∂F∂φ::Function = (q,u,φ) -> __gradient(x->F(u,x),φ;ad_type=∂φ_ad_type)
 )
   ## Dev note (commit fd65d0a):
   # In the past we used the following code to allocate vectors for the derivatives.

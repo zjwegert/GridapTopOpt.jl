@@ -38,7 +38,7 @@ vector of `FEFunctions` or `CellField` `uh`, evaluate the Jacobian
 function Gridap.jacobian(F,uh::Vector{<:CellField},K::Int;ad_type::Symbol=:monolithic)
   @check 0 < K <= length(uh)
   _f(uk) = F(uh[1:K-1]...,uk,uh[K+1:end]...)
-  return __gradient(_f,uh[K];ad_type)
+  return __jacobian(_f,uh[K];ad_type)
 end
 
 # Backwards compat msgs
