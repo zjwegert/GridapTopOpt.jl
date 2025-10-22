@@ -27,16 +27,8 @@ function main(distribute,mesh_partition)
 
   φh = interpolate(x->-sqrt((x[1]-0.5)^2+(x[2]-0.5)^2)+0.25,V_φ)
 
-  Ωs = EmbeddedCollection(model,φh) do cutgeo,_,_
-    Γ = EmbeddedBoundary(cutgeo)
-    (;
-      :Γ  => Γ,
-      :dΓ => Measure(Γ,2*order),
-    )
-  end
-
-  ls_evo = CutFEMEvolver(V_φ,Ωs,dΩ,h)
-  ls_reinit = StabilisedReinitialiser(V_φ,Ωs,dΩ,h)
+  ls_evo = CutFEMEvolver(V_φ,dΩ,h;correct_ls = true,max_steps=10,γg = 0.1)
+  ls_reinit = StabilisedReinitialiser(V_φ,dΩ,h)
   evo = LevelSetEvolution(ls_evo,ls_reinit)
 
   φ0 = copy(get_free_dof_values(φh))
