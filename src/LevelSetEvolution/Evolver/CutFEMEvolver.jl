@@ -85,6 +85,7 @@ function evolve!(s::CutFEMEvolver,φh,velh,γ)
   Δt = γ*hmin
   tF = Δt*max_steps
   φ_tmp = copy(get_free_dof_values(φh))
+  # check_consistent!(φ_tmp)
   φh_tmp = FEFunction(V_φ,φ_tmp)
   A, B = get_weak_form(φh_tmp,velh,Δt,s)
 
@@ -98,6 +99,7 @@ function evolve!(s::CutFEMEvolver,φh,velh,γ)
   ti = 0.0
   while ti <= tF - Gridap.ODEs.ε
     solve!(φ,ns,b)
+    check_consistent!(φ)
     assemble_vector!(v -> B(v,φh) - A(uhd,v),b,assem,V_φ)
     ti += Δt
   end
@@ -116,6 +118,7 @@ function evolve!(s::CutFEMEvolver,φh,velh,γ,cache)
   Δt = γ*hmin
   tF = Δt*max_steps
   copyto!(get_free_dof_values(φh_tmp),get_free_dof_values(φh))
+  # check_consistent!(get_free_dof_values(φh_tmp))
   A, B = get_weak_form(φh_tmp,velh,Δt,s)
 
   # Setup
@@ -129,12 +132,16 @@ function evolve!(s::CutFEMEvolver,φh,velh,γ,cache)
   ti = 0.0
   while ti <= tF - Gridap.ODEs.ε
     solve!(φ,ns,b)
+    check_consistent!(φ)
     assemble_vector!(v -> B(v,φh) - A(uhd,v),b,assem,V_φ)
     ti += Δt
   end
   correct_ls && correct_ls!(φh)
   return get_free_dof_values(φh), cache
 end
+
+check_consistent!(vec) = vec
+check_consistent!(vec::PVector) = consistent!(vec) |> fetch;
 
 function get_weak_form(φh,velh,Δt,s::CutFEMEvolver)
   dΩ_bg, params = s.dΩ_bg, s.params
