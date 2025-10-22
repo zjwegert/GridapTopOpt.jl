@@ -27,7 +27,7 @@ struct MultiLevelSetEvolution{
   evolvers/reinitialisers.
   """
   function MultiLevelSetEvolution(evolvers,reinitialisers,mf_space;reuse_cache=true)
-    cache_type = reuse_cache ? ReuseCache : SeparateCache
+    cache_type = reuse_cache ? ReuseCache() : SeparateCache()
     @check length(evolvers) == length(reinitialisers) "Number of evolvers and reinitialisers must be the same"
     A,B,C,D=typeof(cache_type),typeof(evolvers),typeof(reinitialisers),typeof(mf_space)
     new{A,B,C,D}(evolvers,reinitialisers,mf_space)
