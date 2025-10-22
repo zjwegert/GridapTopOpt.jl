@@ -43,7 +43,9 @@ function main(distribute,mesh_partition)
   φh0 = FEFunction(V_φ,φ0)
 
   velh = interpolate(x->-1,V_φ)
-  evolve!(evo,φh,velh,0.1)
+  _,cache = evolve!(evo,φh,velh,0.1);
+
+  # Expected
   Δt = 0.1*h
   φh_expected_lsf = interpolate(x->-sqrt((x[1]-0.5)^2+(x[2]-0.5)^2)+0.25+evo.evolver.params.max_steps*Δt,V_φ)
 
@@ -51,9 +53,9 @@ function main(distribute,mesh_partition)
   L2error(u) = sqrt(sum(∫(u ⋅ u)dΩ))
   @test L2error(φh_expected_lsf-φh) < 1e-3
 
-  # # Test advected LSF mataches original LSF when going backwards
+  # Test advected LSF mataches original LSF when going backwards, reuse cache
   velh = interpolate(x->1,V_φ)
-  evolve!(evo,φh,velh,0.1)
+  evolve!(evo,φh,velh,0.1,cache)
   @test L2error(φh0-φh) < 1e-4
 end
 

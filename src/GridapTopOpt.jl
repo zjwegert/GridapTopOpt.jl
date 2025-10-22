@@ -94,6 +94,7 @@ export isotropic_elast_tensor
 
 include("LevelSetEvolution/LevelSetEvolution.jl")
 export LevelSetEvolution
+export MultiLevelSetEvolution
 export evolve!
 export reinit!
 export FirstOrderStencil

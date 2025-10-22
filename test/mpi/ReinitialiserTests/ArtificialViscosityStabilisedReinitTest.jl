@@ -36,8 +36,8 @@ function main(distribute,mesh_partition)
     )
   end
 
-  ls_evo = CutFEMEvolver(V_φ,Ωs,dΩ,h)
-  ls_reinit = StabilisedReinitialiser(V_φ,Ωs,dΩ,h;
+  ls_evo = CutFEMEvolver(V_φ,dΩ,h)
+  ls_reinit = StabilisedReinitialiser(V_φ,dΩ,h;
     stabilisation_method=ArtificialViscosity(1.5h),
     nls = GridapSolvers.NewtonSolver(LUSolver();maxiter=50,rtol=1.e-14,verbose=i_am_main(ranks)))
   evo = LevelSetEvolution(ls_evo,ls_reinit)

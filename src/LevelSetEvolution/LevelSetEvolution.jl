@@ -88,6 +88,7 @@ include("Utilities/Helpers.jl")
 include("Stencil/Stencil.jl")
 include("Evolver/Evolver.jl")
 include("Reinitialiser/Reinitialiser.jl")
+include("MultiLevelSetEvolution.jl")
 
 # Backwards compat/errors
 function UnfittedFEEvolution(args...)

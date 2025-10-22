@@ -246,12 +246,11 @@ function main(model,geo_params;ls=LUSolver(),hilb_ls=LUSolver())
   pcf = EmbeddedPDEConstrainedFunctionals(state_collection;analytic_dC=[dVol])
 
   ## Evolution Method
-  evolve_nls = NewtonSolver(ls;maxiter=1,verbose=true)
   reinit_nls = NewtonSolver(ls;maxiter=20,rtol=1.e-14,verbose=true)
 
-  evo = CutFEMEvolver(V_φ,Ω,dΩ_act,hₕ;max_steps,γg=0.5,ode_ls=ls,ode_nl=evolve_nls)
-  reinit1 = StabilisedReinitialiser(V_φ,Ω,dΩ_act,hₕ;stabilisation_method=ArtificialViscosity(1.0),nls=reinit_nls)
-  reinit2 = StabilisedReinitialiser(V_φ,Ω,dΩ_act,hₕ;stabilisation_method=InteriorPenalty(V_φ;γg=1.0),nls=reinit_nls)
+  evo = CutFEMEvolver(V_φ,dΩ_act,hₕ;max_steps,γg=0.5,ode_ls=ls)
+  reinit1 = StabilisedReinitialiser(V_φ,dΩ_act,hₕ;stabilisation_method=ArtificialViscosity(1.0),nls=reinit_nls)
+  reinit2 = StabilisedReinitialiser(V_φ,dΩ_act,hₕ;stabilisation_method=InteriorPenalty(V_φ;γg=1.0),nls=reinit_nls)
   ls_evo = LevelSetEvolution(evo,GridapTopOpt.MultiStageStabilisedReinitialiser([reinit1,reinit2]))
 
   ## Hilbertian extension-regularisation problems

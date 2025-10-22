@@ -4,11 +4,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.4.2] - 2025-##-##
+
+### Added
+- Added option for AD type in `StateMaps`
+- Added `compute_cut` option to `EmbeddedCollection`. This indicates whether to compute cut
+  geometries. If false, the recipes will be called with only `φh`.
+- Added `MultiLevelSetEvolution`
 
 ### Changed
 - Adjusted README.md to discuss AD and link to docs.
 - Now export `StateParamMap` and `val_and_gradient`.
+- Reimplemented `CutFEMEvolver` to enable caching.
+- `CutFEMEvolver` and `StabilisedReinitialiser` no longer require EmbeddedCollection as an argument. This
+  was required to ensure multi-phase methods are compatible with existing methods.
+
+### Fixed
+- Fixed `correct_ls!` function signature
 
 ## [0.4.1] - 2025-8-19
 
