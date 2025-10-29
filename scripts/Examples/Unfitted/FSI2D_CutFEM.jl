@@ -261,7 +261,7 @@ function main(model,geo_params;ls=LUSolver(),hilb_ls=LUSolver())
 
   ## Optimiser
   optimiser = AugmentedLagrangian(pcf,ls_evo,vel_ext,φh;maxiter=300,
-    γ=γ_evo,verbose=true,constraint_names=[:Vol],converged,Λ_update_tol = 0.01vf)
+    γ=γ_evo,verbose=true,constraint_names=[:Vol],Λ_update_tol = 0.01vf)
   for (it,(uh,ph,dh),φh) in optimiser
     if iszero(it % iter_mod)
       writevtk(Ω_act,files_path*"Omega_act_$it",
