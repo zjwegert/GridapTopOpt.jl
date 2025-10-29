@@ -42,6 +42,8 @@ end
 function combine_fields(::MultiFieldFESpace{<:BlockMultiFieldStyle},u...)
   mortar([u...])
 end
+
+# combine_fields rrule
 function ChainRulesCore.rrule(::typeof(combine_fields),V,u...)
   function pullback(y)
     # Unpack y into contributions from each seperate field in u
@@ -49,6 +51,17 @@ function ChainRulesCore.rrule(::typeof(combine_fields),V,u...)
     return (NoTangent(),NoTangent(),ys...)
   end
   return combine_fields(V,u...), y->pullback(y)
+end
+
+# restrict_to_field rrule
+function ChainRulesCore.rrule(::typeof(restrict_to_field),V,u,i)
+  function pullback(y)
+    u0 = zero_free_values(V);
+    _u = map(i->restrict_to_field(V,u0,i),Base.OneTo(length(V)))
+    ys = combine_fields(V,_u[1:i-1]...,y,_u[i+1:end]...)
+    return (NoTangent(),NoTangent(),ys,NoTangent())
+  end
+  return restrict_to_field(V,u,i), y->pullback(y)
 end
 
 ### Zygote extensions to enable compat with PartitionedArrays
