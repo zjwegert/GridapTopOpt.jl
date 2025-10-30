@@ -7,11 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.4.2] - 2025-##-##
 
 ### Added
-- Added option for AD type in `StateMaps`
-- Added `compute_cut` option to `EmbeddedCollection`. This indicates whether to compute cut
+- Added option for AD type in `StateMaps`.
+- Added `compute_cut` option to `EmbeddedCollection`. This indicates whether to compute cut.
   geometries. If false, the recipes will be called with only `φh`.
-- Added `MultiLevelSetEvolution`
-- Added `rrule` for `restrict_to_field`
+- Added `MultiLevelSetEvolution`.
+- Added `rrule` for `restrict_to_field`.
 
 ### Changed
 - Adjusted README.md to discuss AD and link to docs.
@@ -19,9 +19,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Reimplemented `CutFEMEvolver` to enable caching.
 - `CutFEMEvolver` and `StabilisedReinitialiser` no longer require EmbeddedCollection as an argument. This
   was required to ensure multi-phase methods are compatible with existing methods.
+- Unified serial methods for `combine_fields`.
 
 ### Fixed
-- Fixed `correct_ls!` function signature
+- Fixed `correct_ls!` function signature.
+- Fixed `combine_fields` in distributed when using `BlockMultiFieldStyle` with different `PVector` types.
 
 ## [0.4.1] - 2025-8-19
 
