@@ -1,5 +1,3 @@
-struct Zygote_StaggeredMultiField
-
 using GridapTopOpt
 using Gridap, Gridap.MultiField
 using GridapSolvers, GridapSolvers.BlockSolvers, GridapSolvers.NonlinearSolvers
@@ -90,8 +88,6 @@ function main(distribute,mesh_partition)
   end
 end
 
-with_mpi() do distribute
+with_debug() do distribute
   main(distribute,(2,2))
-end
-
 end
