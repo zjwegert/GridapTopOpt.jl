@@ -62,21 +62,21 @@ end
 function ChainRulesCore.rrule(::typeof(combine_fields),V,u...)
   function pullback(y)
     # Unpack y into contributions from each seperate field in u
-    ys = map(i->restrict_to_field(V,y,i),Base.OneTo(length(V)))
+    ys = map(i->restrict(V,y,i),Base.OneTo(length(V)))
     return (NoTangent(),NoTangent(),ys...)
   end
   return combine_fields(V,u...), y->pullback(y)
 end
 
-# restrict_to_field rrule
-function ChainRulesCore.rrule(::typeof(restrict_to_field),V,u,i)
+# restrict rrule
+function ChainRulesCore.rrule(::typeof(restrict),V,u,i)
   function pullback(y)
     u0 = zero_free_values(V);
-    _u = map(i->restrict_to_field(V,u0,i),Base.OneTo(length(V)))
+    _u = map(i->restrict(V,u0,i),Base.OneTo(length(V)))
     ys = combine_fields(V,_u[1:i-1]...,y,_u[i+1:end]...)
     return (NoTangent(),NoTangent(),ys,NoTangent())
   end
-  return restrict_to_field(V,u,i), y->pullback(y)
+  return restrict(V,u,i), y->pullback(y)
 end
 
 ### Zygote extensions to enable compat with PartitionedArrays

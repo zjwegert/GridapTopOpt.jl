@@ -11,7 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added `compute_cut` option to `EmbeddedCollection`. This indicates whether to compute cut.
   geometries. If false, the recipes will be called with only `φh`.
 - Added `MultiLevelSetEvolution`.
-- Added `rrule` for `restrict_to_field`.
+- Added `restrict`, short hand for `restrict_to_field`.
+- Added `rrule` for `restrict`.
 
 ### Changed
 - Adjusted README.md to discuss AD and link to docs.
