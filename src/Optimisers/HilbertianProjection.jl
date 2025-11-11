@@ -400,7 +400,7 @@ function _linesearch!(m::HilbertianProjection{WithAutoDiff},state,γ)
   ## Calculate objective, constraints, and shape derivatives after line search
   J, C, dJ, dC = Gridap.evaluate!(m.problem,φh)
 
-  return J, C, dJ, dC, γ, evo_cache, reinit_cache
+  return J, C, dJ, dC, γ, reinit_cache, evo_cache
 end
 
 function _linesearch!(m::HilbertianProjection{NoAutoDiff},state,γ)
@@ -424,7 +424,7 @@ function _linesearch!(m::HilbertianProjection{NoAutoDiff},state,γ)
     # Check enabled
     if ~ls_enabled
       J, C, dJ, dC = Gridap.evaluate!(m.problem,φh)
-      return J, C, dJ, dC, γ, evo_cache, reinit_cache
+      return J, C, dJ, dC, γ, reinit_cache, evo_cache
     end
 
     # Calcuate new objective and constraints
@@ -446,7 +446,7 @@ function _linesearch!(m::HilbertianProjection{NoAutoDiff},state,γ)
     end
   end
 
-  return J, C, dJ, dC, γ, evo_cache, reinit_cache
+  return J, C, dJ, dC, γ, reinit_cache, evo_cache
 end
 
 function debug_print(orthog,dV,dC,dC_orthog,K,P,nullity,debug_code,debug)
