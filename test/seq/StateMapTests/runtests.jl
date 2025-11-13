@@ -13,9 +13,12 @@ using Test
   include("ThreeStaggeredNonlinearFEStateMapTest.jl")
   include("AffineFEStateMapTest_CutFEM_Elast.jl")
   include("Zygote_TwoStaggeredAffineFEStateMapTest.jl")
-
   include("TwoStaggeredAffineFEStateMapTest_ADTypeUnstableBug.jl")
   include("NonSymmetricThreeStaggeredNonlinearFEStateMapTest.jl")
+  # Transient
+  include("Transient_CrankNicolson_AffineFEStateMap.jl")
+  include("Transient_CrankNicolson_ConstantMats_AffineFEStateMap.jl")
+  include("Transient_CrankNicolson_NonlinearFEStateMap.jl")
 end
 
 end # module

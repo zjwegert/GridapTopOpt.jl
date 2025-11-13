@@ -51,3 +51,12 @@ GridapTopOpt.CustomEmbeddedPDEConstrainedFunctionals(
           analytic_dC = fill(nothing,num_constraints)
         )
 ```
+
+## PartitionedArrays-compatible Zygote methods
+
+```@docs
+GridapTopOpt.val_and_gradient
+GridapTopOpt.val_and_jacobian
+```
+
+Discussion of the usage of these can be found in this [example](../examples/AD-PDE-constrained-functions.md).
