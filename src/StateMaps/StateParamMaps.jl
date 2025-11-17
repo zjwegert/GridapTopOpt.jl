@@ -66,13 +66,15 @@ function StateParamMap(
   ∂j∂φ_vec = get_free_dof_values(zero(V_φ))
   assems = (assem_U,assem_deriv)
   spaces = (U,V_φ)
-  caches = (∂j∂u_vec,∂j∂φ_vec,_∂F∂u,_∂F∂φ)
+  caches = (∂j∂u_vec,∂j∂φ_vec,_∂F∂u,_∂F∂φ,zero(U).free_values,zero(V_φ).free_values)
   return StateParamMap(F,spaces,assems,caches)
 end
 
 function get_∂F∂φ_vec(u_to_j::StateParamMap)
   u_to_j.caches[2]
 end
+get_state(m::StateParamMap) = FEFunction(m.spaces[1], m.caches[5])
+get_parameter(m::StateParamMap) = FEFunction(m.spaces[2], m.caches[6])
 
 function StateParamMap(F::Function,φ_to_u::AbstractFEStateMap;kwargs...)
   U = get_trial_space(φ_to_u)
@@ -87,7 +89,11 @@ end
 
 Evaluate the `StateParamMap` at parameters `uh` and `φh`.
 """
-(u_to_j::AbstractStateParamMap)(uh,φh) = sum(u_to_j.F(uh,φh))
+function (u_to_j::StateParamMap)(uh::FEFunction,φh::FEFunction)
+  u_to_j.caches[5] .= uh.free_values
+  u_to_j.caches[6] .= φh.free_values
+  return sum(u_to_j.F(uh,φh))
+end
 
 function (u_to_j::StateParamMap)(u::AbstractVector,φ::AbstractVector)
   U,V_φ = u_to_j.spaces
@@ -107,7 +113,9 @@ function ChainRulesCore.rrule(u_to_j::StateParamMap,uh,φh)
   F = u_to_j.F
   U,V_φ = u_to_j.spaces
   assem_U,assem_deriv = u_to_j.assems
-  ∂j∂u_vec,∂j∂φ_vec,∂F∂u,∂F∂φ = u_to_j.caches
+  ∂j∂u_vec,∂j∂φ_vec,∂F∂u,∂F∂φ,_,_ = u_to_j.caches
+  u_to_j.caches[5] .= uh.free_values
+  u_to_j.caches[6] .= φh.free_values
 
   function u_to_j_pullback(dj)
     ## Compute ∂F/∂uh(uh,φh) and ∂F/∂φh(uh,φh)

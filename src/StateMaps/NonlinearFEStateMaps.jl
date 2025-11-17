@@ -60,7 +60,7 @@ struct NonlinearFEStateMap{A,B,C,D,E} <: AbstractFEStateMap
     reassemble_adjoint_in_pullback::Bool = false
   )
     jacs = (jac,adjoint_jac)
-  spaces = (U,V,V_φ)
+    spaces = (U,V,V_φ)
     assems = (;assem_U,assem_deriv,assem_adjoint)
     cache = FEStateMapCache(nls,adjoint_ls)
     update_opts = (reassemble_adjoint_in_pullback,)
@@ -96,7 +96,7 @@ function build_cache!(state_map::NonlinearFEStateMap,φh)
   _jac(u,du,v) = jac(u,du,v,φh)
   op = get_algebraic_operator(FEOperator(_res,_jac,U,V,assem_U))
   nls_cache = instantiate_caches(x,nls,op)
-  cache.fwd_cache = (nls,nls_cache,x)
+  cache.fwd_cache = (nls,nls_cache,x,φh.free_values)
 
   ## Adjoint cache
   uhd = zero(U)
@@ -123,6 +123,7 @@ end
 get_plb_cache(m::NonlinearFEStateMap) = m.cache.plb_cache
 get_spaces(m::NonlinearFEStateMap) = m.spaces
 get_assemblers(m::NonlinearFEStateMap) = m.assems
+get_parameter(m::NonlinearFEStateMap) = FEFunction(get_aux_space(m),m.cache.fwd_cache[4])
 
 function forward_solve!(φ_to_u::NonlinearFEStateMap,φh)
   U, V, _ = φ_to_u.spaces
@@ -132,7 +133,8 @@ function forward_solve!(φ_to_u::NonlinearFEStateMap,φh)
   if !is_cache_built(φ_to_u.cache)
     build_cache!(φ_to_u,φh)
   end
-  nls, nls_cache, x = φ_to_u.cache.fwd_cache
+  nls, nls_cache, x, _ = φ_to_u.cache.fwd_cache
+  φ_to_u.cache.fwd_cache[4] .= φh.free_values
 
   _res(u,v) = res(u,v,φh)
   _jac(u,du,v) = jac(u,du,v,φh)

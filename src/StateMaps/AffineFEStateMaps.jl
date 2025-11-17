@@ -94,7 +94,7 @@ function build_cache!(state_map::AffineFEStateMap,φh)
   K, b = get_matrix(op), get_vector(op)
   x  = allocate_in_domain(K); fill!(x,zero(eltype(x)))
   ns = numerical_setup(symbolic_setup(ls,K),K)
-  cache.fwd_cache = (ns,K,b,x,uhd)
+  cache.fwd_cache = (ns,K,b,x,uhd,φh.free_values)
 
   ## Adjoint cache
   adjoint_K  = assemble_matrix((u,v)->biform(v,u,φh),assem_adjoint,V,U)
@@ -119,6 +119,7 @@ end
 get_plb_cache(m::AffineFEStateMap) = m.cache.plb_cache
 get_spaces(m::AffineFEStateMap) = m.spaces
 get_assemblers(m::AffineFEStateMap) = m.assems
+get_parameter(m::AffineFEStateMap) = FEFunction(get_aux_space(m), m.cache.fwd_cache[6] )
 
 function forward_solve!(φ_to_u::AffineFEStateMap,φh)
   biform, liform = φ_to_u.biform, φ_to_u.liform
@@ -127,7 +128,9 @@ function forward_solve!(φ_to_u::AffineFEStateMap,φh)
   if !is_cache_built(φ_to_u.cache)
     build_cache!(φ_to_u,φh)
   end
-  ns, K, b, x, _uhd = φ_to_u.cache.fwd_cache
+  ns, K, b, x, _uhd, φ = φ_to_u.cache.fwd_cache
+  φ_to_u.cache.fwd_cache[6].=φh.free_values
+
   reassemble_matrix,_,_,precompute_uhd = φ_to_u.update_opts
 
   uhd = precompute_uhd ? zero(U) : _uhd;
