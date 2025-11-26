@@ -25,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Fixed `correct_ls!` function signature.
 - Fixed `combine_fields` in distributed when using `BlockMultiFieldStyle` with different `PVector` types.
+- Bug fix in `max_iter` for `HilbertianProjection`
 
 ## [0.4.1] - 2025-8-19
 

@@ -378,6 +378,7 @@ function _linesearch!(m::HilbertianProjection{WithAutoDiff},state,γ)
     end
 
     ~ls_enabled && break
+    ls_it += 1;
 
     # Calcuate new objective and constraints
     J_interm, C_interm = evaluate_functionals!(m.problem,φh)
@@ -426,6 +427,7 @@ function _linesearch!(m::HilbertianProjection{NoAutoDiff},state,γ)
       J, C, dJ, dC = Gridap.evaluate!(m.problem,φh)
       return J, C, dJ, dC, γ, reinit_cache, evo_cache
     end
+    ls_it += 1;
 
     # Calcuate new objective and constraints
     J_interm, C_interm, dJ_interm, dC_interm = Gridap.evaluate!(m.problem,φh)
