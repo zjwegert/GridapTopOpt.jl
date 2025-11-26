@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `CutFEMEvolver` and `StabilisedReinitialiser` no longer require EmbeddedCollection as an argument. This
   was required to ensure multi-phase methods are compatible with existing methods.
 - Unified serial methods for `combine_fields`.
+- The line search can now be enabled after a set iteration in `HilbertianProjection`
 
 ### Fixed
 - Fixed `correct_ls!` function signature.
