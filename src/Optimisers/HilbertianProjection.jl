@@ -378,7 +378,7 @@ function _linesearch!(m::HilbertianProjection{WithAutoDiff},state,γ)
       _,reinit_cache = reinit!(m.ls_evolver,φ,reinit_cache)
     end
 
-    ~ls_enabled || (it <= ls_enable_it) && break
+    ~ls_enabled && (it <= ls_enable_it) && break
     ls_it += 1;
 
     # Calcuate new objective and constraints
@@ -424,7 +424,7 @@ function _linesearch!(m::HilbertianProjection{NoAutoDiff},state,γ)
     end
 
     # Check enabled
-    if ~ls_enabled || (it <= ls_enable_it)
+    if ~ls_enabled && (it <= ls_enable_it)
       J, C, dJ, dC = Gridap.evaluate!(m.problem,φh)
       return J, C, dJ, dC, γ, reinit_cache, evo_cache
     end
