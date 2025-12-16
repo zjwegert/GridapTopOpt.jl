@@ -22,6 +22,7 @@ struct NonlinearFEStateMap{A,B,C,D,E} <: AbstractFEStateMap
   assems      :: D
   cache       :: E
   update_opts :: Tuple{Vararg{Bool}}
+  diff_order  :: Int
 
   @doc """
       NonlinearFEStateMap(
@@ -57,17 +58,19 @@ struct NonlinearFEStateMap{A,B,C,D,E} <: AbstractFEStateMap
     nls::NonlinearSolver = NewtonSolver(LUSolver();maxiter=50,rtol=1.e-8,verbose=true),
     adjoint_ls::LinearSolver = LUSolver(),
     adjoint_jac::Function = jac,
-    reassemble_adjoint_in_pullback::Bool = false
+    reassemble_adjoint_in_pullback::Bool = false,
+    diff_order::Int = 1,
   )
     jacs = (jac,adjoint_jac)
     spaces = (U,V,V_φ)
     assems = (;assem_U,assem_deriv,assem_adjoint)
     cache = FEStateMapCache(nls,adjoint_ls)
     update_opts = (reassemble_adjoint_in_pullback,)
+    update_flags = (false, false) # first element to indicate if the state is solved and second for the adjoint
 
     A, B, C = typeof(res), typeof(jacs), typeof(spaces)
     D, E = typeof(assems), typeof(cache)
-    return new{A,B,C,D,E}(res,jacs,spaces,assems,cache,update_opts)
+    return new{A,B,C,D,E}(res,jacs,spaces,assems,cache,update_opts,diff_order)
   end
 end
 
@@ -85,6 +88,7 @@ function build_cache!(state_map::NonlinearFEStateMap,φh)
   jac, adjoint_jac = state_map.jacs
   cache = state_map.cache
   nls, adjoint_ls = cache.solvers[1], cache.solvers[2]
+  diff_order = state_map.diff_order
 
   ## Pullback cache
   dudφ_vec = get_free_dof_values(zero(V_φ))
@@ -106,6 +110,15 @@ function build_cache!(state_map::NonlinearFEStateMap,φh)
   adjoint_ns = numerical_setup(symbolic_setup(adjoint_ls,adjoint_K),adjoint_K)
   cache.adj_cache = (adjoint_ns,adjoint_K,adjoint_x)
 
+  ## Incremental cache
+  if diff_order == 1 
+    cache.inc_state_cache = () ; cache.inc_adjoint_cache = ()
+  elseif diff_order == 2
+    cache.inc_state_cache, cache.inc_adjoint_cache = build_inc_cache(state_map,φh,uhd,adjoint_x)
+  else
+    error("Differentiation order $(diff_order) not supported.")
+  end
+
   ## Update cache status
   cache.cache_built = true
 
@@ -124,6 +137,7 @@ get_plb_cache(m::NonlinearFEStateMap) = m.cache.plb_cache
 get_spaces(m::NonlinearFEStateMap) = m.spaces
 get_assemblers(m::NonlinearFEStateMap) = m.assems
 get_parameter(m::NonlinearFEStateMap) = FEFunction(get_aux_space(m),m.cache.fwd_cache[4])
+get_res(m::NonlinearFEStateMap) = m.res
 
 function forward_solve!(φ_to_u::NonlinearFEStateMap,φh)
   U, V, _ = φ_to_u.spaces
@@ -135,11 +149,15 @@ function forward_solve!(φ_to_u::NonlinearFEStateMap,φh)
   end
   nls, nls_cache, x, _ = φ_to_u.cache.fwd_cache
   φ_to_u.cache.fwd_cache[4] .= φh.free_values
+  φ_to_u.cache.adjoint_updated = false
 
   _res(u,v) = res(u,v,φh)
   _jac(u,du,v) = jac(u,du,v,φh)
   op = get_algebraic_operator(FEOperator(_res,_jac,U,V,assem_U))
   solve!(x,nls,op,nls_cache)
+  φ_to_u.diff_order == 2 ? update_incremental_state_partials!(φ_to_u, get_res(φ_to_u), FEFunction(U,x), φh) : nothing
+  φ_to_u.cache.state_updated = true
+
   return x
 end
 
@@ -148,7 +166,7 @@ function forward_solve!(φ_to_u::NonlinearFEStateMap,φ::AbstractVector)
   return forward_solve!(φ_to_u,φh)
 end
 
-function dRdφ(φ_to_u::NonlinearFEStateMap,uh,vh,φh)
+function dRdφ(φ_to_u::NonlinearFEStateMap,uh::FEFunction,vh::FEFunction,φh::FEFunction)
   res = φ_to_u.res
   return ∇(res,[uh,vh,φh],3)
 end
@@ -170,6 +188,7 @@ end
 function adjoint_solve!(φ_to_u::NonlinearFEStateMap,du::AbstractVector)
   adjoint_ns, _, adjoint_x = φ_to_u.cache.adj_cache
   solve!(adjoint_x,adjoint_ns,du)
+  φ_to_u.cache.adjoint_updated = true
   return adjoint_x
 end
 
