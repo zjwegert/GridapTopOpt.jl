@@ -51,6 +51,10 @@ import Gridap: solve!
 import PartitionedArrays: default_find_rcv_ids
 import GridapDistributed: remove_ghost_cells
 
+using Krylov
+using LinearMaps
+using ForwardDiff 
+
 __init__() = begin
   include((@__DIR__)*"/Extensions/GridapExtensions.jl")
   include((@__DIR__)*"/LevelSetEvolution/Utilities/MutableRungeKutta.jl")

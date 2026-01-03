@@ -206,6 +206,8 @@ function pullback(u_to_j::StateParamMap,u::AbstractVector,φ::AbstractVector,dj)
 end
 
 function ChainRulesCore.rrule(u_to_j::StateParamMap,uh,φh)
+  println("evaluating state-param map")
+  @show sum(φh.free_values)
   return u_to_j(uh,φh), dj -> pullback(u_to_j,uh,φh,dj)
 end
 
