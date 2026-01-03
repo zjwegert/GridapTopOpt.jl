@@ -160,7 +160,11 @@ function forward_solve!(φ_to_u::NonlinearFEStateMap,φh)
   _res(u,v) = res(u,v,φh)
   _jac(u,du,v) = jac(u,du,v,φh)
   op = get_algebraic_operator(FEOperator(_res,_jac,U,V,assem_U))
+
+    println("solving state")
+  @show sum(φh.free_values)
   solve!(x,nls,op,nls_cache)
+  println("finished solving state")
   φ_to_u.diff_order == 2 ? update_incremental_state_partials!(φ_to_u, get_res(φ_to_u), FEFunction(U,x), φh) : nothing
   φ_to_u.cache.state_updated = true
 
@@ -194,14 +198,19 @@ end
 
 function adjoint_solve!(φ_to_u::NonlinearFEStateMap,du::AbstractVector)
   adjoint_ns, _, adjoint_x = φ_to_u.cache.adj_cache
+  println("solving adjoint")
+  @show sum(φ_to_u.cache.fwd_cache[4])
   solve!(adjoint_x,adjoint_ns,du)
+  println("finished solving adjoint")
   φ_to_u.cache.adjoint_updated = true
   return adjoint_x
 end
 
 function ChainRulesCore.rrule(φ_to_u::NonlinearFEStateMap,φh)
   reassemble_adjoint_in_pullback, = φ_to_u.update_opts
+
   u  = forward_solve!(φ_to_u,φh)
+
   uh = FEFunction(get_trial_space(φ_to_u),u)
   if !reassemble_adjoint_in_pullback
     update_adjoint_caches!(φ_to_u,uh,φh)

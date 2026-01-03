@@ -471,11 +471,12 @@ throughout GridapTopOpt.
     ```
     This functionality is subject to change.
 """
-struct CustomPDEConstrainedFunctionals{N,A} <:  AbstractPDEConstrainedFunctionals{N}
+struct CustomPDEConstrainedFunctionals{N,A,B} <:  AbstractPDEConstrainedFunctionals{N}
   φ_to_jc :: Function
   analytic_dJ
   analytic_dC
   state_map :: A
+  #diff_order :: B
 
     @doc"""
         CustomPDEConstrainedFunctionals(
@@ -507,9 +508,10 @@ struct CustomPDEConstrainedFunctionals{N,A} <:  AbstractPDEConstrainedFunctional
       num_constraints;
       state_map :: Union{Nothing,AbstractFEStateMap,Vector{<:AbstractFEStateMap}} = nothing,
       analytic_dJ = nothing,
-      analytic_dC = fill(nothing,num_constraints)
+      analytic_dC = fill(nothing,num_constraints),
+      diff_order::Int = 1
     )
-    return new{num_constraints,typeof(state_map)}(φ_to_jc,analytic_dJ,analytic_dC,state_map)
+    return new{num_constraints,typeof(state_map),diff_order}(φ_to_jc,analytic_dJ,analytic_dC,state_map)
   end
 end
 
@@ -597,6 +599,52 @@ function evaluate_functionals!(pcf::CustomPDEConstrainedFunctionals{0},φ::Abstr
   j = val[1]
   c = Vector{eltype(val)}();
   return j,c
+end
+
+# with newton conditioning 
+function Fields.evaluate!(pcf::CustomPDEConstrainedFunctionals{0,A,2},φh) where A
+  φ_to_jc = pcf.φ_to_jc
+  analytic_dJ!, analytic_dC! = pcf.analytic_dJ, pcf.analytic_dC
+
+  # Compute derivatives
+  ignore_pullback = findall(!isnothing,vcat(analytic_dJ!, analytic_dC!))
+  val, _grad = val_and_jacobian(φ_to_jc, get_free_dof_values(φh);ignore_pullback)
+
+  @check length(val) == 1 "Expected 0 constraints, φ_to_jc returned $(length(val)) values instead of 1"
+
+  # Unpack
+  j = val[1]
+  c = Vector{eltype(val)}()
+  grad = first(_grad)
+  dJ = grad[1]
+  dC = Vector{eltype(grad)}();
+
+  # Analytic derivative
+  function _compute_dF!(dF,analytic_dF!::Function)
+    analytic_dF!(dF,get_free_dof_values(φh))
+    nothing
+  end
+  function _compute_dF!(dF,analytic_dF!::Nothing)
+    nothing
+  end
+  _compute_dF!(dJ,pcf.analytic_dJ)
+
+  # Define once for the entire problem
+  ∇f = p->Zygote.gradient(p->φ_to_jc(p)[1],p)[1]
+  Hṗ(p,ṗ) =  ForwardDiff.derivative(α -> ∇f(p + α*ṗ), 0)
+
+  # Once per outer iteration
+  p0 = get_free_dof_values(φh)
+  Hṗ_map = LinearMap((x)->Hṗ(p0,x),length(p0),length(p0)) 
+  dJ_newton_results = Krylov.cg_lanczos(Hṗ_map,dJ,verbose=1,check_curvature=true)
+  dJ_newton = dJ_newton_results[1]
+  if dJ_newton_results[2].status == "negative curvature" 
+    @warn "negative curvature detected in Newton solve for objective derivative. Reverting to gradietn direction"
+    dJ_newton .= dJ
+  end
+  @show length(dJ), length(dJ_newton)
+
+  return j,c,dJ_newton,dC
 end
 
 ########## Zygote + Unfitted ##########
