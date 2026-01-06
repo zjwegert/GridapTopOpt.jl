@@ -643,13 +643,31 @@ function Fields.evaluate!(pcf::CustomPDEConstrainedFunctionals{0,A,2},φh) where
   # Once per outer iteration
   p0 = get_free_dof_values(φh)
   Hṗ_map = LinearMap((x)->Hṗ(p0,x),length(p0),length(p0)) 
-  dJ_newton_results = Krylov.cg_lanczos(Hṗ_map,dJ,verbose=1,check_curvature=true)
+
+  # dJ_newton_results = Krylov.cg_lanczos(Hṗ_map,dJ,verbose=1,check_curvature=true)
+  # dJ_newton_results = Krylov.cg_lanczos_shift(Hṗ_map,dJ,[0.1],verbose=1)#,check_curvature=true)
+  # indefs = dJ_newton_results[2].indefinite
+  # @show i = findlast(==(0),indefs)
+
+  # dJ_newton = similar(dJ)
+  # if i == nothing
+  #   dJ_newton .= dJ
+  # elseif i != nothing 
+  #   dJ_newton .= dJ_newton_results[1][i]
+  # end
+
+  α = 1e-2
+  V_φ = φh.fe_space
+  Ω = get_triangulation(V_φ)
+  dΩ = Measure(Ω,3)
+  a_hilb1(p̃,q,p) =∫(α^2*∇(p̃)⋅∇(q) + p̃*q)dΩ
+  l_hilb1(q,p) = ∫(q*p)dΩ
+  hilb_filter = AffineFEStateMap(a_hilb1,l_hilb1,V_φ,V_φ,V_φ,diff_order=2)
+  #K = assemble_matrix((u,v)->a_hilb1(u,v,φh),V_φ,V_φ)
+  dJ_filtered = hilb_filter(dJ)
+
+  dJ_newton_results = Krylov.cg(Hṗ_map,dJ_filtered,verbose=1,itmax=100)#,radius=0.1)#,λ=1.0)
   dJ_newton = dJ_newton_results[1]
-  if dJ_newton_results[2].status == "negative curvature" 
-    @warn "negative curvature detected in Newton solve for objective derivative. Reverting to gradietn direction"
-    dJ_newton .= dJ
-  end
-  @show length(dJ), length(dJ_newton)
 
   return j,c,dJ_newton,dC
 end
