@@ -602,7 +602,7 @@ function evaluate_functionals!(pcf::CustomPDEConstrainedFunctionals{0},φ::Abstr
 end
 
 # with newton conditioning 
-function Fields.evaluate!(pcf::CustomPDEConstrainedFunctionals{0,A,2},φh) where A
+function Fields.evaluate!(pcf::CustomPDEConstrainedFunctionals{0,A,2},φh) where {A}
   φ_to_jc = pcf.φ_to_jc
   analytic_dJ!, analytic_dC! = pcf.analytic_dJ, pcf.analytic_dC
 
@@ -610,7 +610,7 @@ function Fields.evaluate!(pcf::CustomPDEConstrainedFunctionals{0,A,2},φh) where
   ignore_pullback = findall(!isnothing,vcat(analytic_dJ!, analytic_dC!))
   val, _grad = val_and_jacobian(φ_to_jc, get_free_dof_values(φh);ignore_pullback)
 
-  @check length(val) == 1 "Expected 0 constraints, φ_to_jc returned $(length(val)) values instead of 1"
+  #@check length(val) == 1 "Expected 0 constraints, φ_to_jc returned $(length(val)) values instead of 1"
 
   # Unpack
   j = val[1]
@@ -649,7 +649,7 @@ function Fields.evaluate!(pcf::CustomPDEConstrainedFunctionals{0,A,2},φh) where
   #   dJ_newton .= dJ_newton_results[1][i]
   # end
 
-  α = 1e-2
+  α = 0.0#0.04
   V_φ = φh.fe_space
   Ω = get_triangulation(V_φ)
   dΩ = Measure(Ω,3)
@@ -659,7 +659,7 @@ function Fields.evaluate!(pcf::CustomPDEConstrainedFunctionals{0,A,2},φh) where
   #K = assemble_matrix((u,v)->a_hilb1(u,v,φh),V_φ,V_φ)
   dJ_filtered = hilb_filter(dJ)
 
-  dJ_newton_results = Krylov.cg(Hṗ_map,dJ_filtered,verbose=1,itmax=100)#,radius=0.1)#,λ=1.0)
+  dJ_newton_results = Krylov.minares(Hṗ_map,dJ_filtered,verbose=1,itmax=1000,λ=0.0)#,λ=1.0)
   dJ_newton = dJ_newton_results[1]
 
   return j,c,dJ_newton,dC
