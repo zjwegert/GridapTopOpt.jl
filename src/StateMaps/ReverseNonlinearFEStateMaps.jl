@@ -63,7 +63,6 @@ struct ReverseNonlinearFEStateMap{A,B,C,D,E} <: AbstractFEStateMap
 end
 
 function ReverseNonlinearFEStateMap(res::Function,U,V,V_φ,V_diff;kwargs...)
-  println("nw")
   jac = (u,du,v,φh) -> Gridap.jacobian(res,[u,v,φh],1)
   ReverseNonlinearFEStateMap(res,jac,U,V,V_φ,V_diff;kwargs...)
 end

@@ -90,7 +90,7 @@ and/or entires in `analytic_dC`.
 function PDEConstrainedFunctionals(
     objective   :: Function,
     constraints :: Vector{<:Function},
-    state_map   :: Union{AffineFEStateMap,NonlinearFEStateMap,RepeatingAffineFEStateMap};
+    state_map   :: Union{AffineFEStateMap,NonlinearFEStateMap,RepeatingAffineFEStateMap,ReverseNonlinearFEStateMap};
     analytic_dJ = nothing,
     analytic_dC = fill(nothing,length(constraints)))
 

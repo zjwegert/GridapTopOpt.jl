@@ -60,7 +60,7 @@ struct NonlinearFEStateMap{A,B,C,D,E} <: AbstractFEStateMap
     reassemble_adjoint_in_pullback::Bool = false
   )
     jacs = (jac,adjoint_jac)
-  spaces = (U,V,V_φ)
+    spaces = (U,V,V_φ)
     assems = (;assem_U,assem_deriv,assem_adjoint)
     cache = FEStateMapCache(nls,adjoint_ls)
     update_opts = (reassemble_adjoint_in_pullback,)
@@ -72,7 +72,6 @@ struct NonlinearFEStateMap{A,B,C,D,E} <: AbstractFEStateMap
 end
 
 function NonlinearFEStateMap(res::Function,U,V,V_φ;kwargs...)
-  println("nw")
   jac = (u,du,v,φh) -> Gridap.jacobian(res,[u,v,φh],1)
   NonlinearFEStateMap(res,jac,U,V,V_φ;kwargs...)
 end
