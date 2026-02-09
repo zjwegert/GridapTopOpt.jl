@@ -659,7 +659,7 @@ function Fields.evaluate!(pcf::CustomPDEConstrainedFunctionals{0,A,2},φh) where
   #K = assemble_matrix((u,v)->a_hilb1(u,v,φh),V_φ,V_φ)
   dJ_filtered = hilb_filter(dJ)
 
-  dJ_newton_results = Krylov.minares(Hṗ_map,dJ_filtered,verbose=1,itmax=1000,λ=0.0)#,λ=1.0)
+  @show dJ_newton_results = Krylov.minares(Hṗ_map,dJ_filtered,verbose=1,itmax=1000)#,λ=0.0)#,λ=1.0)
   dJ_newton = dJ_newton_results[1]
 
   return j,c,dJ_newton,dC
