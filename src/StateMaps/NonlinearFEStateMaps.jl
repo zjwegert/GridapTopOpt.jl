@@ -13,6 +13,7 @@ element operators.
 - `spaces`: `Tuple` of finite element spaces.
 - `assems`: `Tuple` of assemblers
 - `cache`: An AffineFEStateMapCache
+- `update_opts::Tuple{Vararg{Bool}}`: Special options to optimise the state map update.
 """
 struct NonlinearFEStateMap{A,B,C,D,E} <: AbstractFEStateMap
   res         :: A
@@ -20,6 +21,7 @@ struct NonlinearFEStateMap{A,B,C,D,E} <: AbstractFEStateMap
   spaces      :: C
   assems      :: D
   cache       :: E
+  update_opts :: Tuple{Vararg{Bool}}
 
   @doc """
       NonlinearFEStateMap(
@@ -29,7 +31,8 @@ struct NonlinearFEStateMap{A,B,C,D,E} <: AbstractFEStateMap
         assem_deriv = SparseMatrixAssembler(V_φ,V_φ),
         nls::NonlinearSolver = NewtonSolver(LUSolver();maxiter=50,rtol=1.e-8,verbose=true),
         adjoint_ls::LinearSolver = LUSolver(),
-        adjoint_jac::Function = jac
+        adjoint_jac::Function = jac,
+        reassemble_adjoint_in_pullback::Bool = false
       )
 
   Create an instance of `NonlinearFEStateMap` given the residual `res` as a `Function` type,
@@ -41,6 +44,10 @@ struct NonlinearFEStateMap{A,B,C,D,E} <: AbstractFEStateMap
   specified for the purposes of solving the adjoint problem. This can be computed
   with AD or by hand, but and allows the user to specify a different jacobian
   for the forward problem (e.g., for picard iterations).
+
+  The optional argument `reassemble_adjoint_in_pullback` (default `false`) allows
+  the user to specify whether the adjoint matrix should be reassembled in the pullback.
+  This is required for transient problems with a non-linear residual.
   """
   function NonlinearFEStateMap(
     res::Function,jac::Function,U,V,V_φ;
@@ -49,16 +56,18 @@ struct NonlinearFEStateMap{A,B,C,D,E} <: AbstractFEStateMap
     assem_deriv = SparseMatrixAssembler(V_φ,V_φ),
     nls::NonlinearSolver = NewtonSolver(LUSolver();maxiter=50,rtol=1.e-8,verbose=true),
     adjoint_ls::LinearSolver = LUSolver(),
-    adjoint_jac::Function = jac
+    adjoint_jac::Function = jac,
+    reassemble_adjoint_in_pullback::Bool = false
   )
     jacs = (jac,adjoint_jac)
   spaces = (U,V,V_φ)
     assems = (;assem_U,assem_deriv,assem_adjoint)
     cache = FEStateMapCache(nls,adjoint_ls)
+    update_opts = (reassemble_adjoint_in_pullback,)
 
     A, B, C = typeof(res), typeof(jacs), typeof(spaces)
     D, E = typeof(assems), typeof(cache)
-    return new{A,B,C,D,E}(res,jacs,spaces,assems,cache)
+    return new{A,B,C,D,E}(res,jacs,spaces,assems,cache,update_opts)
   end
 end
 
@@ -160,6 +169,21 @@ function adjoint_solve!(φ_to_u::NonlinearFEStateMap,du::AbstractVector)
   adjoint_ns, _, adjoint_x = φ_to_u.cache.adj_cache
   solve!(adjoint_x,adjoint_ns,du)
   return adjoint_x
+end
+
+function ChainRulesCore.rrule(φ_to_u::NonlinearFEStateMap,φh)
+  reassemble_adjoint_in_pullback, = φ_to_u.update_opts
+  u  = forward_solve!(φ_to_u,φh)
+  uh = FEFunction(get_trial_space(φ_to_u),u)
+  if !reassemble_adjoint_in_pullback
+    update_adjoint_caches!(φ_to_u,uh,φh)
+  end
+  return u, du -> pullback(φ_to_u,uh,φh,du;updated=!reassemble_adjoint_in_pullback)
+end
+
+function ChainRulesCore.rrule(φ_to_u::NonlinearFEStateMap,φ::AbstractVector)
+  φh = FEFunction(get_aux_space(φ_to_u),φ)
+  return ChainRulesCore.rrule(φ_to_u,φh)
 end
 
 ## Backwards compat

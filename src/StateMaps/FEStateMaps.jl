@@ -216,6 +216,19 @@ function build_cache!(::AbstractFEStateMap,φh)
   @abstractmethod
 end
 
+"""
+    delete_cache!(c::FEStateMapCache)
+
+Delete the contents of FEStateMapCache and mark for build.
+"""
+function delete_cache!(c::FEStateMapCache)
+  c.cache_built = false
+  c.fwd_cache = ()
+  c.adj_cache = ()
+  c.plb_cache = ()
+  return
+end
+
 # IO
 function Base.show(io::IO,object::AbstractFEStateMap)
   print(io,"$(nameof(typeof(object)))")

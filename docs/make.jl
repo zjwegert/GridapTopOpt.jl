@@ -23,7 +23,8 @@ makedocs(
         "Introductory examples" => "examples/index.md",
         "Topology optimisation on unfitted meshes" => "examples/Unfitted-TO-with-Laplace.md",
         "FSI with CutFEM" => "examples/Fluid-structure_interaction_with_CutFEM.md",
-        "Topology optimisation with Zygote" => "examples/TO-with-Zygote.md"
+        "AD of generic PDE-constrained functions" => "examples/AD-PDE-constrained-functions.md",
+        "Topology optimisation with Zygote" => "examples/TO-with-Zygote.md",
       ],
       "Breaking changes" => "breaking-changes.md",
       "Reference" => [
