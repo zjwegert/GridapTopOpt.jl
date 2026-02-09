@@ -156,7 +156,6 @@ function forward_solve!(φ_to_u::NonlinearFEStateMap,φh)
   op = get_algebraic_operator(FEOperator(_res,_jac,U,V,assem_U))
 
     println("solving state")
-  @show sum(φh.free_values)
   solve!(x,nls,op,nls_cache)
   println("finished solving state")
   φ_to_u.diff_order == 2 ? update_incremental_state_partials!(φ_to_u, get_res(φ_to_u), FEFunction(U,x), φh) : nothing
@@ -192,7 +191,6 @@ end
 function adjoint_solve!(φ_to_u::NonlinearFEStateMap,du::AbstractVector)
   adjoint_ns, _, adjoint_x = φ_to_u.cache.adj_cache
   println("solving adjoint")
-  @show sum(φ_to_u.cache.fwd_cache[4])
   solve!(adjoint_x,adjoint_ns,du)
   println("finished solving adjoint")
   φ_to_u.cache.adjoint_updated = true
