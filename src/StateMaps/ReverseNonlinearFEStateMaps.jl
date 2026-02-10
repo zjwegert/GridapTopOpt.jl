@@ -12,7 +12,7 @@ element operators.
   for the forward problem/adjoint problem (e.g., Picard iterations).
 - `spaces`: `Tuple` of finite element spaces.
 - `assems`: `Tuple` of assemblers
-- `cache`: An AffineFEStateMapCache
+- `cache`: A FEStateMapCache
 """
 struct ReverseNonlinearFEStateMap{A,B,C,D,E} <: AbstractFEStateMap
   res         :: A
@@ -143,7 +143,7 @@ function dRdφ(φ_to_u::ReverseNonlinearFEStateMap,uh,vh,φh)
     _φh = FEFunction(V_diff, φ)
     sum(res(uh,vh,_φh))
   end                                                                    
-  return ReverseDiff.gradient(_res,φh.free_values)
+  return ReverseDiff.gradient(_res,get_free_dof_values(φh))
 end
 
 function update_adjoint_caches!(φ_to_u::ReverseNonlinearFEStateMap,uh,φh)
