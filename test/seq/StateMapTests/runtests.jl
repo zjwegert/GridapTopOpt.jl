@@ -8,6 +8,7 @@ using Test
   include("MultiFieldNonlinearFEStateMapTest.jl")
   include("NonlinearFEStateMapTest.jl")
   include("RepeatingAffineFEStateMapTest.jl")
+  include("ReverseNonlinearFEStateMapTest.jl")
   include("TwoStaggeredAffineFEStateMapTest.jl")
   include("ThreeStaggeredAffineFEStateMapTests.jl")
   include("ThreeStaggeredNonlinearFEStateMapTest.jl")
