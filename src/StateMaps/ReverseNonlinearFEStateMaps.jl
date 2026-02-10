@@ -70,7 +70,7 @@ end
 # Caching
 function build_cache!(state_map::ReverseNonlinearFEStateMap,φh)
   assem_U, assem_deriv, assem_adjoint = state_map.assems
-  U,V,V_φ = state_map.spaces
+  U,V,V_φ,_ = state_map.spaces
   res = state_map.res
   jac, adjoint_jac = state_map.jacs
   cache = state_map.cache
