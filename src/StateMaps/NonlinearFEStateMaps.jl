@@ -124,7 +124,7 @@ get_spaces(m::NonlinearFEStateMap) = m.spaces
 get_assemblers(m::NonlinearFEStateMap) = m.assems
 
 function forward_solve!(φ_to_u::NonlinearFEStateMap,φh)
-  U, V, _, _ = φ_to_u.spaces
+  U, V, _ = φ_to_u.spaces
   assem_U = φ_to_u.assems.assem_U
   res=φ_to_u.res
   jac,_=φ_to_u.jacs

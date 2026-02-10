@@ -7,19 +7,22 @@ using FiniteDiff, ReverseDiff
 using Test
 
 function main(verbose)
-  model = CartesianDiscreteModel((0,1,0,1),(8,8))
+	model = CartesianDiscreteModel((0,1,0,1),(8,8))
   order = 1
-  reffe = ReferenceFE(lagrangian,Float64,order)
+	basis = lagrangian
+	T = Float64
+	T_rdual = eltype(ReverseDiff.GradientConfig(T[]).input)
+  reffe = ReferenceFE(basis,T,order)
+	reffe_rdual = ReferenceFE(basis, T_rdual, order)
+
   Ω = Triangulation(model)
 
   V_φ = TestFESpace(model,reffe)
+	V_diff = TestFESpace(model,reffe_rdual; vector_type=Vector{T_rdual})
+
   φh = interpolate(1,V_φ)
 
   V = FESpace(model,reffe;dirichlet_tags="boundary")
-
-  T = eltype(ReverseDiff.GradientConfig(reffe[2][1][]).input)
-	reffeT = ReferenceFE(lagrangian, T, order)
-	V_diff = TestFESpace(Ω, reffeT; vector_type=Vector{T})
 
   _sol(x) = x[1] + 1
   U = TrialFESpace(V,_sol)
