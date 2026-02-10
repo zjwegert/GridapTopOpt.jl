@@ -23,7 +23,7 @@ struct ReverseNonlinearFEStateMap{A,B,C,D,E} <: AbstractFEStateMap
 
   @doc """
       ReverseNonlinearFEStateMap(
-        res::Function,jac::Function,U,V,V_φ;
+        res::Function,jac::Function,U,V,V_φ,V_diff;
         assem_U = SparseMatrixAssembler(U,V),
         assem_adjoint = SparseMatrixAssembler(V,U),
         assem_deriv = SparseMatrixAssembler(V_φ,V_φ),
@@ -34,7 +34,7 @@ struct ReverseNonlinearFEStateMap{A,B,C,D,E} <: AbstractFEStateMap
 
   Create an instance of `ReverseNonlinearFEStateMap` given the residual `res` as a `Function` type,
   trial and test spaces `U` and `V`, the FE space `V_φ` for `φh` and derivatives,
-  and the measures as additional arguments.
+  and the measures as additional arguments. The space `V_diff` is the FE space is used to assist with AD. It will be removed in the future.
 
   Optional arguments enable specification of assemblers, nonlinear solver, and
   adjoint (linear) solver. In addition, the jacobian `adjoint_jac` can be optionally
@@ -153,7 +153,7 @@ function update_adjoint_caches!(φ_to_u::ReverseNonlinearFEStateMap,uh,φh)
   assem_adjoint = φ_to_u.assems.assem_adjoint
   adjoint_ns, adjoint_K, _ = φ_to_u.cache.adj_cache
   _,adjoint_jac=φ_to_u.jacs
-  U, V, _ = φ_to_u.spaces
+  U, V, _, _ = φ_to_u.spaces
   jac(du,v) =  adjoint_jac(uh,du,v,φh)
   assemble_adjoint_matrix!(jac,adjoint_K,assem_adjoint,U,V)
   numerical_setup!(adjoint_ns,adjoint_K)
