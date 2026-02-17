@@ -1,3 +1,4 @@
+__precompile__(false)
 module GridapTopOpt
 
 using GridapPETSc, GridapPETSc.PETSC
@@ -73,6 +74,8 @@ export CustomEmbeddedPDEConstrainedFunctionals
 export AffineFEStateMap
 export NonlinearFEStateMap
 export ReverseNonlinearFEStateMap
+export ReverseParameterisedStateMap
+export ParameterisedFunction
 export RepeatingAffineFEStateMap
 export StaggeredAffineFEStateMap
 export StaggeredNonlinearFEStateMap
