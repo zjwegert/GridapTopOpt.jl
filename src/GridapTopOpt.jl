@@ -41,7 +41,7 @@ using GridapEmbedded.LevelSetCutters, GridapEmbedded.Interfaces
 using GridapEmbedded.Interfaces: SubFacetData, SubCellTriangulation, SubFacetTriangulation
 using GridapEmbedded.LevelSetCutters: DifferentiableTriangulation, update_trian!
 
-using Zygote
+using Zygote, ReverseDiff
 using JLD2: save_object, load_object, jldsave
 
 import Base: +
@@ -72,6 +72,7 @@ export CustomPDEConstrainedFunctionals
 export CustomEmbeddedPDEConstrainedFunctionals
 export AffineFEStateMap
 export NonlinearFEStateMap
+export ReverseNonlinearFEStateMap
 export RepeatingAffineFEStateMap
 export StaggeredAffineFEStateMap
 export StaggeredNonlinearFEStateMap
