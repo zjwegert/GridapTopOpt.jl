@@ -92,9 +92,11 @@ export get_cartesian_element_sizes
 export get_element_diameters
 export get_element_diameter_field
 export isotropic_elast_tensor
+export restrict
 
 include("LevelSetEvolution/LevelSetEvolution.jl")
 export LevelSetEvolution
+export MultiLevelSetEvolution
 export evolve!
 export reinit!
 export FirstOrderStencil

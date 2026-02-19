@@ -33,18 +33,19 @@ Create an instance of `StateParamMap`.
 Use the optional argument `∂F∂u` and/or `∂F∂φ`  to specify the directional derivative of
 F(u,φ) with respect to the field u in the direction q as ∂F∂u(q,u,φ) and/or with respect
 to the field φ in the direction q as ∂F∂φ(q,u,φ).
+
+Optional arguments `∂u_ad_type` and `∂φ_ad_type` specify the approach for AD for multifield
+problems (either :split or :monolithic). For SingleField FE problems, this does nothing. Description of options
+can be found in Gridap.MultiField.
 """
 function StateParamMap(
   F,U::FESpace,V_φ::FESpace,
   assem_U::Assembler,assem_deriv::Assembler;
-  ∂F∂u::T = nothing,
-  ∂F∂φ::V = nothing
-) where {T<:Union{Function,Nothing},V<:Union{Function,Nothing}}
-
-  # Use analytic derivatives?
-  _∂F∂u(q,u,φ) = (T <: Nothing) ? Gridap.gradient(x->F(x,φ),u) : ∂F∂u(q,u,φ)
-  _∂F∂φ(q,u,φ) = (T <: Nothing) ? Gridap.gradient(x->F(u,x),φ) : ∂F∂φ(q,u,φ)
-
+  ∂u_ad_type::Symbol=:split,
+  ∂φ_ad_type::Symbol=:monolithic,
+  ∂F∂u::Function = (q,u,φ) -> __gradient(x->F(x,φ),u;ad_type=∂u_ad_type),
+  ∂F∂φ::Function = (q,u,φ) -> __gradient(x->F(u,x),φ;ad_type=∂φ_ad_type)
+)
   ## Dev note (commit fd65d0a):
   # In the past we used the following code to allocate vectors for the derivatives.
   # This was required because we needed these to be RHS vectors for VelocityExtension
@@ -66,7 +67,7 @@ function StateParamMap(
   ∂j∂φ_vec = get_free_dof_values(zero(V_φ))
   assems = (assem_U,assem_deriv)
   spaces = (U,V_φ)
-  caches = (∂j∂u_vec,∂j∂φ_vec,_∂F∂u,_∂F∂φ)
+  caches = (∂j∂u_vec,∂j∂φ_vec,∂F∂u,∂F∂φ)
   return StateParamMap(F,spaces,assems,caches)
 end
 
@@ -104,7 +105,6 @@ a function for evaluating the pullback of `u_to_j`. This enables
 compatiblity with `ChainRules.jl`
 """
 function ChainRulesCore.rrule(u_to_j::StateParamMap,uh,φh)
-  F = u_to_j.F
   U,V_φ = u_to_j.spaces
   assem_U,assem_deriv = u_to_j.assems
   ∂j∂u_vec,∂j∂φ_vec,∂F∂u,∂F∂φ = u_to_j.caches

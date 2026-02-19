@@ -309,7 +309,7 @@ Evaluate the objective and constraints at `φh`.
     when you are certain that `φh` has not been updated.
 """
 function evaluate_functionals!(pcf::EmbeddedPDEConstrainedFunctionals,φh;update_space::Bool=true)
-  update_space && update_collection_with_φh!(pcf.embedded_collection,φh)
+  update_space && update_collection!(pcf.embedded_collection,φh)
   u  = get_state_map(pcf)(φh)
   U  = get_trial_space(get_state_map(pcf))
   uh = FEFunction(U,u)
@@ -335,7 +335,7 @@ Evaluate the derivatives of the objective and constraints at `φh`.
     when you are certain that `φh` has not been updated.
 """
 function evaluate_derivatives!(pcf::EmbeddedPDEConstrainedFunctionals,φh;update_space::Bool=true)
-  update_space && update_collection_with_φh!(pcf.embedded_collection,φh)
+  update_space && update_collection!(pcf.embedded_collection,φh)
   _,_,dJ,dC = evaluate!(pcf,φh)
   return dJ,dC
 end
@@ -358,7 +358,7 @@ Evaluate the objective and constraints, and their derivatives at
     when you are certain that `φh` has not been updated.
 """
 function Fields.evaluate!(pcf::EmbeddedPDEConstrainedFunctionals,φh;update_space::Bool=true)
-  update_space && update_collection_with_φh!(pcf.embedded_collection,φh)
+  update_space && update_collection!(pcf.embedded_collection,φh)
 
   J           = pcf.embedded_collection.J
   C           = pcf.embedded_collection.C
@@ -412,15 +412,8 @@ parameter `φ0`. This is useful for problems where the recipes are not computed
 using the cut geometry information.
 """
 function EmbeddedCollection_in_φh(recipes::Union{<:Function,Vector{<:Function}},bgmodel,φ0)
-  c = EmbeddedCollection(recipes,bgmodel)
-  update_collection_with_φh!(c,φ0)
-end
-
-function update_collection_with_φh!(c::EmbeddedCollection,φh)
-    for r in c.recipes
-    merge!(c.objects,pairs(r(φh)))
-  end
-  return c
+  c = EmbeddedCollection(recipes,bgmodel;compute_cut=false)
+  update_collection!(c,φ0)
 end
 
 # IO
@@ -664,7 +657,7 @@ get_state(m::CustomEmbeddedPDEConstrainedFunctionals) = get_state(m.embedded_col
 get_state(::CustomEmbeddedPDEConstrainedFunctionals{N,Nothing}) where N = nothing
 
 function Fields.evaluate!(pcf::CustomEmbeddedPDEConstrainedFunctionals{N},φh;update_space::Bool=true) where N
-  update_space && update_collection_with_φh!(pcf.embedded_collection,φh)
+  update_space && update_collection!(pcf.embedded_collection,φh)
   φ_to_jc = pcf.φ_to_jc
   analytic_dJ!, analytic_dC! = pcf.analytic_dJ, pcf.analytic_dC
 
@@ -695,7 +688,7 @@ function Fields.evaluate!(pcf::CustomEmbeddedPDEConstrainedFunctionals{N},φh;up
 end
 
 function Fields.evaluate!(pcf::CustomEmbeddedPDEConstrainedFunctionals{0},φh;update_space::Bool=true)
-  update_space && update_collection_with_φh!(pcf.embedded_collection,φh)
+  update_space && update_collection!(pcf.embedded_collection,φh)
   φ_to_jc = pcf.φ_to_jc
   analytic_dJ!, analytic_dC! = pcf.analytic_dJ, pcf.analytic_dC
 
@@ -726,7 +719,7 @@ function Fields.evaluate!(pcf::CustomEmbeddedPDEConstrainedFunctionals{0},φh;up
 end
 
 function evaluate_functionals!(pcf::CustomEmbeddedPDEConstrainedFunctionals{N},φh;update_space::Bool=true) where N
-  update_space && update_collection_with_φh!(pcf.embedded_collection,φh)
+  update_space && update_collection!(pcf.embedded_collection,φh)
   val = pcf.φ_to_jc(get_free_dof_values(φh))
   @check length(val) == N + 1 "Expected $N constraints, φ_to_jc returned $(length(val)) values which should match the number of constraints + 1"
   j = val[1]
@@ -735,7 +728,7 @@ function evaluate_functionals!(pcf::CustomEmbeddedPDEConstrainedFunctionals{N},�
 end
 
 function evaluate_functionals!(pcf::CustomEmbeddedPDEConstrainedFunctionals{0},φh;update_space::Bool=true)
-  update_space && update_collection_with_φh!(pcf.embedded_collection,φh)
+  update_space && update_collection!(pcf.embedded_collection,φh)
   val = pcf.φ_to_jc(get_free_dof_values(φh))
   @check length(val) == 1 "Expected 0 constraints, φ_to_jc returned $(length(val)) values instead of 1"
   j = val[1]

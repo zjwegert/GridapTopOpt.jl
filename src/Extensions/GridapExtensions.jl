@@ -391,3 +391,24 @@ end
 #   @check all(map(i->test_triangulation(trian,get_triangulation(i)),f.single_fields))
 #   trian
 # end
+
+################# Autodiff options #################
+
+SingleFieldFEFunctionTypes = Union{SingleFieldFEFunction,DistributedSingleFieldFEFunction}
+MultiFieldFEFunctionTypes = Union{MultiFieldFEFunction,DistributedMultiFieldFEFunction}
+
+function __gradient(f::Function,uh::SingleFieldFEFunctionTypes;ad_type::Symbol=:monolithic)
+  Gridap.gradient(f,uh)
+end
+
+function __gradient(f::Function,uh::MultiFieldFEFunctionTypes;ad_type::Symbol=:monolithic)
+  Gridap.gradient(f,uh;ad_type)
+end
+
+function __jacobian(f::Function,uh::SingleFieldFEFunctionTypes;ad_type::Symbol=:monolithic)
+  Gridap.jacobian(f,uh)
+end
+
+function __jacobian(f::Function,uh::MultiFieldFEFunctionTypes;ad_type::Symbol=:monolithic)
+  Gridap.jacobian(f,uh;ad_type)
+end

@@ -14,6 +14,7 @@ using Test
   include("ThreeStaggeredNonlinearFEStateMapTest.jl")
   include("AffineFEStateMapTest_CutFEM_Elast.jl")
   include("Zygote_TwoStaggeredAffineFEStateMapTest.jl")
+  include("Zygote_StaggeredMultiField.jl")
   include("TwoStaggeredAffineFEStateMapTest_ADTypeUnstableBug.jl")
   include("NonSymmetricThreeStaggeredNonlinearFEStateMapTest.jl")
   # Transient

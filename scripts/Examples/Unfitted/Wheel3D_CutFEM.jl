@@ -160,11 +160,10 @@ function main(ranks)
 
   ## Evolution Method
   evolve_ls = PETScLinearSolver()
-  evolve_nls = NewtonSolver(evolve_ls;maxiter=1,verbose=i_am_main(ranks))
   reinit_nls = NewtonSolver(PETScLinearSolver();maxiter=20,rtol=1.e-14,verbose=i_am_main(ranks))
 
-  evo = CutFEMEvolver(V_φ,Ω_data,dΩ_bg,hₕ;max_steps,γg=0.01,ode_ls=evolve_ls,ode_nl=evolve_nls)
-  reinit = StabilisedReinitialiser(V_φ,Ω_data,dΩ_bg,hₕ;stabilisation_method=ArtificialViscosity(0.5),nls=reinit_nls)
+  evo = CutFEMEvolver(V_φ,dΩ_bg,hₕ;max_steps,γg=0.01,ode_ls=evolve_ls)
+  reinit = StabilisedReinitialiser(V_φ,dΩ_bg,hₕ;stabilisation_method=ArtificialViscosity(0.5),nls=reinit_nls)
   ls_evo = LevelSetEvolution(evo,reinit)
 
   ## Hilbertian extension-regularisation problems

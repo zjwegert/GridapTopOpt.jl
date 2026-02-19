@@ -30,7 +30,9 @@ struct StabilisedReinitialiser{A,B,C,D} <: Reinitialiser
   assembler::Assembler
   params::D
   @doc """
-      StabilisedReinitialiser(V_φ::C,Ωs::EmbeddedCollection,dΩ_bg::B,h;
+      StabilisedReinitialiser(V_φ::C,dΩ_bg::B,h;
+        correct_ls = true,
+        Ωs = build_Ωs(get_background_model(get_triangulation(V_φ)),V_φ),
         γd = 20.0,
         nls = NewtonSolver(LUSolver();maxiter=20,rtol=1.e-14,verbose=true),
         assembler=SparseMatrixAssembler(V_φ,V_φ),
@@ -38,39 +40,25 @@ struct StabilisedReinitialiser{A,B,C,D} <: Reinitialiser
       ) where {A,B,C}
 
   Create an instance of `StabilisedReinitialiser` with the space for the level-set `V_φ`,
-  the `EmbeddedCollection` `Ωs` for the triangulation and measures, the measure
-  `dΩ_bg` for the background mesh, and the mesh size `h`. The mesh size `h` can
+  the measure `dΩ_bg` for the background mesh, and the mesh size `h`. The mesh size `h` can
   either be a scalar or a `CellField` object.
 
   The optional arguments are:
   - `correct_ls`: Boolean for whether or not to ensure LS DOFs aren't zero
-    this MUST be true for differentiation in unfitted methods.
+    this must be true for differentiation in unfitted methods.
+  - `Ωs`: `EmbeddedCollection` for the boundary triangulation.
   - `γd`: Interface penalty parameter for the reinitialisation equation.
   - `nls`: Nonlinear solver for solving the reinitialisation equation.
   - `assembler`: Assembler for the finite element space.
   - `stabilisation_method`: A `StabilisationMethod` method for stabilising the problem.
   """
-  function StabilisedReinitialiser(V_φ::C,Ωs::EmbeddedCollection,dΩ_bg::B,h;
+  function StabilisedReinitialiser(V_φ::C,dΩ_bg::B,h;
       correct_ls = true,
+      Ωs = build_Ωs(get_background_model(get_triangulation(V_φ)),V_φ),
       γd = 20.0,
       nls = NewtonSolver(LUSolver();maxiter=20,rtol=1.e-14,verbose=true),
       assembler=SparseMatrixAssembler(V_φ,V_φ),
       stabilisation_method::A = InteriorPenalty(V_φ)) where {A,B,C}
-
-    if !(:dΓ ∈ keys(Ωs.objects))
-      @warn "Expected measure ':dΓ' not found in the
-      EmbeddedCollection. This has been added to the recipe list.
-
-      Ensure that you are not using ':dΓ' under a different
-      name to avoid additional computation for cutting."
-      function dΓ_recipe(cutgeo)
-        Γ = DifferentiableTriangulation(EmbeddedBoundary(cutgeo),V_φ)
-        (;
-          :dΓ => Measure(Γ,2get_order(V_φ))
-        )
-      end
-      add_recipe!(Ωs,dΓ_recipe)
-    end
     params = (;γd,h,correct_ls)
     new{A,B,C,typeof(params)}(nls,stabilisation_method,Ωs,dΩ_bg,V_φ,assembler,params)
   end
@@ -79,6 +67,7 @@ end
 function reinit!(s::StabilisedReinitialiser,φh)
   nls, V_φ, assembler, = s.nls, s.space, s.assembler
   correct_ls = s.params.correct_ls
+  update_collection!(s.Ωs,φh)
   # Temp solution for later reinitialisation
   φ = get_free_dof_values(φh);
   φ_tmp = copy(φ)
@@ -94,7 +83,6 @@ function reinit!(s::StabilisedReinitialiser,φh)
     copy!(get_free_dof_values(φh),φ_tmp)
     # Check LS
     correct_ls && correct_ls!(φh)
-    update_collection!(s.Ωs,φh)
   end
   return get_free_dof_values(φh),cache
 end
@@ -103,6 +91,7 @@ function reinit!(s::StabilisedReinitialiser,φh,cache)
   nls, V_φ, assembler, = s.nls, s.space, s.assembler
   correct_ls = s.params.correct_ls
   nls_cache, φ_tmp = cache
+  update_collection!(s.Ωs,φh)
   # Update φ_tmp
   copy!(φ_tmp,get_free_dof_values(φh))
   # Weak form
@@ -115,7 +104,6 @@ function reinit!(s::StabilisedReinitialiser,φh,cache)
     copy!(get_free_dof_values(φh),φ_tmp)
     # Check LS
     correct_ls && correct_ls!(φh)
-    update_collection!(s.Ωs,φh)
   end
   return get_free_dof_values(φh),cache
 end
@@ -211,10 +199,37 @@ function reinit!(s::MultiStageStabilisedReinitialiser,φh,caches)
   return get_free_dof_values(φh),wrapped_cache
 end
 
-## Helper
+## Helpers
+function build_Ωs(model,V_φ)
+  order = get_order(V_φ)
+  Ωs = EmbeddedCollection(model) do cutgeo,_,_
+    Γ = DifferentiableTriangulation(EmbeddedBoundary(cutgeo),V_φ)
+    return (;:dΓ => Measure(Γ,2order))
+  end
+  return Ωs
+end
+
 function _get_solver_flag(log::ConvergenceLog)
   r_abs = log.residuals[log.num_iters+1]
   r_rel = r_abs / log.residuals[1]
   flag  = finished_flag(log.tols,log.num_iters,r_abs,r_rel)
   return flag
+end
+
+## Backwards compat
+function StabilisedReinitialiser(V_φ::C,::EmbeddedCollection,dΩ_bg::B,h;
+    correct_ls = true,
+    γd = 20.0,
+    nls = NewtonSolver(LUSolver();maxiter=20,rtol=1.e-14,verbose=true),
+    assembler=SparseMatrixAssembler(V_φ,V_φ),
+    stabilisation_method::A = InteriorPenalty(V_φ)) where {A,B,C}
+  @warn """
+  This constructor has been deprecated and replaced by a constructor that builds
+  Ωs as an optional argument:
+    StabilisedReinitialiser(V_φ,dΩ_bg,h; kwargs...)
+
+  This constructor will be removed in future versions.
+  """ maxlog=1
+  Ωs = build_Ωs(get_background_model(get_triangulation(V_φ)),V_φ)
+  StabilisedReinitialiser(V_φ,dΩ_bg,h;correct_ls,Ωs,γd,nls,assembler,stabilisation_method)
 end
