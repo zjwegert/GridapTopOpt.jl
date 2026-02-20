@@ -73,7 +73,6 @@ struct NonlinearFEStateMap{A,B,C,D,E} <: AbstractFEStateMap
     assems = (;assem_U,assem_deriv,assem_adjoint)
     cache = FEStateMapCache(nls,adjoint_ls)
     update_opts = (reassemble_adjoint_in_pullback,)
-    update_flags = (false, false) # first element to indicate if the state is solved and second for the adjoint
 
     A, B, C = typeof(res), typeof(jacs), typeof(spaces)
     D, E = typeof(assems), typeof(cache)
@@ -161,9 +160,7 @@ function forward_solve!(φ_to_u::NonlinearFEStateMap,φh)
   _jac(u,du,v) = jac(u,du,v,φh)
   op = get_algebraic_operator(FEOperator(_res,_jac,U,V,assem_U))
 
-    println("solving state")
   solve!(x,nls,op,nls_cache)
-  println("finished solving state")
   φ_to_u.diff_order == 2 ? update_incremental_state_partials!(φ_to_u, get_res(φ_to_u), FEFunction(U,x), φh) : nothing
   φ_to_u.cache.state_updated = true
 
@@ -175,7 +172,7 @@ function forward_solve!(φ_to_u::NonlinearFEStateMap,φ::AbstractVector)
   return forward_solve!(φ_to_u,φh)
 end
 
-function dRdφ(φ_to_u::NonlinearFEStateMap,uh::FEFunction,vh::FEFunction,φh::FEFunction)
+function dRdφ(φ_to_u::NonlinearFEStateMap,uh,vh,φh)
   res = φ_to_u.res
   ad_type = φ_to_u.∂ϕ_ad_type
   return ∇(res,[uh,vh,φh],3;ad_type)
@@ -197,9 +194,7 @@ end
 
 function adjoint_solve!(φ_to_u::NonlinearFEStateMap,du::AbstractVector)
   adjoint_ns, _, adjoint_x = φ_to_u.cache.adj_cache
-  println("solving adjoint")
   solve!(adjoint_x,adjoint_ns,du)
-  println("finished solving adjoint")
   φ_to_u.cache.adjoint_updated = true
   return adjoint_x
 end

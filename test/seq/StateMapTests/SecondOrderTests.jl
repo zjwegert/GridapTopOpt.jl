@@ -210,10 +210,3 @@ Hṗ_fd ≈ Hṗ_FOR
 
 end
 
-
-
-
-# Scalable Shape Optimisation and Inverse Design with Gridap.jl
-
-
-
