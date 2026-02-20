@@ -23,10 +23,10 @@ J(u,φ) = ∫(f(u,φ))dΩ + ∫(g(u,φ))dΓ_N
 ````
 where `f` and `g` are user defined.
 """
-function Gridap.gradient(F,uh::Vector{<:CellField},K::Int;ad_type::Symbol=:split)
+function Gridap.gradient(F,uh::Vector{<:CellField},K::Int)
   @check 0 < K <= length(uh)
   _f(uk) = F(uh[1:K-1]...,uk,uh[K+1:end]...)
-  return __gradient(_f,uh[K];ad_type)
+  return Gridap.gradient(_f,uh[K])
 end
 
 """
@@ -36,10 +36,10 @@ Given a function `F` that returns a DomainContribution when called, and a
 vector of `FEFunctions` or `CellField` `uh`, evaluate the Jacobian
 `F` with respect to `uh[K]`.
 """
-function Gridap.jacobian(F,uh::Vector{<:CellField},K::Int;ad_type::Symbol=:split)
+function Gridap.jacobian(F,uh::Vector{<:CellField},K::Int)
   @check 0 < K <= length(uh)
   _f(uk) = F(uh[1:K-1]...,uk,uh[K+1:end]...)
-  return __jacobian(_f,uh[K];ad_type)
+  return Gridap.jacobian(_f,uh[K])
 end
 
 # Backwards compat msgs

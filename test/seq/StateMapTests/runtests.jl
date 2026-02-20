@@ -8,13 +8,11 @@ using Test
   include("MultiFieldNonlinearFEStateMapTest.jl")
   include("NonlinearFEStateMapTest.jl")
   include("RepeatingAffineFEStateMapTest.jl")
-  include("ReverseNonlinearFEStateMapTest.jl")
   include("TwoStaggeredAffineFEStateMapTest.jl")
   include("ThreeStaggeredAffineFEStateMapTests.jl")
   include("ThreeStaggeredNonlinearFEStateMapTest.jl")
   include("AffineFEStateMapTest_CutFEM_Elast.jl")
   include("Zygote_TwoStaggeredAffineFEStateMapTest.jl")
-  include("Zygote_StaggeredMultiField.jl")
   include("TwoStaggeredAffineFEStateMapTest_ADTypeUnstableBug.jl")
   include("NonSymmetricThreeStaggeredNonlinearFEStateMapTest.jl")
   # Transient

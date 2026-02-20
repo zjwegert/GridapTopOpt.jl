@@ -40,7 +40,7 @@ to handle high-order finite elements.
 - `tol`: stopping tolerance for reinitialiser
 - `max_steps`: number of timesteps
 - `correct_ls`: Boolean for whether or not to ensure LS DOFs aren't zero
-  this must be true for differentiation in unfitted methods.
+  this MUST be true for differentiation in unfitted methods.
 """
 function FiniteDifferenceReinitialiser(
   stencil::Stencil,

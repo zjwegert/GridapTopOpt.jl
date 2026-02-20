@@ -5,8 +5,6 @@ using GridapTopOpt
 using Gridap, Gridap.Geometry, Gridap.Adaptivity
 using GridapEmbedded
 
-include("LegacyCutFEMEvolver.jl")
-
 order = 1
 n = 50
 _model = CartesianDiscreteModel((0,1,0,1),(n,n))
@@ -36,25 +34,16 @@ V_φ = TestFESpace(model,reffe_scalar)
   )
 end
 
-ls_evo = CutFEMEvolver(V_φ,dΩ,h;correct_ls = true,max_steps=10,γg = 0.1)
-ls_evo_legacy = LegacyCutFEMEvolver(V_φ,Ωs,dΩ,h;correct_ls = true,max_steps=10,γg = 0.1)
-ls_reinit = StabilisedReinitialiser(V_φ,dΩ,h)
+ls_evo = CutFEMEvolver(V_φ,Ωs,dΩ,h)
+ls_reinit = StabilisedReinitialiser(V_φ,Ωs,dΩ,h)
 evo = LevelSetEvolution(ls_evo,ls_reinit)
-evo_legacy = LevelSetEvolution(ls_evo_legacy,ls_reinit)
 
 φ0 = copy(get_free_dof_values(φh))
 φh0 = FEFunction(V_φ,φ0)
-φ_legacy = copy(get_free_dof_values(φh))
-φh_legacy = FEFunction(V_φ,φ_legacy)
 
 velh = interpolate(x->-1,V_φ)
-_,cache = evolve!(evo,φh,velh,0.1);
-evolve!(evo_legacy,φh_legacy,velh,0.1);
+evolve!(evo,φh,velh,0.1)
 
-# Legacy
-@test get_free_dof_values(φh_legacy) ≈ get_free_dof_values(φh)
-
-# Expected
 Δt = 0.1*h
 φh_expected_lsf = interpolate(x->-sqrt((x[1]-0.5)^2+(x[2]-0.5)^2)+0.25+evo.evolver.params.max_steps*Δt,V_φ)
 
@@ -64,7 +53,7 @@ L2error(u) = sqrt(sum(∫(u ⋅ u)dΩ))
 
 # # Test advected LSF mataches original LSF when going backwards
 velh = interpolate(x->1,V_φ)
-evolve!(evo,φh,velh,0.1,cache)
+evolve!(evo,φh,velh,0.1)
 @test L2error(φh0-φh) < 1e-4
 
 # writevtk(

@@ -28,8 +28,16 @@ function main(distribute,mesh_partition)
   φh = interpolate(x->-(x[1]-0.5)^2-(x[2]-0.5)^2+0.25^2,V_φ)
   φh0 = interpolate(x->-sqrt((x[1]-0.5)^2+(x[2]-0.5)^2)+0.25,V_φ)
 
-  ls_evo = CutFEMEvolver(V_φ,dΩ,h)
-  ls_reinit = StabilisedReinitialiser(V_φ,dΩ,h;
+  Ωs = EmbeddedCollection(model,φh) do cutgeo,_,_
+    Γ = EmbeddedBoundary(cutgeo)
+    (;
+      :Γ => Γ,
+      :dΓ => Measure(Γ,2*order)
+    )
+  end
+
+  ls_evo = CutFEMEvolver(V_φ,Ωs,dΩ,h)
+  ls_reinit = StabilisedReinitialiser(V_φ,Ωs,dΩ,h;
     stabilisation_method=ArtificialViscosity(1.5h),
     nls = GridapSolvers.NewtonSolver(LUSolver();maxiter=50,rtol=1.e-14,verbose=i_am_main(ranks)))
   evo = LevelSetEvolution(ls_evo,ls_reinit)

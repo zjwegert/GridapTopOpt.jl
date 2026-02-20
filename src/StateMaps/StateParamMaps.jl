@@ -36,22 +36,14 @@ Create an instance of `StateParamMap`.
 Use the optional argument `∂F∂u` and/or `∂F∂φ`  to specify the directional derivative of
 F(u,φ) with respect to the field u in the direction q as ∂F∂u(q,u,φ) and/or with respect
 to the field φ in the direction q as ∂F∂φ(q,u,φ).
-
-Optional arguments `∂u_ad_type` and `∂φ_ad_type` specify the approach for AD for multifield
-problems (either :split or :monolithic). For SingleField FE problems, this does nothing. Description of options
-can be found in Gridap.MultiField.
 """
 function StateParamMap(
   F,U::FESpace,V_φ::FESpace,
   assem_U::Assembler,assem_deriv::Assembler;
-  ∂u_ad_type::Symbol=:split,
-  ∂φ_ad_type::Symbol=:monolithic,
-  ∂F∂u::Function = (q,u,φ) -> __gradient(x->F(x,φ),u;ad_type=∂u_ad_type),
-  ∂F∂φ::Function = (q,u,φ) -> __gradient(x->F(u,x),φ;ad_type=∂φ_ad_type),
-  # ∂F∂u::T = nothing,
-  # ∂F∂φ::V = nothing,
+  ∂F∂u::T = nothing,
+  ∂F∂φ::V = nothing,
   diff_order = 1,
-) #where {T<:Union{Function,Nothing},V<:Union{Function,Nothing}}
+) where {T<:Union{Function,Nothing},V<:Union{Function,Nothing}}
 
   # Use analytic derivatives?
   _∂F∂u(q,u,φ) = (T <: Nothing) ? Gridap.gradient(x->F(x,φ),u) : ∂F∂u(q,u,φ)

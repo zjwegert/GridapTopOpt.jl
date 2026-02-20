@@ -17,7 +17,8 @@ function main(distribute,mesh_partition)
   base_model = UnstructuredDiscreteModel(_model)
   ref_model = refine(base_model, refinement_method = "barycentric")
   model = Adaptivity.get_model(ref_model)
-  h = minimum(get_element_diameters(model))
+  el_Δ = get_el_Δ(_model)
+  h = maximum(el_Δ)
 
   Ω = Triangulation(model)
   dΩ = Measure(Ω,2*order)
@@ -26,17 +27,23 @@ function main(distribute,mesh_partition)
 
   φh = interpolate(x->-sqrt((x[1]-0.5)^2+(x[2]-0.5)^2)+0.25,V_φ)
 
-  ls_evo = CutFEMEvolver(V_φ,dΩ,h;correct_ls = true,max_steps=10,γg = 0.1)
-  ls_reinit = StabilisedReinitialiser(V_φ,dΩ,h)
+  Ωs = EmbeddedCollection(model,φh) do cutgeo,_,_
+    Γ = EmbeddedBoundary(cutgeo)
+    (;
+      :Γ  => Γ,
+      :dΓ => Measure(Γ,2*order),
+    )
+  end
+
+  ls_evo = CutFEMEvolver(V_φ,Ωs,dΩ,h)
+  ls_reinit = StabilisedReinitialiser(V_φ,Ωs,dΩ,h)
   evo = LevelSetEvolution(ls_evo,ls_reinit)
 
   φ0 = copy(get_free_dof_values(φh))
   φh0 = FEFunction(V_φ,φ0)
 
   velh = interpolate(x->-1,V_φ)
-  _,cache = evolve!(evo,φh,velh,0.1);
-
-  # Expected
+  evolve!(evo,φh,velh,0.1)
   Δt = 0.1*h
   φh_expected_lsf = interpolate(x->-sqrt((x[1]-0.5)^2+(x[2]-0.5)^2)+0.25+evo.evolver.params.max_steps*Δt,V_φ)
 
@@ -44,9 +51,9 @@ function main(distribute,mesh_partition)
   L2error(u) = sqrt(sum(∫(u ⋅ u)dΩ))
   @test L2error(φh_expected_lsf-φh) < 1e-3
 
-  # Test advected LSF mataches original LSF when going backwards, reuse cache
+  # # Test advected LSF mataches original LSF when going backwards
   velh = interpolate(x->1,V_φ)
-  evolve!(evo,φh,velh,0.1,cache)
+  evolve!(evo,φh,velh,0.1)
   @test L2error(φh0-φh) < 1e-4
 end
 

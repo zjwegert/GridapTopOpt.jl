@@ -30,8 +30,8 @@ V_φ = TestFESpace(model,reffe_scalar)
   )
 end
 
-ls_evo = CutFEMEvolver(V_φ,dΩ,h)
-ls_reinit = StabilisedReinitialiser(V_φ,dΩ,h;stabilisation_method=InteriorPenalty(V_φ))
+ls_evo = CutFEMEvolver(V_φ,Ωs,dΩ,h)
+ls_reinit = StabilisedReinitialiser(V_φ,Ωs,dΩ,h;stabilisation_method=InteriorPenalty(V_φ))
 evo = LevelSetEvolution(ls_evo,ls_reinit)
 reinit!(evo,φh);
 

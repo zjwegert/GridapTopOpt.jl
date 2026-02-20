@@ -14,7 +14,6 @@ element operators.
 - `assems`: `Tuple` of assemblers
 - `cache`: An AffineFEStateMapCache
 - `update_opts::Tuple{Vararg{Bool}}`: Special options to optimise the state map update.
-- `∂ϕ_ad_type::Symbol`: The AD type used when computing derivatives with respect to `φh` for multi-field case.
 """
 struct NonlinearFEStateMap{A,B,C,D,E} <: AbstractFEStateMap
   res         :: A
@@ -23,7 +22,6 @@ struct NonlinearFEStateMap{A,B,C,D,E} <: AbstractFEStateMap
   assems      :: D
   cache       :: E
   update_opts :: Tuple{Vararg{Bool}}
-  ∂ϕ_ad_type :: Symbol
   diff_order  :: Int
 
   @doc """
@@ -51,10 +49,6 @@ struct NonlinearFEStateMap{A,B,C,D,E} <: AbstractFEStateMap
   The optional argument `reassemble_adjoint_in_pullback` (default `false`) allows
   the user to specify whether the adjoint matrix should be reassembled in the pullback.
   This is required for transient problems with a non-linear residual.
-
-  The optional argument `∂ϕ_ad_type` allows the user to specify the AD type used when computing
-  derivatives with respect to `φh` for multi-field problems. This can be either `:monolithic`
-  (default) or `:split`.
   """
   function NonlinearFEStateMap(
     res::Function,jac::Function,U,V,V_φ;
@@ -65,7 +59,6 @@ struct NonlinearFEStateMap{A,B,C,D,E} <: AbstractFEStateMap
     adjoint_ls::LinearSolver = LUSolver(),
     adjoint_jac::Function = jac,
     reassemble_adjoint_in_pullback::Bool = false,
-    ∂ϕ_ad_type::Symbol = :monolithic,
     diff_order::Int = 1,
   )
     jacs = (jac,adjoint_jac)
@@ -77,13 +70,14 @@ struct NonlinearFEStateMap{A,B,C,D,E} <: AbstractFEStateMap
 
     A, B, C = typeof(res), typeof(jacs), typeof(spaces)
     D, E = typeof(assems), typeof(cache)
-    return new{A,B,C,D,E}(res,jacs,spaces,assems,cache,update_opts,∂ϕ_ad_type,diff_order)
+    return new{A,B,C,D,E}(res,jacs,spaces,assems,cache,update_opts,diff_order)
   end
 end
 
-function NonlinearFEStateMap(res::Function,U,V,V_φ;∂ϕ_ad_type::Symbol=:monolithic,kwargs...)
-  jac = (u,du,v,φh) -> Gridap.jacobian(res,[u,v,φh],1;ad_type=∂ϕ_ad_type)
-  NonlinearFEStateMap(res,jac,U,V,V_φ;∂ϕ_ad_type,kwargs...)
+function NonlinearFEStateMap(res::Function,U,V,V_φ;kwargs...)
+  println("nw")
+  jac = (u,du,v,φh) -> Gridap.jacobian(res,[u,v,φh],1)
+  NonlinearFEStateMap(res,jac,U,V,V_φ;kwargs...)
 end
 
 # Caching
@@ -177,8 +171,7 @@ end
 
 function dRdφ(φ_to_u::NonlinearFEStateMap,uh::FEFunction,vh::FEFunction,φh::FEFunction)
   res = φ_to_u.res
-  ad_type = φ_to_u.∂ϕ_ad_type
-  return ∇(res,[uh,vh,φh],3;ad_type)
+  return ∇(res,[uh,vh,φh],3)
 end
 
 function update_adjoint_caches!(φ_to_u::NonlinearFEStateMap,uh,φh)

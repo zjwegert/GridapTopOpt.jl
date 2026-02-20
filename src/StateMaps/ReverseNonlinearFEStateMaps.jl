@@ -12,7 +12,7 @@ element operators.
   for the forward problem/adjoint problem (e.g., Picard iterations).
 - `spaces`: `Tuple` of finite element spaces.
 - `assems`: `Tuple` of assemblers
-- `cache`: A FEStateMapCache
+- `cache`: An AffineFEStateMapCache
 """
 struct ReverseNonlinearFEStateMap{A,B,C,D,E} <: AbstractFEStateMap
   res         :: A
@@ -23,7 +23,7 @@ struct ReverseNonlinearFEStateMap{A,B,C,D,E} <: AbstractFEStateMap
 
   @doc """
       ReverseNonlinearFEStateMap(
-        res::Function,jac::Function,U,V,V_φ,V_diff;
+        res::Function,jac::Function,U,V,V_φ;
         assem_U = SparseMatrixAssembler(U,V),
         assem_adjoint = SparseMatrixAssembler(V,U),
         assem_deriv = SparseMatrixAssembler(V_φ,V_φ),
@@ -34,7 +34,7 @@ struct ReverseNonlinearFEStateMap{A,B,C,D,E} <: AbstractFEStateMap
 
   Create an instance of `ReverseNonlinearFEStateMap` given the residual `res` as a `Function` type,
   trial and test spaces `U` and `V`, the FE space `V_φ` for `φh` and derivatives,
-  and the measures as additional arguments. The space `V_diff` is the FE space is used to assist with AD. It will be removed in the future.
+  and the measures as additional arguments.
 
   Optional arguments enable specification of assemblers, nonlinear solver, and
   adjoint (linear) solver. In addition, the jacobian `adjoint_jac` can be optionally
@@ -63,6 +63,7 @@ struct ReverseNonlinearFEStateMap{A,B,C,D,E} <: AbstractFEStateMap
 end
 
 function ReverseNonlinearFEStateMap(res::Function,U,V,V_φ,V_diff;kwargs...)
+  println("nw")
   jac = (u,du,v,φh) -> Gridap.jacobian(res,[u,v,φh],1)
   ReverseNonlinearFEStateMap(res,jac,U,V,V_φ,V_diff;kwargs...)
 end
@@ -70,7 +71,7 @@ end
 # Caching
 function build_cache!(state_map::ReverseNonlinearFEStateMap,φh)
   assem_U, assem_deriv, assem_adjoint = state_map.assems
-  U,V,V_φ,_ = state_map.spaces
+  U,V,V_φ = state_map.spaces
   res = state_map.res
   jac, adjoint_jac = state_map.jacs
   cache = state_map.cache
@@ -143,7 +144,7 @@ function dRdφ(φ_to_u::ReverseNonlinearFEStateMap,uh,vh,φh)
     _φh = FEFunction(V_diff, φ)
     sum(res(uh,vh,_φh))
   end                                                                    
-  return ReverseDiff.gradient(_res,get_free_dof_values(φh))
+  return ReverseDiff.gradient(_res,φh.free_values)
 end
 
 function update_adjoint_caches!(φ_to_u::ReverseNonlinearFEStateMap,uh,φh)
@@ -153,7 +154,7 @@ function update_adjoint_caches!(φ_to_u::ReverseNonlinearFEStateMap,uh,φh)
   assem_adjoint = φ_to_u.assems.assem_adjoint
   adjoint_ns, adjoint_K, _ = φ_to_u.cache.adj_cache
   _,adjoint_jac=φ_to_u.jacs
-  U, V, _, _ = φ_to_u.spaces
+  U, V, _ = φ_to_u.spaces
   jac(du,v) =  adjoint_jac(uh,du,v,φh)
   assemble_adjoint_matrix!(jac,adjoint_K,assem_adjoint,U,V)
   numerical_setup!(adjoint_ns,adjoint_K)

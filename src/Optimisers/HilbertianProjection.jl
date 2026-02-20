@@ -202,7 +202,6 @@ struct HilbertianProjection{A} <: Optimiser
   - `ls_ξ_reduce_abs_tol = 0.01`: Tolerance on constraints to reduce `ls_ξ` via `ls_ξ_reduce_coef`.
   - `ls_γ_min = 0.001`: Minimum coeffient on the time step size for solving the HJ evolution equation.
   - `ls_γ_max = 0.1`: Maximum coeffient on the time step size for solving the HJ evolution equation.
-  - `ls_enable_it = 1`: Enable line search after this many iterations.
 
   A more concervative evolution of the boundary can be achieved by decreasing `ls_γ_max`.
 
@@ -223,7 +222,7 @@ struct HilbertianProjection{A} <: Optimiser
     λ=0.5, α_min=0.1, α_max=1.0, γ=0.1, reinit_mod = 1,
     ls_enabled = true, ls_max_iters = 10, ls_δ_inc = 1.1, ls_δ_dec = 0.7,
     ls_ξ = 1, ls_ξ_reduce_coef = 0.0025, ls_ξ_reduce_abs_tol = 0.01,
-    ls_γ_min = 0.001, ls_γ_max = 0.1, ls_enable_it = 1,
+    ls_γ_min = 0.001, ls_γ_max = 0.1,
     maxiter = 1000, verbose=false, constraint_names = map(i -> Symbol("C_$i"),1:N),
     converged::Function = default_hp_converged, debug = false,
     has_oscillations::Function = (ls_enabled ? (args...)->false : default_has_oscillations),
@@ -246,7 +245,7 @@ struct HilbertianProjection{A} <: Optimiser
       all(@. typeof(problem.analytic_dC) <: Function)) ? NoAutoDiff : WithAutoDiff;
 
     params = (;debug,γ,reinit_mod,ls_enabled,ls_max_iters,ls_δ_inc,ls_δ_dec,ls_ξ,
-               ls_ξ_reduce_coef,ls_ξ_reduce_abs_tol,ls_γ_min,ls_γ_max,os_γ_mult,ls_enable_it)
+               ls_ξ_reduce_coef,ls_ξ_reduce_abs_tol,ls_γ_min,ls_γ_max,os_γ_mult)
     new{A}(problem,ls_evolver,vel_ext,projector,history,converged,has_oscillations,params,φ0)
   end
 end
@@ -364,7 +363,7 @@ function _linesearch!(m::HilbertianProjection{WithAutoDiff},state,γ)
   it,J,C,θ,dJ,dC,uh,φh,uhd,vel,φ_tmp,_,os_it,reinit_cache,evo_cache = state
 
   params = m.params; history = m.history
-  ls_enabled, ls_enable_it = params.ls_enabled, params.ls_enable_it; reinit_mod = params.reinit_mod
+  ls_enabled = params.ls_enabled; reinit_mod = params.reinit_mod
   ls_max_iters,δ_inc,δ_dec = params.ls_max_iters,params.ls_δ_inc,params.ls_δ_dec
   ξ, ξ_reduce, ξ_reduce_tol = params.ls_ξ, params.ls_ξ_reduce_coef, params.ls_ξ_reduce_abs_tol
   γ_min, γ_max = params.ls_γ_min,params.ls_γ_max
@@ -378,8 +377,7 @@ function _linesearch!(m::HilbertianProjection{WithAutoDiff},state,γ)
       _,reinit_cache = reinit!(m.ls_evolver,φ,reinit_cache)
     end
 
-    (~ls_enabled || (it <= ls_enable_it)) && break
-    ls_it += 1;
+    ~ls_enabled && break
 
     # Calcuate new objective and constraints
     J_interm, C_interm = evaluate_functionals!(m.problem,φh)
@@ -402,14 +400,14 @@ function _linesearch!(m::HilbertianProjection{WithAutoDiff},state,γ)
   ## Calculate objective, constraints, and shape derivatives after line search
   J, C, dJ, dC = Gridap.evaluate!(m.problem,φh)
 
-  return J, C, dJ, dC, γ, reinit_cache, evo_cache
+  return J, C, dJ, dC, γ, evo_cache, reinit_cache
 end
 
 function _linesearch!(m::HilbertianProjection{NoAutoDiff},state,γ)
   it,J,C,θ,dJ,dC,uh,φh,uhd,vel,φ_tmp,_,os_it,reinit_cache,evo_cache = state
 
   params = m.params; history = m.history
-  ls_enabled, ls_enable_it = params.ls_enabled, params.ls_enable_it; reinit_mod = params.reinit_mod
+  ls_enabled = params.ls_enabled; reinit_mod = params.reinit_mod
   ls_max_iters,δ_inc,δ_dec = params.ls_max_iters,params.ls_δ_inc,params.ls_δ_dec
   ξ, ξ_reduce, ξ_reduce_tol = params.ls_ξ, params.ls_ξ_reduce_coef, params.ls_ξ_reduce_abs_tol
   γ_min, γ_max = params.ls_γ_min,params.ls_γ_max
@@ -424,11 +422,10 @@ function _linesearch!(m::HilbertianProjection{NoAutoDiff},state,γ)
     end
 
     # Check enabled
-    if ~ls_enabled || (it <= ls_enable_it)
+    if ~ls_enabled
       J, C, dJ, dC = Gridap.evaluate!(m.problem,φh)
-      return J, C, dJ, dC, γ, reinit_cache, evo_cache
+      return J, C, dJ, dC, γ, evo_cache, reinit_cache
     end
-    ls_it += 1;
 
     # Calcuate new objective and constraints
     J_interm, C_interm, dJ_interm, dC_interm = Gridap.evaluate!(m.problem,φh)
@@ -449,7 +446,7 @@ function _linesearch!(m::HilbertianProjection{NoAutoDiff},state,γ)
     end
   end
 
-  return J, C, dJ, dC, γ, reinit_cache, evo_cache
+  return J, C, dJ, dC, γ, evo_cache, reinit_cache
 end
 
 function debug_print(orthog,dV,dC,dC_orthog,K,P,nullity,debug_code,debug)

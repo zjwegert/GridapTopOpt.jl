@@ -193,7 +193,7 @@ function dRdφ(φ_to_u::StaggeredAffineFEStateMap{NB},uh,λh,φh) where NB
     λh_k = get_solution(init_adjoint_op,λh,NB-k+1)
     _a(uk,vk,φh) = biforms[k](xhs,uk,vk,φh)
     _l(vk,φh) = liforms[k](xhs,vk,φh)
-    ∂Rk∂φ = ∇((uk,vk,φh) -> _a(uk,vk,φh) - _l(vk,φh),[xh_k,λh_k,φh],3;ad_type=:monolithic)
+    ∂Rk∂φ = ∇((uk,vk,φh) -> _a(uk,vk,φh) - _l(vk,φh),[xh_k,λh_k,φh],3)
     xhs, ∂Rs∂φ = (xhs...,xh_k), (∂Rs∂φ...,∂Rk∂φ)
   end
   return ∂Rs∂φ

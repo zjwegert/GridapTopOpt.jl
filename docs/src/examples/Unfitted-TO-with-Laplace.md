@@ -198,8 +198,8 @@ We now define the evolution and reinitialisation methods for this problem. Here 
 
 To set these up, we provide `CutFEMEvolver` and `StabilisedReinitialiser` as follows:
 ```julia
-evo = CutFEMEvolver(V_φ,dΩ_bg,hₕ;max_steps,γg=0.1)
-reinit = StabilisedReinitialiser(V_φ,dΩ_bg,hₕ;stabilisation_method=ArtificialViscosity(2.0))
+evo = CutFEMEvolver(V_φ,Ωs,dΩ_bg,hₕ;max_steps,γg=0.1)
+reinit = StabilisedReinitialiser(V_φ,Ωs,dΩ_bg,hₕ;stabilisation_method=ArtificialViscosity(2.0))
 ```
 We then define the `LevelSetEvolution` object that wraps these methods, and we reinitialise our initial level-set function via
 ```julia
