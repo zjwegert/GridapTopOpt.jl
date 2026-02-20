@@ -167,7 +167,7 @@ function forward_solve!(φ_to_u::AffineFEStateMap,φ::AbstractVector)
   return forward_solve!(φ_to_u,φh)
 end
 
-function dRdφ(φ_to_u::AffineFEStateMap,uh::FEFunction,vh::FEFunction,φh::FEFunction)
+function dRdφ(φ_to_u::AffineFEStateMap,uh,vh,φh)#uh::FEFunction,vh::FEFunction,φh::FEFunction)
   biform, liform = φ_to_u.biform, φ_to_u.liform
   return ∇(biform,[uh,vh,φh],3) - ∇(liform,[vh,φh],2)
 end
