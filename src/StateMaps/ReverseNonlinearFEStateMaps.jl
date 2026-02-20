@@ -34,13 +34,7 @@ struct ReverseNonlinearFEStateMap{A,B,C,D,E} <: AbstractFEStateMap
 
   Create an instance of `ReverseNonlinearFEStateMap` given the residual `res` as a `Function` type,
   trial and test spaces `U` and `V`, the FE space `V_φ` for `φh` and derivatives,
-  and the measures as additional arguments. The space `V_diff` is the FE space is used to assist with AD. 
-  It will be removed in the future.
-
-  In contrast to the other state maps, the partial derivative of the residual with respect to the parameter 
-  `φ` is computed using ReverseDiff. This is useful when derivative information cannot
-  be computed using only local information (which is an assumption of the ForwardDiff-based approach used in the other state maps).
-  This is untested in parallel.
+  and the measures as additional arguments. The space `V_diff` is the FE space is used to assist with AD. It will be removed in the future.
 
   Optional arguments enable specification of assemblers, nonlinear solver, and
   adjoint (linear) solver. In addition, the jacobian `adjoint_jac` can be optionally
@@ -189,3 +183,20 @@ function pullback(φ_to_u::ReverseNonlinearFEStateMap,uh,φh,du;updated=false)
 
   return (NoTangent(),dudφ_vec)
 end
+
+# ## Backwards compat
+# function ReverseNonlinearFEStateMap(res::Function,jac::Function,U,V,V_φ,U_reg,φh; kwargs...)
+#   error(_msg_v0_3_0(ReverseNonlinearFEStateMap))
+# end
+
+# function ReverseNonlinearFEStateMap(res::Function,U,V,V_φ,U_reg,φh;kwargs...)
+#   error(_msg_v0_3_0(ReverseNonlinearFEStateMap))
+# end
+
+# function ReverseNonlinearFEStateMap(res::Function,jac::Function,U,V,V_φ,φh; kwargs...)
+#   error(_msg_v0_4_0(ReverseNonlinearFEStateMap))
+# end
+
+# function ReverseNonlinearFEStateMap(res::Function,U,V,V_φ,φh;kwargs...)
+#   error(_msg_v0_4_0(ReverseNonlinearFEStateMap))
+# end

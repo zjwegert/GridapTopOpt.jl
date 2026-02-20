@@ -185,12 +185,6 @@ function dRdφ(φ_to_u::AbstractFEStateMap,u::AbstractVector,v::AbstractVector,�
   return dRdφ(φ_to_u,uh,vh,φh)
 end
 
-function dRdφ(φ_to_u::AbstractFEStateMap,u::AbstractVector,v::AbstractVector,φh)
-  uh = FEFunction(get_trial_space(φ_to_u),u)
-  vh = FEFunction(get_test_space(φ_to_u),v)
-  return dRdφ(φ_to_u,uh,vh,φh)
-end
-
 function get_plb_cache(::AbstractFEStateMap)
   @abstractmethod
 end
@@ -276,7 +270,7 @@ end
 is_cache_built(c::FEStateMapCache) = c.cache_built
 
 """
-    build_cache!(::AbstractFEStateMap,φh)
+    build_cache!(::AbstractFEStateMap,φh,uh,λ)
 
 Build the FEStateMapCache (see AffineFEStateMap for an example)
 """

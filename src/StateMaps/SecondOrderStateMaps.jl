@@ -86,10 +86,7 @@ function incremental_adjoint_pullback(p_to_u,res,uᵋ,pᵋ::Vector{ForwardDiff.D
   mul!(du̇, ∂2R∂u∂p_mat, ṗ, -1.0, 1.0)
 
   λ⁻ = solve!(λ⁻,adjoint_ns,du̇) # solve the incremental adjoint equation
-  uh = FEFunction(U,u)
-  λ⁻h = FEFunction(V,λ⁻)
-  ph = FEFunction(V_p,p)
-  ∂R∂p_λ⁻_vecdata = collect_cell_vector(V_p,GridapTopOpt.dRdφ(p_to_u,uh,λ⁻h,ph))
+  ∂R∂p_λ⁻_vecdata = collect_cell_vector(V_p,GridapTopOpt.dRdφ(p_to_u,u,λ⁻,p))
   assemble_vector!(dṗ_from_u,assem_deriv,∂R∂p_λ⁻_vecdata)
 
   # dṗ_from_u .= - ∂R∂p_λ⁻ - (∂2R∂p2_mat*ṗ + ∂2R∂p∂u_mat*u̇)
