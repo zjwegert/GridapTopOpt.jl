@@ -19,6 +19,7 @@ using Gridap.Geometry: get_faces, num_nodes, TriangulationView
 using Gridap.FESpaces: get_assembly_strategy
 using Gridap.ODEs: ODESolver
 using Gridap: writevtk
+using Gridap.Algebra: NLSolversCache, NewtonRaphsonCache
 
 using GridapDistributed
 using GridapDistributed: DistributedDiscreteModel, DistributedTriangulation,
@@ -35,6 +36,8 @@ using GridapSolvers.LinearSolvers, GridapSolvers.NonlinearSolvers, GridapSolvers
 using GridapSolvers.SolverInterfaces: SolverVerboseLevel, SOLVER_VERBOSE_NONE, SOLVER_VERBOSE_LOW, SOLVER_VERBOSE_HIGH,
   SOLVER_CONVERGED_ATOL, SOLVER_CONVERGED_RTOL, ConvergenceLog, finished_flag
 using GridapSolvers.BlockSolvers: combine_fespaces, get_solution
+using GridapSolvers.NonlinearSolvers: NewtonCache
+
 
 using GridapEmbedded
 using GridapEmbedded.LevelSetCutters, GridapEmbedded.Interfaces
@@ -86,6 +89,13 @@ export evaluate_functionals!
 export evaluate_derivatives!
 export val_and_gradient
 export val_and_jacobian
+
+export incremental_state_pushforward
+export objective_partials
+export incremental_objective_pushforward
+export update_incremental_adjoint_partials
+export solve_incremental_adjoint
+export incremental_adjoint_pushforward
 
 include("Utilities.jl")
 export SmoothErsatzMaterialInterpolation
