@@ -151,12 +151,7 @@ function Base.iterate(m::AugmentedLagrangian)
   uhd = zero(V_φ)
 
   ## Reinitialise as SDF
-  #_, reinit_cache = reinit!(m.ls_evolver,φh)
-  s = get_reinitialiser(m.ls_evolver)
-  @show typeof(s)
-  O = typeof(s).parameters[1]
-  stencil,perm,ndof=s.stencil,s.perm,s.params.ndof
-  reinit_cache  = allocate_caches(stencil,φh.free_values,φh.free_values,perm,O,ndof)
+  _, reinit_cache = reinit!(m.ls_evolver,φh)
 
   ## Compute FE problem and shape derivatives
   J, C, dJ, dC = evaluate!(m.problem,φh)
@@ -208,7 +203,7 @@ function Base.iterate(m::AugmentedLagrangian,state)
   V_φ = get_ls_space(m.ls_evolver)
   _,evo_cache = evolve!(m.ls_evolver,get_free_dof_values(φh),dL,γ,evo_cache)
   if iszero(it % reinit_mod)
-  #  _,reinit_cache = reinit!(m.ls_evolver,φh,reinit_cache)
+    _,reinit_cache = reinit!(m.ls_evolver,φh,reinit_cache)
   end
 
   ## Calculate objective, constraints, and shape derivatives
