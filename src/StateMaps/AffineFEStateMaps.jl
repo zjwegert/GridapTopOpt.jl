@@ -175,7 +175,7 @@ function forward_solve!(φ_to_u::AffineFEStateMap,φ::AbstractVector)
   return forward_solve!(φ_to_u,φh)
 end
 
-function dRdφ(φ_to_u::AffineFEStateMap,uh::FEFunction,vh::FEFunction,φh::FEFunction)
+function dRdφ(φ_to_u::AffineFEStateMap,uh,vh,φh)#uh::FEFunction,vh::FEFunction,φh::FEFunction)
   biform, liform = φ_to_u.biform, φ_to_u.liform
   ad_type = φ_to_u.∂ϕ_ad_type
   return __gradient(φ->biform(uh,vh,φ)-liform(vh,φ),φh;ad_type)
