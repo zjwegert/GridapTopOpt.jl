@@ -53,6 +53,10 @@ function StateParamMap(
   diff_order = 1,
 ) #where {T<:Union{Function,Nothing},V<:Union{Function,Nothing}}
 
+  # Use analytic derivatives?
+  _∂F∂u(q,u,φ) = (T <: Nothing) ? Gridap.gradient(x->F(x,φ),u) : ∂F∂u(q,u,φ)
+  _∂F∂φ(q,u,φ) = (T <: Nothing) ? Gridap.gradient(x->F(u,x),φ) : ∂F∂φ(q,u,φ)
+
   ## Dev note (commit fd65d0a):
   # In the past we used the following code to allocate vectors for the derivatives.
   # This was required because we needed these to be RHS vectors for VelocityExtension
@@ -79,7 +83,7 @@ function StateParamMap(
   j = Ref(0.0)
   fwd_ran = false
   bwd_ran = false
-  caches = (∂j∂u_vec,∂j∂φ_vec,∂F∂u,∂F∂φ,uh.free_values,φh.free_values,j)
+  caches = (∂j∂u_vec,∂j∂φ_vec,_∂F∂u,_∂F∂φ,uh.free_values,φh.free_values,j)
   inc_obj_cache = ()
   diff_order == 2 ? inc_obj_cache = build_inc_obj_cache(F,uh,φh,spaces) : nothing
 
