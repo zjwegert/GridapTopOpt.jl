@@ -16,7 +16,7 @@ element operators.
 - `update_opts::Tuple{Vararg{Bool}}`: Special options to optimise the state map update.
 - `∂ϕ_ad_type::Symbol`: The AD type used when computing derivatives with respect to `φh` for multi-field case.
 """
-struct NonlinearFEStateMap{A,B,C,D,E} <: AbstractFEStateMap
+struct NonlinearFEStateMap{A,B,C,D,E,F} <: AbstractFEStateMap
   res         :: A
   jacs        :: B
   spaces      :: C
@@ -75,7 +75,7 @@ struct NonlinearFEStateMap{A,B,C,D,E} <: AbstractFEStateMap
     update_opts = (reassemble_adjoint_in_pullback,)
 
     A, B, C = typeof(res), typeof(jacs), typeof(spaces)
-    D, E = typeof(assems), typeof(cache)
+    D, E, F = typeof(assems), typeof(cache), typeof(diff_order)
     return new{A,B,C,D,E,F}(res,jacs,spaces,assems,cache,update_opts,∂ϕ_ad_type,diff_order)
   end
 end
@@ -105,7 +105,7 @@ function build_cache!(state_map::NonlinearFEStateMap,φh)
   _jac(u,du,v) = jac(u,du,v,φh)
   op = get_algebraic_operator(FEOperator(_res,_jac,U,V,assem_U))
   nls_cache = instantiate_caches(x,nls,op)
-  cache.fwd_cache = (nls,nls_cache,x,φh.free_values)
+  cache.fwd_cache = (nls,nls_cache,x,get_free_dof_values(φh))
 
   ## Adjoint cache
   uhd = zero(U)
@@ -153,7 +153,7 @@ function forward_solve!(φ_to_u::NonlinearFEStateMap,φh)
     build_cache!(φ_to_u,φh)
   end
   nls, nls_cache, x, _ = φ_to_u.cache.fwd_cache
-  φ_to_u.cache.fwd_cache[4] .= φh.free_values
+  φ_to_u.cache.fwd_cache[4] .= get_free_dof_values(φh)
   φ_to_u.cache.adjoint_updated = false
 
   _res(u,v) = res(u,v,φh)

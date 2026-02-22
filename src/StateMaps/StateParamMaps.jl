@@ -47,7 +47,8 @@ function StateParamMap(
   ∂u_ad_type::Symbol=:split,
   ∂φ_ad_type::Symbol=:monolithic,
   ∂F∂u::Function = (q,u,φ) -> __gradient(x->F(x,φ),u;ad_type=∂u_ad_type),
-  ∂F∂φ::Function = (q,u,φ) -> __gradient(x->F(u,x),φ;ad_type=∂φ_ad_type)
+  ∂F∂φ::Function = (q,u,φ) -> __gradient(x->F(u,x),φ;ad_type=∂φ_ad_type),
+  diff_order::Int = 1
 )
   ## Dev note (commit fd65d0a):
   # In the past we used the following code to allocate vectors for the derivatives.
@@ -75,7 +76,7 @@ function StateParamMap(
   j = Ref(0.0)
   fwd_ran = false
   bwd_ran = false
-  caches = (∂j∂u_vec,∂j∂φ_vec,∂F∂u,∂F∂φ,uh.free_values,φh.free_values,j)
+  caches = (∂j∂u_vec,∂j∂φ_vec,∂F∂u,∂F∂φ,get_free_dof_values(uh),get_free_dof_values(φh),j)
   inc_obj_cache = ()
   diff_order == 2 ? inc_obj_cache = build_inc_obj_cache(F,uh,φh,spaces) : nothing
 
@@ -153,8 +154,8 @@ end
 Evaluate the `StateParamMap` at parameters `uh` and `φh`.
 """
 function (u_to_j::StateParamMap)(uh::FEFunction,φh::FEFunction)
-  u_to_j.caches[5] .= uh.free_values
-  u_to_j.caches[6] .= φh.free_values
+  u_to_j.caches[5] .= get_free_dof_values(uh)
+  u_to_j.caches[6] .= get_free_dof_values(φh)
   j = u_to_j.caches[7]
   spaces = u_to_j.spaces
   inc_obj_cache = u_to_j.inc_obj_cache

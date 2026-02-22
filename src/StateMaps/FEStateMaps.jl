@@ -285,7 +285,7 @@ function build_inc_cache(state_map::AbstractFEStateMap,ph,uh,adjoint_x)
   res = get_res(state_map)
 
   # incremental state cache 
-  u̇ = similar(uh.free_values)
+  u̇ = similar(get_free_dof_values(uh))
   dv = get_fe_basis(V)
   ∂R∂p = Gridap.jacobian(p->res(uh,dv,p),ph)
   assem_∂R∂p = SparseMatrixAssembler(V_p,V)

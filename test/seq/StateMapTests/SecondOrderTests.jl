@@ -151,7 +151,7 @@ function p_to_u(p)
     ph = FEFunction(V_p,p)
     op = FEOperator((u,v)->res(u,v,ph),U,V)
     uh = solve(op)
-    return uh.free_values
+    return get_free_dof_values(uh)
 end
 uᵋ = state_map(pᵋ)
 u̇ = vec(mapreduce(ForwardDiff.partials, hcat, uᵋ))
@@ -185,7 +185,7 @@ function p_to_u(p)
     ph = FEFunction(V_p,p)
     op = FEOperator((u,v)->a(u,v,ph)-l(v,ph),U,V)
     uh = solve(op)
-    return uh.free_values
+    return get_free_dof_values(uh)
 end
 uᵋ = state_map(pᵋ)
 u̇ = vec(mapreduce(ForwardDiff.partials, hcat, uᵋ))

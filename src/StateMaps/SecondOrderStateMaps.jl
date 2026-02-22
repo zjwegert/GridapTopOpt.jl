@@ -31,7 +31,7 @@ function incremental_state_map(p_to_u::AbstractFEStateMap, res,  pᵋ::Vector{Fo
   
   p = ForwardDiff.value.(pᵋ) 
   ṗ =  mapreduce(ForwardDiff.partials, vcat, pᵋ)'
-  u = get_state(p_to_u).free_values # current solution
+  u = get_free_dof_values(get_state(p_to_u)) # current solution
 
 
   println("Running HVP at p = $(sum(p)) and ṗ = $(sum(ṗ))")

@@ -14,7 +14,7 @@ element operators `AffineFEOperator`.
 - `update_opts::Tuple{Vararg{Bool}}`: Special options to optimise the state map update.
 - `∂ϕ_ad_type::Symbol`: The AD type used when computing derivatives with respect to `φh` for multi-field case.
 """
-struct AffineFEStateMap{A,B,C,D,E} <: AbstractFEStateMap
+struct AffineFEStateMap{A,B,C,D,E,F} <: AbstractFEStateMap
   biform      :: A
   liform      :: B
   spaces      :: C
@@ -80,7 +80,7 @@ struct AffineFEStateMap{A,B,C,D,E} <: AbstractFEStateMap
     cache = FEStateMapCache(ls,adjoint_ls)
     update_opts = (reassemble_matrix,reassemble_adjoint,
       reassemble_adjoint_in_pullback,precompute_uhd)
-    A,B,C,D,E = typeof(biform),typeof(liform),typeof(spaces),typeof(assems),typeof(cache)
+    A,B,C,D,E,F = typeof(biform),typeof(liform),typeof(spaces),typeof(assems),typeof(cache),typeof(diff_order)
     return new{A,B,C,D,E,F}(biform,liform,spaces,assems,cache,update_opts,∂ϕ_ad_type,diff_order)
   end
 end
@@ -105,7 +105,7 @@ function build_cache!(state_map::AffineFEStateMap,φh)
   K, b = get_matrix(op), get_vector(op)
   x  = allocate_in_domain(K); fill!(x,zero(eltype(x)))
   ns = numerical_setup(symbolic_setup(ls,K),K)
-  cache.fwd_cache = (ns,K,b,x,uhd,φh.free_values)
+  cache.fwd_cache = (ns,K,b,x,uhd,get_free_dof_values(φh))
 
   ## Adjoint cache
   adjoint_K  = assemble_matrix((u,v)->biform(v,u,φh),assem_adjoint,V,U)
@@ -150,7 +150,7 @@ function forward_solve!(φ_to_u::AffineFEStateMap,φh)
     build_cache!(φ_to_u,φh)
   end
   ns, K, b, x, _uhd, φ = φ_to_u.cache.fwd_cache
-  φ_to_u.cache.fwd_cache[6] .= φh.free_values
+  φ_to_u.cache.fwd_cache[6] .= get_free_dof_values(φh)
   φ_to_u.cache.adjoint_updated = false
 
   reassemble_matrix,_,_,precompute_uhd = φ_to_u.update_opts
@@ -175,7 +175,7 @@ function forward_solve!(φ_to_u::AffineFEStateMap,φ::AbstractVector)
   return forward_solve!(φ_to_u,φh)
 end
 
-function dRdφ(φ_to_u::AffineFEStateMap,uh,vh,φh)#uh::FEFunction,vh::FEFunction,φh::FEFunction)
+function dRdφ(φ_to_u::AffineFEStateMap,uh,vh,φh)
   biform, liform = φ_to_u.biform, φ_to_u.liform
   ad_type = φ_to_u.∂ϕ_ad_type
   return __gradient(φ->biform(uh,vh,φ)-liform(vh,φ),φh;ad_type)

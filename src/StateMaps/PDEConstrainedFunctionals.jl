@@ -476,7 +476,6 @@ struct CustomPDEConstrainedFunctionals{N,A,B} <:  AbstractPDEConstrainedFunction
   analytic_dJ
   analytic_dC
   state_map :: A
-  #diff_order :: B
 
     @doc"""
         CustomPDEConstrainedFunctionals(
