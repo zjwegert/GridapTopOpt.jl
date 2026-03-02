@@ -16,7 +16,7 @@ element operators.
 - `update_opts::Tuple{Vararg{Bool}}`: Special options to optimise the state map update.
 - `∂ϕ_ad_type::Symbol`: The AD type used when computing derivatives with respect to `φh` for multi-field case.
 """
-struct NonlinearFEStateMap{A,B,C,D,E,F} <: AbstractFEStateMap
+struct NonlinearFEStateMap{A,B,C,D,E,N} <: AbstractFEStateMap
   res         :: A
   jacs        :: B
   spaces      :: C
@@ -24,7 +24,6 @@ struct NonlinearFEStateMap{A,B,C,D,E,F} <: AbstractFEStateMap
   cache       :: E
   update_opts :: Tuple{Vararg{Bool}}
   ∂ϕ_ad_type :: Symbol
-  diff_order  :: Int
 
   @doc """
       NonlinearFEStateMap(
@@ -67,7 +66,7 @@ struct NonlinearFEStateMap{A,B,C,D,E,F} <: AbstractFEStateMap
     reassemble_adjoint_in_pullback::Bool = false,
     ∂ϕ_ad_type::Symbol = :monolithic,
     diff_order::Int = 1,
-  )
+  ) 
     jacs = (jac,adjoint_jac)
     spaces = (U,V,V_φ)
     assems = (;assem_U,assem_deriv,assem_adjoint)
@@ -75,8 +74,18 @@ struct NonlinearFEStateMap{A,B,C,D,E,F} <: AbstractFEStateMap
     update_opts = (reassemble_adjoint_in_pullback,)
 
     A, B, C = typeof(res), typeof(jacs), typeof(spaces)
-    D, E, F = typeof(assems), typeof(cache), typeof(diff_order)
-    return new{A,B,C,D,E,F}(res,jacs,spaces,assems,cache,update_opts,∂ϕ_ad_type,diff_order)
+    D, E = typeof(assems), typeof(cache)
+    if diff_order == 1
+      return new{A,B,C,D,E,1}(
+        res,jacs,spaces,assems,cache,update_opts,∂ϕ_ad_type
+      )
+    elseif diff_order == 2
+      return new{A,B,C,D,E,2}(
+        res,jacs,spaces,assems,cache,update_opts,∂ϕ_ad_type
+      )
+    else
+      error("Unsupported diff_order = $diff_order. Expected 1 or 2.")
+    end
   end
 end
 
@@ -93,7 +102,7 @@ function build_cache!(state_map::NonlinearFEStateMap,φh)
   jac, adjoint_jac = state_map.jacs
   cache = state_map.cache
   nls, adjoint_ls = cache.solvers[1], cache.solvers[2]
-  diff_order = state_map.diff_order
+  diff_order = get_diff_order(state_map)
 
   ## Pullback cache
   dudφ_vec = get_free_dof_values(zero(V_φ))
@@ -115,14 +124,7 @@ function build_cache!(state_map::NonlinearFEStateMap,φh)
   adjoint_ns = numerical_setup(symbolic_setup(adjoint_ls,adjoint_K),adjoint_K)
   cache.adj_cache = (adjoint_ns,adjoint_K,adjoint_x)
 
-  ## Incremental cache
-  if diff_order == 1 
-    cache.inc_state_cache = () ; cache.inc_adjoint_cache = ()
-  elseif diff_order == 2
-    cache.inc_state_cache, cache.inc_adjoint_cache = build_inc_cache(state_map,φh,uhd,adjoint_x)
-  else
-    error("Differentiation order $(diff_order) not supported.")
-  end
+  cache.inc_state_cache, cache.inc_adjoint_cache = build_inc_cache(state_map,φh,uhd,adjoint_x,diff_order)
 
   ## Update cache status
   cache.cache_built = true
@@ -143,6 +145,7 @@ get_spaces(m::NonlinearFEStateMap) = m.spaces
 get_assemblers(m::NonlinearFEStateMap) = m.assems
 get_parameter(m::NonlinearFEStateMap) = FEFunction(get_aux_space(m),m.cache.fwd_cache[4])
 get_res(m::NonlinearFEStateMap) = m.res
+get_diff_order(::NonlinearFEStateMap{A,B,C,D,E,N}) where {A,B,C,D,E,N} = Val(N)
 
 function forward_solve!(φ_to_u::NonlinearFEStateMap,φh)
   U, V, _ = φ_to_u.spaces
@@ -161,7 +164,9 @@ function forward_solve!(φ_to_u::NonlinearFEStateMap,φh)
   op = get_algebraic_operator(FEOperator(_res,_jac,U,V,assem_U))
 
   solve!(x,nls,op,nls_cache)
-  φ_to_u.diff_order == 2 ? update_incremental_state_partials!(φ_to_u, get_res(φ_to_u), FEFunction(U,x), φh) : nothing
+
+  diff_order = get_diff_order(φ_to_u)
+  update_incremental_state_partials!(φ_to_u,φh,diff_order)
   φ_to_u.cache.state_updated = true
 
   return x

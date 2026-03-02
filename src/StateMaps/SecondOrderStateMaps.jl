@@ -13,19 +13,16 @@ function get_ns(m::NonlinearFEStateMap)
   ns = get_ns(nls_cache)
 end
 
-get_cached_parameter(p_to_u::NonlinearFEStateMap) = p_to_u.cache.fwd_cache[4]
-get_cached_parameter(p_to_u::AffineFEStateMap) = p_to_u.cache.fwd_cache[6]
-
 # helpers
 function fwd_pass_ran(p_to_u::AbstractFEStateMap,p::AbstractVector)
-  get_cached_parameter(p_to_u) == p && p_to_u.cache.state_updated
+  get_free_dof_values(get_parameter(p_to_u)) == p && p_to_u.cache.state_updated
 end
 
 function bwd_pass_ran(p_to_u::AbstractFEStateMap,p::AbstractVector)
-  get_cached_parameter(p_to_u) == p && p_to_u.cache.adjoint_updated
+  get_free_dof_values(get_parameter(p_to_u)) == p && p_to_u.cache.adjoint_updated
 end
 
-function incremental_state_map(p_to_u::AbstractFEStateMap, res,  pᵋ::Vector{ForwardDiff.Dual{T,VT,PT}}) where {T,VT,PT}
+function incremental_state_map(p_to_u::AbstractFEStateMap, res,  pᵋ::AbstractVector{ForwardDiff.Dual{T,VT,PT}}) where {T,VT,PT}
   u̇, assem_∂R∂p, ∂R∂p_mat = p_to_u.cache.inc_state_cache
   ns = get_ns(p_to_u) # numerical factorisation for the incremental state system is the same as the state system in the forward pass
   
@@ -50,18 +47,18 @@ function incremental_state_map(p_to_u::AbstractFEStateMap, res,  pᵋ::Vector{Fo
   end
 end
 
-function (p_to_u::AffineFEStateMap)(pᵋ::Vector{ForwardDiff.Dual{T,VT,PT}}) where {T,VT,PT}
+function (p_to_u::AffineFEStateMap)(pᵋ::AbstractVector{ForwardDiff.Dual{T,VT,PT}}) where {T,VT,PT}
   res = (u,v,p) -> p_to_u.biform(u,v,p) - p_to_u.liform(v,p)
   ns = p_to_u.cache.fwd_cache[1] 
   incremental_state_map(p_to_u, res, pᵋ)
 end
 
-function (p_to_u::NonlinearFEStateMap)(pᵋ::Vector{ForwardDiff.Dual{T,VT,PT}}) where {T,VT,PT}
+function (p_to_u::NonlinearFEStateMap)(pᵋ::AbstractVector{ForwardDiff.Dual{T,VT,PT}}) where {T,VT,PT}
   res = p_to_u.res
   incremental_state_map(p_to_u, res, pᵋ)
 end
 
-function incremental_adjoint_pullback(p_to_u,res,uᵋ,pᵋ::Vector{ForwardDiff.Dual{T,VT,PT}},duᵋ) where {T,VT,PT}
+function incremental_adjoint_pullback(p_to_u,res,uᵋ,pᵋ::AbstractVector{ForwardDiff.Dual{T,VT,PT}},duᵋ) where {T,VT,PT}
   U,V,V_p = p_to_u.spaces
   adjoint_ns, _, λ = p_to_u.cache.adj_cache
   dp_from_u, assem_deriv = p_to_u.cache.plb_cache
@@ -103,13 +100,13 @@ function incremental_adjoint_pullback(p_to_u,res,uᵋ,pᵋ::Vector{ForwardDiff.D
   ( NoTangent(), dpᵋ)
 end
 
-function ChainRulesCore.rrule(p_to_u::NonlinearFEStateMap,pᵋ::Vector{ForwardDiff.Dual{T,VT,PT}}) where {T,VT,PT}
+function ChainRulesCore.rrule(p_to_u::NonlinearFEStateMap,pᵋ::AbstractVector{ForwardDiff.Dual{T,VT,PT}}) where {T,VT,PT}
   res = p_to_u.res
   uᵋ = p_to_u(pᵋ)
   return uᵋ, duᵋ -> incremental_adjoint_pullback(p_to_u,res,uᵋ,pᵋ,duᵋ)
 end
 
-function ChainRulesCore.rrule(p_to_u::AffineFEStateMap,pᵋ::Vector{ForwardDiff.Dual{T,VT,PT}}) where {T,VT,PT}
+function ChainRulesCore.rrule(p_to_u::AffineFEStateMap,pᵋ::AbstractVector{ForwardDiff.Dual{T,VT,PT}}) where {T,VT,PT}
   res = (u,v,p) -> p_to_u.biform(u,v,p) - p_to_u.liform(v,p)
   uᵋ = p_to_u(pᵋ)
   return uᵋ, duᵋ -> incremental_adjoint_pullback(p_to_u,res,uᵋ,pᵋ,duᵋ)

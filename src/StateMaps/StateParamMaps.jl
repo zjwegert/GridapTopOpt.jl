@@ -153,6 +153,12 @@ end
 
 Evaluate the `StateParamMap` at parameters `uh` and `φh`.
 """
+# function (u_to_j::StateParamMap)(uh::FEFunction,φh::FEFunction)
+  
+# end
+
+# (u_to_j::AbstractStateParamMap)(uh,φh) = sum(u_to_j.F(uh,φh))
+
 function (u_to_j::StateParamMap)(uh::FEFunction,φh::FEFunction)
   u_to_j.caches[5] .= get_free_dof_values(uh)
   u_to_j.caches[6] .= get_free_dof_values(φh)

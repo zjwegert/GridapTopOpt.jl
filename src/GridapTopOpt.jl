@@ -89,13 +89,7 @@ export evaluate_functionals!
 export evaluate_derivatives!
 export val_and_gradient
 export val_and_jacobian
-
-export incremental_state_pushforward
-export objective_partials
-export incremental_objective_pushforward
-export update_incremental_adjoint_partials
-export solve_incremental_adjoint
-export incremental_adjoint_pushforward
+export Hvp
 
 include("Utilities.jl")
 export SmoothErsatzMaterialInterpolation

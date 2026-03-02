@@ -14,7 +14,7 @@ element operators `AffineFEOperator`.
 - `update_opts::Tuple{Vararg{Bool}}`: Special options to optimise the state map update.
 - `∂ϕ_ad_type::Symbol`: The AD type used when computing derivatives with respect to `φh` for multi-field case.
 """
-struct AffineFEStateMap{A,B,C,D,E,F} <: AbstractFEStateMap
+struct AffineFEStateMap{A,B,C,D,E,N} <: AbstractFEStateMap
   biform      :: A
   liform      :: B
   spaces      :: C
@@ -22,7 +22,6 @@ struct AffineFEStateMap{A,B,C,D,E,F} <: AbstractFEStateMap
   cache       :: E
   update_opts :: Tuple{Vararg{Bool}}
   ∂ϕ_ad_type :: Symbol
-  diff_order :: Int
 
   @doc """
       AffineFEStateMap(
@@ -73,15 +72,25 @@ struct AffineFEStateMap{A,B,C,D,E,F} <: AbstractFEStateMap
       reassemble_adjoint_in_pullback::Bool = false,
       precompute_uhd::Bool = false,
       ∂ϕ_ad_type::Symbol = :monolithic,
-      diff_order::Int = 1
+      diff_order::Int = 1,
     )
     spaces = (U,V,V_φ)
     assems = (;assem_U,assem_deriv,assem_adjoint)
     cache = FEStateMapCache(ls,adjoint_ls)
     update_opts = (reassemble_matrix,reassemble_adjoint,
       reassemble_adjoint_in_pullback,precompute_uhd)
-    A,B,C,D,E,F = typeof(biform),typeof(liform),typeof(spaces),typeof(assems),typeof(cache),typeof(diff_order)
-    return new{A,B,C,D,E,F}(biform,liform,spaces,assems,cache,update_opts,∂ϕ_ad_type,diff_order)
+    A,B,C,D,E = typeof(biform),typeof(liform),typeof(spaces),typeof(assems),typeof(cache)
+    if diff_order == 1
+      return new{A,B,C,D,E,1}(
+        biform, liform, spaces, assems, cache, update_opts, ∂ϕ_ad_type
+      )
+    elseif diff_order == 2
+      return new{A,B,C,D,E,2}(
+        biform, liform, spaces, assems, cache, update_opts, ∂ϕ_ad_type
+      )
+    else
+      error("Unsupported diff_order = $diff_order. Expected 1 or 2.")
+    end
   end
 end
 
@@ -93,7 +102,7 @@ function build_cache!(state_map::AffineFEStateMap,φh)
   cache = state_map.cache
   ls, adjoint_ls = cache.solvers[1], cache.solvers[2]
   _,_,_,precompute_uhd = state_map.update_opts
-  diff_order = state_map.diff_order
+  diff_order = get_diff_order(state_map)
 
   ## Pullback cache
   dudφ_vec = get_free_dof_values(zero(V_φ))
@@ -105,7 +114,7 @@ function build_cache!(state_map::AffineFEStateMap,φh)
   K, b = get_matrix(op), get_vector(op)
   x  = allocate_in_domain(K); fill!(x,zero(eltype(x)))
   ns = numerical_setup(symbolic_setup(ls,K),K)
-  cache.fwd_cache = (ns,K,b,x,uhd,get_free_dof_values(φh))
+  cache.fwd_cache = (ns,K,b,x,uhd,copy(get_free_dof_values(φh)))
 
   ## Adjoint cache
   adjoint_K  = assemble_matrix((u,v)->biform(v,u,φh),assem_adjoint,V,U)
@@ -114,13 +123,7 @@ function build_cache!(state_map::AffineFEStateMap,φh)
   cache.adj_cache = (adjoint_ns,adjoint_K,adjoint_x)
 
   ## Incremental cache
-  if diff_order == 1 
-    cache.inc_state_cache = () ; cache.inc_adjoint_cache = ()
-  elseif diff_order == 2
-    cache.inc_state_cache, cache.inc_adjoint_cache = build_inc_cache(state_map,φh,uhd,adjoint_x)
-  else
-    error("Differentiation order $(diff_order) not supported.")
-  end
+  cache.inc_state_cache, cache.inc_adjoint_cache = build_inc_cache(state_map,φh,uhd,adjoint_x,diff_order)
 
   ## Update cache status
   cache.cache_built = true
@@ -141,6 +144,7 @@ get_spaces(m::AffineFEStateMap) = m.spaces
 get_assemblers(m::AffineFEStateMap) = m.assems
 get_parameter(m::AffineFEStateMap) = FEFunction(get_aux_space(m), m.cache.fwd_cache[6] )
 get_res(m::AffineFEStateMap) = (u,v,φ) -> m.biform(u,v,φ) - m.liform(v,φ)
+get_diff_order(::AffineFEStateMap{A,B,C,D,E,N}) where {A,B,C,D,E,N} = Val(N)
 
 function forward_solve!(φ_to_u::AffineFEStateMap,φh)
   biform, liform = φ_to_u.biform, φ_to_u.liform
@@ -150,7 +154,7 @@ function forward_solve!(φ_to_u::AffineFEStateMap,φh)
     build_cache!(φ_to_u,φh)
   end
   ns, K, b, x, _uhd, φ = φ_to_u.cache.fwd_cache
-  φ_to_u.cache.fwd_cache[6] .= get_free_dof_values(φh)
+  copyto!(φ_to_u.cache.fwd_cache[6], get_free_dof_values(φh))
   φ_to_u.cache.adjoint_updated = false
 
   reassemble_matrix,_,_,precompute_uhd = φ_to_u.update_opts
@@ -164,7 +168,9 @@ function forward_solve!(φ_to_u::AffineFEStateMap,φh)
   end
   assemble_vector!(l_fwd,b,assem_U,V)
   solve!(x,ns,b)
-  φ_to_u.diff_order == 2 ? update_incremental_state_partials!(φ_to_u, get_res(φ_to_u), get_state(φ_to_u), φh) : nothing
+
+  diff_order = get_diff_order(φ_to_u)
+  update_incremental_state_partials!(φ_to_u,φh,diff_order)
   φ_to_u.cache.state_updated = true
  
   return x

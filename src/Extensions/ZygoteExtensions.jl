@@ -135,3 +135,14 @@ function val_and_gradient(f, args...)
   grad = back(Zygote.sensitivity(y))
   (val=y, grad)
 end
+
+"""
+    val_and_gradient(f, args...)
+
+Compute the Hessian-vector product of f at p in the direction of v using forward-over-reverse AD.
+"""
+function Hvp(f,p,v)
+  ∇f = p->Zygote.gradient(f,p)[1]
+  ForwardDiff.derivative(α -> ∇f(p + α*v), 0)
+end
+

@@ -6,7 +6,7 @@ using GridapSolvers, GridapSolvers.BlockSolvers, GridapSolvers.NonlinearSolvers
 using FiniteDiff
 using Test
 
-function main(verbose)
+
   model = CartesianDiscreteModel((0,1,0,1),(8,8))
   order = 2
   reffe = ReferenceFE(lagrangian,Float64,order)
@@ -38,7 +38,6 @@ function main(verbose)
   xh_exact = interpolate(_sol,U)
   eh = xh - xh_exact
   e = sqrt(sum(∫(eh * eh)dΩ))
-  verbose && println("Error in field: $e")
   @test e < 1e-15
 
   # Compute gradient
@@ -68,10 +67,5 @@ function main(verbose)
   fdm_grad = FiniteDiff.finite_difference_gradient(φ_to_j, get_free_dof_values(φh))
   rel_error = norm(_dF - fdm_grad, Inf)/norm(fdm_grad,Inf)
 
-  verbose && println("Relative error in gradient: $rel_error")
   @test rel_error < 1e-8
-end
-
-main(false)
-
 end
