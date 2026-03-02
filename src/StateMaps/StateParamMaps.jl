@@ -160,8 +160,8 @@ Evaluate the `StateParamMap` at parameters `uh` and `φh`.
 # (u_to_j::AbstractStateParamMap)(uh,φh) = sum(u_to_j.F(uh,φh))
 
 function (u_to_j::StateParamMap)(uh::FEFunction,φh::FEFunction)
-  u_to_j.caches[5] .= get_free_dof_values(uh)
-  u_to_j.caches[6] .= get_free_dof_values(φh)
+  copyto!(u_to_j.caches[5], get_free_dof_values(uh))
+  copyto!(u_to_j.caches[6], get_free_dof_values(φh))
   j = u_to_j.caches[7]
   spaces = u_to_j.spaces
   inc_obj_cache = u_to_j.inc_obj_cache

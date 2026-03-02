@@ -78,9 +78,9 @@ function incremental_adjoint_pullback(p_to_u,res,uᵋ,pᵋ::AbstractVector{Forwa
   end
 
   ## pullback the dual component (solve the incremental adjoint equation) - once per inner iteration
-  # du̇ .= du - (∂2R∂u2_mat*u̇ + ∂2R∂u∂p_mat*ṗ) 
-  mul!(du̇, ∂2R∂u2_mat, u̇, -1.0, 1.0)
-  mul!(du̇, ∂2R∂u∂p_mat, ṗ, -1.0, 1.0)
+  #du̇ .= du̇ - (∂2R∂u2_mat*u̇ + ∂2R∂u∂p_mat*ṗ) 
+  mul!(du̇, ∂2R∂u2_mat, u̇, -1, 1)  # du̇ := du̇ - ∂2R∂u2_mat*u̇
+  mul!(du̇, ∂2R∂u∂p_mat, ṗ, -1, 1) # du̇ := du̇ - ∂2R∂u∂p_mat*ṗ
 
   λ⁻ = solve!(λ⁻,adjoint_ns,du̇) # solve the incremental adjoint equation
   uh = FEFunction(U,u)
@@ -89,10 +89,10 @@ function incremental_adjoint_pullback(p_to_u,res,uᵋ,pᵋ::AbstractVector{Forwa
   ∂R∂p_λ⁻_vecdata = collect_cell_vector(V_p,GridapTopOpt.dRdφ(p_to_u,uh,λ⁻h,ph))
   assemble_vector!(dṗ_from_u,assem_deriv,∂R∂p_λ⁻_vecdata)
 
-  # dṗ_from_u .= - ∂R∂p_λ⁻ - (∂2R∂p2_mat*ṗ + ∂2R∂p∂u_mat*u̇)
-  rmul!(dṗ_from_u, -1)
-  mul!(dṗ_from_u, ∂2R∂p2_mat, ṗ, -1.0, -1.0)
-  mul!(dṗ_from_u, ∂2R∂p∂u_mat, u̇, -1.0, 1.0)
+  #dṗ_from_u .= - dṗ_from_u - (∂2R∂p2_mat*ṗ + ∂2R∂p∂u_mat*u̇)
+  rmul!(dṗ_from_u, -1)                    # dṗ_from_u := -dṗ_from_u
+  mul!(dṗ_from_u, ∂2R∂p2_mat, ṗ, -1, 1)   # dṗ_from_u -= ∂2R∂p2_mat*ṗ
+  mul!(dṗ_from_u, ∂2R∂p∂u_mat, u̇, -1, 1)  # dṗ_from_u -= ∂2R∂p∂u_mat*u̇
 
   dpᵋ = map(dp_from_u, eachrow(dṗ_from_u)) do v, p
     ForwardDiff.Dual{T}(v, p...)

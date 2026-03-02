@@ -156,7 +156,7 @@ function forward_solve!(φ_to_u::NonlinearFEStateMap,φh)
     build_cache!(φ_to_u,φh)
   end
   nls, nls_cache, x, _ = φ_to_u.cache.fwd_cache
-  φ_to_u.cache.fwd_cache[4] .= get_free_dof_values(φh)
+  copyto!(φ_to_u.cache.fwd_cache[4], get_free_dof_values(φh))
   φ_to_u.cache.adjoint_updated = false
 
   _res(u,v) = res(u,v,φh)
