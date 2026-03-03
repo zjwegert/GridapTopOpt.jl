@@ -65,13 +65,16 @@ function incremental_adjoint_pullback(p_to_u,res,uᵋ,pᵋ::AbstractVector{Forwa
   λ⁻, dṗ_from_u,   assem_∂2R∂u2, ∂2R∂u2_mat,   assem_∂2R∂u∂p,∂2R∂u∂p_mat,  assem_∂2R∂p2,∂2R∂p2_mat,  assem_∂2R∂p∂u,∂2R∂p∂u_mat = p_to_u.cache.inc_adjoint_cache
   
   p = ForwardDiff.value.(pᵋ)
-  ṗ =  vec(mapreduce(ForwardDiff.partials, hcat, pᵋ))
+  ṗ =  tangent_from_dual(pᵋ)
   u = ForwardDiff.value.(uᵋ)
-  u̇ = vec(mapreduce(ForwardDiff.partials, hcat, uᵋ))
+  u̇ = tangent_from_dual(uᵋ)
   du = ForwardDiff.value.(duᵋ)
-  du̇ = vec(mapreduce(ForwardDiff.partials, hcat, duᵋ))  
+  du̇ = tangent_from_dual(duᵋ)  
 
   ## pullback the value  (solve the adjoint equation) - once per outer iteration
+  if !is_cache_built(p_to_u.cache) 
+    build_cache!(p_to_u,u,p)
+  end 
   if !bwd_pass_ran(p_to_u,p)
     @warn "You are not calling the backwards pass (state) before computing HVP's"
     _, dp_from_u = GridapTopOpt.pullback(p_to_u,u,p,du) # This will update λ, dp_from_u and the incremental adjoint partials - it would be better if these objects were returned so that we know they were updated 
@@ -117,28 +120,35 @@ end
 ######################################################################
 
 function fwd_pass_ran(u_to_j::StateParamMap,u,p)
-  u_to_j.caches[5] == u && u_to_j.caches[6] == p && u_to_j.cache2.fwd_ran 
+  u_to_j.cache.fwd_cache[1] == u && u_to_j.cache.fwd_cache[2] == p && u_to_j.cache.fwd_ran 
 end
 
 function bwd_pass_ran(u_to_j::StateParamMap,u,p)
-  u_to_j.caches[5] == u && u_to_j.caches[6] == p && u_to_j.cache2.bwd_ran
+  u_to_j.cache.fwd_cache[1] == u && u_to_j.cache.fwd_cache[2] == p && u_to_j.cache.bwd_ran
 end
 
 function (u_to_j::StateParamMap)(uᵋ::Vector{ForwardDiff.Dual{T1,V1,P1}},pᵋ::Vector{ForwardDiff.Dual{T2,V2,P2}}) where {T1,V1,P1,T2,V2,P2}
   F = u_to_j.F
   U,V_p = u_to_j.spaces
-  ∂j∂u_vec,∂j∂φ_vec,_,_,_,_,j = u_to_j.caches
 
   u = ForwardDiff.value.(uᵋ)
   u̇ = ForwardDiff.partials.(uᵋ)
   p = ForwardDiff.value.(pᵋ)
   ṗ = ForwardDiff.partials.(pᵋ)
   
-  # pushforward the value # skip if already computed at the point p 
+  # pushforward the value # skip if already computed at the point p
+
+  if !is_cache_built(u_to_j.cache) 
+    build_cache!(u_to_j,u,p)
+  end 
   if !fwd_pass_ran(u_to_j,u,p)
     @warn "You are not calling the forward pass (objective) before computing HVP's"
     j = u_to_j(u,p) # will also update ∂j∂u_vec and ∂j∂φ_vec
   end 
+
+  ∂j∂u_vec,∂j∂φ_vec,_,_ = u_to_j.cache.plb_cache
+  u,p,j = u_to_j.cache.fwd_cache
+
 
   # pushforward the dual component
   J̇ = ∂j∂φ_vec ⋅ ṗ + ∂j∂u_vec ⋅ u̇
@@ -150,16 +160,18 @@ function ChainRulesCore.rrule(u_to_j::StateParamMap,uᵋ::Vector{ForwardDiff.Dua
   spaces = u_to_j.spaces
   U,V_p = spaces
   F = u_to_j.F
-  ∂j∂u_vec,∂j∂φ_vec,_,_,_,_,j = u_to_j.caches
+  ∂j∂u_vec,∂j∂φ_vec,_,_ = u_to_j.cache.plb_cache
 
   u = ForwardDiff.value.(uᵋ)
   p = ForwardDiff.value.(pᵋ)
-  u̇ = mapreduce(ForwardDiff.partials, hcat, uᵋ)'
-  ṗ = mapreduce(ForwardDiff.partials, hcat, pᵋ)'
+  ṗ = tangent_from_dual(pᵋ)
+  u̇ = tangent_from_dual(uᵋ)
 
   function u_to_j_pullback(dJᵋ)
     # pullback the value # skip if already computed at the point p
     dJ = ForwardDiff.value(dJᵋ)
+    dJ̇ = ForwardDiff.partials(dJᵋ)
+    
     if !bwd_pass_ran(u_to_j,u,p)
       @warn "You are not calling the backwards pass (objective) before computing HVP's"
       _, ∂j∂u_vec, ∂j∂φ_vec = GridapTopOpt.pullback(u_to_j,u,p,dJ) 
@@ -168,17 +180,22 @@ function ChainRulesCore.rrule(u_to_j::StateParamMap,uᵋ::Vector{ForwardDiff.Dua
     # pullback the dual component
 
     # once per outer iteration
-    #∂2J∂u2_mat, ∂2J∂u∂p_mat, ∂2J∂p2_mat, ∂2J∂p∂u_mat = incremental_objective_partials(F,uh,ph,spaces)
-    _, ∂2J∂u2_mat, _, ∂2J∂u∂p_mat, _, ∂2J∂p2_mat,  _, ∂2J∂p∂u_mat = u_to_j.inc_obj_cache
+    dṗ_from_j, du̇_from_j, _, ∂2J∂u2_mat, _, ∂2J∂u∂p_mat, _, ∂2J∂p2_mat,  _, ∂2J∂p∂u_mat = u_to_j.cache.inc_obj_cache
    
     # once per inner iteration
-    dṗ = ∂2J∂p2_mat * ṗ + ∂2J∂p∂u_mat * u̇ 
-    du̇ = ∂2J∂u2_mat * u̇ + ∂2J∂u∂p_mat * ṗ 
+    # dṗ_from_j .=  (∂2J∂p2_mat*ṗ + ∂2J∂p∂u_mat*u̇) 
+    # du̇_from_j .=  (∂2J∂u2_mat*u̇ + ∂2J∂u∂p_mat*ṗ)
 
-    Du̇ = map(∂j∂u_vec, eachrow(du̇)) do v, p
+    mul!(dṗ_from_j, ∂2J∂p2_mat, ṗ, 1, 0)   # dṗ_from_j := ∂2J∂p2_mat*ṗ
+    mul!(dṗ_from_j, ∂2J∂p∂u_mat, u̇, 1, 1)   # dṗ_from_j += ∂2J∂p∂u_mat*u̇
+
+    mul!(du̇_from_j, ∂2J∂u2_mat, u̇, 1, 0)   # du̇_from_j := ∂2J∂u2_mat*u̇
+    mul!(du̇_from_j, ∂2J∂u∂p_mat, ṗ, 1, 1)   # du̇_from_j += ∂2J∂u∂p_mat*ṗ
+
+    Du̇ = map(∂j∂u_vec, eachrow(du̇_from_j)) do v, p
       ForwardDiff.Dual{T1}(v, p...)
     end
-    Dṗ = map(∂j∂φ_vec, eachrow(dṗ)) do v, p
+    Dṗ = map(∂j∂φ_vec, eachrow(dṗ_from_j)) do v, p
       ForwardDiff.Dual{T2}(v, p...)
     end
     (  NoTangent(), Du̇, Dṗ )
@@ -186,3 +203,5 @@ function ChainRulesCore.rrule(u_to_j::StateParamMap,uᵋ::Vector{ForwardDiff.Dua
 
   return u_to_j(uᵋ,pᵋ), u_to_j_pullback
 end
+
+tangent_from_dual(pᵋ) = vec(mapreduce(ForwardDiff.partials, vcat, pᵋ))

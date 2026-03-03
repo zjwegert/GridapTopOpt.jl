@@ -52,8 +52,6 @@ import Gridap: solve!
 import PartitionedArrays: default_find_rcv_ids
 import GridapDistributed: remove_ghost_cells
 
-using Krylov
-using LinearMaps
 using ForwardDiff 
 
 __init__() = begin

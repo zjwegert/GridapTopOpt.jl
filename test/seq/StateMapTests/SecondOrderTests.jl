@@ -30,7 +30,7 @@ uh = FEFunction(U,u)
 ph = FEFunction(V_p,p)
 λh = FEFunction(V,λ)
 spaces = (U,V_p)
-_, ∂2J∂u2_mat, _, ∂2J∂u∂p_mat, _, ∂2J∂p2_mat, _, ∂2J∂p∂u_mat = GridapTopOpt.build_inc_obj_cache(J,uh,ph,spaces)
+_,_,_, ∂2J∂u2_mat, _, ∂2J∂u∂p_mat, _, ∂2J∂p2_mat, _, ∂2J∂p∂u_mat = GridapTopOpt.build_inc_obj_cache(J,uh,ph,spaces,Val(2))
 #∂2J∂u2_mat, ∂2J∂u∂p_mat, ∂2J∂p2_mat, ∂2J∂p∂u_mat = SecondOrderTopOpt.incremental_objective_partials(J,uh,ph,spaces)
 
 # ∂²J / ∂u² * u̇
@@ -128,10 +128,7 @@ g_fd = p->FiniteDifferences.jacobian(central_fdm(5,1),p_to_j,p)
 Hṗ_fd = FiniteDifferences.jacobian(central_fdm(5,1),g_fd,p)[1]*ṗ
 
 p_to_j(p) = objective((state_map(p)),p)
-∇f = p->Zygote.gradient(p_to_j,p)[1]
-Hṗ_FOR =  ForwardDiff.derivative(α -> ∇f(p + α*ṗ), 0)
-
-@test Hṗ_fd ≈ Hṗ_FOR # the Hessian-vector product computed using the pullback should match the finite difference approximation of the Hessian-vector product (this is a test of the entire incremental map, including the adjoint part)
+@test Hṗ_fd ≈ Hvp(p_to_j,p,ṗ) # the Hessian-vector product computed using the pullback should match the finite difference approximation of the Hessian-vector product (this is a test of the entire incremental map, including the adjoint part)
 
 ########################################################
 # Unit and integration tests for the pushforward rules #
@@ -184,9 +181,7 @@ g_fd = p->FiniteDifferences.jacobian(central_fdm(5,1),p_to_j,p)
 Hṗ_fd = FiniteDifferences.jacobian(central_fdm(5,1),g_fd,p)[1]*ṗ
 
 p_to_j(p) = objective((state_map(p)),p)
-∇f = p->Zygote.gradient(p_to_j,p)[1]
-Hṗ_FOR =  ForwardDiff.derivative(α -> ∇f(p + α*ṗ), 0)
-@test Hṗ_fd ≈ Hṗ_FOR # the Hessian-vector product computed using the pullback should match the finite difference approximation of the Hessian-vector product (this is a test of the entire incremental map, including the adjoint part)
+@test Hṗ_fd ≈ Hvp(p_to_j,p,ṗ) # the Hessian-vector product computed with AD should match the finite difference approximation of the Hessian-vector product (this is a test of the entire incremental map, including the adjoint part)
 
 #Affine state map Tests
 a(u,v,p) = ∫( p*(p+1)*∇(u)⋅∇(v) )dΩ
@@ -218,9 +213,7 @@ g_fd = p->FiniteDifferences.jacobian(central_fdm(5,1),p_to_j,p)
 Hṗ_fd = FiniteDifferences.jacobian(central_fdm(5,1),g_fd,p)[1]*ṗ
 
 p_to_j(p) = objective((state_map(p)),p)
-∇f = p->Zygote.gradient(p_to_j,p)[1]
-Hṗ_FOR =  ForwardDiff.derivative(α -> ∇f(p + α*ṗ), 0)
-@test Hṗ_fd ≈ Hṗ_FOR # the Hessian-vector product computed using the pullback should match the finite difference approximation of the Hessian-vector product (this is a test of the entire incremental map, including the adjoint part)
+@test Hṗ_fd ≈ Hvp(p_to_j,p,ṗ) # the Hessian-vector product computed using AD should match the finite difference approximation of the Hessian-vector product (this is a test of the entire incremental map, including the adjoint part)
 
 end
 
