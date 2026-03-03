@@ -82,12 +82,10 @@ export RepeatingAffineFEStateMap
 export StaggeredAffineFEStateMap
 export StaggeredNonlinearFEStateMap
 export StateParamMap
+export rrule
 export get_state
 export evaluate_functionals!
 export evaluate_derivatives!
-export val_and_gradient
-export val_and_jacobian
-export Hvp
 
 include("Utilities.jl")
 export SmoothErsatzMaterialInterpolation
@@ -145,5 +143,8 @@ export psave, pload, pload!
 
 include("Extensions/ZygoteExtensions.jl")
 export combine_fields
+export val_and_gradient
+export val_and_jacobian
+export Hvp
 
 end

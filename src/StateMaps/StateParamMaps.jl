@@ -226,11 +226,19 @@ function ChainRulesCore.rrule(u_to_j::StateParamMap,uh,φh)
   return u_to_j(uh,φh), dj -> pullback(u_to_j,uh,φh,dj)
 end
 
-function ChainRulesCore.rrule(u_to_j::StateParamMap,u::AbstractVector,φ::AbstractVector)
-  U,V_φ = u_to_j.spaces
-  uh = FEFunction(U,u)
-  φh = FEFunction(V_φ,φ)
-  return ChainRulesCore.rrule(u_to_j,uh,φh)
+"""
+    rrule(u_to_j::StateParamMap,uh,φh)
+
+Return the evaluation of a `StateParamMap` and a
+function for evaluating the pullback of `u_to_j`. This enables
+compatibility with `ChainRules.jl`
+"""
+function rrule(u_to_j::StateParamMap,uh,φh)
+  ChainRulesCore.rrule(u_to_j,uh,φh)
+end
+
+function rrule(u_to_j::StateParamMap,u::AbstractVector,φ::AbstractVector)
+  ChainRulesCore.rrule(u_to_j,u,φ)
 end
 
 # IO
