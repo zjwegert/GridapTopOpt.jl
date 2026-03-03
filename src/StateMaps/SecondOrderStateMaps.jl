@@ -13,7 +13,7 @@ function get_ns(m::NonlinearFEStateMap)
   ns = get_ns(nls_cache)
 end
 
-# helpers
+# helpers to check if the inc caches have been updated for the current point p
 function fwd_pass_ran(p_to_u::AbstractFEStateMap,p::AbstractVector)
   get_free_dof_values(get_parameter(p_to_u)) == p && p_to_u.cache.state_updated
 end
@@ -29,9 +29,6 @@ function incremental_state_map(p_to_u::AbstractFEStateMap, res,  pᵋ::AbstractV
   p = ForwardDiff.value.(pᵋ) 
   ṗ =  mapreduce(ForwardDiff.partials, vcat, pᵋ)'
   u = get_free_dof_values(get_state(p_to_u)) # current solution
-
-
-  println("Running HVP at p = $(sum(p)) and ṗ = $(sum(ṗ))")
 
   # solve state (if needed): once per outer iteration - should have been done already as the optimiser should first call the forward pass (to compute the gradient) before computing HVP's
   if !fwd_pass_ran(p_to_u,p)
@@ -115,9 +112,9 @@ function ChainRulesCore.rrule(p_to_u::AffineFEStateMap,pᵋ::AbstractVector{Forw
   return uᵋ, duᵋ -> incremental_adjoint_pullback(p_to_u,res,uᵋ,pᵋ,duᵋ)
 end
 
-######################################################################
+#####################################################################
 # u̇ -> du̇, dṗ: Computing the increments of the objective functional #
-######################################################################
+#####################################################################
 
 function fwd_pass_ran(u_to_j::StateParamMap,u,p)
   u_to_j.cache.fwd_cache[1] == u && u_to_j.cache.fwd_cache[2] == p && u_to_j.cache.fwd_ran 
@@ -184,7 +181,6 @@ function ChainRulesCore.rrule(u_to_j::StateParamMap,uᵋ::Vector{ForwardDiff.Dua
    
     # once per inner iteration
     # dṗ_from_j .=  (∂2J∂p2_mat*ṗ + ∂2J∂p∂u_mat*u̇) 
-    # du̇_from_j .=  (∂2J∂u2_mat*u̇ + ∂2J∂u∂p_mat*ṗ)
 
     mul!(dṗ_from_j, ∂2J∂p2_mat, ṗ, 1, 0)   # dṗ_from_j := ∂2J∂p2_mat*ṗ
     mul!(dṗ_from_j, ∂2J∂p∂u_mat, u̇, 1, 1)   # dṗ_from_j += ∂2J∂p∂u_mat*u̇
@@ -204,4 +200,4 @@ function ChainRulesCore.rrule(u_to_j::StateParamMap,uᵋ::Vector{ForwardDiff.Dua
   return u_to_j(uᵋ,pᵋ), u_to_j_pullback
 end
 
-tangent_from_dual(pᵋ) = vec(mapreduce(ForwardDiff.partials, vcat, pᵋ))
+tangent_from_dual(pᵋ) = first.(ForwardDiff.partials.(pᵋ))

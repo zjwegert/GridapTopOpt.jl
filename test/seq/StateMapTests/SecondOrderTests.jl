@@ -216,4 +216,3 @@ p_to_j(p) = objective((state_map(p)),p)
 @test Hṗ_fd ≈ Hvp(p_to_j,p,ṗ) # the Hessian-vector product computed using AD should match the finite difference approximation of the Hessian-vector product (this is a test of the entire incremental map, including the adjoint part)
 
 end
-
