@@ -8,8 +8,7 @@ using GridapTopOpt
 
 using FiniteDiff,Test
 
-#function main(n;verbose=true)
-  n=7
+function main(n;verbose=true)
   # Params
   vf = 0.3
   D = 2
@@ -96,7 +95,7 @@ using FiniteDiff,Test
   a_s_Ω(d,s) = ε(s) ⊙ (σ ∘ ε(d)) # Elasticity
   j_s_k(d,s) = mean(γ_Gd ∘ hₕ)*(jump(Ω_data.n_Γg ⋅ ∇(s)) ⋅ jump(Ω_data.n_Γg ⋅ ∇(d)))
   v_s_ψ(d,s) = (k_d*Ω_data.ψ)*(d⋅s) # Isolated volume term
-_g = VectorValue(0.0,0.0)
+  _g = VectorValue(0.0,0.0)
 
   a(d,s,φ) = ∫(a_s_Ω(d,s) + v_s_ψ(d,s))Ω_data.dΩ + ∫(j_s_k(d,s))Ω_data.dΓg
   l(s,φ) = ∫(s⋅_g)dΓ_N
@@ -118,8 +117,6 @@ _g = VectorValue(0.0,0.0)
       :C => map(Ci -> GridapTopOpt.StateParamMap(Ci,state_map),[Vol,])
     )
   end
-
-  GridapTopOpt.get_∂F∂φ_vec(state_collection.J)
 
   pcfs = EmbeddedPDEConstrainedFunctionals(state_collection;analytic_dC=(dVol,))
   _,_,_dF,_ = evaluate!(pcfs,φh)
@@ -166,6 +163,6 @@ _g = VectorValue(0.0,0.0)
   @test rel_error < 1e-6
 end
 
-# main(7;verbose=true)
+main(7;verbose=true)
 
-# end
+end
