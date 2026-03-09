@@ -43,6 +43,7 @@ using Test
   # Compute gradient
   F(u1,φ) = ∫(u1*φ+1)dΩ
   pcf = PDEConstrainedFunctionals(F,φ_to_u)
+
   _,_,_dF,_ = evaluate!(pcf,φh);
 
   function φ_to_j(φ)

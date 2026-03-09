@@ -141,7 +141,7 @@ function update_inc_obj_cache!(inc_obj_cache,F,uh,ph,spaces,diff_order::Val{2})
 end
 
 function get_∂F∂φ_vec(u_to_j::StateParamMap)
-  u_to_j.caches[2]
+  u_to_j.cache.plb_cache[2]
 end
 get_state(m::StateParamMap) = FEFunction(m.spaces[1], m.caches[5])
 get_parameter(m::StateParamMap) = FEFunction(m.spaces[2], m.caches[6])

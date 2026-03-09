@@ -68,8 +68,8 @@ struct PDEConstrainedFunctionals{N,A} <: AbstractPDEConstrainedFunctionals{N}
       analytic_dC = fill(nothing,length(constraints)))
 
     # Preallocate
-    dJ = similar(get_∂F∂φ_vec(objective))
-    dC = map(Ci->similar(get_∂F∂φ_vec(Ci)),constraints)
+    dJ = similar(get_free_dof_values(zero(get_aux_space(state_map))))
+    dC = map(Ci->similar(get_free_dof_values(zero(get_aux_space(state_map)))),constraints)
 
     N = length(constraints)
     T = typeof(state_map)
@@ -282,8 +282,8 @@ struct EmbeddedPDEConstrainedFunctionals{N,T} <: AbstractPDEConstrainedFunctiona
     - For problems with no constraints `:C` must at least point to an empty list
     """
     # Preallocate
-    dJ = similar(get_∂F∂φ_vec(embedded_collection.J))
-    dC = map(Ci->similar(get_∂F∂φ_vec(Ci)),embedded_collection.C)
+    dJ = similar(get_free_dof_values(zero(get_aux_space(embedded_collection.state_map))))
+    dC = map(Ci->similar(get_free_dof_values(zero(get_aux_space(embedded_collection.state_map)))),embedded_collection.C)
 
     N = length(embedded_collection.C)
     if analytic_dC isa Nothing

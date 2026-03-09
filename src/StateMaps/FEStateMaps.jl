@@ -257,6 +257,14 @@ function ChainRulesCore.rrule(φ_to_u::AbstractFEStateMap,φ::AbstractVector)
   return ChainRulesCore.rrule(φ_to_u,φh)
 end
 
+function rrule(φ_to_u::AbstractFEStateMap,φh)
+  ChainRulesCore.rrule(φ_to_u,φh)
+end
+
+function rrule(φ_to_u::AbstractFEStateMap,φ::AbstractVector)
+  ChainRulesCore.rrule(φ_to_u,φ)
+end
+
 ## Caching
 mutable struct FEStateMapCache
   cache_built::Bool
