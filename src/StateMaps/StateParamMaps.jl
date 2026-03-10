@@ -87,6 +87,8 @@ build_inc_obj_cache(F,uh,ph,spaces,diff_order::Val{1}) = ()
 function build_inc_obj_cache(F,uh,ph,spaces,diff_order::Val{2})
   U,V_p = spaces
   
+  println("Building incremental objective cache for second derivatives. This may take some time...")
+
   # ∂²J / ∂u² * u̇
   ∂2J∂u2 = Gridap.hessian(uh->F(uh,ph),uh)
   assem_∂2J∂u2 = SparseMatrixAssembler(U,U)
@@ -108,6 +110,8 @@ function build_inc_obj_cache(F,uh,ph,spaces,diff_order::Val{2})
   ∂2J∂p∂u = Gridap.jacobian(uh->∂J∂p(uh,ph),uh)
   assem_∂2J∂p∂u = SparseMatrixAssembler(U,V_p)
   ∂2J∂p∂u_mat = assemble_matrix(∂2J∂p∂u,assem_∂2J∂p∂u,U,V_p)
+
+  println("Done building incremental objective cache.")
 
   dṗ_from_j = get_free_dof_values(zero(V_p))
   du̇_from_j = get_free_dof_values(zero(U))

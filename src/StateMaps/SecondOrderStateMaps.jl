@@ -15,26 +15,28 @@ end
 
 # helpers to check if the inc caches have been updated for the current point p
 function fwd_pass_ran(p_to_u::AbstractFEStateMap,p::AbstractVector)
+  is_cache_built(p_to_u.cache) ? nothing : return false # return false if cache is not built (it will get built in the forward pass)
   get_free_dof_values(get_parameter(p_to_u)) == p && p_to_u.cache.state_updated
 end
 
 function bwd_pass_ran(p_to_u::AbstractFEStateMap,p::AbstractVector)
+  is_cache_built(p_to_u.cache) ? nothing : return false # return false if cache is not built (it will get built in the backward pass)
   get_free_dof_values(get_parameter(p_to_u)) == p && p_to_u.cache.adjoint_updated
 end
 
 function incremental_state_map(p_to_u::AbstractFEStateMap, res,  pᵋ::AbstractVector{ForwardDiff.Dual{T,VT,PT}}) where {T,VT,PT}
-  u̇, assem_∂R∂p, ∂R∂p_mat = p_to_u.cache.inc_state_cache
-  ns = get_ns(p_to_u) # numerical factorisation for the incremental state system is the same as the state system in the forward pass
-  
   p = ForwardDiff.value.(pᵋ) 
   ṗ =  mapreduce(ForwardDiff.partials, vcat, pᵋ)'
-  u = get_free_dof_values(get_state(p_to_u)) # current solution
 
   # solve state (if needed): once per outer iteration - should have been done already as the optimiser should first call the forward pass (to compute the gradient) before computing HVP's
   if !fwd_pass_ran(p_to_u,p)
     @warn "You are not calling the forward pass (state) before computing HVP's"
     u = p_to_u(p) # will also update the incremental state partial ∂R∂p
   end
+
+  u = get_free_dof_values(get_state(p_to_u)) # current solution
+  u̇, assem_∂R∂p, ∂R∂p_mat = p_to_u.cache.inc_state_cache
+  ns = get_ns(p_to_u) # numerical factorisation for the incremental state system is the same as the state system in the forward pass
 
   # solve incremental state: once per inner iteration (only thing changing is ṗ)
   solve!(u̇, ns, -∂R∂p_mat*ṗ') # incremental state equation
@@ -46,7 +48,6 @@ end
 
 function (p_to_u::AffineFEStateMap)(pᵋ::AbstractVector{ForwardDiff.Dual{T,VT,PT}}) where {T,VT,PT}
   res = (u,v,p) -> p_to_u.biform(u,v,p) - p_to_u.liform(v,p)
-  ns = p_to_u.cache.fwd_cache[1] 
   incremental_state_map(p_to_u, res, pᵋ)
 end
 
@@ -69,9 +70,6 @@ function incremental_adjoint_pullback(p_to_u,res,uᵋ,pᵋ::AbstractVector{Forwa
   du̇ = tangent_from_dual(duᵋ)  
 
   ## pullback the value  (solve the adjoint equation) - once per outer iteration
-  if !is_cache_built(p_to_u.cache) 
-    build_cache!(p_to_u,u,p)
-  end 
   if !bwd_pass_ran(p_to_u,p)
     @warn "You are not calling the backwards pass (state) before computing HVP's"
     _, dp_from_u = GridapTopOpt.pullback(p_to_u,u,p,du) # This will update λ, dp_from_u and the incremental adjoint partials - it would be better if these objects were returned so that we know they were updated 
@@ -117,10 +115,12 @@ end
 #####################################################################
 
 function fwd_pass_ran(u_to_j::StateParamMap,u,p)
+  is_cache_built(u_to_j.cache) ? nothing : return false
   u_to_j.cache.fwd_cache[1] == u && u_to_j.cache.fwd_cache[2] == p && u_to_j.cache.fwd_ran 
 end
 
 function bwd_pass_ran(u_to_j::StateParamMap,u,p)
+  is_cache_built(u_to_j.cache) ? nothing : return false
   u_to_j.cache.fwd_cache[1] == u && u_to_j.cache.fwd_cache[2] == p && u_to_j.cache.bwd_ran
 end
 
@@ -134,10 +134,6 @@ function (u_to_j::StateParamMap)(uᵋ::Vector{ForwardDiff.Dual{T1,V1,P1}},pᵋ::
   ṗ = ForwardDiff.partials.(pᵋ)
   
   # pushforward the value # skip if already computed at the point p
-
-  if !is_cache_built(u_to_j.cache) 
-    build_cache!(u_to_j,u,p)
-  end 
   if !fwd_pass_ran(u_to_j,u,p)
     @warn "You are not calling the forward pass (objective) before computing HVP's"
     j = u_to_j(u,p) # will also update ∂j∂u_vec and ∂j∂φ_vec

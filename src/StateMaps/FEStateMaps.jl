@@ -293,6 +293,8 @@ function build_inc_cache(state_map::AbstractFEStateMap,ph,uh,adjoint_x,diff_orde
   U,V,V_p = state_map.spaces
   res = get_res(state_map)
 
+  println("Building incremental state cache...")
+
   # incremental state cache 
   u̇ = similar(get_free_dof_values(uh))
   dv = get_fe_basis(V)
@@ -300,6 +302,8 @@ function build_inc_cache(state_map::AbstractFEStateMap,ph,uh,adjoint_x,diff_orde
   assem_∂R∂p = SparseMatrixAssembler(V_p,V)
   ∂R∂p_mat = assemble_matrix(∂R∂p,assem_∂R∂p,V_p,V)
   inc_state_cache = (u̇, assem_∂R∂p, ∂R∂p_mat)
+
+  println("Building incremental adjoint cache...")
 
   # incremental adjoint cache 
   λh = FEFunction(V,adjoint_x)
@@ -325,6 +329,8 @@ function build_inc_cache(state_map::AbstractFEStateMap,ph,uh,adjoint_x,diff_orde
   # incremental adjoint cotangent
   dṗ_from_u = get_free_dof_values(zero(V_p))
   inc_adjoint_cache = (λ⁻, dṗ_from_u,   assem_∂2R∂u2, ∂2R∂u2_mat,   assem_∂2R∂u∂p,∂2R∂u∂p_mat,  assem_∂2R∂p2,∂2R∂p2_mat,  assem_∂2R∂p∂u,∂2R∂p∂u_mat)
+  
+  println("Done building incremental state/adjoint cache.")
   
   return inc_state_cache, inc_adjoint_cache
 end
