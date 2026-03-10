@@ -65,7 +65,7 @@ GridapTopOpt.build_cache!(αu₁_to_u₂,αu₁h);
 for i in 2:length(αuᵢ₋₁_to_uᵢ)
   αuᵢ₋₁_to_uᵢ[i].cache.cache_built = true
   αuᵢ₋₁_to_uᵢ[i].cache.adj_cache = αu₁_to_u₂_adj_cache
-  αuᵢ₋₁_to_uᵢ[i].cache.fwd_cache = (αu₁_to_u₂_fwd_cache[1:3]...,similar(αu₁_to_u₂_fwd_cache[4]),zero(αuᵢ₋₁_to_uᵢ[i].spaces[1]));
+  αuᵢ₋₁_to_uᵢ[i].cache.fwd_cache = (αu₁_to_u₂_fwd_cache[1:3]...,similar(αu₁_to_u₂_fwd_cache[4]),zero(αuᵢ₋₁_to_uᵢ[i].spaces[1]),αu₁_to_u₂_fwd_cache[6]);
   αuᵢ₋₁_to_uᵢ[i].cache.plb_cache = αu₁_to_u₂_plb_cache
 end;
 
