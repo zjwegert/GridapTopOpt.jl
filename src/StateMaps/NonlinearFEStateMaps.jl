@@ -114,7 +114,7 @@ function build_cache!(state_map::NonlinearFEStateMap,φh)
   _jac(u,du,v) = jac(u,du,v,φh)
   op = get_algebraic_operator(FEOperator(_res,_jac,U,V,assem_U))
   nls_cache = instantiate_caches(x,nls,op)
-  cache.fwd_cache = (nls,nls_cache,x,get_free_dof_values(φh))
+  cache.fwd_cache = (nls,nls_cache,x,copy(get_free_dof_values(φh)))
 
   ## Adjoint cache
   uhd = zero(U)
