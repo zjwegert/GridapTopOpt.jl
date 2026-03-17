@@ -1,5 +1,5 @@
 """
-    struct NonlinearFEStateMap{A,B,C,D,E} <: AbstractFEStateMap
+    struct ReverseNonlinearFEStateMap{A,B,C,D,E} <: AbstractFEStateMap
 
 A structure to enable the forward problem and pullback for nonlinear finite
 element operators.
@@ -12,81 +12,65 @@ element operators.
   for the forward problem/adjoint problem (e.g., Picard iterations).
 - `spaces`: `Tuple` of finite element spaces.
 - `assems`: `Tuple` of assemblers
-- `cache`: An AffineFEStateMapCache
-- `update_opts::Tuple{Vararg{Bool}}`: Special options to optimise the state map update.
-- `∂ϕ_ad_type::Symbol`: The AD type used when computing derivatives with respect to `φh` for multi-field case.
+- `cache`: A FEStateMapCache
 """
-struct NonlinearFEStateMap{A,B,C,D,E} <: AbstractFEStateMap
+struct ReverseNonlinearFEStateMap{A,B,C,D,E} <: AbstractFEStateMap
   res         :: A
   jacs        :: B
   spaces      :: C
   assems      :: D
   cache       :: E
-  update_opts :: Tuple{Vararg{Bool}}
-  ∂ϕ_ad_type :: Symbol
 
   @doc """
-      NonlinearFEStateMap(
-        res::Function,jac::Function,U,V,V_φ;
+      ReverseNonlinearFEStateMap(
+        res::Function,jac::Function,U,V,V_φ,V_diff;
         assem_U = SparseMatrixAssembler(U,V),
         assem_adjoint = SparseMatrixAssembler(V,U),
         assem_deriv = SparseMatrixAssembler(V_φ,V_φ),
         nls::NonlinearSolver = NewtonSolver(LUSolver();maxiter=50,rtol=1.e-8,verbose=true),
         adjoint_ls::LinearSolver = LUSolver(),
-        adjoint_jac::Function = jac,
-        reassemble_adjoint_in_pullback::Bool = false
+        adjoint_jac::Function = jac
       )
 
-  Create an instance of `NonlinearFEStateMap` given the residual `res` as a `Function` type,
+  Create an instance of `ReverseNonlinearFEStateMap` given the residual `res` as a `Function` type,
   trial and test spaces `U` and `V`, the FE space `V_φ` for `φh` and derivatives,
-  and the measures as additional arguments.
+  and the measures as additional arguments. The space `V_diff` is the FE space is used to assist with AD. It will be removed in the future.
 
   Optional arguments enable specification of assemblers, nonlinear solver, and
   adjoint (linear) solver. In addition, the jacobian `adjoint_jac` can be optionally
   specified for the purposes of solving the adjoint problem. This can be computed
   with AD or by hand, but and allows the user to specify a different jacobian
   for the forward problem (e.g., for picard iterations).
-
-  The optional argument `reassemble_adjoint_in_pullback` (default `false`) allows
-  the user to specify whether the adjoint matrix should be reassembled in the pullback.
-  This is required for transient problems with a non-linear residual.
-
-  The optional argument `∂ϕ_ad_type` allows the user to specify the AD type used when computing
-  derivatives with respect to `φh` for multi-field problems. This can be either `:monolithic`
-  (default) or `:split`.
   """
-  function NonlinearFEStateMap(
-    res::Function,jac::Function,U,V,V_φ;
+  function ReverseNonlinearFEStateMap(
+    res::Function,jac::Function,U,V,V_φ,V_diff;
     assem_U = SparseMatrixAssembler(U,V),
     assem_adjoint = SparseMatrixAssembler(V,U),
     assem_deriv = SparseMatrixAssembler(V_φ,V_φ),
     nls::NonlinearSolver = NewtonSolver(LUSolver();maxiter=50,rtol=1.e-8,verbose=true),
     adjoint_ls::LinearSolver = LUSolver(),
-    adjoint_jac::Function = jac,
-    reassemble_adjoint_in_pullback::Bool = false,
-    ∂ϕ_ad_type::Symbol = :monolithic
+    adjoint_jac::Function = jac
   )
     jacs = (jac,adjoint_jac)
-    spaces = (U,V,V_φ)
+    spaces = (U,V,V_φ,V_diff)
     assems = (;assem_U,assem_deriv,assem_adjoint)
     cache = FEStateMapCache(nls,adjoint_ls)
-    update_opts = (reassemble_adjoint_in_pullback,)
 
     A, B, C = typeof(res), typeof(jacs), typeof(spaces)
     D, E = typeof(assems), typeof(cache)
-    return new{A,B,C,D,E}(res,jacs,spaces,assems,cache,update_opts,∂ϕ_ad_type)
+    return new{A,B,C,D,E}(res,jacs,spaces,assems,cache)
   end
 end
 
-function NonlinearFEStateMap(res::Function,U,V,V_φ;∂ϕ_ad_type::Symbol=:monolithic,kwargs...)
-  jac = (u,du,v,φh) -> Gridap.jacobian(res,[u,v,φh],1;ad_type=∂ϕ_ad_type)
-  NonlinearFEStateMap(res,jac,U,V,V_φ;∂ϕ_ad_type,kwargs...)
+function ReverseNonlinearFEStateMap(res::Function,U,V,V_φ,V_diff;kwargs...)
+  jac = (u,du,v,φh) -> Gridap.jacobian(res,[u,v,φh],1)
+  ReverseNonlinearFEStateMap(res,jac,U,V,V_φ,V_diff;kwargs...)
 end
 
 # Caching
-function build_cache!(state_map::NonlinearFEStateMap,φh)
+function build_cache!(state_map::ReverseNonlinearFEStateMap,φh)
   assem_U, assem_deriv, assem_adjoint = state_map.assems
-  U,V,V_φ = state_map.spaces
+  U,V,V_φ,_ = state_map.spaces
   res = state_map.res
   jac, adjoint_jac = state_map.jacs
   cache = state_map.cache
@@ -119,19 +103,19 @@ function build_cache!(state_map::NonlinearFEStateMap,φh)
 end
 
 # Getters
-function get_state(m::NonlinearFEStateMap)
+function get_state(m::ReverseNonlinearFEStateMap)
   @assert is_cache_built(m.cache) """
     You must build the cache before using get_state. This can be achieved by either
     solving your problem with my_state_map(φh) or by running build_cache!(my_state_map,φh)
   """
   FEFunction(get_trial_space(m),m.cache.fwd_cache[3])
 end
-get_plb_cache(m::NonlinearFEStateMap) = m.cache.plb_cache
-get_spaces(m::NonlinearFEStateMap) = m.spaces
-get_assemblers(m::NonlinearFEStateMap) = m.assems
+get_plb_cache(m::ReverseNonlinearFEStateMap) = m.cache.plb_cache
+get_spaces(m::ReverseNonlinearFEStateMap) = m.spaces
+get_assemblers(m::ReverseNonlinearFEStateMap) = m.assems
 
-function forward_solve!(φ_to_u::NonlinearFEStateMap,φh)
-  U, V, _ = φ_to_u.spaces
+function forward_solve!(φ_to_u::ReverseNonlinearFEStateMap,φh)
+  U, V, _, _ = φ_to_u.spaces
   assem_U = φ_to_u.assems.assem_U
   res=φ_to_u.res
   jac,_=φ_to_u.jacs
@@ -147,65 +131,72 @@ function forward_solve!(φ_to_u::NonlinearFEStateMap,φh)
   return x
 end
 
-function forward_solve!(φ_to_u::NonlinearFEStateMap,φ::AbstractVector)
+function forward_solve!(φ_to_u::ReverseNonlinearFEStateMap,φ::AbstractVector)
   φh = FEFunction(get_aux_space(φ_to_u),φ)
   return forward_solve!(φ_to_u,φh)
 end
 
-function dRdφ(φ_to_u::NonlinearFEStateMap,uh,vh,φh)
+function dRdφ(φ_to_u::ReverseNonlinearFEStateMap,uh,vh,φh)
   res = φ_to_u.res
-  ad_type = φ_to_u.∂ϕ_ad_type
-  return ∇(res,[uh,vh,φh],3;ad_type)
+  V_diff = φ_to_u.spaces[4]
+  function _res(φ)
+    _φh = FEFunction(V_diff, φ)
+    sum(res(uh,vh,_φh))
+  end                                                                    
+  return ReverseDiff.gradient(_res,get_free_dof_values(φh))
 end
 
-function update_adjoint_caches!(φ_to_u::NonlinearFEStateMap,uh,φh)
+function update_adjoint_caches!(φ_to_u::ReverseNonlinearFEStateMap,uh,φh)
   if !is_cache_built(φ_to_u.cache)
     build_cache!(φ_to_u,φh)
   end
   assem_adjoint = φ_to_u.assems.assem_adjoint
   adjoint_ns, adjoint_K, _ = φ_to_u.cache.adj_cache
   _,adjoint_jac=φ_to_u.jacs
-  U, V, _ = φ_to_u.spaces
+  U, V, _, _ = φ_to_u.spaces
   jac(du,v) =  adjoint_jac(uh,du,v,φh)
   assemble_adjoint_matrix!(jac,adjoint_K,assem_adjoint,U,V)
   numerical_setup!(adjoint_ns,adjoint_K)
   return φ_to_u.cache.adj_cache
 end
 
-function adjoint_solve!(φ_to_u::NonlinearFEStateMap,du::AbstractVector)
+function adjoint_solve!(φ_to_u::ReverseNonlinearFEStateMap,du::AbstractVector)
   adjoint_ns, _, adjoint_x = φ_to_u.cache.adj_cache
   solve!(adjoint_x,adjoint_ns,du)
   return adjoint_x
 end
 
-function ChainRulesCore.rrule(φ_to_u::NonlinearFEStateMap,φh)
-  reassemble_adjoint_in_pullback, = φ_to_u.update_opts
-  u  = forward_solve!(φ_to_u,φh)
-  uh = FEFunction(get_trial_space(φ_to_u),u)
-  if !reassemble_adjoint_in_pullback
+function pullback(φ_to_u::ReverseNonlinearFEStateMap,uh,φh,du;updated=false)
+  dudφ_vec, assem_deriv = get_plb_cache(φ_to_u)
+  V_φ = get_deriv_space(φ_to_u)
+
+  ## Adjoint Solve
+  if !updated
     update_adjoint_caches!(φ_to_u,uh,φh)
   end
-  return u, du -> pullback(φ_to_u,uh,φh,du;updated=!reassemble_adjoint_in_pullback)
+  λ  = adjoint_solve!(φ_to_u,du)
+  λh = FEFunction(get_test_space(φ_to_u),λ)
+
+  ## Compute grad
+  dudφ_vec = dRdφ(φ_to_u,uh,λh,φh)
+  rmul!(dudφ_vec, -1)
+
+  return (NoTangent(),dudφ_vec)
 end
 
-function ChainRulesCore.rrule(φ_to_u::NonlinearFEStateMap,φ::AbstractVector)
-  φh = FEFunction(get_aux_space(φ_to_u),φ)
-  return ChainRulesCore.rrule(φ_to_u,φh)
-end
+# ## Backwards compat
+# function ReverseNonlinearFEStateMap(res::Function,jac::Function,U,V,V_φ,U_reg,φh; kwargs...)
+#   error(_msg_v0_3_0(ReverseNonlinearFEStateMap))
+# end
 
-## Backwards compat
-function NonlinearFEStateMap(res::Function,jac::Function,U,V,V_φ,U_reg,φh; kwargs...)
-  error(_msg_v0_3_0(NonlinearFEStateMap))
-end
+# function ReverseNonlinearFEStateMap(res::Function,U,V,V_φ,U_reg,φh;kwargs...)
+#   error(_msg_v0_3_0(ReverseNonlinearFEStateMap))
+# end
 
-function NonlinearFEStateMap(res::Function,U,V,V_φ,U_reg,φh;kwargs...)
-  error(_msg_v0_3_0(NonlinearFEStateMap))
-end
+# function ReverseNonlinearFEStateMap(res::Function,jac::Function,U,V,V_φ,φh; kwargs...)
+#   error(_msg_v0_4_0(ReverseNonlinearFEStateMap))
+# end
 
-function NonlinearFEStateMap(res::Function,jac::Function,U,V,V_φ,φh; kwargs...)
-  error(_msg_v0_4_0(NonlinearFEStateMap))
-end
-
-function NonlinearFEStateMap(res::Function,U,V,V_φ,φh;kwargs...)
-  error(_msg_v0_4_0(NonlinearFEStateMap))
-end
+# function ReverseNonlinearFEStateMap(res::Function,U,V,V_φ,φh;kwargs...)
+#   error(_msg_v0_4_0(ReverseNonlinearFEStateMap))
+# end
