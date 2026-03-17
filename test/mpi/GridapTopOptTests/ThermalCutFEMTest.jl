@@ -4,7 +4,7 @@ using Gridap, Gridap.Adaptivity, Gridap.Geometry
 using GridapEmbedded, GridapEmbedded.LevelSetCutters
 using GridapTopOpt
 using GridapSolvers, GridapSolvers.BlockSolvers, GridapSolvers.NonlinearSolvers
-using GridapDistributed, GridapPETSc, PartitionedArrays
+using GridapDistributed, PartitionedArrays
 
 using GridapTopOpt: StateParamMap
 

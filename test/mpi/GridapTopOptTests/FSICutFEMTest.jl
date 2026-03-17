@@ -6,7 +6,6 @@ using GridapSolvers, GridapSolvers.BlockSolvers, GridapSolvers.NonlinearSolvers
 using GridapGmsh
 using GridapDistributed
 using PartitionedArrays
-using GridapPETSc
 using GridapTopOpt
 
 using GridapTopOpt: StaggeredStateParamMap
