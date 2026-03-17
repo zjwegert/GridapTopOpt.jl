@@ -123,7 +123,6 @@ function val_and_jacobian(f, args...;ignore_pullback=[])
   (val=y, grad=out)
 end
 
-
 # Equivalent `Zygote.withgradient` call that is compatible with PartitionedArrays
 """
     val_and_gradient(f, args...)
@@ -134,4 +133,14 @@ function val_and_gradient(f, args...)
   y, back = Zygote.pullback(f, args...)
   grad = back(Zygote.sensitivity(y))
   (val=y, grad)
+end
+
+"""
+    Hvp(f,p,v)
+
+Compute the Hessian-vector product of f at p in the direction of v using forward-over-reverse AD.
+"""
+function Hvp(f,p,v)
+  ∇f = p->Zygote.gradient(f,p)[1]
+  ForwardDiff.derivative(α -> ∇f(p + α*v), 0)
 end

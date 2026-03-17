@@ -16,7 +16,7 @@ element operators.
 - `update_opts::Tuple{Vararg{Bool}}`: Special options to optimise the state map update.
 - `∂ϕ_ad_type::Symbol`: The AD type used when computing derivatives with respect to `φh` for multi-field case.
 """
-struct NonlinearFEStateMap{A,B,C,D,E} <: AbstractFEStateMap
+struct NonlinearFEStateMap{A,B,C,D,E,N} <: AbstractFEStateMap
   res         :: A
   jacs        :: B
   spaces      :: C
@@ -64,8 +64,9 @@ struct NonlinearFEStateMap{A,B,C,D,E} <: AbstractFEStateMap
     adjoint_ls::LinearSolver = LUSolver(),
     adjoint_jac::Function = jac,
     reassemble_adjoint_in_pullback::Bool = false,
-    ∂ϕ_ad_type::Symbol = :monolithic
-  )
+    ∂ϕ_ad_type::Symbol = :monolithic,
+    diff_order::Int = 1,
+  ) 
     jacs = (jac,adjoint_jac)
     spaces = (U,V,V_φ)
     assems = (;assem_U,assem_deriv,assem_adjoint)
@@ -74,7 +75,17 @@ struct NonlinearFEStateMap{A,B,C,D,E} <: AbstractFEStateMap
 
     A, B, C = typeof(res), typeof(jacs), typeof(spaces)
     D, E = typeof(assems), typeof(cache)
-    return new{A,B,C,D,E}(res,jacs,spaces,assems,cache,update_opts,∂ϕ_ad_type)
+    if diff_order == 1
+      return new{A,B,C,D,E,1}(
+        res,jacs,spaces,assems,cache,update_opts,∂ϕ_ad_type
+      )
+    elseif diff_order == 2
+      return new{A,B,C,D,E,2}(
+        res,jacs,spaces,assems,cache,update_opts,∂ϕ_ad_type
+      )
+    else
+      error("Unsupported diff_order = $diff_order. Expected 1 or 2.")
+    end
   end
 end
 
@@ -91,6 +102,7 @@ function build_cache!(state_map::NonlinearFEStateMap,φh)
   jac, adjoint_jac = state_map.jacs
   cache = state_map.cache
   nls, adjoint_ls = cache.solvers[1], cache.solvers[2]
+  diff_order = get_diff_order(state_map)
 
   ## Pullback cache
   dudφ_vec = get_free_dof_values(zero(V_φ))
@@ -102,7 +114,7 @@ function build_cache!(state_map::NonlinearFEStateMap,φh)
   _jac(u,du,v) = jac(u,du,v,φh)
   op = get_algebraic_operator(FEOperator(_res,_jac,U,V,assem_U))
   nls_cache = instantiate_caches(x,nls,op)
-  cache.fwd_cache = (nls,nls_cache,x)
+  cache.fwd_cache = (nls,nls_cache,x,copy(get_free_dof_values(φh)))
 
   ## Adjoint cache
   uhd = zero(U)
@@ -111,6 +123,8 @@ function build_cache!(state_map::NonlinearFEStateMap,φh)
   adjoint_x  = allocate_in_domain(adjoint_K); fill!(adjoint_x,zero(eltype(adjoint_x)))
   adjoint_ns = numerical_setup(symbolic_setup(adjoint_ls,adjoint_K),adjoint_K)
   cache.adj_cache = (adjoint_ns,adjoint_K,adjoint_x)
+
+  cache.inc_state_cache, cache.inc_adjoint_cache = build_inc_cache(state_map,φh,uhd,adjoint_x,diff_order)
 
   ## Update cache status
   cache.cache_built = true
@@ -129,6 +143,9 @@ end
 get_plb_cache(m::NonlinearFEStateMap) = m.cache.plb_cache
 get_spaces(m::NonlinearFEStateMap) = m.spaces
 get_assemblers(m::NonlinearFEStateMap) = m.assems
+get_parameter(m::NonlinearFEStateMap) = FEFunction(get_aux_space(m),m.cache.fwd_cache[4])
+get_res(m::NonlinearFEStateMap) = m.res
+get_diff_order(::NonlinearFEStateMap{A,B,C,D,E,N}) where {A,B,C,D,E,N} = Val(N)
 
 function forward_solve!(φ_to_u::NonlinearFEStateMap,φh)
   U, V, _ = φ_to_u.spaces
@@ -138,12 +155,20 @@ function forward_solve!(φ_to_u::NonlinearFEStateMap,φh)
   if !is_cache_built(φ_to_u.cache)
     build_cache!(φ_to_u,φh)
   end
-  nls, nls_cache, x = φ_to_u.cache.fwd_cache
+  nls, nls_cache, x, _ = φ_to_u.cache.fwd_cache
+  copyto!(φ_to_u.cache.fwd_cache[4], get_free_dof_values(φh))
+  φ_to_u.cache.adjoint_updated = false
 
   _res(u,v) = res(u,v,φh)
   _jac(u,du,v) = jac(u,du,v,φh)
   op = get_algebraic_operator(FEOperator(_res,_jac,U,V,assem_U))
+
   solve!(x,nls,op,nls_cache)
+
+  diff_order = get_diff_order(φ_to_u)
+  update_incremental_state_partials!(φ_to_u,φh,diff_order)
+  φ_to_u.cache.state_updated = true
+
   return x
 end
 
@@ -175,12 +200,15 @@ end
 function adjoint_solve!(φ_to_u::NonlinearFEStateMap,du::AbstractVector)
   adjoint_ns, _, adjoint_x = φ_to_u.cache.adj_cache
   solve!(adjoint_x,adjoint_ns,du)
+  φ_to_u.cache.adjoint_updated = true
   return adjoint_x
 end
 
 function ChainRulesCore.rrule(φ_to_u::NonlinearFEStateMap,φh)
   reassemble_adjoint_in_pullback, = φ_to_u.update_opts
+
   u  = forward_solve!(φ_to_u,φh)
+
   uh = FEFunction(get_trial_space(φ_to_u),u)
   if !reassemble_adjoint_in_pullback
     update_adjoint_caches!(φ_to_u,uh,φh)

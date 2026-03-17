@@ -76,7 +76,7 @@ for i in 2:length(αuᵢ₋₁_to_uᵢ)
   fill!(_x,0.1)
   αuᵢ₋₁_to_uᵢ[i].cache.cache_built = true
   αuᵢ₋₁_to_uᵢ[i].cache.adj_cache = αu₁_to_u₂_adj_cache
-  αuᵢ₋₁_to_uᵢ[i].cache.fwd_cache = (αu₁_to_u₂_fwd_cache[1:2]...,_x);
+  αuᵢ₋₁_to_uᵢ[i].cache.fwd_cache = (αu₁_to_u₂_fwd_cache[1:2]...,_x,αu₁_to_u₂_fwd_cache[4]);
   αuᵢ₋₁_to_uᵢ[i].cache.plb_cache = αu₁_to_u₂_plb_cache
 end;
 fill!(αu₁_to_u₂_fwd_cache[3],0.1)

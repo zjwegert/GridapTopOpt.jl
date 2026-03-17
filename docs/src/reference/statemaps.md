@@ -17,7 +17,6 @@ GridapTopOpt.get_state
 
 ```@docs
 GridapTopOpt.StateParamMap
-GridapTopOpt.rrule(u_to_j::GridapTopOpt.StateParamMap,uh,φh)
 ```
 
 ## Implemented types of `AbstractFEStateMap`
@@ -38,6 +37,12 @@ Modules = [GridapTopOpt]
 Pages = ["StateMaps/NonlinearFEStateMaps.jl"]
 ```
 
+### `NonlinearFEStateMap`
+```@autodocs
+Modules = [GridapTopOpt]
+Pages = ["StateMaps/ReverseNonlinearFEStateMaps.jl"]
+```
+
 ### `RepeatingAffineFEStateMap`
 ```@autodocs
 Modules = [GridapTopOpt]
@@ -56,7 +61,6 @@ Pages = ["StateMaps/StaggeredFEStateMaps.jl"]
 
 #### Existing methods
 ```@docs
-GridapTopOpt.rrule(φ_to_u::GridapTopOpt.AbstractFEStateMap,φh)
 GridapTopOpt.pullback
 ```
 
