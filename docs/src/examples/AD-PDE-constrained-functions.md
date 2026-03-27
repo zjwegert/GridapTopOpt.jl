@@ -6,7 +6,7 @@ GridapTopOpt provides serial and distributed automatic differentiation methods f
 
 Let's consider the following introductory example. Suppose we wish to differentiate
 
-$$J(\kappa,u(\kappa)) = \left(\int_\Omega(u(\kappa)-u_\textrm{obs})~\mathrm{d}\boldsymbol{x}\right)^{1/2}$$
+$$J(\kappa,u(\kappa)) = \left(\int_\Omega(u(\kappa)-u_\textrm{obs})^2~\mathrm{d}\boldsymbol{x}\right)^{1/2}$$
 
 where $u_\textrm{obs}$ is some observed data and $u$ depends on $\kappa$ through Poisson's equation: find $u\in H^1_g(\Omega)$ such that $a(u,v) = l(v)$ for all $v\in H^1_0(\Omega)$ where
 
