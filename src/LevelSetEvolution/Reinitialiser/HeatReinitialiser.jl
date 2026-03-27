@@ -27,10 +27,11 @@ function `get_lsf_to_sdf_map`.
 - `Ωs`: An EmbeddedCollection for holding information regarding the geometry.
 """
 struct HeatReinitialiser <: Reinitialiser
-  φ_to_x   :: AffineFEStateMap
-  x_to_y   :: AffineFEStateMap
-  yφ_to_sdf :: AffineFEStateMap
-  Ωs       :: EmbeddedCollection
+  φ_to_x     :: AffineFEStateMap
+  x_to_y     :: AffineFEStateMap
+  yφ_to_sdf  :: AffineFEStateMap
+  Ωs         :: EmbeddedCollection
+  correct_ls :: Bool
 
   @doc """
       HeatReinitialiser(V_φ,model;
@@ -40,7 +41,8 @@ struct HeatReinitialiser <: Reinitialiser
         V_xy = build_V_xy(model,V_φ),
         M_xyφ = MultiFieldFESpace([Vxy,V_φ]),
         V_sdf = build_V_sdf(model,V_φ),
-        Ωs = build_Ωs(model,boundary_tags,V_φ)
+        Ωs = build_Ωs(model,boundary_tags,V_φ),
+        correct_ls = true
       )
 
   Create an instance of `HeatReinitialiser`.
@@ -50,6 +52,8 @@ struct HeatReinitialiser <: Reinitialiser
   - `γd`: Penalty parameter to preserve level sets, default is 10.
   - `boundary_tags`: Tag/s for the boundary, default is "boundary" (e.g., for CartesianDiscreteModel).
     For your own mesh (e.g., unstructured) covering M, you should provide the tags that consistute ∂M.
+  - `correct_ls`: Boolean for whether or not to ensure LS DOFs aren't zero
+    this must be true for differentiation in unfitted methods.
 
   Advanced optional parameters:
   - `V_xy`: TestFESpace for the vector field x, default is built using `build_V_xy`.
@@ -79,6 +83,7 @@ struct HeatReinitialiser <: Reinitialiser
     t  = minimum(get_element_diameters(model))^2,
     γd = 10.0,
     boundary_tags = "boundary",
+    correct_ls = true,
     V_xy = build_V_xy(model,V_φ),
     M_xyφ = MultiFieldFESpace([V_xy,V_φ]),
     V_sdf = build_V_sdf(model,V_φ),
@@ -98,7 +103,7 @@ struct HeatReinitialiser <: Reinitialiser
     φ_to_x, x_to_y, yφ_to_sdf = build_state_maps(Ωs,V_φ,V_xy,M_xyφ,V_sdf,t,γd,
       φ_to_x_solvers, x_to_y_solvers, yφ_to_sdf_solvers)
 
-    new(φ_to_x,x_to_y,yφ_to_sdf,Ωs)
+    new(φ_to_x,x_to_y,yφ_to_sdf,Ωs,correct_ls)
   end
 end
 
@@ -110,6 +115,7 @@ function reinit!(m::HeatReinitialiser,φh::FEFunction)
   yφ  = combine_fields(get_deriv_space(m.yφ_to_sdf),y,φ)
   sdf = m.yφ_to_sdf(yφ)
   copyto!(φ,sdf)
+  m.correct_ls && correct_ls!(φh)
   φ,nothing
 end
 
@@ -122,6 +128,7 @@ function reinit!(m::HeatReinitialiser,φh::DistributedCellField)
   sdf = m.yφ_to_sdf(yφ)
   copyto!(φ,sdf)
   consistent!(φ) |> fetch
+  m.correct_ls && correct_ls!(φh)
   φ,nothing
 end
 
@@ -171,7 +178,7 @@ function build_Ωs(model,boundary_tags,V_φ)
   n = get_normal_vector(∂M)
   hₕ = get_element_diameter_field(model)
 
-  Ωs = EmbeddedCollection(model) do cutgeo,_,_
+  return EmbeddedCollection(model) do cutgeo,_,_
     Γ = DifferentiableTriangulation(EmbeddedBoundary(cutgeo),V_φ)
     dΓ = Measure(Γ,2order)
     (;
