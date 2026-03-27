@@ -85,8 +85,8 @@ function build_cache!(state_map::AffineFEStateMap,φh)
   _,_,_,precompute_uhd = state_map.update_opts
 
   ## Pullback cache
-  dudφ_vec = get_free_dof_values(zero(V_φ))
-  cache.plb_cache = (dudφ_vec,assem_deriv)
+  dφ_from_u_vec = get_free_dof_values(zero(V_φ))
+  cache.plb_cache = (dφ_from_u_vec,assem_deriv)
 
   ## Forward cache
   uhd = precompute_uhd ? nothing : zero(U);

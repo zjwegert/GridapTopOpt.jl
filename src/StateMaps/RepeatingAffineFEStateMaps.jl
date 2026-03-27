@@ -146,8 +146,8 @@ function build_cache!(state_map::RepeatingAffineFEStateMap{N},φh) where N
 
   ## Pullback cache
   uhd = zero(U0)
-  dudφ_vec = get_free_dof_values(zero(V_φ))
-  cache.plb_cache = (dudφ_vec,assem_deriv)
+  dφ_from_u_vec = get_free_dof_values(zero(V_φ))
+  cache.plb_cache = (dφ_from_u_vec,assem_deriv)
 
   ## Forward cache
   K  = assemble_matrix((u,v) -> biform(u,v,φh),assem_U0,U0,V0)

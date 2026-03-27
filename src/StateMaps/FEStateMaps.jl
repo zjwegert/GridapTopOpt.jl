@@ -149,7 +149,7 @@ Compute `∂F∂u*dudφ` at `φh` and `uh` using the adjoint method. I.e., let
 and solve the adjoint problem `dRduᵀ*λ = ∂F∂uᵀ` using [`adjoint_solve!`](@ref).
 """
 function pullback(φ_to_u::AbstractFEStateMap,uh,φh,du;updated=false)
-  dudφ_vec, assem_deriv = get_plb_cache(φ_to_u)
+  dφ_from_u_vec, assem_deriv = get_plb_cache(φ_to_u)
   V_φ = get_deriv_space(φ_to_u)
 
   ## Adjoint Solve
@@ -160,11 +160,11 @@ function pullback(φ_to_u::AbstractFEStateMap,uh,φh,du;updated=false)
   λh = FEFunction(get_test_space(φ_to_u),λ)
 
   ## Compute grad
-  dudφ_vecdata = collect_cell_vector(V_φ,dRdφ(φ_to_u,uh,λh,φh))
-  assemble_vector!(dudφ_vec,assem_deriv,dudφ_vecdata)
-  rmul!(dudφ_vec, -1)
+  dφ_from_u_vecdata = collect_cell_vector(V_φ,dRdφ(φ_to_u,uh,λh,φh))
+  assemble_vector!(dφ_from_u_vec,assem_deriv,dφ_from_u_vecdata)
+  rmul!(dφ_from_u_vec, -1)
 
-  return (NoTangent(),dudφ_vec)
+  return (NoTangent(),dφ_from_u_vec)
 end
 
 function pullback(φ_to_u::AbstractFEStateMap,u::AbstractVector,φ::AbstractVector,du::AbstractVector;updated=false)

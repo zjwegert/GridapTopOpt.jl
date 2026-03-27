@@ -86,8 +86,8 @@ function build_cache!(state_map::NonlinearFEStateMap,φh)
   nls, adjoint_ls = cache.solvers[1], cache.solvers[2]
 
   ## Pullback cache
-  dudφ_vec = get_free_dof_values(zero(V_φ))
-  cache.plb_cache = (dudφ_vec,assem_deriv)
+  dφ_from_u_vec = get_free_dof_values(zero(V_φ))
+  cache.plb_cache = (dφ_from_u_vec,assem_deriv)
 
   ## Forward cache
   x = zero_free_values(U)
