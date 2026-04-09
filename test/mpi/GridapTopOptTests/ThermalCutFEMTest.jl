@@ -4,7 +4,7 @@ using Gridap, Gridap.Adaptivity, Gridap.Geometry
 using GridapEmbedded, GridapEmbedded.LevelSetCutters
 using GridapTopOpt
 using GridapSolvers, GridapSolvers.BlockSolvers, GridapSolvers.NonlinearSolvers
-using GridapDistributed, GridapPETSc, PartitionedArrays
+using GridapDistributed, PartitionedArrays
 
 using GridapTopOpt: StateParamMap
 
@@ -103,11 +103,10 @@ function main(distribute,mesh_partition)
   pcfs = EmbeddedPDEConstrainedFunctionals(state_collection;analytic_dC=(dVol,))
 
   ## Evolution Method
-  evolve_nls = NewtonSolver(LUSolver();maxiter=1,verbose=i_am_main(ranks))
   reinit_nls = NewtonSolver(LUSolver();maxiter=20,rtol=1.e-14,verbose=i_am_main(ranks))
 
-  evo = CutFEMEvolver(V_φ,Ωs,dΩ_bg,hₕ;max_steps,γg=0.1,ode_ls=LUSolver(),ode_nl=evolve_nls)
-  reinit = StabilisedReinitialiser(V_φ,Ωs,dΩ_bg,hₕ;stabilisation_method=ArtificialViscosity(2.0),nls=reinit_nls)
+  evo = CutFEMEvolver(V_φ,dΩ_bg,hₕ;max_steps,γg=0.1,ode_ls=LUSolver())
+  reinit = StabilisedReinitialiser(V_φ,dΩ_bg,hₕ;stabilisation_method=ArtificialViscosity(2.0),nls=reinit_nls)
   ls_evo = LevelSetEvolution(evo,reinit)
   reinit!(ls_evo,φh)
 

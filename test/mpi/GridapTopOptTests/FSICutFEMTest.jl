@@ -6,7 +6,6 @@ using GridapSolvers, GridapSolvers.BlockSolvers, GridapSolvers.NonlinearSolvers
 using GridapGmsh
 using GridapDistributed
 using PartitionedArrays
-using GridapPETSc
 using GridapTopOpt
 
 using GridapTopOpt: StaggeredStateParamMap
@@ -209,11 +208,10 @@ function main(distribute,mesh_partition)
   pcf = EmbeddedPDEConstrainedFunctionals(state_collection;analytic_dC=[dVol])
 
   ## Evolution Method
-  evolve_nls = NewtonSolver(LUSolver();maxiter=1,verbose=i_am_main(ranks))
   reinit_nls = NewtonSolver(LUSolver();maxiter=20,rtol=1.e-14,verbose=i_am_main(ranks))
 
-  evo = CutFEMEvolver(V_φ,Ω,dΩ_act,hₕ;max_steps,γg=0.01,ode_ls=LUSolver(),ode_nl=evolve_nls)
-  reinit = StabilisedReinitialiser(V_φ,Ω,dΩ_act,hₕ;stabilisation_method=ArtificialViscosity(0.5),nls=reinit_nls)
+  evo = CutFEMEvolver(V_φ,dΩ_act,hₕ;max_steps,γg=0.01,ode_ls=LUSolver())
+  reinit = StabilisedReinitialiser(V_φ,dΩ_act,hₕ;stabilisation_method=ArtificialViscosity(0.5),nls=reinit_nls)
   ls_evo = LevelSetEvolution(evo,reinit)
 
   ## Hilbertian extension-regularisation problems

@@ -1,7 +1,7 @@
 module JLD2SaveLoadMPI
 using Test
 
-using Gridap, Gridap.MultiField, GridapDistributed, GridapPETSc, GridapSolvers,
+using Gridap, Gridap.MultiField, GridapDistributed, GridapSolvers,
   PartitionedArrays, GridapTopOpt, SparseMatricesCSR
 
 function main(distribute,mesh_partition)
