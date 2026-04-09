@@ -6,6 +6,7 @@ include("ReverseNonlinearFEStateMaps.jl")
 include("RepeatingAffineFEStateMaps.jl")
 include("StaggeredFEStateMaps.jl")
 include("PDEConstrainedFunctionals.jl")
+include("SecondOrderStateMaps.jl")
 
 """
     Gridap.gradient(F,uh::Vector{<:CellField},K::Int)

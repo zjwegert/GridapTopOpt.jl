@@ -14,7 +14,7 @@ element operators `AffineFEOperator`.
 - `update_opts::Tuple{Vararg{Bool}}`: Special options to optimise the state map update.
 - `∂ϕ_ad_type::Symbol`: The AD type used when computing derivatives with respect to `φh` for multi-field case.
 """
-struct AffineFEStateMap{A,B,C,D,E} <: AbstractFEStateMap
+struct AffineFEStateMap{A,B,C,D,E,N} <: AbstractFEStateMap
   biform      :: A
   liform      :: B
   spaces      :: C
@@ -71,7 +71,8 @@ struct AffineFEStateMap{A,B,C,D,E} <: AbstractFEStateMap
       reassemble_adjoint::Bool = true,
       reassemble_adjoint_in_pullback::Bool = false,
       precompute_uhd::Bool = false,
-      ∂ϕ_ad_type::Symbol = :monolithic
+      ∂ϕ_ad_type::Symbol = :monolithic,
+      diff_order::Int = 1,
     )
     spaces = (U,V,V_φ)
     assems = (;assem_U,assem_deriv,assem_adjoint)
@@ -79,7 +80,17 @@ struct AffineFEStateMap{A,B,C,D,E} <: AbstractFEStateMap
     update_opts = (reassemble_matrix,reassemble_adjoint,
       reassemble_adjoint_in_pullback,precompute_uhd)
     A,B,C,D,E = typeof(biform),typeof(liform),typeof(spaces),typeof(assems),typeof(cache)
-    return new{A,B,C,D,E}(biform,liform,spaces,assems,cache,update_opts,∂ϕ_ad_type)
+    if diff_order == 1
+      return new{A,B,C,D,E,1}(
+        biform, liform, spaces, assems, cache, update_opts, ∂ϕ_ad_type
+      )
+    elseif diff_order == 2
+      return new{A,B,C,D,E,2}(
+        biform, liform, spaces, assems, cache, update_opts, ∂ϕ_ad_type
+      )
+    else
+      error("Unsupported diff_order = $diff_order. Expected 1 or 2.")
+    end
   end
 end
 
@@ -91,6 +102,7 @@ function build_cache!(state_map::AffineFEStateMap,φh)
   cache = state_map.cache
   ls, adjoint_ls = cache.solvers[1], cache.solvers[2]
   _,_,_,precompute_uhd = state_map.update_opts
+  diff_order = get_diff_order(state_map)
 
   ## Pullback cache
   dudφ_vec = get_free_dof_values(zero(V_φ))
@@ -102,13 +114,16 @@ function build_cache!(state_map::AffineFEStateMap,φh)
   K, b = get_matrix(op), get_vector(op)
   x  = allocate_in_domain(K); fill!(x,zero(eltype(x)))
   ns = numerical_setup(symbolic_setup(ls,K),K)
-  cache.fwd_cache = (ns,K,b,x,uhd)
+  cache.fwd_cache = (ns,K,b,x,uhd,copy(get_free_dof_values(φh)))
 
   ## Adjoint cache
   adjoint_K  = assemble_matrix((u,v)->biform(v,u,φh),assem_adjoint,V,U)
   adjoint_x  = allocate_in_domain(adjoint_K); fill!(adjoint_x,zero(eltype(adjoint_x)))
   adjoint_ns = numerical_setup(symbolic_setup(adjoint_ls,adjoint_K),adjoint_K)
   cache.adj_cache = (adjoint_ns,adjoint_K,adjoint_x)
+
+  ## Incremental cache
+  cache.inc_state_cache, cache.inc_adjoint_cache = build_inc_cache(state_map,φh,uhd,adjoint_x,diff_order)
 
   ## Update cache status
   cache.cache_built = true
@@ -127,6 +142,9 @@ end
 get_plb_cache(m::AffineFEStateMap) = m.cache.plb_cache
 get_spaces(m::AffineFEStateMap) = m.spaces
 get_assemblers(m::AffineFEStateMap) = m.assems
+get_parameter(m::AffineFEStateMap) = FEFunction(get_aux_space(m), m.cache.fwd_cache[6] )
+get_res(m::AffineFEStateMap) = (u,v,φ) -> m.biform(u,v,φ) - m.liform(v,φ)
+get_diff_order(::AffineFEStateMap{A,B,C,D,E,N}) where {A,B,C,D,E,N} = Val(N)
 
 function forward_solve!(φ_to_u::AffineFEStateMap,φh)
   biform, liform = φ_to_u.biform, φ_to_u.liform
@@ -135,7 +153,10 @@ function forward_solve!(φ_to_u::AffineFEStateMap,φh)
   if !is_cache_built(φ_to_u.cache)
     build_cache!(φ_to_u,φh)
   end
-  ns, K, b, x, _uhd = φ_to_u.cache.fwd_cache
+  ns, K, b, x, _uhd, φ = φ_to_u.cache.fwd_cache
+  copyto!(φ_to_u.cache.fwd_cache[6], get_free_dof_values(φh))
+  φ_to_u.cache.adjoint_updated = false
+
   reassemble_matrix,_,_,precompute_uhd = φ_to_u.update_opts
 
   uhd = precompute_uhd ? zero(U) : _uhd;
@@ -147,6 +168,11 @@ function forward_solve!(φ_to_u::AffineFEStateMap,φh)
   end
   assemble_vector!(l_fwd,b,assem_U,V)
   solve!(x,ns,b)
+
+  diff_order = get_diff_order(φ_to_u)
+  update_incremental_state_partials!(φ_to_u,φh,diff_order)
+  φ_to_u.cache.state_updated = true
+ 
   return x
 end
 
@@ -176,6 +202,7 @@ end
 function adjoint_solve!(φ_to_u::AffineFEStateMap,du::AbstractVector)
   adjoint_ns, _, adjoint_x = φ_to_u.cache.adj_cache
   solve!(adjoint_x,adjoint_ns,du)
+  φ_to_u.cache.adjoint_updated = true
   return adjoint_x
 end
 
