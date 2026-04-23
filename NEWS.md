@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   was required to ensure multi-phase methods are compatible with existing methods.
 - Unified serial methods for `combine_fields`.
 - The line search can now be enabled after a set iteration in `HilbertianProjection`
+- Removed `Gridap.ReferenceFEs.get_order(f::LinearCombinationFieldVector)` - now available in Gridap
 
 ### Fixed
 - Fixed `correct_ls!` function signature.
