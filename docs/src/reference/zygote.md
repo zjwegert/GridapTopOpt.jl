@@ -59,4 +59,9 @@ GridapTopOpt.val_and_gradient
 GridapTopOpt.val_and_jacobian
 ```
 
+## Serial-only Hessian-vector-products
+```@docs
+GridapTopOpt.Hvp
+```
+
 Discussion of the usage of these can be found in this [example](../examples/AD-PDE-constrained-functions.md).

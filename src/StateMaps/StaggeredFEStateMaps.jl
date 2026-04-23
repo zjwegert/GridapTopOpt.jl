@@ -80,8 +80,14 @@ struct StaggeredAffineFEStateMap{NB,SB,A,B,C,D,E,F} <: AbstractFEStateMap
       assem_deriv     :: Assembler = SparseMatrixAssembler(V_φ,V_φ),
       assems_adjoint  :: Vector{<:Assembler} = map(SparseMatrixAssembler,op.tests,op.trials),
       solver          :: StaggeredFESolver{NB} = StaggeredFESolver(fill(LUSolver(),length(op.biforms))),
-      adjoint_solver  :: StaggeredFESolver{NB} = StaggeredFESolver(fill(LUSolver(),length(op.biforms)))
+      adjoint_solver  :: StaggeredFESolver{NB} = StaggeredFESolver(fill(LUSolver(),length(op.biforms))),
+      diff_order = 1
     ) where {NB,SB}
+
+    # Check that diff_order is 1 (second-order derivatives not supported)
+    if diff_order !=1
+      error("ReverseNonlinearFEStateMap only supports diff_order=1. Second-order derivatives are not supported.")
+    end
 
     @assert length(∂Rk∂xhi) == NB-1 && all(map(length,∂Rk∂xhi) .== 1:NB-1) """\n
     We expect k ∈ 2:NB and i ∈ 1:k-1.
@@ -474,6 +480,8 @@ function pullback(φ_to_u::StaggeredFEStateMapTypes{NB},xh,φh,dFdxj;kwargs...) 
   return (NoTangent(),Σ_λᵀs_∂Rs∂φ)
 end
 
+get_diff_order(::StaggeredFEStateMapTypes) = Val(1)
+
 function ChainRulesCore.rrule(φ_to_u::StaggeredFEStateMapTypes,φh)
   u  = forward_solve!(φ_to_u,φh)
   uh = FEFunction(get_trial_space(φ_to_u),u)
@@ -659,6 +667,8 @@ function ChainRulesCore.rrule(u_to_j::StaggeredStateParamMap,u::AbstractVector,�
   φh = FEFunction(V_φ,φ)
   return ChainRulesCore.rrule(u_to_j,uh,φh)
 end
+
+rrule(u_to_j::StaggeredStateParamMap,u,j) = ChainRulesCore.rrule(u_to_j,u,j)
 
 ## Backwards compat
 function StaggeredAffineFEStateMap(

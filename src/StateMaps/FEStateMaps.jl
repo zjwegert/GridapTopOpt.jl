@@ -94,6 +94,25 @@ function forward_solve!(φ_to_u::AbstractFEStateMap,φh)
 end
 
 """
+    update_incremental_state_partials!(p_to_u,res,u,p)
+
+Update the incremental state partial `∂R/∂p` 
+"""
+function update_incremental_state_partials!(p_to_u,ph,diff_order::Val{2})
+  U,V,V_p = p_to_u.spaces
+  u̇, assem_∂R∂p, ∂R∂p_mat = p_to_u.cache.inc_state_cache
+  res = get_res(p_to_u)
+  uh = get_state(p_to_u)
+  dv = get_fe_basis(V)
+  ∂R∂p = Gridap.jacobian(p->res(uh,dv,p),ph)
+  assem_∂R∂p = SparseMatrixAssembler(V_p,V)
+  assemble_matrix!(∂R∂p,∂R∂p_mat,assem_∂R∂p,V_p,V)
+  return ∂R∂p_mat
+end
+
+update_incremental_state_partials!(p_to_u,ph,diff_order::Val{1}) = nothing
+
+"""
     update_adjoint_caches!(φ_to_u::AbstractFEStateMap,uh,φh)
 
 Update the cache for the adjoint problem. This is usually a tuple
@@ -108,6 +127,43 @@ function update_adjoint_caches!(φ_to_u::AbstractFEStateMap,u::AbstractVector,φ
   φh = FEFunction(get_aux_space(φ_to_u),φ)
   return update_adjoint_caches!(φ_to_u,uh,φh)
 end
+
+"""
+    update_incremental_adjoint_partials(res,uh,ph,λh,spaces)
+
+Update the incremental adjoint partials used in the second order derivative computations.
+"""
+function update_incremental_adjoint_partials!(p_to_u,uh,ph,λh,diff_order::Val{2})
+  U,V,V_p = p_to_u.spaces
+  res = get_res(p_to_u)
+
+  if !is_cache_built(p_to_u.cache)
+    build_cache!(p_to_u,ph)
+  end
+  _, _,   assem_∂2R∂u2, ∂2R∂u2_mat,   assem_∂2R∂u∂p,∂2R∂u∂p_mat,  assem_∂2R∂p2,∂2R∂p2_mat,  assem_∂2R∂p∂u,∂2R∂p∂u_mat = p_to_u.cache.inc_adjoint_cache
+
+  # ∂²R / ∂u² * u̇ * λ
+  ∂2R∂u2 = Gridap.hessian(uh->res(uh,λh,ph),uh) 
+  assemble_matrix!(∂2R∂u2,∂2R∂u2_mat,assem_∂2R∂u2,U,U)
+
+  # ∂/∂p (∂R/∂u * λ) * ṗ
+  ∂R∂u_λ(uh,ph) = Gridap.gradient(uh->res(uh,λh,ph),uh)
+  ∂2R∂u∂p = Gridap.jacobian(p->∂R∂u_λ(uh,p),ph) 
+  assemble_matrix!(∂2R∂u∂p,∂2R∂u∂p_mat,assem_∂2R∂u∂p,V_p,V)
+
+  # ∂²R / ∂p² * ṗ * λ
+  ∂2R∂p2 = Gridap.hessian(ph->res(uh,λh,ph),ph)
+  assemble_matrix!(∂2R∂p2,∂2R∂p2_mat,assem_∂2R∂p2,V_p,V_p)
+
+  # ∂/∂u (∂R/∂p * λ) * ṗ
+  ∂R∂p_λ(uh,ph) = Gridap.gradient(ph->res(uh,λh,ph),ph)
+  ∂2R∂p∂u = Gridap.jacobian(uh->∂R∂p_λ(uh,ph),uh) 
+  assemble_matrix!(∂2R∂p∂u,∂2R∂p∂u_mat,assem_∂2R∂p∂u,U,V_p)
+
+  return ∂2R∂u2_mat, ∂2R∂u∂p_mat, ∂2R∂p2_mat, ∂2R∂p∂u_mat
+end
+
+update_incremental_adjoint_partials!(p_to_u,uh,ph,λh,diff_order::Val{1}) = nothing
 
 """
     adjoint_solve!(φ_to_u::AbstractFEStateMap,du::AbstractVector)
@@ -135,6 +191,12 @@ function dRdφ(φ_to_u::AbstractFEStateMap,u::AbstractVector,v::AbstractVector,�
   return dRdφ(φ_to_u,uh,vh,φh)
 end
 
+function dRdφ(φ_to_u::AbstractFEStateMap,u::AbstractVector,v::AbstractVector,φh)
+  uh = FEFunction(get_trial_space(φ_to_u),u)
+  vh = FEFunction(get_test_space(φ_to_u),v)
+  return dRdφ(φ_to_u,uh,vh,φh)
+end
+
 function get_plb_cache(::AbstractFEStateMap)
   @abstractmethod
 end
@@ -156,8 +218,11 @@ function pullback(φ_to_u::AbstractFEStateMap,uh,φh,du;updated=false)
   if !updated
     update_adjoint_caches!(φ_to_u,uh,φh)
   end
+
   λ  = adjoint_solve!(φ_to_u,du)
   λh = FEFunction(get_test_space(φ_to_u),λ)
+
+  update_incremental_adjoint_partials!(φ_to_u,uh,φh,λh,get_diff_order(φ_to_u))
 
   ## Compute grad
   dudφ_vecdata = collect_cell_vector(V_φ,dRdφ(φ_to_u,uh,λh,φh))
@@ -192,6 +257,14 @@ function ChainRulesCore.rrule(φ_to_u::AbstractFEStateMap,φ::AbstractVector)
   return ChainRulesCore.rrule(φ_to_u,φh)
 end
 
+function rrule(φ_to_u::AbstractFEStateMap,φh)
+  ChainRulesCore.rrule(φ_to_u,φh)
+end
+
+function rrule(φ_to_u::AbstractFEStateMap,φ::AbstractVector)
+  ChainRulesCore.rrule(φ_to_u,φ)
+end
+
 ## Caching
 mutable struct FEStateMapCache
   cache_built::Bool
@@ -199,10 +272,14 @@ mutable struct FEStateMapCache
   fwd_cache::Tuple
   adj_cache::Tuple
   plb_cache::Tuple
+  inc_state_cache::Tuple
+  inc_adjoint_cache::Tuple
+  state_updated:: Bool
+  adjoint_updated:: Bool
 end
 
 function FEStateMapCache(fwd_solver,adjoint_solver)
-  FEStateMapCache(false,(fwd_solver,adjoint_solver),(),(),())
+  FEStateMapCache(false,(fwd_solver,adjoint_solver),(),(),(),(),(),false,false)
 end
 
 is_cache_built(c::FEStateMapCache) = c.cache_built
@@ -212,6 +289,54 @@ is_cache_built(c::FEStateMapCache) = c.cache_built
 
 Build the FEStateMapCache (see AffineFEStateMap for an example)
 """
+function build_inc_cache(state_map::AbstractFEStateMap,ph,uh,adjoint_x,diff_order::Val{2})
+  U,V,V_p = state_map.spaces
+  res = get_res(state_map)
+
+  println("Building incremental state cache...")
+
+  # incremental state cache 
+  u̇ = similar(get_free_dof_values(uh))
+  dv = get_fe_basis(V)
+  ∂R∂p = Gridap.jacobian(p->res(uh,dv,p),ph)
+  assem_∂R∂p = SparseMatrixAssembler(V_p,V)
+  ∂R∂p_mat = assemble_matrix(∂R∂p,assem_∂R∂p,V_p,V)
+  inc_state_cache = (u̇, assem_∂R∂p, ∂R∂p_mat)
+
+  println("Building incremental adjoint cache...")
+
+  # incremental adjoint cache 
+  λh = FEFunction(V,adjoint_x)
+  λ⁻ = similar(adjoint_x)
+  # ∂²R / ∂u² * u̇ * λ
+  ∂2R∂u2 = Gridap.hessian(uh->res(uh,λh,ph),uh) 
+  assem_∂2R∂u2 = SparseMatrixAssembler(U,U)
+  ∂2R∂u2_mat = assemble_matrix(∂2R∂u2,assem_∂2R∂u2,U,U)  
+  # ∂/∂p (∂R/∂u * λ) * ṗ
+  ∂R∂u_λ(uh,ph) = Gridap.gradient(uh->res(uh,λh,ph),uh)
+  ∂2R∂u∂p = Gridap.jacobian(p->∂R∂u_λ(uh,p),ph) 
+  assem_∂2R∂u∂p = SparseMatrixAssembler(V_p,V)
+  ∂2R∂u∂p_mat = assemble_matrix(∂2R∂u∂p,assem_∂2R∂u∂p,V_p,V)
+  # ∂²R / ∂p² * ṗ * λ
+  ∂2R∂p2 = Gridap.hessian(ph->res(uh,λh,ph),ph)
+  assem_∂2R∂p2 = SparseMatrixAssembler(V_p,V_p)
+  ∂2R∂p2_mat = assemble_matrix(∂2R∂p2,assem_∂2R∂p2,V_p,V_p)
+  # ∂/∂u (∂R/∂p * λ) * ṗ
+  ∂R∂p_λ(uh,ph) = Gridap.gradient(ph->res(uh,λh,ph),ph)
+  ∂2R∂p∂u = Gridap.jacobian(uh->∂R∂p_λ(uh,ph),uh) 
+  assem_∂2R∂p∂u = SparseMatrixAssembler(U,V_p)
+  ∂2R∂p∂u_mat = assemble_matrix(∂2R∂p∂u,assem_∂2R∂p∂u,U,V_p)
+  # incremental adjoint cotangent
+  dṗ_from_u = get_free_dof_values(zero(V_p))
+  inc_adjoint_cache = (λ⁻, dṗ_from_u,   assem_∂2R∂u2, ∂2R∂u2_mat,   assem_∂2R∂u∂p,∂2R∂u∂p_mat,  assem_∂2R∂p2,∂2R∂p2_mat,  assem_∂2R∂p∂u,∂2R∂p∂u_mat)
+  
+  println("Done building incremental state/adjoint cache.")
+  
+  return inc_state_cache, inc_adjoint_cache
+end
+
+build_inc_cache(state_map::AbstractFEStateMap,ph,uh,adjoint_x,diff_order::Val{1}) = ((),())
+
 function build_cache!(::AbstractFEStateMap,φh)
   @abstractmethod
 end
@@ -226,6 +351,8 @@ function delete_cache!(c::FEStateMapCache)
   c.fwd_cache = ()
   c.adj_cache = ()
   c.plb_cache = ()
+  c.inc_state_cache = ()
+  c.inc_adjoint_cache = ()
   return
 end
 
