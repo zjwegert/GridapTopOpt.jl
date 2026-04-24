@@ -12,7 +12,6 @@ DataStructures = "864edb3b-99cc-5e75-8d2d-829cb0a9cfe8"
 DelimitedFiles = "8bb1440f-4735-579b-a4ab-409b98df4dab"
 FillArrays = "1a297f60-69ca-5386-bcde-b61e274b549b"
 FiniteDiff = "6a86dc24-6348-571c-b903-95158fe2bd41"
-ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
 Gridap = "56d4f2e9-7ea1-5844-9cf6-b9c51ca7ce8e"
 GridapDistributed = "f9701e48-63b3-45aa-9a63-9bc6c271f355"
 GridapEmbedded = "8838a6a3-0006-4405-b874-385995508d5d"
@@ -36,9 +35,8 @@ ChainRulesCore = "1"
 CircularArrays = "1"
 DataStructures = "0.19"
 FillArrays = "1.11"
-FiniteDiff = "2"
-ForwardDiff = "0.10.38, 1"
-Gridap = "=0.20.3"
+FiniteDiff = "2.27.0"
+Gridap = "0.19, 0.20"
 GridapDistributed = "0.4"
 GridapEmbedded = "0.9"
 GridapGmsh = "0.7"
@@ -54,8 +52,9 @@ Zygote = "0.7"
 julia = "1.10"
 
 [extras]
+FiniteDiff = "6a86dc24-6348-571c-b903-95158fe2bd41"
 MPIPreferences = "3da0fdf6-3ccc-4f1b-acd9-58baa6c99267"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
-test = ["Test"]
+test = ["Test", "FiniteDiff"]

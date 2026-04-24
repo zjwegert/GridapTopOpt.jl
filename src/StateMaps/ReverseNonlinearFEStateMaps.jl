@@ -142,7 +142,7 @@ function dRdφ(φ_to_u::ReverseNonlinearFEStateMap,uh,vh,φh)
   function _res(φ)
     _φh = FEFunction(V_diff, φ)
     sum(res(uh,vh,_φh))
-  end                                                                    
+  end
   return ReverseDiff.gradient(_res,get_free_dof_values(φh))
 end
 
@@ -183,20 +183,3 @@ function pullback(φ_to_u::ReverseNonlinearFEStateMap,uh,φh,du;updated=false)
 
   return (NoTangent(),dudφ_vec)
 end
-
-# ## Backwards compat
-# function ReverseNonlinearFEStateMap(res::Function,jac::Function,U,V,V_φ,U_reg,φh; kwargs...)
-#   error(_msg_v0_3_0(ReverseNonlinearFEStateMap))
-# end
-
-# function ReverseNonlinearFEStateMap(res::Function,U,V,V_φ,U_reg,φh;kwargs...)
-#   error(_msg_v0_3_0(ReverseNonlinearFEStateMap))
-# end
-
-# function ReverseNonlinearFEStateMap(res::Function,jac::Function,U,V,V_φ,φh; kwargs...)
-#   error(_msg_v0_4_0(ReverseNonlinearFEStateMap))
-# end
-
-# function ReverseNonlinearFEStateMap(res::Function,U,V,V_φ,φh;kwargs...)
-#   error(_msg_v0_4_0(ReverseNonlinearFEStateMap))
-# end
