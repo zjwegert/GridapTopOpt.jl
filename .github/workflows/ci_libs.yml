@@ -29,7 +29,7 @@ jobs:
       fail-fast: false
       matrix:
         version:
-          - '1.11'
+          - '1.10'
         os:
           - ubuntu-latest
         arch:
@@ -39,8 +39,8 @@ jobs:
     steps:
       - name: Install p4est/petsc dependencies
         run: |
-           sudo apt-get update 
-           sudo apt-get install -y wget gfortran g++ openmpi-bin libopenmpi-dev 
+           sudo apt-get update
+           sudo apt-get install -y wget gfortran g++ openmpi-bin libopenmpi-dev
       - name: Install p4est
         run: |
           # Install p4est 2.8.5 from sources
@@ -98,7 +98,7 @@ jobs:
         run: |
           using Pkg
           Pkg.add("MPIPreferences")
-      - name: use MPI system binary 
+      - name: use MPI system binary
         shell: julia --color=yes --project=. {0}
         run: |
           using MPIPreferences
