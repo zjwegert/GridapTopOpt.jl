@@ -1,7 +1,7 @@
 ## Old CutFEMEvolver, this may be removed in a future release
 using Gridap.ODEs: ODESolver
 
-include((@__DIR__)*"/LevelSetEvolution/Utilities/MutableRungeKutta.jl")
+include("./src/LevelSetEvolution/Utilities/MutableRungeKutta.jl")
 
 struct LegacyCutFEMEvolver{A,B,C} <: GridapTopOpt.Evolver
   ode_solver::ODESolver
