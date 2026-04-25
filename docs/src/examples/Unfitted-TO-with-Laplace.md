@@ -67,7 +67,7 @@ vf = 0.3          # Volume fraction
 iter_mod = 10     # Write output every iter_mod iterations
 ```
 
-Here, we deictate that the initial mesh size is $50^2$ quadrilateral elements, the time steps for the evolution equation is set to $n/5$, the required volume fraction is 0.3, the reguarisation coefficent for the Hilbertian extension-regularisation is 2, and we data files at each iteration.
+Here, we dictate that the initial mesh size is $50^2$ quadrilateral elements, the time steps for the evolution equation is set to $n/5$, the required volume fraction is 0.3, the reguarisation coefficent for the Hilbertian extension-regularisation is 2, and we data files at each iteration.
 ## Mesh with refinement
 For this problem, we use a refined mesh using Gridap's adaptivity features. In addition, we mark mesh entities that are part of $\overline{\Omega}_D$ and $\Gamma_N$:
 ```julia
@@ -93,6 +93,9 @@ writevtk(model,path*"model")
 
 !!! warning
     Non-TET/TRI polytopes are simplexified by GridapEmbedded when cutting. As a result, derivative information from AD will not be correct when using a mesh that isn't made of TRI/TET. Please use a mesh with TRI/TET polytopes to ensure correctness of derivative results.
+
+!!! note
+    We use three rounds of refinement, which is much more than neccessary. To reduce the cost of computation, comment out `ref_model = refine(ref_model)`.
 
 ## FESpace for level-set function and derivatives
 In example, we consider piecewise linear cuts defined via a level-set function. As such, the level-set function should be discretised using continuous piecewise-linear finite elements. In addition, we use the same space for the derivatives, except we also constrain the derivative space so that the shape derivatives are zero on $\overline{\Omega}_D$ and $\Gamma_N$.
@@ -198,8 +201,8 @@ We now define the evolution and reinitialisation methods for this problem. Here 
 
 To set these up, we provide `CutFEMEvolver` and `StabilisedReinitialiser` as follows:
 ```julia
-evo = CutFEMEvolver(V_φ,Ωs,dΩ_bg,hₕ;max_steps,γg=0.1)
-reinit = StabilisedReinitialiser(V_φ,Ωs,dΩ_bg,hₕ;stabilisation_method=ArtificialViscosity(2.0))
+evo = CutFEMEvolver(V_φ,dΩ_bg,hₕ;max_steps,γg=0.1)
+reinit = StabilisedReinitialiser(V_φ,dΩ_bg,hₕ;stabilisation_method=ArtificialViscosity(2.0))
 ```
 We then define the `LevelSetEvolution` object that wraps these methods, and we reinitialise our initial level-set function via
 ```julia

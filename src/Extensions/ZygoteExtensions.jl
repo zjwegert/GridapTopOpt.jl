@@ -25,30 +25,58 @@ Base.broadcasted(f, a::Union{BlockPArray,BlockPBroadcasted}, b::AbstractThunk) =
 adjoint_solve!(a::AbstractFEStateMap,b::AbstractThunk) = adjoint_solve!(a,unthunk(b))
 
 ### MultiField extensions (these should go in Gridap)
+# Serial
+function combine_fields(::MultiFieldFESpace,u...)
+  mortar([u...])
+end
+
+# Distributed
 function combine_fields(V::DistributedMultiFieldFESpace{<:ConsecutiveMultiFieldStyle},u...)
   uhs = FEFunction.(V,u) # This could be done better, needed for ghosts
   us = get_free_dof_values.(uhs)
   _u = map(combine_fields,local_views(V),map(local_views,us)...)
   PVector(_u,partition(get_free_dof_ids(V)))
 end
-function combine_fields(::MultiFieldFESpace{<:ConsecutiveMultiFieldStyle},u...)
-  # Avoid memory allocs from reduce(vcat,u)
-  mortar([u...])
+
+function GridapTopOpt.combine_fields(V::GridapTopOpt.DistributedMultiFieldFESpace{<:BlockMultiFieldStyle},u::PVector{T}...) where T
+  gids = map(get_free_dof_ids,GridapTopOpt.blocks(V))
+  GridapTopOpt.BlockPVector([u...],gids)
 end
-function combine_fields(V::DistributedMultiFieldFESpace{<:BlockMultiFieldStyle},u...)
-  gids = map(get_free_dof_ids,blocks(V))
-  BlockPVector([u...],gids)
+
+function GridapTopOpt.combine_fields(V::GridapTopOpt.DistributedMultiFieldFESpace{<:BlockMultiFieldStyle},u...)
+  gids = map(get_free_dof_ids,GridapTopOpt.blocks(V))
+  _u = map(psubarray_to_pvec,u)
+  GridapTopOpt.BlockPVector([_u...],gids)
 end
-function combine_fields(::MultiFieldFESpace{<:BlockMultiFieldStyle},u...)
-  mortar([u...])
+
+function psubarray_to_pvec(p::PVector{<:SubArray}) # Local collection
+  v = map(collect,local_views(p))
+  PVector(v,p.index_partition)
 end
+
+function psubarray_to_pvec(p::PVector) # Do nothing
+  p
+end
+
+# combine_fields rrule
 function ChainRulesCore.rrule(::typeof(combine_fields),V,u...)
   function pullback(y)
     # Unpack y into contributions from each seperate field in u
-    ys = map(i->restrict_to_field(V,y,i),Base.OneTo(length(V)))
+    ys = map(i->restrict(V,y,i),Base.OneTo(length(V)))
     return (NoTangent(),NoTangent(),ys...)
   end
   return combine_fields(V,u...), y->pullback(y)
+end
+
+# restrict rrule
+function ChainRulesCore.rrule(::typeof(restrict),V,u,i)
+  function pullback(y)
+    u0 = zero_free_values(V);
+    _u = map(i->restrict(V,u0,i),Base.OneTo(length(V)))
+    ys = combine_fields(V,_u[1:i-1]...,y,_u[i+1:end]...)
+    return (NoTangent(),NoTangent(),ys,NoTangent())
+  end
+  return restrict(V,u,i), y->pullback(y)
 end
 
 ### Zygote extensions to enable compat with PartitionedArrays
