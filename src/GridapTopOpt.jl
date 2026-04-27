@@ -1,14 +1,13 @@
 module GridapTopOpt
 
-using GridapPETSc, GridapPETSc.PETSC
-using GridapPETSc: PetscScalar, PetscInt, PETSC,  @check_error_code
-
 using MPI
 using BlockArrays, CircularArrays, FillArrays
 using LinearAlgebra
 using ChainRulesCore
 using DelimitedFiles, Printf
 using DataStructures
+using PartitionedArrays
+using PartitionedArrays: getany, tuple_of_arrays, matching_ghost_indices
 
 using Gridap
 using Gridap.Helpers, Gridap.Algebra, Gridap.TensorValues
@@ -28,8 +27,8 @@ using GridapDistributed: DistributedDiscreteModel, DistributedTriangulation,
   DistributedMultiFieldFEBasis, BlockPMatrix, BlockPVector, change_ghost,
   DistributedMultiFieldFEFunction, DistributedSingleFieldFEFunction, DistributedMultiFieldFESpace
 
-using PartitionedArrays
-using PartitionedArrays: getany, tuple_of_arrays, matching_ghost_indices
+using GridapPETSc, GridapPETSc.PETSC
+using GridapPETSc: PetscScalar, PetscInt, PETSC,  @check_error_code
 
 using GridapSolvers
 using GridapSolvers.LinearSolvers, GridapSolvers.NonlinearSolvers, GridapSolvers.BlockSolvers
@@ -50,18 +49,16 @@ using JLD2: save_object, load_object, jldsave
 import Base: +
 import Gridap: solve!
 import PartitionedArrays: default_find_rcv_ids
-import GridapDistributed: remove_ghost_cells
 
 using ForwardDiff 
 
 __init__() = begin
-  include((@__DIR__)*"/Extensions/GridapExtensions.jl")
-  include((@__DIR__)*"/LevelSetEvolution/Utilities/MutableRungeKutta.jl")
-
   function default_find_rcv_ids(::MPIArray)
     PartitionedArrays.find_rcv_ids_ibarrier
   end
 end
+
+include((@__DIR__)*"/Extensions/GridapExtensions.jl")
 
 include("Embedded/Embedded.jl")
 export EmbeddedCollection, update_collection!, add_recipe!

@@ -1,6 +1,8 @@
 ## Old CutFEMEvolver, this may be removed in a future release
 using Gridap.ODEs: ODESolver
 
+include("../../../src/LevelSetEvolution/Utilities/MutableRungeKutta.jl")
+
 struct LegacyCutFEMEvolver{A,B,C} <: GridapTopOpt.Evolver
   ode_solver::ODESolver
   Ωs::EmbeddedCollection
@@ -15,7 +17,7 @@ struct LegacyCutFEMEvolver{A,B,C} <: GridapTopOpt.Evolver
       γg = 0.1,
       ode_ls = LUSolver(),
       ode_nl = ode_ls,
-      ode_solver = GridapTopOpt.MutableRungeKutta(ode_nl, ode_ls, 0.1, :DIRK_CrankNicolson_2_2),
+      ode_solver = MutableRungeKutta(ode_nl, ode_ls, 0.1, :DIRK_CrankNicolson_2_2),
       assembler=SparseMatrixAssembler(V_φ,V_φ)) where {A,B}
     model = get_background_model(get_triangulation(V_φ))
     Γg = SkeletonTriangulation(model)

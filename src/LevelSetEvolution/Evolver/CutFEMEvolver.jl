@@ -188,7 +188,7 @@ function CutFEMEvolver(V_φ::B,Ωs::EmbeddedCollection,dΩ_bg::A,h;
     γg = 0.1,
     ode_ls = LUSolver(),
     ode_nl = ode_ls,
-    ode_solver = MutableRungeKutta(ode_nl, ode_ls, 0.1, :DIRK_CrankNicolson_2_2),
+    ode_solver = nothing, #MutableRungeKutta(ode_nl, ode_ls, 0.1, :DIRK_CrankNicolson_2_2),
     assembler=SparseMatrixAssembler(V_φ,V_φ)) where {A,B}
   @warn """
   This constructor will be deprecated in future releases. Please use the new CutFEMEvolver

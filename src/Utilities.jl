@@ -311,6 +311,7 @@ function get_element_diameter_field(model::DistributedDiscreteModel)
 end
 
 function _get_tri_max_length(coords)
+  isempty(coords) && return zero(eltype(eltype(coords)))
   d12 = norm(coords[1]-coords[2])
   d13 = norm(coords[1]-coords[3])
   d23 = norm(coords[2]-coords[3])
@@ -319,6 +320,7 @@ function _get_tri_max_length(coords)
 end
 
 function _get_quad_max_length(coords)
+  isempty(coords) && return zero(eltype(eltype(coords)))
   # 3---4
   # |   |
   # |   |
@@ -332,6 +334,7 @@ function _get_quad_max_length(coords)
 end
 
 function _get_tet_max_length(coords)
+  isempty(coords) && return zero(eltype(eltype(coords)))
   d12 = norm(coords[1]-coords[2])
   d13 = norm(coords[1]-coords[3])
   d14 = norm(coords[1]-coords[4])
@@ -343,6 +346,7 @@ function _get_tet_max_length(coords)
 end
 
 function _get_hex_max_length(coords)
+  isempty(coords) && return zero(eltype(eltype(coords)))
   #Front 3---4 Back 7---8
   #      |   |      |   |
   #      |   |      |   |
