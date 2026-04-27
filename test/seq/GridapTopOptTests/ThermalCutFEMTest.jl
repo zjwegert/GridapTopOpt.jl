@@ -8,7 +8,7 @@ using GridapTopOpt: StateParamMap
 
 function main(AD_case)
   # Params
-  n = 10            # Initial mesh size (pre-refinement)
+  n = 20            # Initial mesh size (pre-refinement)
   max_steps = 10/n  # Time-steps for evolution equation
   vf = 0.3          # Volume fraction
   α_coeff = 2       # Regularisation coefficient extension-regularisation
