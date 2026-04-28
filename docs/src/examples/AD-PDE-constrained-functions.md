@@ -35,14 +35,14 @@ U = TrialFESpace(V,x->x[1])
 a(u, v, κ) = ∫(κ * ∇(v) ⋅ ∇(u))dΩ
 b(v, κ) = ∫(v*f)dΩ
 κ_to_u = AffineFEStateMap(a,b,U,V,K)
-l2_norm = GridapTopOpt.StateParamMap((u, κ) -> ∫(u ⋅ u)dΩ,κ_to_u)
+l2_norm = StateParamMap((u, κ) -> ∫(u ⋅ u)dΩ,κ_to_u)
 u_obs = interpolate(x -> sin(2π*x[1]), V) |> get_free_dof_values
 function J(κ)
   u = κ_to_u(κ)
   sqrt(l2_norm(u-u_obs, κ))
 end
 κ0h = interpolate(1.0, K)
-val, grad = GridapTopOpt.val_and_gradient(J, get_free_dof_values(κ0h))
+val, grad = val_and_gradient(J, get_free_dof_values(κ0h))
 ```
 
 The above is quite standard other than [`AffineFEStateMap`](@ref), [`StateParamMap`](@ref), and [`val_and_gradient`](@ref). These work as follows:
@@ -64,3 +64,45 @@ Additional examples, as well as examples using GridapDistributed, can be found i
 
 !!! note
     Refer to [`CustomPDEConstrainedFunctionals`](@ref) and [`CustomEmbeddedPDEConstrainedFunctionals`](@ref) when attempting to use this with the level-set topology optimisation methods in GridapTopOpt.
+
+## Second-order AD of generic PDE-constrained functions
+The capability to compute Hessian-vector products was added in GridapTopOpt v0.5. Under the hood, we use forward-over-reverse automatic differentiation, however most users will only ever need the [`Hvp`](@ref) function. Below, we demonstrate how to compute the Hessian-vector product.
+
+```julia
+using Gridap, GridapTopOpt
+
+f(x) = x[2]
+g(x) = x[1]
+
+model = CartesianDiscreteModel((0,1,0,1), (10,10))
+Ω = Triangulation(model)
+dΩ = Measure(Ω, 2)
+reffe = ReferenceFE(lagrangian, Float64, 1)
+K = TestFESpace(model, reffe)
+V = TestFESpace(model, reffe; dirichlet_tags="boundary")
+U = TrialFESpace(V,x->x[1])
+a(u, v, κ) = ∫(κ * ∇(v) ⋅ ∇(u))dΩ
+b(v, κ) = ∫(v*f)dΩ
+κ_to_u = AffineFEStateMap(a,b,U,V,K;diff_order=2)
+l2_norm = StateParamMap((u, κ) -> ∫(u ⋅ u + 0κ)dΩ,κ_to_u;diff_order=2)
+u_obs = interpolate(x -> sin(2π*x[1]), V) |> get_free_dof_values
+function J(κ)
+  u = κ_to_u(κ)
+  sqrt(l2_norm(u-u_obs, κ))
+end
+κ0h = interpolate(1.0, K)
+val, grad = val_and_gradient(J, get_free_dof_values(κ0h))
+# Hessian-vector product
+vh = interpolate(0.5, K)
+Hv = Hvp(J, get_free_dof_values(κ0h),get_free_dof_values(vh))
+```
+
+Note that we set the optional parameter `diff_order` in `AffineFEStateMap` and `StateParamMap` to specify that we will be computing the Hessian-vector product.
+
+We again verify using finite differences as follows:
+
+```julia
+using FiniteDiff, Test
+```
+
+TODO

@@ -6,7 +6,7 @@ using Zygote
 using ForwardDiff
 
 # FE setup
-order = 1 
+order = 1
 xmax = ymax = 1.0
 dom = (0,xmax,0,ymax)
 el_size = (2,2)
@@ -30,7 +30,7 @@ uh = FEFunction(U,u)
 ph = FEFunction(V_p,p)
 λh = FEFunction(V,λ)
 spaces = (U,V_p)
-_,_,_, ∂2J∂u2_mat, _, ∂2J∂u∂p_mat, _, ∂2J∂p2_mat, _, ∂2J∂p∂u_mat = GridapTopOpt.build_inc_obj_cache(J,uh,ph,spaces,Val(2))
+_,_,_, ∂2J∂u2_mat, _, ∂2J∂u∂p_mat, _, ∂2J∂p2_mat, _, ∂2J∂p∂u_mat = GridapTopOpt.build_inc_obj_cache(J,uh,ph,spaces)
 #∂2J∂u2_mat, ∂2J∂u∂p_mat, ∂2J∂p2_mat, ∂2J∂p∂u_mat = SecondOrderTopOpt.incremental_objective_partials(J,uh,ph,spaces)
 
 # ∂²J / ∂u² * u̇
@@ -61,8 +61,7 @@ dp_ = get_trial_fe_basis(V_p)
 f(x) = 1.0
 res(u,v,p) = ∫( p*∇(u)⋅∇(v) - f*v )dΩ
 state_map = NonlinearFEStateMap(res,U,V,V_p,diff_order=2)
-diff_order = GridapTopOpt.get_diff_order(state_map)
-∂2R∂u2_mat, ∂2R∂u∂p_mat, ∂2R∂p2_mat, ∂2R∂p∂u_mat = GridapTopOpt.update_incremental_adjoint_partials!(state_map,uh,ph,λh,diff_order)
+∂2R∂u2_mat, ∂2R∂u∂p_mat, ∂2R∂p2_mat, ∂2R∂p∂u_mat = GridapTopOpt.update_incremental_adjoint_partials!(state_map,uh,ph,λh)
 
 # ∂²R / ∂u² * u̇ * λ
 ∂2∂u2R_analytical(uh,λh,ph) = ∫( 0*du*dv )dΩ
@@ -76,10 +75,10 @@ diff_order = GridapTopOpt.get_diff_order(state_map)
 # ∂²R / ∂p² * ṗ * λ
 ∂2R∂p2_analytical(uh,λh) = ∫( 0*dp⋅dp_ )dΩ
 ∂2R∂p2_matrix_analytical = assemble_matrix(∂2R∂p2_analytical(uh,λh),V_p,V_p)
-@test ∂2R∂p2_matrix_analytical ≈ ∂2R∂p2_mat   
+@test ∂2R∂p2_matrix_analytical ≈ ∂2R∂p2_mat
 
 # ∂/∂u (∂R/∂p * λ) * ṗ
-∂2R∂p∂u_analytical(uh,λh,ph) = ∫( dp * ∇(du) ⋅ ∇(λh) )dΩ   
+∂2R∂p∂u_analytical(uh,λh,ph) = ∫( dp * ∇(du) ⋅ ∇(λh) )dΩ
 ∂2R∂p∂u_matrix_analytical = assemble_matrix(∂2R∂p∂u_analytical(uh,λh,ph),U,V_p)
 @test ∂2R∂p∂u_matrix_analytical ≈ ∂2R∂p∂u_mat
 
@@ -88,7 +87,7 @@ diff_order = GridapTopOpt.get_diff_order(state_map)
 ######################
 
 f(x) = 1.0
-res(u,v,p) = ∫( p*∇(u)⋅∇(v)-f*v )dΩ   
+res(u,v,p) = ∫( p*∇(u)⋅∇(v)-f*v )dΩ
 J(u,p) = ∫( f*u + 0*p )dΩ # p term to avoid dual error - should be fixed in the future
 state_map = NonlinearFEStateMap(res,U,V,V_p,diff_order=2)
 objective = GridapTopOpt.StateParamMap(J,state_map,diff_order=2)
@@ -134,7 +133,7 @@ p_to_j(p) = objective((state_map(p)),p)
 # Unit and integration tests for the pushforward rules #
 ########################################################
 
-J(u,p) = ∫( f*(1.0(sin∘(2π*u))+1)*(1.0(cos∘(2π*p))+1)*p)dΩ 
+J(u,p) = ∫( f*(1.0(sin∘(2π*u))+1)*(1.0(cos∘(2π*p))+1)*p)dΩ
 objective = GridapTopOpt.StateParamMap(J,state_map,diff_order=2)
 
 # incremental objective (and pullback) test (u̇->du̇)
@@ -152,7 +151,7 @@ du̇dṗ_FD =FiniteDifferences.jacobian(central_fdm(5,1),up->Zygote.gradient(up_
 
 @test du̇dṗ_FD ≈ du̇dṗ # the pullback of the incremental objective should match the finite difference approximation of the pullback of the incremental objective
 
-# Nonlinear state map tests 
+# Nonlinear state map tests
 res(u,v,p) = ∫( (u+1)*(p)*∇(u)⋅∇(v) - f*v )dΩ
 state_map = NonlinearFEStateMap(res,U,V,V_p,diff_order=2)
 Zygote.gradient(p->objective(state_map(p),p),p) # update λ and u
@@ -168,7 +167,7 @@ uᵋ = state_map(pᵋ)
 u̇ = vec(mapreduce(ForwardDiff.partials, hcat, uᵋ))
 ∂u_∂p_FD = FiniteDifferences.jacobian(central_fdm(5,1),p_to_u,p)[1]
 ∂u_∂p_FD_ṗ = ∂u_∂p_FD * ṗ
-@test u̇ ≈ ∂u_∂p_FD_ṗ rtol = 1e-7 # the pullback of the incremental state should match the finite difference approximation of the pullback of the incremental state 
+@test u̇ ≈ ∂u_∂p_FD_ṗ rtol = 1e-7 # the pullback of the incremental state should match the finite difference approximation of the pullback of the incremental state
 
 # entire incremental map (including the adjoint part) (ṗ->dṗ)
 function p_to_j(p)
@@ -200,7 +199,7 @@ uᵋ = state_map(pᵋ)
 u̇ = vec(mapreduce(ForwardDiff.partials, hcat, uᵋ))
 ∂u_∂p_FD = FiniteDifferences.jacobian(central_fdm(5,1),p_to_u,p)[1]
 ∂u_∂p_FD_ṗ = ∂u_∂p_FD * ṗ
-@test u̇ ≈ ∂u_∂p_FD_ṗ 
+@test u̇ ≈ ∂u_∂p_FD_ṗ
 
 # entire incremental map (including the adjoint part) (ṗ->dṗ)
 function p_to_j(p)

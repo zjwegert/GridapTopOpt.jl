@@ -68,8 +68,9 @@ struct PDEConstrainedFunctionals{N,A} <: AbstractPDEConstrainedFunctionals{N}
       analytic_dC = fill(nothing,length(constraints)))
 
     # Preallocate
-    dJ = similar(get_free_dof_values(zero(get_aux_space(state_map))))
-    dC = map(Ci->similar(get_free_dof_values(zero(get_aux_space(state_map)))),constraints)
+    V_φ = get_aux_space(state_map)
+    dJ = similar(get_free_dof_values(zero(V_φ)))
+    dC = map(Ci->similar(get_free_dof_values(zero(V_φ))),constraints)
 
     N = length(constraints)
     T = typeof(state_map)
@@ -282,8 +283,9 @@ struct EmbeddedPDEConstrainedFunctionals{N,T} <: AbstractPDEConstrainedFunctiona
     - For problems with no constraints `:C` must at least point to an empty list
     """
     # Preallocate
-    dJ = similar(get_free_dof_values(zero(get_aux_space(embedded_collection.state_map))))
-    dC = map(Ci->similar(get_free_dof_values(zero(get_aux_space(embedded_collection.state_map)))),embedded_collection.C)
+    V_φ = get_aux_space(embedded_collection.state_map)
+    dJ = similar(get_free_dof_values(zero(V_φ)))
+    dC = map(Ci->similar(get_free_dof_values(zero(V_φ))),embedded_collection.C)
 
     N = length(embedded_collection.C)
     if analytic_dC isa Nothing
@@ -424,13 +426,13 @@ end
 
 ############## Zygote Compat ##############
 """
-    CustomPDEConstrainedFunctionals{N,A} <:  AbstractPDEConstrainedFunctionals{N}
+    CustomPDEConstrainedFunctionals{N,A,ND} <:  AbstractPDEConstrainedFunctionals{N}
 
 A version of `PDEConstrainedFunctionals` that allows for an arbitrary mapping
 `φ_to_jc` that is used to compute the objective and constraints given the primal variable.
 
 Under the hood, we use Zygote to compute the Jacobian of this mapping with the rrules defined
-throughout GridapTopOpt.
+throughout GridapTopOpt. `ND` specifies the order of derivatives to be computed.
 
 # Parameters
 
@@ -600,8 +602,8 @@ function evaluate_functionals!(pcf::CustomPDEConstrainedFunctionals{0},φ::Abstr
   return j,c
 end
 
-# with newton conditioning 
-function Fields.evaluate!(pcf::CustomPDEConstrainedFunctionals{0,A,2},φh) where {A}
+# Second order - TBD
+function Fields.evaluate!(pcf::CustomPDEConstrainedFunctionals{N,A,2},φh) where {N,A}
   @not_implemented "The way to interface second order problems with the native first order optimisers has not yet been decided"
 end
 

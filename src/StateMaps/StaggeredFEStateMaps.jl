@@ -1,5 +1,5 @@
 """
-    struct StaggeredAffineFEStateMap{NB,SB} <: AbstractFEStateMap{NB,SB}
+    struct StaggeredAffineFEStateMap{NB,SB,A,B,C,D,E,F} <: AbstractFEStateMap{1}
       biforms    :: Vector{<:Function}
       liforms    :: Vector{<:Function}
       ∂Rk∂xhi    :: Tuple{Vararg{Tuple{Vararg{Function}}}}
@@ -45,7 +45,7 @@ where `A_k` and `b_k` only depend on the previous variables `u_1,...,u_{k-1}`.
     # u1φ_to_u2 has a MultiFieldFESpace V_u1φ of primal vars
     u1φ_to_u2 = AffineFEStateMap(a2,l2,U2,V,V_u1φ)
     # The StateParamMap F needs to take a MultiFieldFEFunction u1u2h ∈ U_u1u2
-    F = GridapTopOpt.StateParamMap(F,U_u1u2,V_φ,assem_U_u1u2,assem_V_φ)
+    F = StateParamMap(F,U_u1u2,V_φ,assem_U_u1u2,assem_V_φ)
 
     function φ_to_j(φ)
       u1 = φ_to_u1(φ)
@@ -61,7 +61,7 @@ where `A_k` and `b_k` only depend on the previous variables `u_1,...,u_{k-1}`.
     StaggeredStateMaps will remain in GridapTopOpt for backwards compatibility.
     These methods will not be updated in future unless required due to breaking changes.
 """
-struct StaggeredAffineFEStateMap{NB,SB,A,B,C,D,E,F} <: AbstractFEStateMap
+struct StaggeredAffineFEStateMap{NB,SB,A,B,C,D,E,F} <: AbstractFEStateMap{1}
   biforms    :: Vector{<:Function}
   liforms    :: Vector{<:Function}
   ∂Rk∂xhi    :: Tuple{Vararg{Tuple{Vararg{Function}}}}
@@ -84,11 +84,7 @@ struct StaggeredAffineFEStateMap{NB,SB,A,B,C,D,E,F} <: AbstractFEStateMap
       diff_order = 1
     ) where {NB,SB}
 
-    # Check that diff_order is 1 (second-order derivatives not supported)
-    if diff_order !=1
-      error("ReverseNonlinearFEStateMap only supports diff_order=1. Second-order derivatives are not supported.")
-    end
-
+    @assert isone(diff_order) "StaggeredAffineFEStateMap only supports diff_order=1. Second-order derivatives are not supported."
     @assert length(∂Rk∂xhi) == NB-1 && all(map(length,∂Rk∂xhi) .== 1:NB-1) """\n
     We expect k ∈ 2:NB and i ∈ 1:k-1.
 
@@ -176,7 +172,7 @@ get_assemblers(m::StaggeredAffineFEStateMap) = m.assems
 get_plb_cache(m::StaggeredAffineFEStateMap) = m.plb_caches
 
 function forward_solve!(φ_to_u::StaggeredAffineFEStateMap,φ::AbstractVector)
-  φh = FEFunction(GridapTopOpt.get_aux_space(φ_to_u),φ)
+  φh = FEFunction(get_aux_space(φ_to_u),φ)
   return forward_solve!(φ_to_u,φh)
 end
 
@@ -225,7 +221,7 @@ function get_staggered_operator_at_φ(op::StaggeredAffineFEOperator,φh)
 end
 
 """
-    mutable struct StaggeredNonlinearFEStateMap{NB,SB} <: AbstractFEStateMap{NB,SB}
+    mutable struct StaggeredNonlinearFEStateMap{NB,SB,A,B,C,D,E,F} <: AbstractFEStateMap{1}
       const residuals         :: Vector{<:Function}
       const jacobians         :: Vector{<:Function}
       const adjoint_jacobians :: Vector{<:Function}
@@ -255,7 +251,7 @@ we expect a set of residual/jacobian pairs that also depend on φ:
     StaggeredStateMaps will remain in GridapTopOpt for backwards compatibility.
     These methods will not be updated in future unless required due to breaking changes.
 """
-mutable struct StaggeredNonlinearFEStateMap{NB,SB,A,B,C,D,E,F} <: AbstractFEStateMap
+mutable struct StaggeredNonlinearFEStateMap{NB,SB,A,B,C,D,E,F} <: AbstractFEStateMap{1}
   const residuals         :: Vector{<:Function}
   const jacobians         :: Vector{<:Function}
   const adjoint_jacobians :: Vector{<:Function}
@@ -277,9 +273,11 @@ mutable struct StaggeredNonlinearFEStateMap{NB,SB,A,B,C,D,E,F} <: AbstractFEStat
       solver            :: StaggeredFESolver{NB} = StaggeredFESolver(
         fill(NewtonSolver(LUSolver();maxiter=50,rtol=1.e-8,verbose=true),length(op.residuals))),
       adjoint_solver    :: StaggeredFESolver{NB} = StaggeredFESolver(fill(LUSolver(),length(op.residuals))),
-      adjoint_jacobians :: Vector{<:Function} = op.jacobians
+      adjoint_jacobians :: Vector{<:Function} = op.jacobians,
+      diff_order = 1
     ) where {NB,SB}
 
+    @assert isone(diff_order) "StaggeredAffineFEStateMap only supports diff_order=1. Second-order derivatives are not supported."
     @assert length(∂Rk∂xhi) == NB-1 && all(map(length,∂Rk∂xhi) .== 1:NB-1) """\n
     We expect k ∈ 2:NB and i ∈ 1:k-1.
 
@@ -371,7 +369,7 @@ get_assemblers(m::StaggeredNonlinearFEStateMap) = m.assems
 get_plb_cache(m::StaggeredNonlinearFEStateMap) = m.plb_caches
 
 function forward_solve!(φ_to_u::StaggeredNonlinearFEStateMap,φ::AbstractVector)
-  φh = FEFunction(GridapTopOpt.get_aux_space(φ_to_u),φ)
+  φh = FEFunction(get_aux_space(φ_to_u),φ)
   return forward_solve!(φ_to_u,φh)
 end
 
@@ -462,7 +460,7 @@ end
 function pullback(φ_to_u::StaggeredFEStateMapTypes{NB},xh,φh,dFdxj;kwargs...) where NB
   Σ_λᵀs_∂Rs∂φ, assem_deriv = φ_to_u.plb_caches
   Λ = last(φ_to_u.adj_caches).test
-  V_φ = GridapTopOpt.get_deriv_space(φ_to_u)
+  V_φ = get_deriv_space(φ_to_u)
 
   # Adjoint Solve
   λ  = adjoint_solve!(φ_to_u,xh,φh,dFdxj)
@@ -479,8 +477,6 @@ function pullback(φ_to_u::StaggeredFEStateMapTypes{NB},xh,φh,dFdxj;kwargs...) 
 
   return (NoTangent(),Σ_λᵀs_∂Rs∂φ)
 end
-
-get_diff_order(::StaggeredFEStateMapTypes) = Val(1)
 
 function ChainRulesCore.rrule(φ_to_u::StaggeredFEStateMapTypes,φh)
   u  = forward_solve!(φ_to_u,φh)
@@ -558,7 +554,7 @@ function _instantiate_caches(xh,solver::StaggeredFESolver{NB},op::StaggeredFEOpe
     x_k = get_free_dof_values(xh_k)
     op_k = GridapSolvers.BlockSolvers.get_operator(op,xhs,k)
     algebraic_op_k = get_algebraic_operator(op_k)
-    cache_k = GridapTopOpt.instantiate_caches(x_k,solvers[k],algebraic_op_k)
+    cache_k = instantiate_caches(x_k,solvers[k],algebraic_op_k)
     xhs, caches, operators = (xhs...,xh_k), (caches...,cache_k), (operators...,op_k)
   end
   return (caches,operators)
@@ -570,7 +566,7 @@ end
 #  type.
 #
 # This will be refactored/removed in the future.
-struct StaggeredStateParamMap{NB,A,B,C,D} <: GridapTopOpt.AbstractStateParamMap
+struct StaggeredStateParamMap{NB,A,B,C,D} <: AbstractStateParamMap{1}
   F       :: A
   spaces  :: B
   assems  :: C
@@ -580,17 +576,17 @@ end
 
 function StaggeredStateParamMap(F::Function,∂F∂xhi::Tuple{Vararg{Function}},φ_to_u::StaggeredFEStateMapTypes)
   Us = φ_to_u.spaces.trials
-  V_φ = GridapTopOpt.get_aux_space(φ_to_u)
-  assem_deriv = GridapTopOpt.get_deriv_assembler(φ_to_u)
-  assem_U = GridapTopOpt.get_pde_assembler(φ_to_u)
+  V_φ = get_aux_space(φ_to_u)
+  assem_deriv = get_deriv_assembler(φ_to_u)
+  assem_U = get_pde_assembler(φ_to_u)
   StaggeredStateParamMap(F,∂F∂xhi,Us,V_φ,assem_U,assem_deriv)
 end
 
 function StaggeredStateParamMap(F::Function,φ_to_u::StaggeredFEStateMapTypes)
   Us = φ_to_u.spaces.trials
-  V_φ = GridapTopOpt.get_aux_space(φ_to_u)
-  assem_deriv = GridapTopOpt.get_deriv_assembler(φ_to_u)
-  assem_U = GridapTopOpt.get_pde_assembler(φ_to_u)
+  V_φ = get_aux_space(φ_to_u)
+  assem_deriv = get_deriv_assembler(φ_to_u)
+  assem_U = get_pde_assembler(φ_to_u)
 
   @assert length(Us) == length(assem_U)
   NB = length(Us)
@@ -615,10 +611,6 @@ function StaggeredStateParamMap(
   caches = ∂F∂φ_vec
   A,B,C,D = typeof(F),typeof(spaces),typeof(assems),typeof(caches)
   return StaggeredStateParamMap{length(trials),A,B,C,D}(F,spaces,assems,caches,∂F∂xhi)
-end
-
-function get_∂F∂φ_vec(u_to_j::StaggeredStateParamMap)
-  u_to_j.caches
 end
 
 function (u_to_j::StaggeredStateParamMap)(u::AbstractVector,φ::AbstractVector)
@@ -667,8 +659,6 @@ function ChainRulesCore.rrule(u_to_j::StaggeredStateParamMap,u::AbstractVector,�
   φh = FEFunction(V_φ,φ)
   return ChainRulesCore.rrule(u_to_j,uh,φh)
 end
-
-rrule(u_to_j::StaggeredStateParamMap,u,j) = ChainRulesCore.rrule(u_to_j,u,j)
 
 ## Backwards compat
 function StaggeredAffineFEStateMap(

@@ -141,6 +141,6 @@ end
 Compute the Hessian-vector product of f at p in the direction of v using forward-over-reverse AD.
 """
 function Hvp(f,p,v)
-  ∇f = p->Zygote.gradient(f,p)[1]
+  ∇f = p->val_and_gradient(f,p).grad[1]
   ForwardDiff.derivative(α -> ∇f(p + α*v), 0)
 end

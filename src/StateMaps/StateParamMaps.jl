@@ -1,9 +1,11 @@
 # Abstract type is only needed for compat with staggered state maps. This
 #  type will be deprecated in a future release.
-abstract type AbstractStateParamMap end
+abstract type AbstractStateParamMap{N} end
+
+get_diff_order(::AbstractStateParamMap{N}) where N = N
 
 """
-    struct StateParamMap{A,B,C,D} <: AbstractStateParamMap
+    struct StateParamMap{A,B,C,D,N} <: AbstractStateParamMap
 
 A wrapper to handle partial differentation of a function F
 of a specific form (see below) in a `ChainRules.jl` compatible way with caching.
@@ -17,7 +19,7 @@ We assume that we have a function F of the following form:
 where `u` and `φ` are each expected to inherit from `Union{FEFunction,MultiFieldFEFunction}`
 or the GridapDistributed equivalent.
 """
-struct StateParamMap{A,B,C,D,N} <: AbstractStateParamMap
+struct StateParamMap{A,B,C,D,N} <: AbstractStateParamMap{N}
   F       :: A
   spaces  :: B
   assems  :: C
@@ -66,90 +68,15 @@ struct StateParamMap{A,B,C,D,N} <: AbstractStateParamMap
     assems = (assem_U,assem_deriv)
     spaces = (U,V_φ)
     cache = StateParamMapCache(∂F∂u,∂F∂φ)
-
     A, B, C, D = typeof(F), typeof(spaces), typeof(assems), typeof(cache)
-    if diff_order == 1
-      return new{A,B,C,D,1}(
-        F,spaces,assems,cache
-      )
-    elseif diff_order == 2
-      return new{A,B,C,D,2}(
-        F,spaces,assems,cache
-      )
-    else
-      error("Unsupported diff_order = $diff_order. Expected 1 or 2.")
-    end
+    !(diff_order ∈ (1,2)) && error("Unsupported diff_order = $diff_order. Expected 1 or 2.")
+    return new{A,B,C,D,diff_order}(F,spaces,assems,cache)
   end
 end
 
-build_inc_obj_cache(F,uh,ph,spaces,diff_order::Val{1}) = ()
-
-function build_inc_obj_cache(F,uh,ph,spaces,diff_order::Val{2})
-  U,V_p = spaces
-  
-  println("Building incremental objective cache for second derivatives. This may take some time...")
-
-  # ∂²J / ∂u² * u̇
-  ∂2J∂u2 = Gridap.hessian(uh->F(uh,ph),uh)
-  assem_∂2J∂u2 = SparseMatrixAssembler(U,U)
-  ∂2J∂u2_mat = assemble_matrix(∂2J∂u2,assem_∂2J∂u2,U,U)
-
-  # ∂/∂p (∂J/∂u ) * ṗ
-  ∂J∂u(uh,ph) = Gridap.gradient(uh->F(uh,ph),uh)
-  ∂2J∂u∂p = Gridap.jacobian(p->∂J∂u(uh,p),ph)
-  assem_∂2J∂u∂p = SparseMatrixAssembler(V_p,U)
-  ∂2J∂u∂p_mat = assemble_matrix(∂2J∂u∂p,assem_∂2J∂u∂p,V_p,U)
-
-  # ∂²J / ∂p² * ṗ
-  ∂2J∂p2 = Gridap.hessian(p->F(uh,p),ph)
-  assem_∂2J∂p2 = SparseMatrixAssembler(V_p,V_p)
-  ∂2J∂p2_mat = assemble_matrix(∂2J∂p2,assem_∂2J∂p2,V_p,V_p)
-
-  # ∂/∂u (∂J / ∂p) * u̇
-  ∂J∂p(uh,ph) = Gridap.gradient(p->F(uh,p),ph)
-  ∂2J∂p∂u = Gridap.jacobian(uh->∂J∂p(uh,ph),uh)
-  assem_∂2J∂p∂u = SparseMatrixAssembler(U,V_p)
-  ∂2J∂p∂u_mat = assemble_matrix(∂2J∂p∂u,assem_∂2J∂p∂u,U,V_p)
-
-  println("Done building incremental objective cache.")
-
-  dṗ_from_j = get_free_dof_values(zero(V_p))
-  du̇_from_j = get_free_dof_values(zero(U))
-
-  dṗ_from_j, du̇_from_j, assem_∂2J∂u2, ∂2J∂u2_mat,   assem_∂2J∂u∂p, ∂2J∂u∂p_mat,   assem_∂2J∂p2, ∂2J∂p2_mat,   assem_∂2J∂p∂u, ∂2J∂p∂u_mat
-end
-
-function update_inc_obj_cache!(inc_obj_cache,F,uh,ph,spaces,diff_order::Val{1})
-  return inc_obj_cache
-end
-
-function update_inc_obj_cache!(inc_obj_cache,F,uh,ph,spaces,diff_order::Val{2})
-  U,V_p = spaces 
-  dṗ_from_j, du̇_from_j, assem_∂2J∂u2, ∂2J∂u2_mat,   assem_∂2J∂u∂p, ∂2J∂u∂p_mat,   assem_∂2J∂p2, ∂2J∂p2_mat,   assem_∂2J∂p∂u, ∂2J∂p∂u_mat = inc_obj_cache
-
-  ∂2J∂u2 = Gridap.hessian(uh->F(uh,ph),uh)
-  assemble_matrix!(∂2J∂u2,∂2J∂u2_mat,assem_∂2J∂u2,U,U)
-
-  ∂J∂u(uh,ph) = Gridap.gradient(uh->F(uh,ph),uh)
-  ∂2J∂u∂p = Gridap.jacobian(p->∂J∂u(uh,p),ph)
-  assemble_matrix!(∂2J∂u∂p,∂2J∂u∂p_mat,assem_∂2J∂u∂p,V_p,U)
-
-  ∂2J∂p2 = Gridap.hessian(p->F(uh,p),ph)
-  assemble_matrix!(∂2J∂p2,∂2J∂p2_mat,assem_∂2J∂p2,V_p,V_p)
-
-  ∂J∂p(uh,ph) = Gridap.gradient(p->F(uh,p),ph)
-  ∂2J∂p∂u = Gridap.jacobian(uh->∂J∂p(uh,ph),uh)
-  assemble_matrix!(∂2J∂p∂u,∂2J∂p∂u_mat,assem_∂2J∂p∂u,U,V_p)
-
-  return inc_obj_cache
-end
-
-function get_∂F∂φ_vec(u_to_j::StateParamMap)
-  u_to_j.cache.plb_cache[2]
-end
+get_spaces(m::StateParamMap) = m.spaces
 get_state(m::StateParamMap) = FEFunction(m.spaces[1], m.caches[5])
 get_parameter(m::StateParamMap) = FEFunction(m.spaces[2], m.caches[6])
-get_diff_order(m::StateParamMap{A,B,C,D,N}) where {A,B,C,D,N} = Val(N)
 
 function StateParamMap(F::Function,φ_to_u::AbstractFEStateMap;kwargs...)
   U = get_trial_space(φ_to_u)
@@ -160,48 +87,46 @@ function StateParamMap(F::Function,φ_to_u::AbstractFEStateMap;kwargs...)
 end
 
 """
-    (u_to_j::StateParamMap)(uh,φh)
+    (u_to_j::AbstractStateParamMap)(uh,φh)
 
-Evaluate the `StateParamMap` at parameters `uh` and `φh`.
+Evaluate the `u_to_j` at parameters `uh` and `φh`.
 """
-function (u_to_j::StateParamMap)(uh::FEFunction,φh::FEFunction)
-  diff_order = get_diff_order(u_to_j)
-
-  if !is_cache_built(u_to_j.cache)
-    build_cache!(u_to_j,uh,φh)
-  end
-  u_to_j.cache.fwd_ran = true # (running fwd here)
-  u_to_j.cache.bwd_ran = false # (bwd to be set to true in the pullback)
-  u_to_j(uh,φh,diff_order)
+function (u_to_j::AbstractStateParamMap)(uh,φh)
+  j = sum(u_to_j.F(uh,φh))
+  check_and_build_cache!(u_to_j,uh,φh,j)
+  return j
 end
 
-(u_to_j::AbstractStateParamMap)(uh,φh,diff_order::Val{1}) = sum(u_to_j.F(uh,φh))
-
-function (u_to_j::StateParamMap)(uh::FEFunction,φh::FEFunction,diff_order::Val{2})
-  u, p, j = u_to_j.cache.fwd_cache
-  copyto!(u, get_free_dof_values(uh))
-  copyto!(p, get_free_dof_values(φh))
-  j[] = sum(u_to_j.F(uh, φh))
-end
-
-function (u_to_j::StateParamMap)(u::AbstractVector,φ::AbstractVector)
-  U,V_φ = u_to_j.spaces
+function (u_to_j::AbstractStateParamMap)(u::AbstractVector,φ::AbstractVector)
+  U,V_φ = get_spaces(u_to_j)
   uh = FEFunction(U,u)
   φh = FEFunction(V_φ,φ)
   return u_to_j(uh,φh)
 end
 
+function check_and_build_cache!(u_to_j::StateParamMap,uh,φh,j)
+  if !is_cache_built(u_to_j.cache)
+    build_cache!(u_to_j,uh,φh)
+  end
+  update_diff_cache!(u_to_j,uh,φh,j)
+  nothing
+end
+
+update_diff_cache!(::StateParamMap{A,B,C,D,1},uh,φh,j) where {A,B,C,D} = nothing
+
 """
-    ChainRulesCore.rrule(u_to_j::StateParamMap,uh,φh)
+    ChainRulesCore.rrule(u_to_j::StateParamMap,u,φ)
 
 Return the evaluation of a `StateParamMap` and a
 a function for evaluating the pullback of `u_to_j`. This enables
 compatiblity with `ChainRules.jl`
 """
+function ChainRulesCore.rrule(u_to_j::StateParamMap,u,φ)
+  return u_to_j(u,φ), dj -> pullback(u_to_j,u,φ,dj)
+end
 
 function pullback(u_to_j::StateParamMap,uh,φh,dj)
-  F = u_to_j.F
-  U,V_φ = u_to_j.spaces
+  U,V_φ = get_spaces(u_to_j)
   assem_U,assem_deriv = u_to_j.assems
   ∂j∂u_vec,∂j∂φ_vec,∂F∂u,∂F∂φ = u_to_j.cache.plb_cache
 
@@ -214,35 +139,125 @@ function pullback(u_to_j::StateParamMap,uh,φh,dj)
   assemble_vector!(∂j∂φ_vec,assem_deriv,∂j∂φ_vecdata)
   ∂j∂u_vec .*= dj
   ∂j∂φ_vec .*= dj
-  update_inc_obj_cache!(u_to_j.cache.inc_obj_cache,u_to_j.F,uh,φh,u_to_j.spaces,get_diff_order(u_to_j))
-  u_to_j.cache.bwd_ran = true 
+  update_inc_obj_cache!(u_to_j,uh,φh)
   (  NoTangent(), ∂j∂u_vec, ∂j∂φ_vec )
 end
 
+update_inc_obj_cache!(::StateParamMap{A,B,C,D,1},uh,φh) where {A,B,C,D} = nothing
+
 function pullback(u_to_j::StateParamMap,u::AbstractVector,φ::AbstractVector,dj)
-  U,V_φ = u_to_j.spaces
+  U,V_φ = get_spaces(u_to_j)
   uh = FEFunction(U,u)
   φh = FEFunction(V_φ,φ)
   return pullback(u_to_j,uh,φh,dj)
 end
 
-function ChainRulesCore.rrule(u_to_j::StateParamMap,uh,φh)
-  return u_to_j(uh,φh), dj -> pullback(u_to_j,uh,φh,dj)
+# Cache
+mutable struct StateParamMapCache
+  fwd_cache::Tuple
+  plb_cache::Tuple
+  inc_obj_cache::Tuple
+  cache_built::Bool
+  fwd_ran:: Bool
+  bwd_ran:: Bool
 end
 
-"""
-    rrule(u_to_j::StateParamMap,uh,φh)
+is_cache_built(c::StateParamMapCache) = c.cache_built
 
-Return the evaluation of a `StateParamMap` and a
-function for evaluating the pullback of `u_to_j`. This enables
-compatibility with `ChainRules.jl`
-"""
-function rrule(u_to_j::StateParamMap,uh,φh)
-  ChainRulesCore.rrule(u_to_j,uh,φh)
+function StateParamMapCache(∂F∂u,∂F∂φ)
+  plb_cache = (nothing, nothing, ∂F∂u, ∂F∂φ)
+  StateParamMapCache((),plb_cache,(),false,false,false)
 end
 
-function rrule(u_to_j::StateParamMap,u::AbstractVector,φ::AbstractVector)
-  ChainRulesCore.rrule(u_to_j,u,φ)
+function build_cache!(u_to_j::StateParamMap{A,B,C,D,1},uh,φh) where {A,B,C,D}
+  U, V_φ = get_spaces(u_to_j)
+  ∂j∂u_vec = get_free_dof_values(zero(U))
+  ∂j∂φ_vec = get_free_dof_values(zero(V_φ))
+  ∂F∂u,∂F∂φ = u_to_j.cache.plb_cache[3:4]
+  u_to_j.cache.plb_cache = (∂j∂u_vec,∂j∂φ_vec,∂F∂u,∂F∂φ)
+  u_to_j.cache.cache_built = true
+  return nothing
+end
+
+# Second order
+
+function update_diff_cache!(u_to_j::StateParamMap{A,B,C,D,2},uh,φh,j) where {A,B,C,D}
+  u, φ, j_cache = u_to_j.cache.fwd_cache
+  copyto!(u, get_free_dof_values(uh))
+  copyto!(φ, get_free_dof_values(φh))
+  j_cache[] = j
+  u_to_j.cache.fwd_ran = true
+  u_to_j.cache.bwd_ran = false
+  nothing
+end
+
+function build_cache!(u_to_j::StateParamMap{A,B,C,D,2},uh,φh) where {A,B,C,D}
+  _,_,∂F∂u,∂F∂φ = u_to_j.cache.plb_cache
+  U,V_φ = u_to_j.spaces
+  u_to_j.cache.fwd_cache = (get_free_dof_values(zero(U)), get_free_dof_values(zero(V_φ)), Ref(0.0))
+  u_to_j.cache.plb_cache = (get_free_dof_values(zero(U)), get_free_dof_values(zero(V_φ)), ∂F∂u, ∂F∂φ)
+  u_to_j.cache.inc_obj_cache = build_inc_obj_cache(u_to_j.F,uh,φh,u_to_j.spaces)
+  u_to_j.cache.cache_built = true
+  u_to_j.cache.fwd_ran = false
+  u_to_j.cache.bwd_ran = false
+  return nothing
+end
+
+function build_inc_obj_cache(F,uh,φh,spaces)
+  U,V_φ = spaces
+
+  # ∂²J / ∂u² * u̇
+  ∂2J∂u2 = Gridap.hessian(uh->F(uh,φh),uh)
+  assem_∂2J∂u2 = SparseMatrixAssembler(U,U)
+  ∂2J∂u2_mat = assemble_matrix(∂2J∂u2,assem_∂2J∂u2,U,U)
+
+  # ∂/∂φ (∂J/∂u ) * ̇φ
+  ∂J∂u(uh,φh) = Gridap.gradient(uh->F(uh,φh),uh)
+  ∂2J∂u∂φ = Gridap.jacobian(φ->∂J∂u(uh,φ),φh)
+  assem_∂2J∂u∂φ = SparseMatrixAssembler(V_φ,U)
+  ∂2J∂u∂φ_mat = assemble_matrix(∂2J∂u∂φ,assem_∂2J∂u∂φ,V_φ,U)
+
+  # ∂²J / ∂φ² * ̇φ
+  ∂2J∂φ2 = Gridap.hessian(φ->F(uh,φ),φh)
+  assem_∂2J∂φ2 = SparseMatrixAssembler(V_φ,V_φ)
+  ∂2J∂φ2_mat = assemble_matrix(∂2J∂φ2,assem_∂2J∂φ2,V_φ,V_φ)
+
+  # ∂/∂u (∂J / ∂φ) * u̇
+  ∂J∂φ(uh,φh) = Gridap.gradient(φ->F(uh,φ),φh)
+  ∂2J∂φ∂u = Gridap.jacobian(uh->∂J∂φ(uh,φh),uh)
+  assem_∂2J∂φ∂u = SparseMatrixAssembler(U,V_φ)
+  ∂2J∂φ∂u_mat = assemble_matrix(∂2J∂φ∂u,assem_∂2J∂φ∂u,U,V_φ)
+
+  dṗ_from_j = get_free_dof_values(zero(V_φ))
+  du̇_from_j = get_free_dof_values(zero(U))
+
+  dṗ_from_j, du̇_from_j, assem_∂2J∂u2, ∂2J∂u2_mat,   assem_∂2J∂u∂φ, ∂2J∂u∂φ_mat,   assem_∂2J∂φ2, ∂2J∂φ2_mat,   assem_∂2J∂φ∂u, ∂2J∂φ∂u_mat
+end
+
+function update_inc_obj_cache!(u_to_j::StateParamMap{A,B,C,D,2},uh,φh) where {A,B,C,D}
+  U,V_φ = get_spaces(u_to_j)
+  F = u_to_j.F
+  inc_obj_cache = u_to_j.cache.inc_obj_cache
+  dṗ_from_j, du̇_from_j, assem_∂2J∂u2, ∂2J∂u2_mat, assem_∂2J∂u∂φ,
+    ∂2J∂u∂φ_mat, assem_∂2J∂φ2, ∂2J∂φ2_mat, assem_∂2J∂φ∂u, ∂2J∂φ∂u_mat = inc_obj_cache
+
+  ∂2J∂u2 = Gridap.hessian(uh->F(uh,φh),uh)
+  assemble_matrix!(∂2J∂u2,∂2J∂u2_mat,assem_∂2J∂u2,U,U)
+
+  ∂J∂u(uh,φh) = Gridap.gradient(uh->F(uh,φh),uh)
+  ∂2J∂u∂φ = Gridap.jacobian(φ->∂J∂u(uh,φ),φh)
+  assemble_matrix!(∂2J∂u∂φ,∂2J∂u∂φ_mat,assem_∂2J∂u∂φ,V_φ,U)
+
+  ∂2J∂φ2 = Gridap.hessian(φ->F(uh,φ),φh)
+  assemble_matrix!(∂2J∂φ2,∂2J∂φ2_mat,assem_∂2J∂φ2,V_φ,V_φ)
+
+  ∂J∂φ(uh,φh) = Gridap.gradient(φ->F(uh,φ),φh)
+  ∂2J∂φ∂u = Gridap.jacobian(uh->∂J∂φ(uh,φh),uh)
+  assemble_matrix!(∂2J∂φ∂u,∂2J∂φ∂u_mat,assem_∂2J∂φ∂u,U,V_φ)
+
+  u_to_j.cache.bwd_ran = true
+
+  return nothing
 end
 
 # IO
@@ -261,41 +276,4 @@ end
 function StateParamMap(
     F,U::FESpace,V_φ::FESpace,U_reg,assem_U::Assembler,assem_deriv::Assembler;kwargs...)
   error(_msg_v0_3_0(StateParamMap))
-end
-
-mutable struct StateParamMapCache
-  fwd_cache::Tuple
-  plb_cache::Tuple
-  inc_obj_cache::Tuple
-  cache_built::Bool
-  fwd_ran:: Bool
-  bwd_ran:: Bool
-end
-
-is_cache_built(c::StateParamMapCache) = c.cache_built
-
-function StateParamMapCache(∂F∂u,∂F∂φ)
-  plb_cache = (nothing, nothing, ∂F∂u, ∂F∂φ)  
-  StateParamMapCache((),plb_cache,(),false,false,false)
-end
-
-function build_cache!(u_to_j::StateParamMap,uh,φh)
-  _,_,∂F∂u,∂F∂φ = u_to_j.cache.plb_cache
-  U,V_φ = u_to_j.spaces
-
-  uh = zero(U)
-  φh = zero(V_φ)
-  j = Ref(0.0)
-  u_to_j.cache.fwd_cache = (get_free_dof_values(uh), get_free_dof_values(φh), j)
-
-  u_to_j.cache.plb_cache = (get_free_dof_values(zero(U)), get_free_dof_values(zero(V_φ)), ∂F∂u, ∂F∂φ)
-
-  diff_order = get_diff_order(u_to_j) 
-  u_to_j.cache.inc_obj_cache = build_inc_obj_cache(u_to_j.F,uh,φh,u_to_j.spaces,diff_order) 
-
-  u_to_j.cache.cache_built = true
-  u_to_j.cache.fwd_ran = false
-  u_to_j.cache.bwd_ran = false
-
-  u_to_j.cache
 end

@@ -21,6 +21,8 @@ using Test
   include("Transient_CrankNicolson_AffineFEStateMap.jl")
   include("Transient_CrankNicolson_ConstantMats_AffineFEStateMap.jl")
   include("Transient_CrankNicolson_NonlinearFEStateMap.jl")
+  # Second order
+  include("SecondOrderTests.jl")
 end
 
 end # module

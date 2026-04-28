@@ -50,7 +50,7 @@ import Base: +
 import Gridap: solve!
 import PartitionedArrays: default_find_rcv_ids
 
-using ForwardDiff 
+using ForwardDiff
 
 __init__() = begin
   function default_find_rcv_ids(::MPIArray)
@@ -79,7 +79,6 @@ export RepeatingAffineFEStateMap
 export StaggeredAffineFEStateMap
 export StaggeredNonlinearFEStateMap
 export StateParamMap
-export rrule
 export get_state
 export evaluate_functionals!
 export evaluate_derivatives!

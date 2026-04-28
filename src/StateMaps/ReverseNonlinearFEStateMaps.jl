@@ -1,5 +1,5 @@
 """
-    struct ReverseNonlinearFEStateMap{A,B,C,D,E} <: AbstractFEStateMap
+    struct ReverseNonlinearFEStateMap{A,B,C,D,E} <: AbstractFEStateMap{1}
 
 A structure to enable the forward problem and pullback for nonlinear finite
 element operators.
@@ -14,7 +14,7 @@ element operators.
 - `assems`: `Tuple` of assemblers
 - `cache`: A FEStateMapCache
 """
-struct ReverseNonlinearFEStateMap{A,B,C,D,E} <: AbstractFEStateMap
+struct ReverseNonlinearFEStateMap{A,B,C,D,E} <: AbstractFEStateMap{1}
   res         :: A
   jacs        :: B
   spaces      :: C
@@ -34,10 +34,10 @@ struct ReverseNonlinearFEStateMap{A,B,C,D,E} <: AbstractFEStateMap
 
   Create an instance of `ReverseNonlinearFEStateMap` given the residual `res` as a `Function` type,
   trial and test spaces `U` and `V`, the FE space `V_φ` for `φh` and derivatives,
-  and the measures as additional arguments. The space `V_diff` is the FE space is used to assist with AD. 
+  and the measures as additional arguments. The space `V_diff` is the FE space is used to assist with AD.
   It will be removed in the future.
 
-  In contrast to the other state maps, the partial derivative of the residual with respect to the parameter 
+  In contrast to the other state maps, the partial derivative of the residual with respect to the parameter
   `φ` is computed using ReverseDiff. This is useful when derivative information cannot
   be computed using only local information (which is an assumption of the ForwardDiff-based approach used in the other state maps).
   This is untested in parallel.
@@ -199,8 +199,6 @@ function pullback(φ_to_u::ReverseNonlinearFEStateMap,uh,φh,du;updated=false)
 
   return (NoTangent(),dudφ_vec)
 end
-
-get_diff_order(::ReverseNonlinearFEStateMap) = Val(1)
 
 function ChainRulesCore.rrule(φ_to_u::ReverseNonlinearFEStateMap,φh)
   u  = forward_solve!(φ_to_u,φh)

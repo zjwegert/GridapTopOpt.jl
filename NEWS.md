@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added `restrict`, short hand for `restrict_to_field`.
 - Added `rrule` for `restrict`.
 - Added `ReverseNonlinearFEStateMap` to allow for reverse propagation of dual numbers through a state map.
+- Added second-order AD of generic PDE-constrained functions.
 
 ### Changed
 - Adjusted README.md to discuss AD and link to docs.
