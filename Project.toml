@@ -35,7 +35,6 @@ ChainRulesCore = "1"
 CircularArrays = "1"
 DataStructures = "0.19"
 FillArrays = "1.11"
-FiniteDiff = "2.27.0"
 ForwardDiff = "0.10.38, 1"
 Gridap = "0.19, 0.20"
 GridapDistributed = "0.4"
@@ -54,8 +53,9 @@ julia = "1.10"
 
 [extras]
 FiniteDiff = "6a86dc24-6348-571c-b903-95158fe2bd41"
+FiniteDifferences = "26cc04aa-876d-5657-8c51-4c34ba976000"
 MPIPreferences = "3da0fdf6-3ccc-4f1b-acd9-58baa6c99267"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
-test = ["Test", "FiniteDiff"]
+test = ["Test", "FiniteDiff","FiniteDifferences"]
