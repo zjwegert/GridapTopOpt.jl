@@ -66,6 +66,9 @@ Additional examples, as well as examples using GridapDistributed, can be found i
     Refer to [`CustomPDEConstrainedFunctionals`](@ref) and [`CustomEmbeddedPDEConstrainedFunctionals`](@ref) when attempting to use this with the level-set topology optimisation methods in GridapTopOpt.
 
 ## Second-order AD of generic PDE-constrained functions
+!!! warning
+    The Hessian-vector product capability is new. Please report any issues that you encounter.
+
 The capability to compute Hessian-vector products was added in GridapTopOpt v0.5. Under the hood, we use forward-over-reverse automatic differentiation, however most users will only ever need the [`Hvp`](@ref) function. Below, we demonstrate how to compute the Hessian-vector product.
 
 ```julia
@@ -74,17 +77,17 @@ using Gridap, GridapTopOpt
 f(x) = x[2]
 g(x) = x[1]
 
-model = CartesianDiscreteModel((0,1,0,1), (10,10))
+model = CartesianDiscreteModel((0,1,0,1), (2,2))
 Ω = Triangulation(model)
 dΩ = Measure(Ω, 2)
 reffe = ReferenceFE(lagrangian, Float64, 1)
 K = TestFESpace(model, reffe)
 V = TestFESpace(model, reffe; dirichlet_tags="boundary")
-U = TrialFESpace(V,x->x[1])
-a(u, v, κ) = ∫(κ * ∇(v) ⋅ ∇(u))dΩ
+U = TrialFESpace(V,g)
+a(u, v, κ) = ∫(κ*(κ+1) * ∇(v) ⋅ ∇(u))dΩ
 b(v, κ) = ∫(v*f)dΩ
 κ_to_u = AffineFEStateMap(a,b,U,V,K;diff_order=2)
-l2_norm = StateParamMap((u, κ) -> ∫(u ⋅ u + 0κ)dΩ,κ_to_u;diff_order=2)
+l2_norm = StateParamMap((u, κ) -> ∫(u ⋅ u + 0κ)dΩ,κ_to_u;diff_order=2) # (!!)
 u_obs = interpolate(x -> sin(2π*x[1]), V) |> get_free_dof_values
 function J(κ)
   u = κ_to_u(κ)
@@ -97,12 +100,28 @@ vh = interpolate(0.5, K)
 Hv = Hvp(J, get_free_dof_values(κ0h),get_free_dof_values(vh))
 ```
 
-Note that we set the optional parameter `diff_order` in `AffineFEStateMap` and `StateParamMap` to specify that we will be computing the Hessian-vector product.
+Here we set the optional parameter `diff_order = 2` in `AffineFEStateMap` and `StateParamMap` to specify that we will be computing the Hessian-vector product in our computations. Note that we reduce the mesh size to make finite differences tractable.
 
-We again verify using finite differences as follows:
+We again verify using finite differences:
 
 ```julia
-using FiniteDiff, Test
+using FiniteDifferences, Test
+κ = get_free_dof_values(κ0h)
+v = get_free_dof_values(vh)
+function κ_to_j(κ)
+    κh = FEFunction(K,κ)
+    op = AffineFEOperator((u,v)->a(u,v,κh),v->b(v,κh),U,V)
+    u = solve(op) |> get_free_dof_values
+    sqrt(l2_norm(u-u_obs, κ))
+end
+g_fd = κ->FiniteDifferences.jacobian(central_fdm(5,1),κ_to_j,κ)
+Hv_fd = FiniteDifferences.jacobian(central_fdm(5,1),g_fd,κ)[1]*v
+maximum(abs,Hv-Hv_fd)/maximum(abs,Hv)
 ```
 
-TODO
+Here we use FiniteDifferences instead of FiniteDiff so that we can specify the finite difference scheme.
+
+!!! note
+    The map denoted by `(!!)` in the above has `... + 0κ` in the integrand. This is currently required for functionals that implicitly depond on the parameter. This will be investigated in future.
+
+    Another issue is Gridap's long complilation time when computing Hessian's with AD. This will be investigated in future.
