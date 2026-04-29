@@ -124,6 +124,16 @@ Hṗ_FOR = ForwardDiff.derivative(α -> ∇f(p + α*ṗ), 0)
 
 @test λ⁻ ≈ u̇ # the incremental adjoint should equal the incremental state for a self-adjoint problem
 
+# to test
+function fd_hvp(f, p, v; h::Real = cbrt(eps()))
+  ∇f(q) = val_and_gradient(f, q).grad[1]
+  g₋₂ = ∇f(p - 2h*v)
+  g₋₁ = ∇f(p - h*v)
+  g₊₁ = ∇f(p + h*v)
+  g₊₂ = ∇f(p + 2h*v)
+  return (g₋₂ - 8*g₋₁ + 8*g₊₁ - g₊₂) / (12h)
+end
+
 # function p_to_j(p)
 #     ph = FEFunction(V_p,p)
 #     op = FEOperator((u,v)->res(u,v,ph),U,V)
