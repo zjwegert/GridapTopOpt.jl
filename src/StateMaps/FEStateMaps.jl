@@ -282,16 +282,16 @@ is_cache_built(c::FEStateMapCache) = c.cache_built
 
 Build the FEStateMapCache (see AffineFEStateMap for an example)
 """
-function build_inc_cache(state_map::AbstractFEStateMap{2},φh,uh,adjoint_x)
+function build_inc_cache(state_map::AbstractFEStateMap{2},φh,uh,x,adjoint_x)
   U,V,V_p = state_map.spaces
   res = get_res(state_map)
 
   # incremental state cache
-  u̇ = similar(get_free_dof_values(uh))
   dv = get_fe_basis(V)
   ∂R∂φ = Gridap.jacobian(φ->res(uh,dv,φ),φh)
   assem_∂R∂φ = SparseMatrixAssembler(V_p,V)
   ∂R∂φ_mat = assemble_matrix(∂R∂φ,assem_∂R∂φ,V_p,V)
+  u̇ = copy(x)
   inc_state_cache = (u̇, assem_∂R∂φ, ∂R∂φ_mat)
 
   # incremental adjoint cache
@@ -316,13 +316,13 @@ function build_inc_cache(state_map::AbstractFEStateMap{2},φh,uh,adjoint_x)
   assem_∂2R∂φ∂u = SparseMatrixAssembler(U,V_p)
   ∂2R∂φ∂u_mat = assemble_matrix(∂2R∂φ∂u,assem_∂2R∂φ∂u,U,V_p)
   # incremental adjoint cotangent
-  dṗ_from_u = get_free_dof_values(zero(V_p))
+  dṗ_from_u = allocate_in_domain(∂2R∂φ2_mat)
   inc_adjoint_cache = (λ⁻, dṗ_from_u,   assem_∂2R∂u2, ∂2R∂u2_mat,   assem_∂2R∂u∂φ,∂2R∂u∂φ_mat,  assem_∂2R∂φ2,∂2R∂φ2_mat,  assem_∂2R∂φ∂u,∂2R∂φ∂u_mat)
 
   return inc_state_cache, inc_adjoint_cache
 end
 
-build_inc_cache(state_map::AbstractFEStateMap{1},φh,uh,adjoint_x) = ((),())
+build_inc_cache(state_map::AbstractFEStateMap{1},φh,uh,x,adjoint_x) = ((),())
 
 function build_cache!(::AbstractFEStateMap,φh)
   @abstractmethod

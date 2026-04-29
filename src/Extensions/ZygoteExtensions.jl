@@ -144,3 +144,6 @@ function Hvp(f,p,v)
   ∇f = p->val_and_gradient(f,p).grad[1]
   ForwardDiff.derivative(α -> ∇f(p + α*v), 0)
 end
+
+# FowardDiff extensions
+@inline ForwardDiff.extract_derivative(::Type{T}, y::PVector) where {T} = Base.Fix1(ForwardDiff.extract_derivative,T).(y)

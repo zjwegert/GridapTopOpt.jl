@@ -24,11 +24,40 @@ function bwd_pass_ran(p_to_u::AbstractFEStateMap,p::AbstractVector)
   get_free_dof_values(get_parameter(p_to_u)) == p && p_to_u.cache.adjoint_updated
 end
 
+function _mapreduce_partials(pᵋ,∂R∂p_mat)
+  mapreduce(ForwardDiff.partials, vcat, pᵋ)
+end
+
+function _mapreduce_partials(pᵋ::PVector,∂R∂p_mat)
+  pvec = allocate_in_domain(∂R∂p_mat)
+  v = map(Base.Fix2(_mapreduce_partials,nothing), local_views(pᵋ))
+  pvec_ids = pvec.index_partition
+  pᵋ_ids = pᵋ.index_partition
+  map(_map_dofs_to_rhs!,local_views(pvec),local_views(pvec_ids),v,local_views(pᵋ_ids))
+  consistent!(pvec) |> wait
+  return pvec
+end
+
+function _build_duals(tag, u, u̇)
+  map(u, eachrow(u̇)) do v, p
+    ForwardDiff.Dual{tag}(v, p...)
+  end
+end
+
+function _build_duals(tag, u::PVector, u̇::PVector)
+  ids = u̇.index_partition
+  v = map(Base.Fix1(_build_duals,tag), local_views(u), local_views(u̇))
+  u_dual = PVector(v,ids)
+  consistent!(u_dual) |> wait
+  return u_dual
+end
+
 function incremental_state_map(p_to_u::AbstractFEStateMap{N}, res,  pᵋ::AbstractVector{ForwardDiff.Dual{T,VT,PT}}) where {N,T,VT,PT}
   @assert N == 2 "You're trying to compute the Hessian-vector product for a state map that only expects first order derivatives.
     You should set diff_order = 2 in the FEStateMap and StateParamMap constructors to enable second order differentiation."
+  u̇, assem_∂R∂p, ∂R∂p_mat = p_to_u.cache.inc_state_cache
   p = ForwardDiff.value.(pᵋ)
-  ṗ =  mapreduce(ForwardDiff.partials, vcat, pᵋ)'
+  ṗ = _mapreduce_partials(pᵋ,∂R∂p_mat)
 
   # solve state (if needed): once per outer iteration - should have been done already as the optimiser should first call the forward pass (to compute the gradient) before computing HVP's
   if !fwd_pass_ran(p_to_u,p)
@@ -37,15 +66,11 @@ function incremental_state_map(p_to_u::AbstractFEStateMap{N}, res,  pᵋ::Abstra
   end
 
   u = get_free_dof_values(get_state(p_to_u)) # current solution
-  u̇, assem_∂R∂p, ∂R∂p_mat = p_to_u.cache.inc_state_cache
   ns = get_ns(p_to_u) # numerical factorisation for the incremental state system is the same as the state system in the forward pass
 
   # solve incremental state: once per inner iteration (only thing changing is ṗ)
-  solve!(u̇, ns, -∂R∂p_mat*ṗ') # incremental state equation
-
-  return map(u, eachrow(u̇)) do v, p
-    ForwardDiff.Dual{T}(v, p...)
-  end
+  solve!(u̇, ns, -∂R∂p_mat*ṗ) # incremental state equation
+  return _build_duals(T, u, u̇)
 end
 
 function (p_to_u::AffineFEStateMap)(pᵋ::AbstractVector{ForwardDiff.Dual{T,VT,PT}}) where {T,VT,PT}
@@ -65,7 +90,7 @@ function incremental_adjoint_pullback(p_to_u,res,uᵋ,pᵋ::AbstractVector{Forwa
   λ⁻, dṗ_from_u,   assem_∂2R∂u2, ∂2R∂u2_mat,   assem_∂2R∂u∂p,∂2R∂u∂p_mat,  assem_∂2R∂p2,∂2R∂p2_mat,  assem_∂2R∂p∂u,∂2R∂p∂u_mat = p_to_u.cache.inc_adjoint_cache
 
   p = ForwardDiff.value.(pᵋ)
-  ṗ =  tangent_from_dual(pᵋ)
+  ṗ = _mapreduce_partials(pᵋ,∂2R∂u∂p_mat)
   u = ForwardDiff.value.(uᵋ)
   u̇ = tangent_from_dual(uᵋ)
   du = ForwardDiff.value.(duᵋ)
@@ -94,9 +119,7 @@ function incremental_adjoint_pullback(p_to_u,res,uᵋ,pᵋ::AbstractVector{Forwa
   mul!(dṗ_from_u, ∂2R∂p2_mat, ṗ, -1, 1)   # dṗ_from_u -= ∂2R∂p2_mat*ṗ
   mul!(dṗ_from_u, ∂2R∂p∂u_mat, u̇, -1, 1)  # dṗ_from_u -= ∂2R∂p∂u_mat*u̇
 
-  dpᵋ = map(dp_from_u, eachrow(dṗ_from_u)) do v, p
-    ForwardDiff.Dual{T}(v, p...)
-  end
+  dpᵋ = _build_duals(T, dp_from_u, dṗ_from_u)
   ( NoTangent(), dpᵋ)
 end
 
@@ -126,7 +149,7 @@ function bwd_pass_ran(u_to_j::StateParamMap,u,p)
   u_to_j.cache.fwd_cache[1] == u && u_to_j.cache.fwd_cache[2] == p && u_to_j.cache.bwd_ran
 end
 
-function (u_to_j::StateParamMap)(uᵋ::Vector{ForwardDiff.Dual{T1,V1,P1}},pᵋ::Vector{ForwardDiff.Dual{T2,V2,P2}}) where {T1,V1,P1,T2,V2,P2}
+function (u_to_j::StateParamMap)(uᵋ::AbstractVector{ForwardDiff.Dual{T1,V1,P1}},pᵋ::AbstractVector{ForwardDiff.Dual{T2,V2,P2}}) where {T1,V1,P1,T2,V2,P2}
   F = u_to_j.F
   U,V_p = u_to_j.spaces
 
@@ -144,14 +167,13 @@ function (u_to_j::StateParamMap)(uᵋ::Vector{ForwardDiff.Dual{T1,V1,P1}},pᵋ::
   ∂j∂u_vec,∂j∂φ_vec,_,_ = u_to_j.cache.plb_cache
   u,p,j = u_to_j.cache.fwd_cache
 
-
   # pushforward the dual component
   J̇ = ∂j∂φ_vec ⋅ ṗ + ∂j∂u_vec ⋅ u̇
   Jᵋ = ForwardDiff.Dual{T2}(j[], J̇)
   return  Jᵋ
 end
 
-function ChainRulesCore.rrule(u_to_j::StateParamMap,uᵋ::Vector{ForwardDiff.Dual{T1,V1,P1}},pᵋ::Vector{ForwardDiff.Dual{T2,V2,P2}}) where {T1,V1,P1,T2,V2,P2}
+function ChainRulesCore.rrule(u_to_j::StateParamMap,uᵋ::AbstractVector{ForwardDiff.Dual{T1,V1,P1}},pᵋ::AbstractVector{ForwardDiff.Dual{T2,V2,P2}}) where {T1,V1,P1,T2,V2,P2}
   spaces = u_to_j.spaces
   U,V_p = spaces
   F = u_to_j.F
@@ -159,8 +181,6 @@ function ChainRulesCore.rrule(u_to_j::StateParamMap,uᵋ::Vector{ForwardDiff.Dua
 
   u = ForwardDiff.value.(uᵋ)
   p = ForwardDiff.value.(pᵋ)
-  ṗ = tangent_from_dual(pᵋ)
-  u̇ = tangent_from_dual(uᵋ)
 
   function u_to_j_pullback(dJᵋ)
     # pullback the value # skip if already computed at the point p
@@ -176,6 +196,8 @@ function ChainRulesCore.rrule(u_to_j::StateParamMap,uᵋ::Vector{ForwardDiff.Dua
 
     # once per outer iteration
     dṗ_from_j, du̇_from_j, _, ∂2J∂u2_mat, _, ∂2J∂u∂p_mat, _, ∂2J∂p2_mat,  _, ∂2J∂p∂u_mat = u_to_j.cache.inc_obj_cache
+    ṗ = _mapreduce_partials(pᵋ,∂2J∂p2_mat)
+    u̇ = tangent_from_dual(uᵋ)
 
     # once per inner iteration
     # dṗ_from_j .=  (∂2J∂p2_mat*ṗ + ∂2J∂p∂u_mat*u̇)
@@ -186,12 +208,8 @@ function ChainRulesCore.rrule(u_to_j::StateParamMap,uᵋ::Vector{ForwardDiff.Dua
     mul!(du̇_from_j, ∂2J∂u2_mat, u̇, 1, 0)   # du̇_from_j := ∂2J∂u2_mat*u̇
     mul!(du̇_from_j, ∂2J∂u∂p_mat, ṗ, 1, 1)   # du̇_from_j += ∂2J∂u∂p_mat*ṗ
 
-    Du̇ = map(∂j∂u_vec, eachrow(du̇_from_j)) do v, p
-      ForwardDiff.Dual{T1}(v, p...)
-    end
-    Dṗ = map(∂j∂φ_vec, eachrow(dṗ_from_j)) do v, p
-      ForwardDiff.Dual{T2}(v, p...)
-    end
+    Du̇ = _build_duals(T1, ∂j∂u_vec, du̇_from_j)
+    Dṗ = _build_duals(T2, ∂j∂φ_vec, dṗ_from_j)
     (  NoTangent(), Du̇, Dṗ )
   end
 

@@ -214,4 +214,43 @@ Hṗ_fd = FiniteDifferences.jacobian(central_fdm(5,1),g_fd,p)[1]*ṗ
 p_to_j(p) = objective((state_map(p)),p)
 @test Hṗ_fd ≈ Hvp(p_to_j,p,ṗ) # the Hessian-vector product computed using AD should match the finite difference approximation of the Hessian-vector product (this is a test of the entire incremental map, including the adjoint part)
 
+# Doc test
+f(x) = x[2]
+g(x) = x[1]
+
+model = CartesianDiscreteModel((0,1,0,1), (2,2))
+Ω = Triangulation(model)
+dΩ = Measure(Ω, 2)
+reffe = ReferenceFE(lagrangian, Float64, 1)
+K = TestFESpace(model, reffe)
+V = TestFESpace(model, reffe; dirichlet_tags="boundary")
+U = TrialFESpace(V,g)
+a(u, v, κ) = ∫(κ * ∇(v) ⋅ ∇(u))dΩ
+b(v, κ) = ∫(v*f)dΩ
+κ_to_u = AffineFEStateMap(a,b,U,V,K;diff_order=2)
+l2_norm = StateParamMap((u, κ) -> ∫(u ⋅ u + 0κ)dΩ,κ_to_u;diff_order=2) # (!!)
+u_obs = interpolate(x -> sin(2π*x[1]), V) |> get_free_dof_values
+function J(κ)
+  u = κ_to_u(κ)
+  sqrt(l2_norm(u-u_obs, κ))
+end
+κ0h = interpolate(1.0, K)
+val, grad = val_and_gradient(J, get_free_dof_values(κ0h))
+# Hessian-vector product
+vh = interpolate(0.5, K)
+Hv = Hvp(J, get_free_dof_values(κ0h),get_free_dof_values(vh))
+
+# FD
+κ = get_free_dof_values(κ0h)
+v = get_free_dof_values(vh)
+function κ_to_j(κ)
+    κh = FEFunction(K,κ)
+    op = AffineFEOperator((u,v)->a(u,v,κh),v->b(v,κh),U,V)
+    u = solve(op) |> get_free_dof_values
+    sqrt(l2_norm(u-u_obs, κ))
+end
+g_fd = κ->FiniteDifferences.jacobian(central_fdm(5,1),κ_to_j,κ)
+Hv_fd = FiniteDifferences.jacobian(central_fdm(5,1),g_fd,κ)[1]*v
+@test maximum(abs,Hv-Hv_fd)/maximum(abs,Hv) < 1e-7
+
 end
