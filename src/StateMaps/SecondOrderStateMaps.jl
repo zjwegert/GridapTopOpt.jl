@@ -46,7 +46,7 @@ end
 
 function _build_duals(tag, u::PVector, u̇::PVector)
   ids = u̇.index_partition
-  v = map(Base.Fix1(_build_duals,tag), local_views(u), local_views(u̇))
+  v = map((x,y)->_build_duals(tag,x,y), local_views(u), local_views(u̇))
   u_dual = PVector(v,ids)
   consistent!(u_dual) |> wait
   return u_dual

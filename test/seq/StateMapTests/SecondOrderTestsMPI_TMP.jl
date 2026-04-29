@@ -1,8 +1,17 @@
 using Test, Gridap, GridapTopOpt
-using FiniteDifferences
 using Zygote
 using ForwardDiff
 using PartitionedArrays, GridapDistributed
+
+# Compute hvp using FD + val_and_gradient - Note, this relies on val_and_gradient being correct, but this is tested in other places.
+function fd_hvp(f, p, v; h::Real = cbrt(eps()))
+  ∇f(q) = val_and_gradient(f, q).grad[1]
+  g₋₂ = ∇f(p - 2h*v)
+  g₋₁ = ∇f(p - h*v)
+  g₊₁ = ∇f(p + h*v)
+  g₊₂ = ∇f(p + 2h*v)
+  return (g₋₂ - 8*g₋₁ + 8*g₊₁ - g₊₂) / (12h)
+end
 
 mesh_partition = (2,2)
 ranks = with_debug() do distribute
@@ -14,6 +23,7 @@ order = 1
 xmax = ymax = 1.0
 dom = (0,xmax,0,ymax)
 el_size = (4,4)
+# model = CartesianDiscreteModel(dom,el_size)
 model = CartesianDiscreteModel(ranks,mesh_partition,dom,el_size)
 Ω = Triangulation(model)
 dΩ = Measure(Ω,2*order)
@@ -97,15 +107,15 @@ ṗh = interpolate(x->rand(), V_p)
 u = state_map(get_free_dof_values(ph))
 
 uh = FEFunction(U,u)
-Zygote.gradient(p->objective(state_map(p),p),get_free_dof_values(ph)) # update λ
+Zygote.gradient(p->objective(state_map(p),p),get_free_dof_values(ph)); # update λ
 λ = state_map.cache.adj_cache[3]
 
 @test u ≈ λ # the adjoint should equal the solution for a self-adjoint problem
 
-λh = FEFunction(V,λ)
-T = ForwardDiff.Tag(()->(),typeof(p))
 p = get_free_dof_values(ph)
 ṗ = get_free_dof_values(ṗh)
+λh = FEFunction(V,λ)
+T = ForwardDiff.Tag(()->(),typeof(p))
 pᵋ = GridapTopOpt._build_duals(T,p,ṗ);
 uᵋ = state_map(pᵋ)
 ForwardDiff.value.(uᵋ) ≈ u
@@ -124,164 +134,100 @@ Hṗ_FOR = ForwardDiff.derivative(α -> ∇f(p + α*ṗ), 0)
 
 @test λ⁻ ≈ u̇ # the incremental adjoint should equal the incremental state for a self-adjoint problem
 
-# to test
-function fd_hvp(f, p, v; h::Real = cbrt(eps()))
-  ∇f(q) = val_and_gradient(f, q).grad[1]
-  g₋₂ = ∇f(p - 2h*v)
-  g₋₁ = ∇f(p - h*v)
-  g₊₁ = ∇f(p + h*v)
-  g₊₂ = ∇f(p + 2h*v)
-  return (g₋₂ - 8*g₋₁ + 8*g₊₁ - g₊₂) / (12h)
-end
-
-# function p_to_j(p)
-#     ph = FEFunction(V_p,p)
-#     op = FEOperator((u,v)->res(u,v,ph),U,V)
-#     uh = solve(op)
-#     sum(J(uh,ph))
-# end
-# g_fd = p->FiniteDifferences.jacobian(central_fdm(5,1),p_to_j,p)
-# Hṗ_fd = FiniteDifferences.jacobian(central_fdm(5,1),g_fd,p)[1]*ṗ
-
-# p_to_j(p) = objective((state_map(p)),p)
-# @test Hṗ_fd ≈ Hvp(p_to_j,p,ṗ) # the Hessian-vector product computed using the pullback should match the finite difference approximation of the Hessian-vector product (this is a test of the entire incremental map, including the adjoint part)
+Hṗ_fd = fd_hvp(p->objective(state_map(p),p),p,ṗ)
+Hṗ = Hvp(p->objective(state_map(p),p),p,ṗ)
+@test Hṗ_fd ≈ Hṗ
 
 # ########################################################
 # # Unit and integration tests for the pushforward rules #
 # ########################################################
 
-# J(u,p) = ∫( f*(1.0(sin∘(2π*u))+1)*(1.0(cos∘(2π*p))+1)*p)dΩ
-# objective = GridapTopOpt.StateParamMap(J,state_map,diff_order=2)
+J(u,p) = ∫( f*(1.0(sin∘(2π*u))+1)*(1.0(cos∘(2π*p))+1)*p)dΩ
+objective = GridapTopOpt.StateParamMap(J,state_map,diff_order=2)
 
-# # incremental objective (and pullback) test (u̇->du̇)
-# N = num_free_dofs(V)
-# function up_to_j(up)
-#     u = up[1:N]
-#     p = up[N+1:end]
-#     j = objective(u,p)
+# !! Nonlinear state map tests
+res(u,v,p) = ∫( (u+1)*(p)*∇(u)⋅∇(v) - f*v )dΩ
+state_map = NonlinearFEStateMap(res,U,V,V_p,diff_order=2)
+Zygote.gradient(p->objective(state_map(p),p),p); # update λ and u
+
+# entire incremental map (including the adjoint part) (ṗ->dṗ)
+p_to_j(p) = objective((state_map(p)),p)
+Hṗ_fd = fd_hvp(p_to_j,p,ṗ)
+Hṗ = Hvp(p_to_j,p,ṗ)
+@test Hṗ_fd ≈ Hṗ
+
+# !! Affine state map Tests
+a(u,v,p) = ∫( p*(p+1)*∇(u)⋅∇(v) )dΩ
+l(v,p) = ∫( f*v )dΩ
+state_map = AffineFEStateMap(a,l,U,V,V_p,diff_order=2)
+Zygote.gradient(p->objective(state_map(p),p),p); # update λ and u
+
+# entire incremental map (including the adjoint part) (ṗ->dṗ)
+p_to_j(p) = objective((state_map(p)),p)
+Hṗ_fd = fd_hvp(p_to_j,p,ṗ)
+Hṗ = Hvp(p_to_j,p,ṗ)
+
+@test maximum(abs,Hṗ_fd - Hṗ)/maximum(abs,Hṗ) < 1e-7
+# @test Hṗ_fd ≈ Hṗ
+
+# nonlinear version of linear problem
+state_map = NonlinearFEStateMap((u,v,p)->a(u,v,p)-l(v,p),U,V,V_p,diff_order=2)
+p_to_j(p) = objective((state_map(p)),p)
+Hṗ_fd = fd_hvp(p_to_j,p,ṗ)
+Hṗ = Hvp(p_to_j,p,ṗ)
+@test Hṗ_fd ≈ Hṗ
+
+# ##
+# mesh_partition = (2,2)
+# ranks = with_debug() do distribute
+#   distribute(LinearIndices((prod(mesh_partition),)))
 # end
-# up = vcat(u,p)
-# u̇ṗ = vcat(u̇,ṗ)
-# ∇f = up->Zygote.gradient(up_to_j,up)[1]
-# du̇dṗ =  ForwardDiff.derivative(α -> ∇f(up + α*u̇ṗ), 0)
-# du̇dṗ_FD =FiniteDifferences.jacobian(central_fdm(5,1),up->Zygote.gradient(up_to_j,up)[1],up)[1]*vcat(u̇,ṗ)
 
-# @test du̇dṗ_FD ≈ du̇dṗ # the pullback of the incremental objective should match the finite difference approximation of the pullback of the incremental objective
+# function driver(model)
+#   f(x) = x[2]
+#   g(x) = x[1]
 
-# # Nonlinear state map tests
-# res(u,v,p) = ∫( (u+1)*(p)*∇(u)⋅∇(v) - f*v )dΩ
-# state_map = NonlinearFEStateMap(res,U,V,V_p,diff_order=2)
-# Zygote.gradient(p->objective(state_map(p),p),p) # update λ and u
+#   Ω = Triangulation(model)
+#   dΩ = Measure(Ω, 2)
+#   reffe = ReferenceFE(lagrangian, Float64, 1)
+#   K = TestFESpace(model, reffe)
+#   V = TestFESpace(model, reffe; dirichlet_tags="boundary")
+#   U = TrialFESpace(V,g)
+#   a(u, v, κ) = ∫(κ * ∇(v) ⋅ ∇(u))dΩ
+#   b(v, κ) = ∫(v*f)dΩ
+#   κ_to_u = AffineFEStateMap(a,b,U,V,K;diff_order=2)
+#   l2_norm = StateParamMap((u, κ) -> ∫(u ⋅ u + 0κ)dΩ,κ_to_u;diff_order=2) # (!!)
+#   u_obs = interpolate(x -> sin(2π*x[1]), V) |> get_free_dof_values
+#   function J(κ)
+#     u = κ_to_u(κ)
+#     sqrt(l2_norm(u-u_obs, κ))
+#   end
+#   κ0h = interpolate(1.0, K)
+#   val, grad = val_and_gradient(J, get_free_dof_values(κ0h));
+#   # Hessian-vector product
+#   vh = interpolate(0.5, K);
+#   Hv = Hvp(J, get_free_dof_values(κ0h),get_free_dof_values(vh));
 
-# # incremental state test (ṗ->u̇)
-# function p_to_u(p)
-#     ph = FEFunction(V_p,p)
-#     op = FEOperator((u,v)->res(u,v,ph),U,V)
-#     uh = solve(op)
-#     return get_free_dof_values(uh)
+#   return Hv, K
 # end
-# uᵋ = state_map(pᵋ)
-# u̇ = vec(mapreduce(ForwardDiff.partials, hcat, uᵋ))
-# ∂u_∂p_FD = FiniteDifferences.jacobian(central_fdm(5,1),p_to_u,p)[1]
-# ∂u_∂p_FD_ṗ = ∂u_∂p_FD * ṗ
-# @test u̇ ≈ ∂u_∂p_FD_ṗ rtol = 1e-7 # the pullback of the incremental state should match the finite difference approximation of the pullback of the incremental state
 
-# # entire incremental map (including the adjoint part) (ṗ->dṗ)
-# function p_to_j(p)
-#     ph = FEFunction(V_p,p)
-#     op = FEOperator((u,v)->res(u,v,ph),U,V)
-#     uh = solve(op)
-#     sum(J(uh,ph))
+# model_serial = CartesianDiscreteModel((0,1,0,1),(8,8));
+# dF_serial,V_deriv_serial = driver(model_serial);
+
+# model = GridapTopOpt.ordered_distributed_model_from_serial_model(ranks,model_serial);
+# dF,V_deriv = driver(model);
+
+# # @test
+# length(dF_serial) ≈ length(dF)
+# # @test
+# norm(dF_serial)
+# norm(dF)
+
+# dFh = FEFunction(V_deriv,dF)
+# dFh_serial = FEFunction(V_deriv_serial,dF_serial)
+# deriv_test = GridapTopOpt.test_serial_and_distributed_fields(dFh,V_deriv,dFh_serial,V_deriv_serial)
+
+# map_main(deriv_test) do deriv_test
+#   @test deriv_test
+#   nothing
 # end
-# g_fd = p->FiniteDifferences.jacobian(central_fdm(5,1),p_to_j,p)
-# Hṗ_fd = FiniteDifferences.jacobian(central_fdm(5,1),g_fd,p)[1]*ṗ
-
-# p_to_j(p) = objective((state_map(p)),p)
-# @test Hṗ_fd ≈ Hvp(p_to_j,p,ṗ) # the Hessian-vector product computed with AD should match the finite difference approximation of the Hessian-vector product (this is a test of the entire incremental map, including the adjoint part)
-
-# #Affine state map Tests
-# a(u,v,p) = ∫( p*(p+1)*∇(u)⋅∇(v) )dΩ
-# l(v,p) = ∫( f*v )dΩ
-# state_map = AffineFEStateMap(a,l,U,V,V_p,diff_order=2)
-# Zygote.gradient(p->objective(state_map(p),p),p) # update λ and u
-
-# # incremental state test (ṗ->u̇)
-# function p_to_u(p)
-#     ph = FEFunction(V_p,p)
-#     op = FEOperator((u,v)->a(u,v,ph)-l(v,ph),U,V)
-#     uh = solve(op)
-#     return get_free_dof_values(uh)
-# end
-# uᵋ = state_map(pᵋ)
-# u̇ = vec(mapreduce(ForwardDiff.partials, hcat, uᵋ))
-# ∂u_∂p_FD = FiniteDifferences.jacobian(central_fdm(5,1),p_to_u,p)[1]
-# ∂u_∂p_FD_ṗ = ∂u_∂p_FD * ṗ
-# @test u̇ ≈ ∂u_∂p_FD_ṗ
-
-# # entire incremental map (including the adjoint part) (ṗ->dṗ)
-# function p_to_j(p)
-#     ph = FEFunction(V_p,p)
-#     op = AffineFEOperator((u,v)->a(u,v,ph),v->l(v,ph),U,V)
-#     uh = solve(op)
-#     sum(J(uh,ph))
-# end
-# g_fd = p->FiniteDifferences.jacobian(central_fdm(5,1),p_to_j,p)
-# Hṗ_fd = FiniteDifferences.jacobian(central_fdm(5,1),g_fd,p)[1]*ṗ
-
-# p_to_j(p) = objective((state_map(p)),p)
-# @test Hṗ_fd ≈ Hvp(p_to_j,p,ṗ) # the Hessian-vector product computed using AD should match the finite difference approximation of the Hessian-vector product (this is a test of the entire incremental map, including the adjoint part)
-
-##
-mesh_partition = (2,2)
-ranks = with_debug() do distribute
-  distribute(LinearIndices((prod(mesh_partition),)))
-end
-
-function driver(model)
-  f(x) = x[2]
-  g(x) = x[1]
-
-  Ω = Triangulation(model)
-  dΩ = Measure(Ω, 2)
-  reffe = ReferenceFE(lagrangian, Float64, 1)
-  K = TestFESpace(model, reffe)
-  V = TestFESpace(model, reffe; dirichlet_tags="boundary")
-  U = TrialFESpace(V,g)
-  a(u, v, κ) = ∫(κ * ∇(v) ⋅ ∇(u))dΩ
-  b(v, κ) = ∫(v*f)dΩ
-  κ_to_u = AffineFEStateMap(a,b,U,V,K;diff_order=2)
-  l2_norm = StateParamMap((u, κ) -> ∫(u ⋅ u + 0κ)dΩ,κ_to_u;diff_order=2) # (!!)
-  u_obs = interpolate(x -> sin(2π*x[1]), V) |> get_free_dof_values
-  function J(κ)
-    u = κ_to_u(κ)
-    sqrt(l2_norm(u-u_obs, κ))
-  end
-  κ0h = interpolate(1.0, K)
-  val, grad = val_and_gradient(J, get_free_dof_values(κ0h));
-  # Hessian-vector product
-  vh = interpolate(0.5, K);
-  Hv = Hvp(J, get_free_dof_values(κ0h),get_free_dof_values(vh));
-
-  return Hv, K
-end
-
-model_serial = CartesianDiscreteModel((0,1,0,1),(8,8));
-dF_serial,V_deriv_serial = driver(model_serial);
-
-model = GridapTopOpt.ordered_distributed_model_from_serial_model(ranks,model_serial);
-dF,V_deriv = driver(model);
-
-# @test
-length(dF_serial) ≈ length(dF)
-# @test
-norm(dF_serial)
-norm(dF)
-
-dFh = FEFunction(V_deriv,dF)
-dFh_serial = FEFunction(V_deriv_serial,dF_serial)
-deriv_test = GridapTopOpt.test_serial_and_distributed_fields(dFh,V_deriv,dFh_serial,V_deriv_serial)
-
-map_main(deriv_test) do deriv_test
-  @test deriv_test
-  nothing
-end
