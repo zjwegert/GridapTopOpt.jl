@@ -92,7 +92,7 @@ function incremental_adjoint_pullback(p_to_u,res,uᵋ,pᵋ::AbstractVector{Forwa
   p = ForwardDiff.value.(pᵋ)
   ṗ = _mapreduce_partials(pᵋ,∂2R∂u∂p_mat)
   u = ForwardDiff.value.(uᵋ)
-  u̇ = tangent_from_dual(uᵋ)
+  u̇ = _mapreduce_partials(uᵋ,∂2R∂u2_mat)
   du = ForwardDiff.value.(duᵋ)
   du̇ = tangent_from_dual(duᵋ)
 
@@ -197,7 +197,7 @@ function ChainRulesCore.rrule(u_to_j::StateParamMap,uᵋ::AbstractVector{Forward
     # once per outer iteration
     dṗ_from_j, du̇_from_j, _, ∂2J∂u2_mat, _, ∂2J∂u∂p_mat, _, ∂2J∂p2_mat,  _, ∂2J∂p∂u_mat = u_to_j.cache.inc_obj_cache
     ṗ = _mapreduce_partials(pᵋ,∂2J∂p2_mat)
-    u̇ = tangent_from_dual(uᵋ)
+    u̇ = _mapreduce_partials(uᵋ,∂2J∂u2_mat)
 
     # once per inner iteration
     # dṗ_from_j .=  (∂2J∂p2_mat*ṗ + ∂2J∂p∂u_mat*u̇)
