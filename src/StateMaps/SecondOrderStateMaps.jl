@@ -115,12 +115,13 @@ function incremental_adjoint_pullback(p_to_u,res,uᵋ,pᵋ::AbstractVector{Forwa
   assemble_vector!(dṗ_from_u,assem_deriv,∂R∂p_λ⁻_vecdata)
 
   #dṗ_from_u .= - dṗ_from_u - (∂2R∂p2_mat*ṗ + ∂2R∂p∂u_mat*u̇)
+  ṗ = _mapreduce_partials(pᵋ,∂2R∂p2_mat) # this is necessary for distributed
   rmul!(dṗ_from_u, -1)                    # dṗ_from_u := -dṗ_from_u
   mul!(dṗ_from_u, ∂2R∂p2_mat, ṗ, -1, 1)   # dṗ_from_u -= ∂2R∂p2_mat*ṗ
   mul!(dṗ_from_u, ∂2R∂p∂u_mat, u̇, -1, 1)  # dṗ_from_u -= ∂2R∂p∂u_mat*u̇
 
   dpᵋ = _build_duals(T, dp_from_u, dṗ_from_u)
-  ( NoTangent(), dpᵋ)
+  ( NoTangent(), copy(dpᵋ)) # avoid aliasing issues
 end
 
 function ChainRulesCore.rrule(p_to_u::NonlinearFEStateMap,pᵋ::AbstractVector{ForwardDiff.Dual{T,VT,PT}}) where {T,VT,PT}
@@ -164,16 +165,85 @@ function (u_to_j::StateParamMap)(uᵋ::AbstractVector{ForwardDiff.Dual{T1,V1,P1}
     j = u_to_j(u,p) # will also update ∂j∂u_vec and ∂j∂φ_vec
   end
 
-  ∂j∂u_vec,∂j∂φ_vec,_,_ = u_to_j.cache.plb_cache
   u,p,j = u_to_j.cache.fwd_cache
+  # Use unscaled gradients because ∂j∂φ_vec in plb_cache may be scaled by a previous pullback's dj
+  inc_obj_cache = u_to_j.cache.inc_obj_cache
+  ∂j∂u_unscaled, ∂j∂φ_unscaled = inc_obj_cache.∂j∂u_unscaled, inc_obj_cache.∂j∂φ_unscaled
 
   # pushforward the dual component
-  J̇ = ∂j∂φ_vec ⋅ ṗ + ∂j∂u_vec ⋅ u̇
+  J̇ = ∂j∂φ_unscaled ⋅ ṗ + ∂j∂u_unscaled ⋅ u̇
+  Jᵋ = ForwardDiff.Dual{T2}(j[], J̇)
+  return  Jᵋ
+end
+
+# case that u is constant
+function (u_to_j::StateParamMap)(uᵋ::AbstractVector,pᵋ::AbstractVector{ForwardDiff.Dual{T2,V2,P2}}) where {T2,V2,P2}
+  u = ForwardDiff.value.(uᵋ)
+  p = ForwardDiff.value.(pᵋ)
+  ṗ = ForwardDiff.partials.(pᵋ)
+
+  # pushforward the value # skip if already computed at the point p
+  if !fwd_pass_ran(u_to_j,u,p)
+    @warn "You are not calling the forward pass (objective) before computing HVP's"
+    j = u_to_j(u,p) # will also update ∂j∂u_vec and ∂j∂φ_vec
+  end
+
+  u,p,j = u_to_j.cache.fwd_cache
+  # Use unscaled gradients because ∂j∂φ_vec in plb_cache may be scaled by a previous pullback's dj
+  ∂j∂φ_unscaled = u_to_j.cache.inc_obj_cache.∂j∂φ_unscaled
+
+  # pushforward the dual component
+  J̇ = ∂j∂φ_unscaled ⋅ ṗ
   Jᵋ = ForwardDiff.Dual{T2}(j[], J̇)
   return  Jᵋ
 end
 
 function ChainRulesCore.rrule(u_to_j::StateParamMap,uᵋ::AbstractVector{ForwardDiff.Dual{T1,V1,P1}},pᵋ::AbstractVector{ForwardDiff.Dual{T2,V2,P2}}) where {T1,V1,P1,T2,V2,P2}
+  ∂j∂u_vec,∂j∂φ_vec,_,_ = u_to_j.cache.plb_cache
+
+  u = ForwardDiff.value.(uᵋ)
+  p = ForwardDiff.value.(pᵋ)
+
+  function u_to_j_pullback(dJᵋ)
+    # pullback the value # skip if already computed at the point p
+    dJ = ForwardDiff.value(dJᵋ)
+    dJ̇ = first(ForwardDiff.partials(dJᵋ))
+
+    if !bwd_pass_ran(u_to_j,u,p)
+      @warn "You are not calling the backwards pass (objective) before computing HVP's"
+      _, ∂j∂u_vec, ∂j∂φ_vec = GridapTopOpt.pullback(u_to_j,u,p,dJ)
+    end
+
+    # pullback the dual component
+
+    # once per outer iteration
+    dṗ_from_j, du̇_from_j, _, ∂2J∂u2_mat, _, ∂2J∂u∂p_mat, _, ∂2J∂p2_mat,  _,
+      ∂2J∂p∂u_mat, ∂j∂u_unscaled, ∂j∂φ_unscaled = u_to_j.cache.inc_obj_cache
+    ṗ = _mapreduce_partials(pᵋ,∂2J∂p2_mat)
+    u̇ = _mapreduce_partials(uᵋ,∂2J∂u2_mat)
+
+    # once per inner iteration
+    # dṗ_from_j .= dJ*(∂2J∂p2_mat*ṗ + ∂2J∂p∂u_mat*u̇) + dJ̇*∂j∂φ_vec_raw
+
+    mul!(dṗ_from_j, ∂2J∂p2_mat, ṗ, dJ, 0)    # dṗ_from_j := dJ*∂2J∂p2_mat*ṗ
+    mul!(dṗ_from_j, ∂2J∂p∂u_mat, u̇, dJ, 1)   # dṗ_from_j += dJ*∂2J∂p∂u_mat*u̇
+    axpy!(dJ̇, ∂j∂φ_unscaled, dṗ_from_j) # dṗ_from_j += dJ̇*∂j∂φ_unscaled
+
+    ṗ = _mapreduce_partials(pᵋ,∂2J∂u∂p_mat) # this is necessary for distributed
+    mul!(du̇_from_j, ∂2J∂u2_mat, u̇, dJ, 0)    # du̇_from_j := dJ*∂2J∂u2_mat*u̇
+    mul!(du̇_from_j, ∂2J∂u∂p_mat, ṗ, dJ, 1)   # du̇_from_j += dJ*∂2J∂u∂p_mat*ṗ
+    axpy!(dJ̇, ∂j∂u_unscaled, du̇_from_j) # du̇_from_j += dJ̇*∂j∂u_unscaled
+
+    Du̇ = _build_duals(T1, ∂j∂u_vec, du̇_from_j)
+    Dṗ = _build_duals(T2, ∂j∂φ_vec, dṗ_from_j)
+    (  NoTangent(), copy(Du̇), copy(Dṗ) ) # avoid aliasing issues
+  end
+
+  return u_to_j(uᵋ,pᵋ), u_to_j_pullback
+end
+
+# case that u is constant
+function ChainRulesCore.rrule(u_to_j::StateParamMap,uᵋ::AbstractVector,pᵋ::AbstractVector{ForwardDiff.Dual{T2,V2,P2}}) where {T2,V2,P2}
   spaces = u_to_j.spaces
   U,V_p = spaces
   F = u_to_j.F
@@ -185,32 +255,29 @@ function ChainRulesCore.rrule(u_to_j::StateParamMap,uᵋ::AbstractVector{Forward
   function u_to_j_pullback(dJᵋ)
     # pullback the value # skip if already computed at the point p
     dJ = ForwardDiff.value(dJᵋ)
-    dJ̇ = ForwardDiff.partials(dJᵋ)
+    dJ̇ = first(ForwardDiff.partials(dJᵋ))
 
     if !bwd_pass_ran(u_to_j,u,p)
       @warn "You are not calling the backwards pass (objective) before computing HVP's"
       _, ∂j∂u_vec, ∂j∂φ_vec = GridapTopOpt.pullback(u_to_j,u,p,dJ)
     end
 
-    # pullback the dual component
-
     # once per outer iteration
-    dṗ_from_j, du̇_from_j, _, ∂2J∂u2_mat, _, ∂2J∂u∂p_mat, _, ∂2J∂p2_mat,  _, ∂2J∂p∂u_mat = u_to_j.cache.inc_obj_cache
-    ṗ = _mapreduce_partials(pᵋ,∂2J∂p2_mat)
-    u̇ = _mapreduce_partials(uᵋ,∂2J∂u2_mat)
+    dṗ_from_j, du̇_from_j, _, _, _, ∂2J∂u∂p_mat, _, ∂2J∂p2_mat,  _, _,
+      ∂j∂u_unscaled, ∂j∂φ_unscaled = u_to_j.cache.inc_obj_cache
+    ṗ = _mapreduce_partials(pᵋ,∂2J∂p2_mat)
 
     # once per inner iteration
-    # dṗ_from_j .=  (∂2J∂p2_mat*ṗ + ∂2J∂p∂u_mat*u̇)
+    # dṗ_from_j .= dJ*∂2J∂p2_mat*ṗ + dJ̇*∂j∂φ_vec_raw
 
-    mul!(dṗ_from_j, ∂2J∂p2_mat, ṗ, 1, 0)   # dṗ_from_j := ∂2J∂p2_mat*ṗ
-    mul!(dṗ_from_j, ∂2J∂p∂u_mat, u̇, 1, 1)   # dṗ_from_j += ∂2J∂p∂u_mat*u̇
+    mul!(dṗ_from_j, ∂2J∂p2_mat, ṗ, dJ, 0)    # dṗ_from_j := dJ*∂2J∂p2_mat*ṗ
+    axpy!(dJ̇, ∂j∂φ_unscaled, dṗ_from_j) # dṗ_from_j += dJ̇*∂j∂φ_unscaled
+    mul!(du̇_from_j, ∂2J∂u∂p_mat, ṗ, dJ, 0)    # du̇_from_j := dJ*∂2J∂u∂p_mat*ṗ
+    axpy!(dJ̇, ∂j∂u_unscaled, du̇_from_j) # du̇_from_j += dJ̇*∂j∂u_unscaled
 
-    mul!(du̇_from_j, ∂2J∂u2_mat, u̇, 1, 0)   # du̇_from_j := ∂2J∂u2_mat*u̇
-    mul!(du̇_from_j, ∂2J∂u∂p_mat, ṗ, 1, 1)   # du̇_from_j += ∂2J∂u∂p_mat*ṗ
-
-    Du̇ = _build_duals(T1, ∂j∂u_vec, du̇_from_j)
+    Du̇ = _build_duals(T2, ∂j∂u_vec, du̇_from_j)
     Dṗ = _build_duals(T2, ∂j∂φ_vec, dṗ_from_j)
-    (  NoTangent(), Du̇, Dṗ )
+    (  NoTangent(), copy(Du̇), copy(Dṗ) ) # avoid aliasing issues
   end
 
   return u_to_j(uᵋ,pᵋ), u_to_j_pullback

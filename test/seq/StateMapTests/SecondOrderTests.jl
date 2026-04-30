@@ -30,7 +30,7 @@ uh = FEFunction(U,u)
 ph = FEFunction(V_p,p)
 λh = FEFunction(V,λ)
 spaces = (U,V_p)
-_,_,_, ∂2J∂u2_mat, _, ∂2J∂u∂p_mat, _, ∂2J∂p2_mat, _, ∂2J∂p∂u_mat = GridapTopOpt.build_inc_obj_cache(J,uh,ph,spaces)
+_,_,_, ∂2J∂u2_mat, _, ∂2J∂u∂p_mat, _, ∂2J∂p2_mat, _, ∂2J∂p∂u_mat,_,_ = GridapTopOpt.build_inc_obj_cache(J,uh,ph,spaces)
 #∂2J∂u2_mat, ∂2J∂u∂p_mat, ∂2J∂p2_mat, ∂2J∂p∂u_mat = SecondOrderTopOpt.incremental_objective_partials(J,uh,ph,spaces)
 
 # ∂²J / ∂u² * u̇
@@ -214,14 +214,69 @@ Hṗ_fd = FiniteDifferences.jacobian(central_fdm(5,1),g_fd,p)[1]*ṗ
 p_to_j(p) = objective((state_map(p)),p)
 @test Hṗ_fd ≈ Hvp(p_to_j,p,ṗ) # the Hessian-vector product computed using AD should match the finite difference approximation of the Hessian-vector product (this is a test of the entire incremental map, including the adjoint part)
 
-# Doc test
-f(x) = x[2]
-g(x) = x[1]
-
-model = CartesianDiscreteModel((0,1,0,1), (2,2))
+# ! Test StateParamMap with operation
+model = CartesianDiscreteModel((0,1,0,1), (3,3))
 Ω = Triangulation(model)
 dΩ = Measure(Ω, 2)
 reffe = ReferenceFE(lagrangian, Float64, 1)
+K = TestFESpace(model, reffe)
+κ0h = interpolate(x->x[1], K)
+κ = get_free_dof_values(κ0h)
+vh = interpolate(0.5, K)
+v = get_free_dof_values(vh)
+assem = SparseMatrixAssembler(K,K)
+l2_norm = StateParamMap((u, κ) -> ∫(u + κ*κ)dΩ,K,K,assem,assem;diff_order=2) # (!!)
+u_obs = interpolate(x -> sin(2π*x[1]), K) |> get_free_dof_values
+function κ_to_J(κ)
+  l2_norm(u_obs, κ)
+end
+val, grad = val_and_gradient(κ_to_J, κ)
+# Hessian-vector product
+Hv = Hvp(κ_to_J, κ, v)
+
+# !! Tests
+# grad
+dκ_to_J_fd = FiniteDifferences.grad(central_fdm(5,1),κ_to_J,κ)[1]
+dκ_to_J = grad[1]
+@test dκ_to_J ≈ dκ_to_J_fd
+# hvp
+g_fd = κ->FiniteDifferences.jacobian(central_fdm(5,1),κ_to_J,κ)
+Hv_fd = FiniteDifferences.jacobian(central_fdm(5,1),g_fd,κ)[1]*v
+@show maximum(abs,Hv-Hv_fd)/maximum(abs,Hv)
+@test Hv ≈ Hv_fd
+
+# Op on StateParamMap
+function κ_to_J(κ)
+  l2_norm(u_obs, κ)^2
+end
+val, grad = val_and_gradient(κ_to_J, κ)
+# Hessian-vector product
+Hv = Hvp(κ_to_J, κ, v)
+
+# !! Tests
+# grad
+dκ_to_J_fd = FiniteDifferences.grad(central_fdm(5,1),κ_to_J,κ)[1]
+dκ_to_J = grad[1]
+@test dκ_to_J ≈ dκ_to_J_fd
+# hvp
+g_fd = κ->FiniteDifferences.jacobian(central_fdm(5,1),κ_to_J,κ)
+Hv_fd = FiniteDifferences.jacobian(central_fdm(5,1),g_fd,κ)[1]*v
+@show maximum(abs,Hv-Hv_fd)/maximum(abs,Hv)
+@test Hv ≈ Hv_fd
+
+# Test full case
+f(x) = x[2]
+g(x) = x[1]
+
+model = CartesianDiscreteModel((0,1,0,1), (3,3))
+Ω = Triangulation(model)
+dΩ = Measure(Ω, 2)
+reffe = ReferenceFE(lagrangian, Float64, 1)
+K = TestFESpace(model, reffe)
+κ0h = interpolate(x->x[1], K)
+κ = get_free_dof_values(κ0h)
+vh = interpolate(0.5, K)
+v = get_free_dof_values(vh)
 K = TestFESpace(model, reffe)
 V = TestFESpace(model, reffe; dirichlet_tags="boundary")
 U = TrialFESpace(V,g)
@@ -230,27 +285,23 @@ b(v, κ) = ∫(v*f)dΩ
 κ_to_u = AffineFEStateMap(a,b,U,V,K;diff_order=2)
 l2_norm = StateParamMap((u, κ) -> ∫(u ⋅ u + 0κ)dΩ,κ_to_u;diff_order=2) # (!!)
 u_obs = interpolate(x -> sin(2π*x[1]), V) |> get_free_dof_values
-function J(κ)
+function κ_to_J(κ)
   u = κ_to_u(κ)
   sqrt(l2_norm(u-u_obs, κ))
 end
-κ0h = interpolate(1.0, K)
-val, grad = val_and_gradient(J, get_free_dof_values(κ0h))
+val, grad = val_and_gradient(κ_to_J, κ)
 # Hessian-vector product
-vh = interpolate(0.5, K)
-Hv = Hvp(J, get_free_dof_values(κ0h),get_free_dof_values(vh))
+Hv = Hvp(κ_to_J, κ, v)
 
-# FD
-κ = get_free_dof_values(κ0h)
-v = get_free_dof_values(vh)
-function κ_to_j(κ)
-    κh = FEFunction(K,κ)
-    op = AffineFEOperator((u,v)->a(u,v,κh),v->b(v,κh),U,V)
-    u = solve(op) |> get_free_dof_values
-    sqrt(l2_norm(u-u_obs, κ))
-end
-g_fd = κ->FiniteDifferences.jacobian(central_fdm(5,1),κ_to_j,κ)
+# !! Tests
+# grad
+dκ_to_J_fd = FiniteDifferences.grad(central_fdm(5,1),κ_to_J,κ)[1]
+dκ_to_J = grad[1]
+@test dκ_to_J ≈ dκ_to_J_fd
+# hvp
+g_fd = κ->FiniteDifferences.jacobian(central_fdm(5,1),κ_to_J,κ)
 Hv_fd = FiniteDifferences.jacobian(central_fdm(5,1),g_fd,κ)[1]*v
-@test maximum(abs,Hv-Hv_fd)/maximum(abs,Hv) < 1e-7
+@show maximum(abs,Hv-Hv_fd)/maximum(abs,Hv)
+@test Hv ≈ Hv_fd
 
 end

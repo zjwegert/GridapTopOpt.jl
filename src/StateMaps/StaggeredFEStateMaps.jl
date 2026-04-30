@@ -475,7 +475,7 @@ function pullback(φ_to_u::StaggeredFEStateMapTypes{NB},xh,φh,dFdxj;kwargs...) 
   end
   rmul!(Σ_λᵀs_∂Rs∂φ, -1)
 
-  return (NoTangent(),Σ_λᵀs_∂Rs∂φ)
+  return (NoTangent(),copy(Σ_λᵀs_∂Rs∂φ))
 end
 
 function ChainRulesCore.rrule(φ_to_u::StaggeredFEStateMapTypes,φh)
@@ -647,7 +647,7 @@ function ChainRulesCore.rrule(u_to_j::StaggeredStateParamMap,uh,φh)
     dj_∂F∂xhi = map(∂F∂xh->(x...)->dj*∂F∂xh(x...),∂F∂xhi)
     ∂F∂φ_vec .*= dj
 
-    (  NoTangent(), dj_∂F∂xhi, ∂F∂φ_vec)
+    (  NoTangent(), dj_∂F∂xhi, copy(∂F∂φ_vec))
     # As above, this is really bad as dFdxj is a tuple of functions and ∂F∂φ_vec is a vector. This is temporary
   end
   return u_to_j(uh,φh), u_to_j_pullback

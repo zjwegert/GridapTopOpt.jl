@@ -137,13 +137,25 @@ function pullback(u_to_j::StateParamMap,uh,φh,dj)
   ∂j∂φ = ∂F∂φ(get_fe_basis(V_φ),uh,φh)
   ∂j∂φ_vecdata = collect_cell_vector(V_φ,∂j∂φ)
   assemble_vector!(∂j∂φ_vec,assem_deriv,∂j∂φ_vecdata)
+  _update_unscaled_grad!(u_to_j, ∂j∂u_vec, ∂j∂φ_vec)
   ∂j∂u_vec .*= dj
   ∂j∂φ_vec .*= dj
   update_inc_obj_cache!(u_to_j,uh,φh)
-  (  NoTangent(), ∂j∂u_vec, ∂j∂φ_vec )
+  # Return copies so that repeated calls to val_and_gradient don't alias the same buffer
+  ( NoTangent(), copy(∂j∂u_vec), copy(∂j∂φ_vec) )
 end
 
 update_inc_obj_cache!(::StateParamMap{A,B,C,D,1},uh,φh) where {A,B,C,D} = nothing
+
+# Save unscaled gradients into inc_obj_cache before pullback scales them in-place.
+# This is needed for correct HVP of composed functions g(j(u,φ)).
+_update_unscaled_grad!(::StateParamMap{A,B,C,D,1},_,_) where {A,B,C,D} = nothing
+function _update_unscaled_grad!(u_to_j::StateParamMap{A,B,C,D,2}, ∂j∂u_vec, ∂j∂φ_vec) where {A,B,C,D}
+  inc_obj_cache = u_to_j.cache.inc_obj_cache
+  ∂j∂u_unscaled, ∂j∂φ_unscaled = inc_obj_cache.∂j∂u_unscaled, inc_obj_cache.∂j∂φ_unscaled
+  copyto!(∂j∂u_unscaled, ∂j∂u_vec)
+  copyto!(∂j∂φ_unscaled, ∂j∂φ_vec)
+end
 
 function pullback(u_to_j::StateParamMap,u::AbstractVector,φ::AbstractVector,dj)
   U,V_φ = get_spaces(u_to_j)
@@ -156,7 +168,7 @@ end
 mutable struct StateParamMapCache
   fwd_cache::Tuple
   plb_cache::Tuple
-  inc_obj_cache::Tuple
+  inc_obj_cache::NamedTuple
   cache_built::Bool
   fwd_ran:: Bool
   bwd_ran:: Bool
@@ -231,7 +243,13 @@ function build_inc_obj_cache(F,uh,φh,spaces)
   dṗ_from_j = get_free_dof_values(zero(V_φ))
   du̇_from_j = get_free_dof_values(zero(U))
 
-  dṗ_from_j, du̇_from_j, assem_∂2J∂u2, ∂2J∂u2_mat,   assem_∂2J∂u∂φ, ∂2J∂u∂φ_mat,   assem_∂2J∂φ2, ∂2J∂φ2_mat,   assem_∂2J∂φ∂u, ∂2J∂φ∂u_mat
+  # Unscaled gradients needed for correct HVP of composed functions g(j(u,φ))
+  ∂j∂u_unscaled = get_free_dof_values(zero(U))
+  ∂j∂φ_unscaled = get_free_dof_values(zero(V_φ))
+
+  (;dṗ_from_j, du̇_from_j, assem_∂2J∂u2, ∂2J∂u2_mat,
+    assem_∂2J∂u∂φ, ∂2J∂u∂φ_mat, assem_∂2J∂φ2, ∂2J∂φ2_mat,
+    assem_∂2J∂φ∂u, ∂2J∂φ∂u_mat, ∂j∂u_unscaled, ∂j∂φ_unscaled)
 end
 
 function update_inc_obj_cache!(u_to_j::StateParamMap{A,B,C,D,2},uh,φh) where {A,B,C,D}

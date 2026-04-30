@@ -230,7 +230,7 @@ function pullback(φ_to_u::AbstractFEStateMap,uh,φh,du;updated=false)
   assemble_vector!(dudφ_vec,assem_deriv,dudφ_vecdata)
   rmul!(dudφ_vec, -1)
 
-  return (NoTangent(),dudφ_vec)
+  return (NoTangent(),copy(dudφ_vec)) # avoid aliasing issues
 end
 
 function pullback(φ_to_u::AbstractFEStateMap,u::AbstractVector,φ::AbstractVector,du::AbstractVector;updated=false)

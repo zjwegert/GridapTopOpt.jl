@@ -23,7 +23,7 @@ order = 1
 xmax = ymax = 1.0
 dom = (0,xmax,0,ymax)
 el_size = (4,4)
-# model = CartesianDiscreteModel(dom,el_size)
+CartesianDiscreteModel(dom,el_size)
 model = CartesianDiscreteModel(ranks,mesh_partition,dom,el_size)
 Ω = Triangulation(model)
 dΩ = Measure(Ω,2*order)
@@ -41,7 +41,7 @@ uh = interpolate(x->rand(), U)
 ph = interpolate(x->rand(), V_p)
 λh = interpolate(x->rand(), V)
 spaces = (U,V_p)
-_,_,_, ∂2J∂u2_mat, _, ∂2J∂u∂p_mat, _, ∂2J∂p2_mat, _, ∂2J∂p∂u_mat = GridapTopOpt.build_inc_obj_cache(J,uh,ph,spaces);
+_,_,_, ∂2J∂u2_mat, _, ∂2J∂u∂p_mat, _, ∂2J∂p2_mat, _, ∂2J∂p∂u_mat,_,_ = GridapTopOpt.build_inc_obj_cache(J,uh,ph,spaces);
 #∂2J∂u2_mat, ∂2J∂u∂p_mat, ∂2J∂p2_mat, ∂2J∂p∂u_mat = SecondOrderTopOpt.incremental_objective_partials(J,uh,ph,spaces)
 
 # ∂²J / ∂u² * u̇
@@ -166,16 +166,66 @@ Zygote.gradient(p->objective(state_map(p),p),p); # update λ and u
 p_to_j(p) = objective((state_map(p)),p)
 Hṗ_fd = fd_hvp(p_to_j,p,ṗ)
 Hṗ = Hvp(p_to_j,p,ṗ)
-
-@test maximum(abs,Hṗ_fd - Hṗ)/maximum(abs,Hṗ) < 1e-7
-# @test Hṗ_fd ≈ Hṗ
-
-# nonlinear version of linear problem
-state_map = NonlinearFEStateMap((u,v,p)->a(u,v,p)-l(v,p),U,V,V_p,diff_order=2)
-p_to_j(p) = objective((state_map(p)),p)
-Hṗ_fd = fd_hvp(p_to_j,p,ṗ)
-Hṗ = Hvp(p_to_j,p,ṗ)
 @test Hṗ_fd ≈ Hṗ
+
+# ! only StateParamMap
+model = CartesianDiscreteModel(ranks,mesh_partition,(0,1,0,1), (3,3))
+Ω = Triangulation(model)
+dΩ = Measure(Ω, 2)
+reffe = ReferenceFE(lagrangian, Float64, 1)
+K = TestFESpace(model, reffe)
+κ0h = interpolate(x->x[1], K)
+κ = get_free_dof_values(κ0h)
+vh = interpolate(0.5, K)
+v = get_free_dof_values(vh)
+assem = SparseMatrixAssembler(K,K)
+l2_norm = StateParamMap((u, κ) -> ∫(u + κ*κ)dΩ,K,K,assem,assem;diff_order=2) # (!!)
+u_obs = interpolate(x -> sin(2π*x[1]), K) |> get_free_dof_values
+function κ_to_J(κ)
+  sqrt(l2_norm(u_obs, κ))
+end
+val, grad = val_and_gradient(κ_to_J, κ);
+# Hessian-vector product
+Hv = Hvp(κ_to_J, κ, v)
+
+# Test full case
+Hv_fd = fd_hvp(κ_to_J, κ, v)
+@show maximum(abs,Hv-Hv_fd)/maximum(abs,Hv)
+@test Hv ≈ Hv_fd
+
+# ! Doc example
+f(x) = x[2]
+g(x) = x[1]
+
+model = CartesianDiscreteModel(ranks,mesh_partition,(0,1,0,1), (3,3))
+Ω = Triangulation(model)
+dΩ = Measure(Ω, 2)
+reffe = ReferenceFE(lagrangian, Float64, 1)
+K = TestFESpace(model, reffe)
+κ0h = interpolate(x->x[1], K)
+κ = get_free_dof_values(κ0h)
+vh = interpolate(0.5, K)
+v = get_free_dof_values(vh)
+K = TestFESpace(model, reffe)
+V = TestFESpace(model, reffe; dirichlet_tags="boundary")
+U = TrialFESpace(V,g)
+a(u, v, κ) = ∫(κ * ∇(v) ⋅ ∇(u))dΩ
+b(v, κ) = ∫(v*f)dΩ
+κ_to_u = AffineFEStateMap(a,b,U,V,K;diff_order=2)
+l2_norm = StateParamMap((u, κ) -> ∫(u ⋅ u + 0κ)dΩ,κ_to_u;diff_order=2) # (!!)
+u_obs = interpolate(x -> sin(2π*x[1]), V) |> get_free_dof_values
+function κ_to_J(κ)
+  u = κ_to_u(κ)
+  sqrt(l2_norm(u-u_obs, κ))
+end
+val, grad = val_and_gradient(κ_to_J, κ);
+# Hessian-vector product
+Hv = Hvp(κ_to_J, κ, v)
+
+# !! Tests
+Hv_fd = fd_hvp(κ_to_J, κ, v)
+@show maximum(abs,Hv-Hv_fd)/maximum(abs,Hv)
+@test Hv ≈ Hv_fd
 
 # ##
 # mesh_partition = (2,2)

@@ -197,7 +197,7 @@ function pullback(φ_to_u::ReverseNonlinearFEStateMap,uh,φh,du;updated=false)
   dudφ_vec = dRdφ(φ_to_u,uh,λh,φh)
   rmul!(dudφ_vec, -1)
 
-  return (NoTangent(),dudφ_vec)
+  return (NoTangent(),copy(dudφ_vec)) # avoid aliasing issues
 end
 
 function ChainRulesCore.rrule(φ_to_u::ReverseNonlinearFEStateMap,φh)
