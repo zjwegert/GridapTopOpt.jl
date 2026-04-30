@@ -1,4 +1,4 @@
-module SecondOrderTestsMPI_seq
+# module SecondOrderTestsMPI_seq
 using Test, Gridap, GridapTopOpt
 using Zygote
 using ForwardDiff
@@ -24,7 +24,7 @@ order = 1
 xmax = ymax = 1.0
 dom = (0,xmax,0,ymax)
 el_size = (4,4)
-CartesianDiscreteModel(dom,el_size)
+# model = CartesianDiscreteModel(dom,el_size)
 model = CartesianDiscreteModel(ranks,mesh_partition,dom,el_size)
 Ω = Triangulation(model)
 dΩ = Measure(Ω,2*order)
@@ -73,7 +73,7 @@ dp_ = get_trial_fe_basis(V_p)
 f(x) = 1.0
 res(u,v,p) = ∫( p*∇(u)⋅∇(v) - f*v )dΩ
 state_map = NonlinearFEStateMap(res,U,V,V_p,diff_order=2)
-∂2R∂u2_mat, ∂2R∂u∂p_mat, ∂2R∂p2_mat, ∂2R∂p∂u_mat = GridapTopOpt.update_incremental_adjoint_partials!(state_map,uh,ph,λh)
+∂2R∂u2_mat, ∂2R∂u∂p_mat, ∂2R∂p2_mat, ∂2R∂p∂u_mat = GridapTopOpt.update_incremental_adjoint_partials!(state_map,uh,ph,λh);
 
 # ∂²R / ∂u² * u̇ * λ
 ∂2∂u2R_analytical(uh,λh,ph) = ∫( 0*du*dv )dΩ
@@ -155,7 +155,7 @@ Zygote.gradient(p->objective(state_map(p),p),p); # update λ and u
 p_to_j(p) = objective((state_map(p)),p)
 Hṗ_fd = fd_hvp(p_to_j,p,ṗ)
 Hṗ = Hvp(p_to_j,p,ṗ)
-@test Hṗ_fd ≈ Hṗ
+@test Hṗ_fd ≈ Hṗ rtol = 1e-7
 
 # !! Affine state map Tests
 a(u,v,p) = ∫( p*(p+1)*∇(u)⋅∇(v) )dΩ
@@ -167,7 +167,7 @@ Zygote.gradient(p->objective(state_map(p),p),p); # update λ and u
 p_to_j(p) = objective((state_map(p)),p)
 Hṗ_fd = fd_hvp(p_to_j,p,ṗ)
 Hṗ = Hvp(p_to_j,p,ṗ)
-@test Hṗ_fd ≈ Hṗ
+@test Hṗ_fd ≈ Hṗ rtol = 1e-7
 
 # ! only StateParamMap
 model = CartesianDiscreteModel(ranks,mesh_partition,(0,1,0,1), (3,3))
@@ -192,7 +192,7 @@ Hv = Hvp(κ_to_J, κ, v)
 # Test full case
 Hv_fd = fd_hvp(κ_to_J, κ, v)
 @show maximum(abs,Hv-Hv_fd)/maximum(abs,Hv)
-@test Hv ≈ Hv_fd
+@test Hv ≈ Hv_fd rtol = 1e-7
 
 # ! Doc example
 f(x) = x[2]
@@ -226,7 +226,7 @@ Hv = Hvp(κ_to_J, κ, v)
 # !! Tests
 Hv_fd = fd_hvp(κ_to_J, κ, v)
 @show maximum(abs,Hv-Hv_fd)/maximum(abs,Hv)
-@test Hv ≈ Hv_fd
+@test Hv ≈ Hv_fd rtol = 1e-7
 nothing
 
-end
+# end

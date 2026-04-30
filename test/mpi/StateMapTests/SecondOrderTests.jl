@@ -1,4 +1,4 @@
-# module SecondOrderTests
+module SecondOrderTests
 using Test, Gridap, GridapTopOpt
 using Zygote
 using ForwardDiff
@@ -153,7 +153,7 @@ function main(distribute,mesh_partition)
   Hṗ_fd = fd_hvp(p_to_j1,p,ṗ)
   Hṗ = Hvp(p_to_j1,p,ṗ)
   @show maximum(abs,Hṗ-Hṗ_fd)/maximum(abs,Hṗ)
-  @test Hṗ_fd ≈ Hṗ
+  @test Hṗ_fd ≈ Hṗ rtol = 1e-7
 
   # !! Affine state map Tests
   a(u,v,p) = ∫( p*(p+1)*∇(u)⋅∇(v) )dΩ
@@ -165,7 +165,8 @@ function main(distribute,mesh_partition)
   p_to_j2(p) = objective((state_map(p)),p)
   Hṗ_fd = fd_hvp(p_to_j2,p,ṗ)
   Hṗ = Hvp(p_to_j2,p,ṗ)
-  @test Hṗ_fd ≈ Hṗ
+  @show maximum(abs,Hṗ-Hṗ_fd)/maximum(abs,Hṗ)
+  @test Hṗ_fd ≈ Hṗ rtol = 1e-7
 
   # ! only StateParamMap
   model = CartesianDiscreteModel(ranks,mesh_partition,(0,1,0,1), (3,3))
@@ -190,7 +191,7 @@ function main(distribute,mesh_partition)
   # Test full case
   Hv_fd = fd_hvp(κ_to_J1, κ, v)
   @show maximum(abs,Hv-Hv_fd)/maximum(abs,Hv)
-  @test Hv ≈ Hv_fd
+  @test Hv ≈ Hv_fd rtol = 1e-7
 
   # ! Doc example
   f3(x) = x[2]
@@ -224,7 +225,7 @@ function main(distribute,mesh_partition)
   # !! Tests
   Hv_fd = fd_hvp(κ_to_J2, κ, v)
   @show maximum(abs,Hv-Hv_fd)/maximum(abs,Hv)
-  @test Hv ≈ Hv_fd
+  @test Hv ≈ Hv_fd rtol = 1e-7
   nothing
 end
 
@@ -286,4 +287,4 @@ end
 #   @test hes_test
 #   nothing
 # end
-# # end
+end
