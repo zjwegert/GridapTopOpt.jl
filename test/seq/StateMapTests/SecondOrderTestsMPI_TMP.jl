@@ -226,6 +226,7 @@ Hv = Hvp(κ_to_J, κ, v)
 Hv_fd = fd_hvp(κ_to_J, κ, v)
 @show maximum(abs,Hv-Hv_fd)/maximum(abs,Hv)
 @test Hv ≈ Hv_fd
+nothing
 
 # ##
 # mesh_partition = (2,2)
