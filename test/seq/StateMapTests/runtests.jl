@@ -23,7 +23,7 @@ using Test
   include("Transient_CrankNicolson_NonlinearFEStateMap.jl")
   # Second order
   include("SecondOrderTests.jl")
-  include("SecondOrderTestsMPI_TMP.jl")
+  include("SecondOrderTestsMPI_seq.jl")
 end
 
 end # module
