@@ -113,7 +113,7 @@ function build_cache!(state_map::AffineFEStateMap,φh)
   cache.adj_cache = (adjoint_ns,adjoint_K,adjoint_x)
 
   ## Incremental cache
-  x_inc = allocate_in_domain(K); adj_x_inc = allocate_in_domain(K)
+  x_inc = allocate_in_domain(K); adj_x_inc = allocate_in_domain(adjoint_K)
   cache.inc_state_cache, cache.inc_adjoint_cache = build_inc_cache(state_map,φh,uhd,x_inc,adj_x_inc)
 
   ## Update cache status

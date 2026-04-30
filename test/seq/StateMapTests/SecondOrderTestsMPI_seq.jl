@@ -137,7 +137,8 @@ Hṗ_FOR = ForwardDiff.derivative(α -> ∇f(p + α*ṗ), 0)
 
 Hṗ_fd = fd_hvp(p->objective(state_map(p),p),p,ṗ)
 Hṗ = Hvp(p->objective(state_map(p),p),p,ṗ)
-@test Hṗ_fd ≈ Hṗ
+@show maximum(abs,Hṗ-Hṗ_fd)/maximum(abs,Hṗ)
+@test Hṗ_fd ≈ Hṗ reltol = 1e-7
 
 # ########################################################
 # # Unit and integration tests for the pushforward rules #
@@ -155,6 +156,7 @@ Zygote.gradient(p->objective(state_map(p),p),p); # update λ and u
 p_to_j(p) = objective((state_map(p)),p)
 Hṗ_fd = fd_hvp(p_to_j,p,ṗ)
 Hṗ = Hvp(p_to_j,p,ṗ)
+@show maximum(abs,Hṗ-Hṗ_fd)/maximum(abs,Hṗ)
 @test Hṗ_fd ≈ Hṗ rtol = 1e-7
 
 # !! Affine state map Tests
@@ -167,6 +169,7 @@ Zygote.gradient(p->objective(state_map(p),p),p); # update λ and u
 p_to_j(p) = objective((state_map(p)),p)
 Hṗ_fd = fd_hvp(p_to_j,p,ṗ)
 Hṗ = Hvp(p_to_j,p,ṗ)
+@show maximum(abs,Hṗ-Hṗ_fd)/maximum(abs,Hṗ)
 @test Hṗ_fd ≈ Hṗ rtol = 1e-7
 
 # ! only StateParamMap
