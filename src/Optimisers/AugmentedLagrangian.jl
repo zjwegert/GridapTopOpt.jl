@@ -129,7 +129,7 @@ end
 
 function default_al_converged(
   m::AugmentedLagrangian;
-  L_tol = 0.01*maximum(get_min_dof_spacing(m.ls_evolver))/(length(get_min_dof_spacing(m.ls_evolver))-1),
+  L_tol = 0.01*maximum(get_min_dof_spacing(m.ls_evolver)),
   C_tol = 0.01
 )
   h  = m.history

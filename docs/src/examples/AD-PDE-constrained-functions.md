@@ -6,7 +6,7 @@ GridapTopOpt provides serial and distributed automatic differentiation methods f
 
 Let's consider the following introductory example. Suppose we wish to differentiate
 
-$$J(u,\kappa) = \left(\int_\Omega(u(\kappa)-u_\textrm{obs})~\mathrm{d}\boldsymbol{x}\right)^{1/2}$$
+$$J(\kappa,u(\kappa)) = \left(\int_\Omega(u(\kappa)-u_\textrm{obs})^2~\mathrm{d}\boldsymbol{x}\right)^{1/2}$$
 
 where $u_\textrm{obs}$ is some observed data and $u$ depends on $\kappa$ through Poisson's equation: find $u\in H^1_g(\Omega)$ such that $a(u,v) = l(v)$ for all $v\in H^1_0(\Omega)$ where
 
@@ -28,17 +28,17 @@ g(x) = x[1]
 model = CartesianDiscreteModel((0,1,0,1), (10,10))
 Ω = Triangulation(model)
 dΩ = Measure(Ω, 2)
-reffe = ReferenceFE(lagrangian, Float64, 1)
-K = TestFESpace(model, reffe)
-V = TestFESpace(model, reffe; dirichlet_tags="boundary")
-U = TrialFESpace(V,x->x[1])
+K = TestFESpace(model, ReferenceFE(lagrangian, Float64, 0))
+V = TestFESpace(model, ReferenceFE(lagrangian, Float64, 1); dirichlet_tags="boundary")
+U = TrialFESpace(V,g)
 a(u, v, κ) = ∫(κ * ∇(v) ⋅ ∇(u))dΩ
 b(v, κ) = ∫(v*f)dΩ
 κ_to_u = AffineFEStateMap(a,b,U,V,K)
 l2_norm = StateParamMap((u, κ) -> ∫(u ⋅ u)dΩ,κ_to_u)
 u_obs = interpolate(x -> sin(2π*x[1]), V) |> get_free_dof_values
-function J(κ)
+function κ_to_J(κ)
   u = κ_to_u(κ)
+  # ... (other maps if neccessary)
   sqrt(l2_norm(u-u_obs, κ))
 end
 κ0h = interpolate(1.0, K)
@@ -56,7 +56,7 @@ Finally, we verify the above using finite differences as follows:
 
 ```julia
 using FiniteDiff, Test
-fdm_grad = FiniteDiff.finite_difference_gradient(J, get_free_dof_values(κ0h))
+fdm_grad = FiniteDiff.finite_difference_gradient(κ_to_J, get_free_dof_values(κ0h))
 @test maximum(abs,grad[1] - fdm_grad)/maximum(abs, grad[1]) < 1e-7
 ```
 

@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.4.2] - 2025-##-##
+## [0.5.0] - 2025-##-##
 
 ### Added
 - Added option for AD type in `StateMaps`.
@@ -17,8 +17,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added AD for computing Hessian-vector products of generic PDE-constrained functions in serial and distributed.
 
 ### Changed
-- Adjusted README.md to discuss AD and link to docs.
-- Now export `StateParamMap` and `val_and_gradient`.
 - Reimplemented `CutFEMEvolver` to enable caching.
 - `CutFEMEvolver` and `StabilisedReinitialiser` no longer require EmbeddedCollection as an argument. This
   was required to ensure multi-phase methods are compatible with existing methods.
@@ -33,6 +31,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Bug in `get_element_diameters` introduced in Gridap v0.20.4 for changes to behaviour for empty triangulations.
 - Minor typos in docs.
 - Possible bugs due to aliasing of caches.
+
+## [0.4.3] - 2026-5-1
+
+### Fixed
+- `get_min_dof_spacing` in `FiniteDifferenceEvolver` returned a `Tuple` instead of a scalar.
+
+## [0.4.2] - 2026-5-1
+
+### Changed
+- Adjusted README.md to discuss AD and link to docs.
+- Now export `StateParamMap` and `val_and_gradient`.
+
+### Fixed
+- Typo in augmented Lagrangian convergence check
 
 ## [0.4.1] - 2025-8-19
 
