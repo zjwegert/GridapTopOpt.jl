@@ -65,7 +65,7 @@ function FiniteDifferenceEvolver(
   return FiniteDifferenceEvolver{order}(stencil,model,space,perm,params)
 end
 
-get_min_dof_spacing(m::FiniteDifferenceEvolver) = m.params.Δ
+get_min_dof_spacing(m::FiniteDifferenceEvolver) = minimum(m.params.Δ)
 get_ls_space(m::FiniteDifferenceEvolver) = m.space
 
 # Compute the time step for the `FiniteDifferenceEvolver`.

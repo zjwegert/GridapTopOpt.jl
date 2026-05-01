@@ -30,6 +30,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Bug in `get_element_diameters` introduced in Gridap v0.20.4 for changes to behaviour for empty triangulations.
 - Minor typos in docs.
 
+## [0.4.3] - 2026-5-1
+
+### Fixed
+- `get_min_dof_spacing` in `FiniteDifferenceEvolver` returned a `Tuple` instead of a scalar.
+
 ## [0.4.2] - 2026-5-1
 
 ### Changed
