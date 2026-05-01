@@ -1,4 +1,4 @@
-# module SecondOrderTestsMPI_seq
+module SecondOrderTestsMPI_seq
 using Test, Gridap, GridapTopOpt
 using Zygote
 using ForwardDiff
@@ -138,7 +138,7 @@ Hṗ_FOR = ForwardDiff.derivative(α -> ∇f(p + α*ṗ), 0)
 Hṗ_fd = fd_hvp(p->objective(state_map(p),p),p,ṗ)
 Hṗ = Hvp(p->objective(state_map(p),p),p,ṗ)
 @show maximum(abs,Hṗ-Hṗ_fd)/maximum(abs,Hṗ)
-@test Hṗ_fd ≈ Hṗ reltol = 1e-7
+@test Hṗ_fd ≈ Hṗ rtol = 1e-7
 
 # ########################################################
 # # Unit and integration tests for the pushforward rules #
@@ -232,4 +232,4 @@ Hv_fd = fd_hvp(κ_to_J, κ, v)
 @test Hv ≈ Hv_fd rtol = 1e-7
 nothing
 
-# end
+end
