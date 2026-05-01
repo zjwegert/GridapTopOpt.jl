@@ -1,5 +1,5 @@
 """
-    struct RepeatingAffineFEStateMap <: AbstractFEStateMap
+    struct RepeatingAffineFEStateMap <: AbstractFEStateMap{1}
 
 A structure to enable the forward problem and pullback for affine finite
 element operators `AffineFEOperator` with multiple linear forms but only
@@ -13,14 +13,16 @@ a single bilinear form.
 - `spaces_0`: Original finite element spaces that are being repeated.
 - `assems`: `Tuple` of assemblers
 - `cache`: An AffineFEStateMapCache
+- `∂ϕ_ad_type::Symbol`: The AD type used when computing derivatives with respect to `φh` for multi-field case.
 """
-struct RepeatingAffineFEStateMap{N,A,B,C,D,E,F} <: AbstractFEStateMap
-  biform   :: A
-  liform   :: B
-  spaces   :: C
-  spaces_0 :: D
-  assems   :: E
-  cache    :: F
+struct RepeatingAffineFEStateMap{N,A,B,C,D,E,F} <: AbstractFEStateMap{1}
+  biform     :: A
+  liform     :: B
+  spaces     :: C
+  spaces_0   :: D
+  assems     :: E
+  cache      :: F
+  ∂ϕ_ad_type :: Symbol
 
   @doc """
       RepeatingAffineFEStateMap(
@@ -29,7 +31,8 @@ struct RepeatingAffineFEStateMap{N,A,B,C,D,E,F} <: AbstractFEStateMap
         assem_adjoint = SparseMatrixAssembler(V0,U0),
         assem_deriv = SparseMatrixAssembler(V_φ,V_φ),
         ls::LinearSolver = LUSolver(),
-        adjoint_ls::LinearSolver = LUSolver()
+        adjoint_ls::LinearSolver = LUSolver(),
+        ∂ϕ_ad_type::Symbol = :monolithic
       )
 
   Create an instance of `RepeatingAffineFEStateMap` given the number of blocks `nblocks`,
@@ -38,6 +41,10 @@ struct RepeatingAffineFEStateMap{N,A,B,C,D,E,F} <: AbstractFEStateMap
   and the measures as additional arguments.
 
   Optional arguments enable specification of assemblers and linear solvers.
+
+  The optional argument `∂ϕ_ad_type` allows the user to specify the AD type used when computing
+  derivatives with respect to `φh` for multi-field problems. This can be either `:monolithic`
+  (default) or `:split`.
 
   # Note
 
@@ -50,7 +57,14 @@ struct RepeatingAffineFEStateMap{N,A,B,C,D,E,F} <: AbstractFEStateMap
     assem_adjoint = SparseMatrixAssembler(V0,U0),
     assem_deriv = SparseMatrixAssembler(V_φ,V_φ),
     ls::LinearSolver = LUSolver(),
-    adjoint_ls::LinearSolver = LUSolver())
+    adjoint_ls::LinearSolver = LUSolver(),
+    ∂ϕ_ad_type::Symbol = :monolithic,
+    diff_order = 1,
+  )
+    if diff_order !=1
+      error("RepeatingAffineFEStateMap only supports diff_order=1. Second-order derivatives are not supported.")
+    end
+
     @check nblocks == length(liforms)
 
     U, V = repeat_spaces(nblocks,U0,V0)
@@ -66,7 +80,7 @@ struct RepeatingAffineFEStateMap{N,A,B,C,D,E,F} <: AbstractFEStateMap
 
     A,B,C,D = typeof(biform), typeof(liforms), typeof(spaces), typeof(spaces_0)
     E,F = typeof(assems), typeof(cache)
-    return new{nblocks,A,B,C,D,E,F}(biform,liforms,spaces,spaces_0,assems,cache)
+    return new{nblocks,A,B,C,D,E,F}(biform,liforms,spaces,spaces_0,assems,cache,∂ϕ_ad_type)
   end
 end
 
@@ -216,12 +230,13 @@ end
 function dRdφ(φ_to_u::RepeatingAffineFEStateMap,uh,vh,φh)
   biform, liforms = φ_to_u.biform, φ_to_u.liform
   U0, V0 = φ_to_u.spaces_0
+  ad_type = φ_to_u.∂ϕ_ad_type
 
   uh_blocks = repeated_blocks(U0,uh)
   vh_blocks = repeated_blocks(V0,vh)
   res = DomainContribution()
   for (liform,uhi,vhi) in zip(liforms,uh_blocks,vh_blocks)
-    res = res + ∇(biform,[uhi,vhi,φh],3) - ∇(liform,[vhi,φh],2)
+    res = res + __gradient(x->biform(uhi,vhi,x)-liform(vhi,x),φh;ad_type)
   end
   return res
 end
@@ -245,14 +260,4 @@ function adjoint_solve!(φ_to_u::RepeatingAffineFEStateMap,du::AbstractBlockVect
     solve!(xi,adjoint_ns,dui)
   end
   return adjoint_x
-end
-
-## Backwards compat
-function RepeatingAffineFEStateMap(nblocks::Int,biform::Function,liforms::Vector{<:Function},
-    U0,V0,V_φ,U_reg,φh;kwargs...)
-  error(_msg_v0_3_0(RepeatingAffineFEStateMap))
-end
-function RepeatingAffineFEStateMap(nblocks::Int,biform::Function,liforms::Vector{<:Function},
-    U0,V0,V_φ,φh;kwargs...)
-  error(_msg_v0_4_0(RepeatingAffineFEStateMap))
 end

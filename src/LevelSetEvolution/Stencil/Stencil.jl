@@ -70,8 +70,6 @@ function get_stencil_params(model::DistributedDiscreteModel,space::DistributedFE
   return order, isperiodic, Δ, ndof
 end
 
-Gridap.ReferenceFEs.get_order(f::Gridap.Fields.LinearCombinationFieldVector) = get_order(f.fields)
-
 # Create dof permutation vector to enable finite differences on
 #  higher order Lagrangian finite elements on a Cartesian mesh.
 function create_dof_permutation(model::CartesianDiscreteModel{Dc},

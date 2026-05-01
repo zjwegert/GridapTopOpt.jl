@@ -1,7 +1,7 @@
 module NonlinearThermalComplianceALMTestsMPI
 using Test
 
-using Gridap, Gridap.MultiField, GridapDistributed, GridapPETSc, GridapSolvers,
+using Gridap, Gridap.MultiField, GridapDistributed, GridapSolvers,
   PartitionedArrays, GridapTopOpt, SparseMatricesCSR
 
 """

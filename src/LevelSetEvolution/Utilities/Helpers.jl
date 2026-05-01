@@ -1,4 +1,4 @@
-function correct_ls!(x::Vector; tol = 1e-10)
+function correct_ls!(x::AbstractVector; tol = 1e-10)
   for i in eachindex(x)
     if iszero(abs(x[i]))
       x[i] = tol

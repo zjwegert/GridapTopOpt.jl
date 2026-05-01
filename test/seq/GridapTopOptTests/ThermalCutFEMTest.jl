@@ -8,7 +8,7 @@ using GridapTopOpt: StateParamMap
 
 function main(AD_case)
   # Params
-  n = 10            # Initial mesh size (pre-refinement)
+  n = 20            # Initial mesh size (pre-refinement)
   max_steps = 10/n  # Time-steps for evolution equation
   vf = 0.3          # Volume fraction
   α_coeff = 2       # Regularisation coefficient extension-regularisation
@@ -113,8 +113,8 @@ function main(AD_case)
   end
 
   ## Evolution Method
-  evo = CutFEMEvolver(V_φ,Ωs,dΩ_bg,hₕ;max_steps,γg=0.1)
-  reinit = StabilisedReinitialiser(V_φ,Ωs,dΩ_bg,hₕ;stabilisation_method=ArtificialViscosity(2.0))
+  evo = CutFEMEvolver(V_φ,dΩ_bg,hₕ;max_steps,γg=0.1)
+  reinit = StabilisedReinitialiser(V_φ,dΩ_bg,hₕ;stabilisation_method=ArtificialViscosity(2.0))
   ls_evo = LevelSetEvolution(evo,reinit)
   reinit!(ls_evo,φh)
 
