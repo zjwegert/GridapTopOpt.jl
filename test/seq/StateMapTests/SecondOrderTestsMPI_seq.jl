@@ -5,7 +5,7 @@ using ForwardDiff
 using PartitionedArrays, GridapDistributed
 
 # Compute hvp using FD + val_and_gradient - Note, this relies on val_and_gradient being correct, but this is tested in other places.
-function fd_hvp(f, p, v; h::Real = cbrt(eps()))
+function fd_hvp(f, p, v; h::Real = sqrt(eps()))
   ∇f(q) = val_and_gradient(f, q).grad[1]
   g₋₂ = ∇f(p - 2h*v)
   g₋₁ = ∇f(p - h*v)
