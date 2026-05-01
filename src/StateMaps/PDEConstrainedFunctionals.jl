@@ -68,8 +68,9 @@ struct PDEConstrainedFunctionals{N,A} <: AbstractPDEConstrainedFunctionals{N}
       analytic_dC = fill(nothing,length(constraints)))
 
     # Preallocate
-    dJ = similar(get_∂F∂φ_vec(objective))
-    dC = map(Ci->similar(get_∂F∂φ_vec(Ci)),constraints)
+    V_φ = get_aux_space(state_map)
+    dJ = similar(get_free_dof_values(zero(V_φ)))
+    dC = map(Ci->similar(get_free_dof_values(zero(V_φ))),constraints)
 
     N = length(constraints)
     T = typeof(state_map)
@@ -282,8 +283,9 @@ struct EmbeddedPDEConstrainedFunctionals{N,T} <: AbstractPDEConstrainedFunctiona
     - For problems with no constraints `:C` must at least point to an empty list
     """
     # Preallocate
-    dJ = similar(get_∂F∂φ_vec(embedded_collection.J))
-    dC = map(Ci->similar(get_∂F∂φ_vec(Ci)),embedded_collection.C)
+    V_φ = get_aux_space(embedded_collection.state_map)
+    dJ = similar(get_free_dof_values(zero(V_φ)))
+    dC = map(Ci->similar(get_free_dof_values(zero(V_φ))),embedded_collection.C)
 
     N = length(embedded_collection.C)
     if analytic_dC isa Nothing
@@ -424,13 +426,13 @@ end
 
 ############## Zygote Compat ##############
 """
-    CustomPDEConstrainedFunctionals{N,A} <:  AbstractPDEConstrainedFunctionals{N}
+    CustomPDEConstrainedFunctionals{N,A,ND} <:  AbstractPDEConstrainedFunctionals{N}
 
 A version of `PDEConstrainedFunctionals` that allows for an arbitrary mapping
 `φ_to_jc` that is used to compute the objective and constraints given the primal variable.
 
 Under the hood, we use Zygote to compute the Jacobian of this mapping with the rrules defined
-throughout GridapTopOpt.
+throughout GridapTopOpt. `ND` specifies the order of derivatives to be computed.
 
 # Parameters
 
@@ -471,7 +473,7 @@ throughout GridapTopOpt.
     ```
     This functionality is subject to change.
 """
-struct CustomPDEConstrainedFunctionals{N,A} <:  AbstractPDEConstrainedFunctionals{N}
+struct CustomPDEConstrainedFunctionals{N,A,B} <:  AbstractPDEConstrainedFunctionals{N}
   φ_to_jc :: Function
   analytic_dJ
   analytic_dC
@@ -507,9 +509,10 @@ struct CustomPDEConstrainedFunctionals{N,A} <:  AbstractPDEConstrainedFunctional
       num_constraints;
       state_map :: Union{Nothing,AbstractFEStateMap,Vector{<:AbstractFEStateMap}} = nothing,
       analytic_dJ = nothing,
-      analytic_dC = fill(nothing,num_constraints)
+      analytic_dC = fill(nothing,num_constraints),
+      diff_order::Int = 1
     )
-    return new{num_constraints,typeof(state_map)}(φ_to_jc,analytic_dJ,analytic_dC,state_map)
+    return new{num_constraints,typeof(state_map),diff_order}(φ_to_jc,analytic_dJ,analytic_dC,state_map)
   end
 end
 
@@ -597,6 +600,11 @@ function evaluate_functionals!(pcf::CustomPDEConstrainedFunctionals{0},φ::Abstr
   j = val[1]
   c = Vector{eltype(val)}();
   return j,c
+end
+
+# Second order - TBD
+function Fields.evaluate!(pcf::CustomPDEConstrainedFunctionals{N,A,2},φh) where {N,A}
+  @not_implemented "The way to interface second order problems with the native first order optimisers has not yet been decided"
 end
 
 ########## Zygote + Unfitted ##########

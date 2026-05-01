@@ -18,6 +18,7 @@ using Gridap.Geometry: get_faces, num_nodes, TriangulationView
 using Gridap.FESpaces: get_assembly_strategy
 using Gridap.ODEs: ODESolver
 using Gridap: writevtk
+using Gridap.Algebra: NLSolversCache, NewtonRaphsonCache
 
 using GridapDistributed
 using GridapDistributed: DistributedDiscreteModel, DistributedTriangulation,
@@ -34,6 +35,8 @@ using GridapSolvers.LinearSolvers, GridapSolvers.NonlinearSolvers, GridapSolvers
 using GridapSolvers.SolverInterfaces: SolverVerboseLevel, SOLVER_VERBOSE_NONE, SOLVER_VERBOSE_LOW, SOLVER_VERBOSE_HIGH,
   SOLVER_CONVERGED_ATOL, SOLVER_CONVERGED_RTOL, ConvergenceLog, finished_flag
 using GridapSolvers.BlockSolvers: combine_fespaces, get_solution
+using GridapSolvers.NonlinearSolvers: NewtonCache
+
 
 using GridapEmbedded
 using GridapEmbedded.LevelSetCutters, GridapEmbedded.Interfaces
@@ -46,6 +49,8 @@ using JLD2: save_object, load_object, jldsave
 import Base: +
 import Gridap: solve!
 import PartitionedArrays: default_find_rcv_ids
+
+using ForwardDiff
 
 __init__() = begin
   function default_find_rcv_ids(::MPIArray)
@@ -77,8 +82,6 @@ export StateParamMap
 export get_state
 export evaluate_functionals!
 export evaluate_derivatives!
-export val_and_gradient
-export val_and_jacobian
 
 include("Utilities.jl")
 export SmoothErsatzMaterialInterpolation
@@ -136,5 +139,8 @@ export psave, pload, pload!
 
 include("Extensions/ZygoteExtensions.jl")
 export combine_fields
+export val_and_gradient
+export val_and_jacobian
+export Hvp
 
 end

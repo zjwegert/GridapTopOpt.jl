@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added `restrict`, short hand for `restrict_to_field`.
 - Added `rrule` for `restrict`.
 - Added `ReverseNonlinearFEStateMap` to allow for reverse propagation of dual numbers through a state map.
+- Added AD for computing Hessian-vector products of generic PDE-constrained functions in serial and distributed.
 
 ### Changed
 - Reimplemented `CutFEMEvolver` to enable caching.
@@ -29,6 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Bug fix in `max_iter` for `HilbertianProjection`
 - Bug in `get_element_diameters` introduced in Gridap v0.20.4 for changes to behaviour for empty triangulations.
 - Minor typos in docs.
+- Possible bugs due to aliasing of caches.
 
 ## [0.4.3] - 2026-5-1
 

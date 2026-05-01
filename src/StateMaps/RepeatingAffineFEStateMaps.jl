@@ -1,5 +1,5 @@
 """
-    struct RepeatingAffineFEStateMap <: AbstractFEStateMap
+    struct RepeatingAffineFEStateMap <: AbstractFEStateMap{1}
 
 A structure to enable the forward problem and pullback for affine finite
 element operators `AffineFEOperator` with multiple linear forms but only
@@ -15,7 +15,7 @@ a single bilinear form.
 - `cache`: An AffineFEStateMapCache
 - `∂ϕ_ad_type::Symbol`: The AD type used when computing derivatives with respect to `φh` for multi-field case.
 """
-struct RepeatingAffineFEStateMap{N,A,B,C,D,E,F} <: AbstractFEStateMap
+struct RepeatingAffineFEStateMap{N,A,B,C,D,E,F} <: AbstractFEStateMap{1}
   biform     :: A
   liform     :: B
   spaces     :: C
@@ -58,7 +58,13 @@ struct RepeatingAffineFEStateMap{N,A,B,C,D,E,F} <: AbstractFEStateMap
     assem_deriv = SparseMatrixAssembler(V_φ,V_φ),
     ls::LinearSolver = LUSolver(),
     adjoint_ls::LinearSolver = LUSolver(),
-    ∂ϕ_ad_type::Symbol = :monolithic)
+    ∂ϕ_ad_type::Symbol = :monolithic,
+    diff_order = 1,
+  )
+    if diff_order !=1
+      error("RepeatingAffineFEStateMap only supports diff_order=1. Second-order derivatives are not supported.")
+    end
+
     @check nblocks == length(liforms)
 
     U, V = repeat_spaces(nblocks,U0,V0)
@@ -254,14 +260,4 @@ function adjoint_solve!(φ_to_u::RepeatingAffineFEStateMap,du::AbstractBlockVect
     solve!(xi,adjoint_ns,dui)
   end
   return adjoint_x
-end
-
-## Backwards compat
-function RepeatingAffineFEStateMap(nblocks::Int,biform::Function,liforms::Vector{<:Function},
-    U0,V0,V_φ,U_reg,φh;kwargs...)
-  error(_msg_v0_3_0(RepeatingAffineFEStateMap))
-end
-function RepeatingAffineFEStateMap(nblocks::Int,biform::Function,liforms::Vector{<:Function},
-    U0,V0,V_φ,φh;kwargs...)
-  error(_msg_v0_4_0(RepeatingAffineFEStateMap))
 end

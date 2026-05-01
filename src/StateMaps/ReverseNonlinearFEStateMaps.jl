@@ -1,5 +1,5 @@
 """
-    struct ReverseNonlinearFEStateMap{A,B,C,D,E} <: AbstractFEStateMap
+    struct ReverseNonlinearFEStateMap{A,B,C,D,E} <: AbstractFEStateMap{1}
 
 A structure to enable the forward problem and pullback for nonlinear finite
 element operators.
@@ -14,7 +14,7 @@ element operators.
 - `assems`: `Tuple` of assemblers
 - `cache`: A FEStateMapCache
 """
-struct ReverseNonlinearFEStateMap{A,B,C,D,E} <: AbstractFEStateMap
+struct ReverseNonlinearFEStateMap{A,B,C,D,E} <: AbstractFEStateMap{1}
   res         :: A
   jacs        :: B
   spaces      :: C
@@ -34,7 +34,16 @@ struct ReverseNonlinearFEStateMap{A,B,C,D,E} <: AbstractFEStateMap
 
   Create an instance of `ReverseNonlinearFEStateMap` given the residual `res` as a `Function` type,
   trial and test spaces `U` and `V`, the FE space `V_φ` for `φh` and derivatives,
-  and the measures as additional arguments. The space `V_diff` is the FE space is used to assist with AD. It will be removed in the future.
+  and the measures as additional arguments. The space `V_diff` is the FE space is used to assist with AD.
+  It will be removed in the future.
+
+  In contrast to the other state maps, the partial derivative of the residual with respect to the parameter
+  `φ` is computed using ReverseDiff. This is useful when derivative information cannot
+  be computed using only local information (which is an assumption of the ForwardDiff-based approach used in the other state maps).
+  This is untested in parallel.
+
+  **Note:** This state map only supports first-order derivatives (diff_order=1). Second-order derivatives
+  are not supported.
 
   Optional arguments enable specification of assemblers, nonlinear solver, and
   adjoint (linear) solver. In addition, the jacobian `adjoint_jac` can be optionally
@@ -49,8 +58,15 @@ struct ReverseNonlinearFEStateMap{A,B,C,D,E} <: AbstractFEStateMap
     assem_deriv = SparseMatrixAssembler(V_φ,V_φ),
     nls::NonlinearSolver = NewtonSolver(LUSolver();maxiter=50,rtol=1.e-8,verbose=true),
     adjoint_ls::LinearSolver = LUSolver(),
-    adjoint_jac::Function = jac
+    adjoint_jac::Function = jac,
+    diff_order = 1,
   )
+
+    # Check that diff_order is 1 (second-order derivatives not supported)
+    if diff_order != 1
+      error("ReverseNonlinearFEStateMap only supports diff_order=1. Second-order derivatives are not supported.")
+    end
+
     jacs = (jac,adjoint_jac)
     spaces = (U,V,V_φ,V_diff)
     assems = (;assem_U,assem_deriv,assem_adjoint)
@@ -181,5 +197,17 @@ function pullback(φ_to_u::ReverseNonlinearFEStateMap,uh,φh,du;updated=false)
   dudφ_vec = dRdφ(φ_to_u,uh,λh,φh)
   rmul!(dudφ_vec, -1)
 
-  return (NoTangent(),dudφ_vec)
+  return (NoTangent(),copy(dudφ_vec)) # avoid aliasing issues
+end
+
+function ChainRulesCore.rrule(φ_to_u::ReverseNonlinearFEStateMap,φh)
+  u  = forward_solve!(φ_to_u,φh)
+  uh = FEFunction(get_trial_space(φ_to_u),u)
+  update_adjoint_caches!(φ_to_u,uh,φh)
+  return u, du -> pullback(φ_to_u,uh,φh,du;updated=true)
+end
+
+function ChainRulesCore.rrule(φ_to_u::ReverseNonlinearFEStateMap,φ::AbstractVector)
+  φh = FEFunction(get_aux_space(φ_to_u),φ)
+  return ChainRulesCore.rrule(φ_to_u,φh)
 end
