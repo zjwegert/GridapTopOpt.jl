@@ -1,7 +1,7 @@
 module PZMultiFieldRepeatingStateTests
 using Test
 
-using Gridap, GridapDistributed, GridapPETSc, GridapSolvers,
+using Gridap, GridapDistributed, GridapSolvers,
   PartitionedArrays, GridapTopOpt, SparseMatricesCSR
 
 using Gridap.TensorValues, Gridap.Helpers, Gridap.MultiField

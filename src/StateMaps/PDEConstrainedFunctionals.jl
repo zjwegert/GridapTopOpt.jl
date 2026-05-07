@@ -68,8 +68,9 @@ struct PDEConstrainedFunctionals{N,A} <: AbstractPDEConstrainedFunctionals{N}
       analytic_dC = fill(nothing,length(constraints)))
 
     # Preallocate
-    dJ = similar(get_∂F∂φ_vec(objective))
-    dC = map(Ci->similar(get_∂F∂φ_vec(Ci)),constraints)
+    V_φ = get_aux_space(state_map)
+    dJ = similar(get_free_dof_values(zero(V_φ)))
+    dC = map(Ci->similar(get_free_dof_values(zero(V_φ))),constraints)
 
     N = length(constraints)
     T = typeof(state_map)
@@ -90,7 +91,7 @@ and/or entires in `analytic_dC`.
 function PDEConstrainedFunctionals(
     objective   :: Function,
     constraints :: Vector{<:Function},
-    state_map   :: Union{AffineFEStateMap,NonlinearFEStateMap,RepeatingAffineFEStateMap};
+    state_map   :: Union{AffineFEStateMap,NonlinearFEStateMap,RepeatingAffineFEStateMap,ReverseNonlinearFEStateMap};
     analytic_dJ = nothing,
     analytic_dC = fill(nothing,length(constraints)))
 
@@ -282,8 +283,9 @@ struct EmbeddedPDEConstrainedFunctionals{N,T} <: AbstractPDEConstrainedFunctiona
     - For problems with no constraints `:C` must at least point to an empty list
     """
     # Preallocate
-    dJ = similar(get_∂F∂φ_vec(embedded_collection.J))
-    dC = map(Ci->similar(get_∂F∂φ_vec(Ci)),embedded_collection.C)
+    V_φ = get_aux_space(embedded_collection.state_map)
+    dJ = similar(get_free_dof_values(zero(V_φ)))
+    dC = map(Ci->similar(get_free_dof_values(zero(V_φ))),embedded_collection.C)
 
     N = length(embedded_collection.C)
     if analytic_dC isa Nothing
@@ -309,7 +311,7 @@ Evaluate the objective and constraints at `φh`.
     when you are certain that `φh` has not been updated.
 """
 function evaluate_functionals!(pcf::EmbeddedPDEConstrainedFunctionals,φh;update_space::Bool=true)
-  update_space && update_collection_with_φh!(pcf.embedded_collection,φh)
+  update_space && update_collection!(pcf.embedded_collection,φh)
   u  = get_state_map(pcf)(φh)
   U  = get_trial_space(get_state_map(pcf))
   uh = FEFunction(U,u)
@@ -335,7 +337,7 @@ Evaluate the derivatives of the objective and constraints at `φh`.
     when you are certain that `φh` has not been updated.
 """
 function evaluate_derivatives!(pcf::EmbeddedPDEConstrainedFunctionals,φh;update_space::Bool=true)
-  update_space && update_collection_with_φh!(pcf.embedded_collection,φh)
+  update_space && update_collection!(pcf.embedded_collection,φh)
   _,_,dJ,dC = evaluate!(pcf,φh)
   return dJ,dC
 end
@@ -358,7 +360,7 @@ Evaluate the objective and constraints, and their derivatives at
     when you are certain that `φh` has not been updated.
 """
 function Fields.evaluate!(pcf::EmbeddedPDEConstrainedFunctionals,φh;update_space::Bool=true)
-  update_space && update_collection_with_φh!(pcf.embedded_collection,φh)
+  update_space && update_collection!(pcf.embedded_collection,φh)
 
   J           = pcf.embedded_collection.J
   C           = pcf.embedded_collection.C
@@ -412,15 +414,8 @@ parameter `φ0`. This is useful for problems where the recipes are not computed
 using the cut geometry information.
 """
 function EmbeddedCollection_in_φh(recipes::Union{<:Function,Vector{<:Function}},bgmodel,φ0)
-  c = EmbeddedCollection(recipes,bgmodel)
-  update_collection_with_φh!(c,φ0)
-end
-
-function update_collection_with_φh!(c::EmbeddedCollection,φh)
-    for r in c.recipes
-    merge!(c.objects,pairs(r(φh)))
-  end
-  return c
+  c = EmbeddedCollection(recipes,bgmodel;compute_cut=false)
+  update_collection!(c,φ0)
 end
 
 # IO
@@ -431,13 +426,13 @@ end
 
 ############## Zygote Compat ##############
 """
-    CustomPDEConstrainedFunctionals{N,A} <:  AbstractPDEConstrainedFunctionals{N}
+    CustomPDEConstrainedFunctionals{N,A,ND} <:  AbstractPDEConstrainedFunctionals{N}
 
 A version of `PDEConstrainedFunctionals` that allows for an arbitrary mapping
 `φ_to_jc` that is used to compute the objective and constraints given the primal variable.
 
 Under the hood, we use Zygote to compute the Jacobian of this mapping with the rrules defined
-throughout GridapTopOpt.
+throughout GridapTopOpt. `ND` specifies the order of derivatives to be computed.
 
 # Parameters
 
@@ -478,7 +473,7 @@ throughout GridapTopOpt.
     ```
     This functionality is subject to change.
 """
-struct CustomPDEConstrainedFunctionals{N,A} <:  AbstractPDEConstrainedFunctionals{N}
+struct CustomPDEConstrainedFunctionals{N,A,B} <:  AbstractPDEConstrainedFunctionals{N}
   φ_to_jc :: Function
   analytic_dJ
   analytic_dC
@@ -514,9 +509,10 @@ struct CustomPDEConstrainedFunctionals{N,A} <:  AbstractPDEConstrainedFunctional
       num_constraints;
       state_map :: Union{Nothing,AbstractFEStateMap,Vector{<:AbstractFEStateMap}} = nothing,
       analytic_dJ = nothing,
-      analytic_dC = fill(nothing,num_constraints)
+      analytic_dC = fill(nothing,num_constraints),
+      diff_order::Int = 1
     )
-    return new{num_constraints,typeof(state_map)}(φ_to_jc,analytic_dJ,analytic_dC,state_map)
+    return new{num_constraints,typeof(state_map),diff_order}(φ_to_jc,analytic_dJ,analytic_dC,state_map)
   end
 end
 
@@ -606,6 +602,11 @@ function evaluate_functionals!(pcf::CustomPDEConstrainedFunctionals{0},φ::Abstr
   return j,c
 end
 
+# Second order - TBD
+function Fields.evaluate!(pcf::CustomPDEConstrainedFunctionals{N,A,2},φh) where {N,A}
+  @not_implemented "The way to interface second order problems with the native first order optimisers has not yet been decided"
+end
+
 ########## Zygote + Unfitted ##########
 """
     struct CustomEmbeddedPDEConstrainedFunctionals{N,A} <: AbstractPDEConstrainedFunctionals{N}
@@ -664,7 +665,7 @@ get_state(m::CustomEmbeddedPDEConstrainedFunctionals) = get_state(m.embedded_col
 get_state(::CustomEmbeddedPDEConstrainedFunctionals{N,Nothing}) where N = nothing
 
 function Fields.evaluate!(pcf::CustomEmbeddedPDEConstrainedFunctionals{N},φh;update_space::Bool=true) where N
-  update_space && update_collection_with_φh!(pcf.embedded_collection,φh)
+  update_space && update_collection!(pcf.embedded_collection,φh)
   φ_to_jc = pcf.φ_to_jc
   analytic_dJ!, analytic_dC! = pcf.analytic_dJ, pcf.analytic_dC
 
@@ -695,7 +696,7 @@ function Fields.evaluate!(pcf::CustomEmbeddedPDEConstrainedFunctionals{N},φh;up
 end
 
 function Fields.evaluate!(pcf::CustomEmbeddedPDEConstrainedFunctionals{0},φh;update_space::Bool=true)
-  update_space && update_collection_with_φh!(pcf.embedded_collection,φh)
+  update_space && update_collection!(pcf.embedded_collection,φh)
   φ_to_jc = pcf.φ_to_jc
   analytic_dJ!, analytic_dC! = pcf.analytic_dJ, pcf.analytic_dC
 
@@ -726,7 +727,7 @@ function Fields.evaluate!(pcf::CustomEmbeddedPDEConstrainedFunctionals{0},φh;up
 end
 
 function evaluate_functionals!(pcf::CustomEmbeddedPDEConstrainedFunctionals{N},φh;update_space::Bool=true) where N
-  update_space && update_collection_with_φh!(pcf.embedded_collection,φh)
+  update_space && update_collection!(pcf.embedded_collection,φh)
   val = pcf.φ_to_jc(get_free_dof_values(φh))
   @check length(val) == N + 1 "Expected $N constraints, φ_to_jc returned $(length(val)) values which should match the number of constraints + 1"
   j = val[1]
@@ -735,7 +736,7 @@ function evaluate_functionals!(pcf::CustomEmbeddedPDEConstrainedFunctionals{N},�
 end
 
 function evaluate_functionals!(pcf::CustomEmbeddedPDEConstrainedFunctionals{0},φh;update_space::Bool=true)
-  update_space && update_collection_with_φh!(pcf.embedded_collection,φh)
+  update_space && update_collection!(pcf.embedded_collection,φh)
   val = pcf.φ_to_jc(get_free_dof_values(φh))
   @check length(val) == 1 "Expected 0 constraints, φ_to_jc returned $(length(val)) values instead of 1"
   j = val[1]

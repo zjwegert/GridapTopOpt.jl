@@ -6,8 +6,7 @@ List of `Evolver` types:
 |             **Method**            | **Ambient mesh type** |   **Cached**   | **Preferred Method** |
 |:---------------------------------:|:---------------------:|:--------------:|:--------------------:|
 | [`FiniteDifferenceEvolver`](@ref) | Cartesian             |       ✓        |                      |
-| [`CutFEMEvolver`](@ref)           | Unstructured          |       ✗*       |          ☆           |
-_*: Caching is disabled due to a bug. This is will be improved in future._
+| [`CutFEMEvolver`](@ref)           | Unstructured          |       ✓        |          ☆           |
 
 List of `Reinitialiser` types:
 

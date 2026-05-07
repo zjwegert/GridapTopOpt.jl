@@ -3,7 +3,6 @@ module AffineFEStateMapTest_CutFEM_Elast
 using Gridap, Gridap.Geometry, Gridap.Adaptivity, Gridap.MultiField, Gridap.TensorValues
 using GridapEmbedded, GridapEmbedded.LevelSetCutters
 using GridapSolvers, GridapSolvers.BlockSolvers, GridapSolvers.NonlinearSolvers
-using GridapGmsh
 using GridapTopOpt
 using PartitionedArrays, GridapDistributed
 

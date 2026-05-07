@@ -1,12 +1,30 @@
-name: CI_MPI
-on: [push, pull_request]
+name: CI-External-Libraries
+on:
+  push:
+    branches:
+      - main
+    tags: ['*']
+    paths-ignore:
+      - 'NEWS.md'
+      - 'README.md'
+      - 'LICENSE.md'
+  pull_request:
+    paths-ignore:
+      - 'NEWS.md'
+      - 'README.md'
+      - 'LICENSE.md'
+concurrency:
+  # Skip intermediate builds: always.
+  # Cancel intermediate builds: only if it is a pull request build.
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ startsWith(github.ref, 'refs/pull/') }}
 jobs:
   test:
-    name: MPI - Julia ${{ matrix.version }} - ${{ matrix.os }} - ${{ matrix.arch }} - ${{ github.event_name }}
+    name: External Libraries - Julia ${{ matrix.version }} - ${{ matrix.os }} - ${{ matrix.arch }} - ${{ github.event_name }}
     runs-on: ${{ matrix.os }}
     env:
       P4EST_ROOT_DIR: "/opt/p4est/2.8.5/"
-      JULIA_PETSC_LIBRARY: "/opt/petsc/3.22.4/lib/libpetsc"
+      JULIA_PETSC_LIBRARY: "/opt/petsc/3.23.4/lib/libpetsc"
     strategy:
       fail-fast: false
       matrix:
@@ -16,6 +34,8 @@ jobs:
           - ubuntu-latest
         arch:
           - x64
+        testcase:
+          - extlibs
     steps:
       - name: Install p4est/petsc dependencies
         run: |
@@ -47,7 +67,7 @@ jobs:
         run: |
           CURR_DIR=$(pwd)
           PACKAGE=petsc
-          VERSION=3.22.4
+          VERSION=3.23.4
           INSTALL_ROOT=/opt
           PETSC_INSTALL=$INSTALL_ROOT/$PACKAGE/$VERSION
           TAR_FILE=$PACKAGE-$VERSION.tar.gz
@@ -61,25 +81,35 @@ jobs:
           cd $SOURCES_DIR
           ./configure --prefix=$PETSC_INSTALL --with-cc=mpicc --with-cxx=mpicxx --with-fc=mpif90 \
              --download-mumps --download-scalapack --download-parmetis --download-metis \
-             --download-fblaslapack --download-ptscotch --with-debugging --with-x=0 --with-shared=1 \
+             --download-fblaslapack --download-ptscotch --download-hpddm --download-slepc \
+             --with-debugging --with-x=0 --with-shared=1 \
              --with-mpi=1 --with-64-bit-indices
           make
           make install
           cd $CURR_DIR
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: julia-actions/setup-julia@v2
         with:
           version: ${{ matrix.version }}
           arch: ${{ matrix.arch }}
       - uses: julia-actions/cache@v2
+      - name: add MPIPreferences and external packages
+        shell: julia --color=yes --project=. {0}
+        run: |
+          using Pkg
+          Pkg.add("MPIPreferences")
+      - name: use MPI system binary
+        shell: julia --color=yes --project=. {0}
+        run: |
+          using MPIPreferences
+          MPIPreferences.use_system_binary()
       - uses: julia-actions/julia-buildpkg@latest
-      - run: echo $PWD
-      - run: julia --project=. -e 'using Pkg; Pkg.instantiate();'
-      - run: julia --project=. -e 'using Pkg; Pkg.add("MPIPreferences")'
-      - run: julia --project=. -e 'using MPIPreferences; MPIPreferences.use_system_binary()'
-      - run: julia --project=. -e 'using Pkg; Pkg.build(); Pkg.precompile()'
-      - run: julia --project=. --color=yes --check-bounds=yes test/mpi/runtests.jl
-      - uses: codecov/codecov-action@v4
+      - uses: julia-actions/julia-runtest@v1
+        env:
+          TESTCASE: ${{ matrix.testcase }}
+      - uses: julia-actions/julia-processcoverage@v1
+      - uses: codecov/codecov-action@v5
         with:
-          file: lcov.info
+          verbose: true
           token: ${{ secrets.CODECOV_TOKEN }}
+          flags: test-extlibs

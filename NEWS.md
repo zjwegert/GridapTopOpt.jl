@@ -4,6 +4,34 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - 2025-##-##
+
+### Added
+- Added option for AD type in `StateMaps`.
+- Added `compute_cut` option to `EmbeddedCollection`. This indicates whether to compute cut.
+  geometries. If false, the recipes will be called with only `φh`.
+- Added `MultiLevelSetEvolution`.
+- Added `restrict`, short hand for `restrict_to_field`.
+- Added `rrule` for `restrict`.
+- Added `ReverseNonlinearFEStateMap` to allow for reverse propagation of dual numbers through a state map.
+- Added AD for computing Hessian-vector products of generic PDE-constrained functions in serial and distributed.
+
+### Changed
+- Reimplemented `CutFEMEvolver` to enable caching.
+- `CutFEMEvolver` and `StabilisedReinitialiser` no longer require EmbeddedCollection as an argument. This
+  was required to ensure multi-phase methods are compatible with existing methods.
+- Unified serial methods for `combine_fields`.
+- The line search can now be enabled after a set iteration in `HilbertianProjection`
+- Removed `Gridap.ReferenceFEs.get_order(f::LinearCombinationFieldVector)` - now available in Gridap
+
+### Fixed
+- Fixed `correct_ls!` function signature.
+- Fixed `combine_fields` in distributed when using `BlockMultiFieldStyle` with different `PVector` types.
+- Bug fix in `max_iter` for `HilbertianProjection`
+- Bug in `get_element_diameters` introduced in Gridap v0.20.4 for changes to behaviour for empty triangulations.
+- Minor typos in docs.
+- Possible bugs due to aliasing of caches.
+
 ## [0.4.3] - 2026-5-1
 
 ### Fixed

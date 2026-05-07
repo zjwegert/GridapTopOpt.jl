@@ -311,6 +311,7 @@ function get_element_diameter_field(model::DistributedDiscreteModel)
 end
 
 function _get_tri_max_length(coords)
+  isempty(coords) && return zero(eltype(eltype(coords)))
   d12 = norm(coords[1]-coords[2])
   d13 = norm(coords[1]-coords[3])
   d23 = norm(coords[2]-coords[3])
@@ -319,6 +320,7 @@ function _get_tri_max_length(coords)
 end
 
 function _get_quad_max_length(coords)
+  isempty(coords) && return zero(eltype(eltype(coords)))
   # 3---4
   # |   |
   # |   |
@@ -332,6 +334,7 @@ function _get_quad_max_length(coords)
 end
 
 function _get_tet_max_length(coords)
+  isempty(coords) && return zero(eltype(eltype(coords)))
   d12 = norm(coords[1]-coords[2])
   d13 = norm(coords[1]-coords[3])
   d14 = norm(coords[1]-coords[4])
@@ -343,6 +346,7 @@ function _get_tet_max_length(coords)
 end
 
 function _get_hex_max_length(coords)
+  isempty(coords) && return zero(eltype(eltype(coords)))
   #Front 3---4 Back 7---8
   #      |   |      |   |
   #      |   |      |   |
@@ -405,3 +409,25 @@ end
 # Triangulation dimensions
 _num_dims(space::FESpace) = num_cell_dims(get_triangulation(space))
 _num_dims(space::GridapDistributed.DistributedSingleFieldFESpace) = getany(map(_num_dims,local_views(space)))
+
+# new version of restrict_to_field
+
+"""
+    restrict(f::MultiFieldFESpace,free_values::AbstractVector,field::Integer)
+
+Restrict free_values to ith space in f.
+"""
+function restrict(
+  f::MultiFieldFESpace,free_values::AbstractVector,field::Integer
+)
+  restrict_to_field(f,free_values,field)
+end
+
+function restrict(
+  f::DistributedMultiFieldFESpace,free_values::AbstractVector,field::Integer
+)
+  # Fix ghosts when free_values from allocate_in_domain
+  xh = FEFunction(f,free_values)
+  x = get_free_dof_values(xh)
+  restrict_to_field(f,x,field)
+end

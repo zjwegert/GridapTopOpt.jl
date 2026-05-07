@@ -65,7 +65,7 @@ GridapTopOpt.build_cache!(αu₁_to_u₂,αu₁h);
 for i in 2:length(αuᵢ₋₁_to_uᵢ)
   αuᵢ₋₁_to_uᵢ[i].cache.cache_built = true
   αuᵢ₋₁_to_uᵢ[i].cache.adj_cache = αu₁_to_u₂_adj_cache
-  αuᵢ₋₁_to_uᵢ[i].cache.fwd_cache = (αu₁_to_u₂_fwd_cache[1:3]...,similar(αu₁_to_u₂_fwd_cache[4]),αu₁_to_u₂_fwd_cache[end]);
+  αuᵢ₋₁_to_uᵢ[i].cache.fwd_cache = (αu₁_to_u₂_fwd_cache[1:3]...,similar(αu₁_to_u₂_fwd_cache[4]),αu₁_to_u₂_fwd_cache[end],αu₁_to_u₂_fwd_cache[6]);
   αuᵢ₋₁_to_uᵢ[i].cache.plb_cache = αu₁_to_u₂_plb_cache
 end;
 
@@ -133,6 +133,8 @@ using FiniteDiff
 fdm_grad = FiniteDiff.finite_difference_gradient(α_to_j_sum, get_free_dof_values(αh))
 
 norm(ad_grad - fdm_grad,Inf)/norm(fdm_grad,Inf)
+
+
 @test ad_grad ≈ fdm_grad
 
 end

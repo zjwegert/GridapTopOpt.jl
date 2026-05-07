@@ -8,17 +8,22 @@ using Test
   include("MultiFieldNonlinearFEStateMapTest.jl")
   include("NonlinearFEStateMapTest.jl")
   include("RepeatingAffineFEStateMapTest.jl")
+  include("ReverseNonlinearFEStateMapTest.jl")
   include("TwoStaggeredAffineFEStateMapTest.jl")
   include("ThreeStaggeredAffineFEStateMapTests.jl")
   include("ThreeStaggeredNonlinearFEStateMapTest.jl")
   include("AffineFEStateMapTest_CutFEM_Elast.jl")
   include("Zygote_TwoStaggeredAffineFEStateMapTest.jl")
+  include("Zygote_StaggeredMultiField.jl")
   include("TwoStaggeredAffineFEStateMapTest_ADTypeUnstableBug.jl")
   include("NonSymmetricThreeStaggeredNonlinearFEStateMapTest.jl")
   # Transient
   include("Transient_CrankNicolson_AffineFEStateMap.jl")
   include("Transient_CrankNicolson_ConstantMats_AffineFEStateMap.jl")
   include("Transient_CrankNicolson_NonlinearFEStateMap.jl")
+  # Second order
+  include("SecondOrderTests.jl")
+  include("SecondOrderTestsMPI_seq.jl")
 end
 
 end # module
