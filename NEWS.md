@@ -4,7 +4,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.5.0] - 2025-##-##
+## [0.5.1] - 2025-7-22
+
+### Fixed
+
+- Minor bug fix in `CustomPDEConstrainedFunctionals`. Since Since PR[#101](https://github.com/zjwegert/GridapTopOpt.jl/pull/101).
+
+## [0.5.0] - 2025-5-7
 
 ### Added
 - Added option for AD type in `StateMaps`.
