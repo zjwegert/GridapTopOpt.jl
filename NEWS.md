@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Minor bug fix in `CustomPDEConstrainedFunctionals`. Since Since PR[#1316](https://github.com/gridap/Gridap.jl/pull/1316).
+- Minor bug fix in `CustomPDEConstrainedFunctionals`. Since Since PR[#101](https://github.com/zjwegert/GridapTopOpt.jl/pull/101).
 
 ## [0.5.0] - 2025-5-7
 
