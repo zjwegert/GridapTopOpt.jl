@@ -575,7 +575,6 @@ function Fields.evaluate!(pcf::CustomPDEConstrainedFunctionals{0},φh)
     nothing
   end
   _compute_dF!(dJ,pcf.analytic_dJ)
-  map(_compute_dF!,dC,analytic_dC!)
 
   return j,c,dJ,dC
 end
