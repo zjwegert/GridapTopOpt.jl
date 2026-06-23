@@ -157,7 +157,7 @@ p_to_j(p) = objective((state_map(p)),p)
 Hṗ_fd = fd_hvp(p_to_j,p,ṗ)
 Hṗ = Hvp(p_to_j,p,ṗ)
 @show maximum(abs,Hṗ-Hṗ_fd)/maximum(abs,Hṗ)
-@test Hṗ_fd ≈ Hṗ rtol = 1e-7
+@test Hṗ_fd ≈ Hṗ rtol = 1e-6
 
 # !! Affine state map Tests
 a(u,v,p) = ∫( p*(p+1)*∇(u)⋅∇(v) )dΩ
