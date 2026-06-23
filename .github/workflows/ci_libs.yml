@@ -25,11 +25,12 @@ jobs:
     env:
       P4EST_ROOT_DIR: "/opt/p4est/2.8.5/"
       JULIA_PETSC_LIBRARY: "/opt/petsc/3.23.4/lib/libpetsc"
+      GMSHROOT: "/opt/gmsh/4.15.2/"
     strategy:
       fail-fast: false
       matrix:
         version:
-          - '1.11'
+          - '1.12'
         os:
           - ubuntu-latest
         arch:
@@ -37,6 +38,18 @@ jobs:
         testcase:
           - extlibs
     steps:
+      - name: Install Gmsh
+        run: |
+          # Install Gmsh 4.15.2 from sources
+          PACKAGE=gmsh
+          VERSION="4.15.2"
+          TAR_FILE="$PACKAGE-$VERSION-Linux64-sdk.tgz"
+          URL="https://gmsh.info/bin/Linux/$TAR_FILE"
+          INSTALL_ROOT=/opt/
+          GMSH_INSTALL=$INSTALL_ROOT/$PACKAGE/$VERSION
+          wget -q $URL -O $INSTALL_ROOT/$TAR_FILE
+          mkdir -p $GMSH_INSTALL
+          tar xzf $INSTALL_ROOT/$TAR_FILE -C $GMSH_INSTALL --strip-components=1
       - name: Install p4est/petsc dependencies
         run: |
            sudo apt-get update

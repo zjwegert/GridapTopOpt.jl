@@ -4,7 +4,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.5.0] - 2026-5-7
+## [Unreleased]
+
+### Changed
+- Updated tests to Julia v0.12 and Gmsh SDK install. Since PR[#104](https://github.com/zjwegert/GridapTopOpt.jl/pull/104).
+
+## [0.5.0] - 2026-05-7
 
 ### Added
 - Added option for AD type in `StateMaps`.
