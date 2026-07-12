@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Support for complex-valued DOFs. Since PR[#105](https://github.com/zjwegert/GridapTopOpt.jl/pull/105).
+
 ### Changed
 - Updated tests to Julia v0.12 and Gmsh SDK install. Since PR[#104](https://github.com/zjwegert/GridapTopOpt.jl/pull/104).
 

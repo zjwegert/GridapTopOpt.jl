@@ -96,7 +96,7 @@ end
 
 """
     OptimiserHistory(
-      T::Type{<:Real},
+      T::Type{<:Number},
       keys::Vector{Symbol},
       bundles::Dict{Symbol,Vector{Symbol}}=Dict{Symbol,Vector{Symbol}}(),
       maxiter = 200,
@@ -107,7 +107,7 @@ Create an instance of Optimiser history with some defaults for
 `bundles`, `maxiter`, and `verbose`.
 """
 function OptimiserHistory(
-  T::Type{<:Real},
+  T::Type{<:Number},
   keys::Vector{Symbol},
   bundles::Dict{Symbol,Vector{Symbol}}=Dict{Symbol,Vector{Symbol}}(),
   maxiter = 200,
@@ -153,11 +153,11 @@ function Base.getindex(h::OptimiserHistory,it::Int)
   return OptimiserHistorySlice(it,h)
 end
 
-function Base.setindex!(h::OptimiserHistory{T},val::T,k::Symbol,it::Integer) where T
+function Base.setindex!(h::OptimiserHistory,val::T,k::Symbol,it::Integer) where T<:Number
   @inbounds h.values[k][it+1] = val
 end
 
-function Base.setindex!(h::OptimiserHistory{T},vals::Tuple,k::Symbol,it::Integer) where T
+function Base.setindex!(h::OptimiserHistory,vals::Tuple,k::Symbol,it::Integer)
   kk = h.bundles[k]
   setindex!(h,kk,vals,it)
 end
