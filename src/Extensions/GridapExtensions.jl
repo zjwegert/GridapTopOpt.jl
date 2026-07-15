@@ -48,7 +48,7 @@ transpose_contributions(b::DistributedDomainContribution) =
 function transpose_contributions(b::DomainContribution)
   c = DomainContribution()
   for (trian,array_old) in b.dict
-    array_new = lazy_map(transpose,array_old)
+    array_new = lazy_map(adjoint,array_old)
     add_contribution!(c,trian,array_new)
   end
   return c
