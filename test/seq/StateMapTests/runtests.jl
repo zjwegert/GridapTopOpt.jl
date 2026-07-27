@@ -17,6 +17,8 @@ using Test
   include("Zygote_StaggeredMultiField.jl")
   include("TwoStaggeredAffineFEStateMapTest_ADTypeUnstableBug.jl")
   include("NonSymmetricThreeStaggeredNonlinearFEStateMapTest.jl")
+  # Complex-valued
+  include("ComplexAffineFEStateMapTest.jl")
   # Transient
   include("Transient_CrankNicolson_AffineFEStateMap.jl")
   include("Transient_CrankNicolson_ConstantMats_AffineFEStateMap.jl")
