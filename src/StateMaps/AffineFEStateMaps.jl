@@ -107,7 +107,7 @@ function build_cache!(state_map::AffineFEStateMap,φh)
   cache.fwd_cache = (ns,K,b,x,uhd,copy(get_free_dof_values(φh)))
 
   ## Adjoint cache
-  adjoint_K  = assemble_adjoint_matrix((u,v)->biform(v,u,φh),assem_adjoint,U,V)
+  adjoint_K  = assemble_adjoint_matrix((u,v)->biform(u,v,φh),assem_adjoint,U,V)
   adjoint_x  = allocate_in_domain(adjoint_K); fill!(adjoint_x,zero(eltype(adjoint_x)))
   adjoint_ns = numerical_setup(symbolic_setup(adjoint_ls,adjoint_K),adjoint_K)
   cache.adj_cache = (adjoint_ns,adjoint_K,adjoint_x)
@@ -182,7 +182,7 @@ function update_adjoint_caches!(φ_to_u::AffineFEStateMap,uh,φh)
   assem_adjoint = φ_to_u.assems.assem_adjoint
   adjoint_ns, adjoint_K, _ = φ_to_u.cache.adj_cache
   U, V, _ = φ_to_u.spaces
-  assemble_adjoint_matrix!((u,v) -> φ_to_u.biform(v,u,φh),adjoint_K,assem_adjoint,U,V)
+  assemble_adjoint_matrix!((u,v) -> φ_to_u.biform(u,v,φh),adjoint_K,assem_adjoint,U,V)
   numerical_setup!(adjoint_ns,adjoint_K)
   return φ_to_u.cache.adj_cache
 end
