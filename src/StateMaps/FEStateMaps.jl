@@ -221,7 +221,7 @@ function pullback(φ_to_u::AbstractFEStateMap,uh,φh,du;updated=false)
   end
 
   λ  = adjoint_solve!(φ_to_u,du)
-  λh = FEFunction(get_test_space(φ_to_u),λ)
+  λh = FEFunction(get_test_space(φ_to_u),conj!(λ))
 
   update_incremental_adjoint_partials!(φ_to_u,uh,φh,λh)
 

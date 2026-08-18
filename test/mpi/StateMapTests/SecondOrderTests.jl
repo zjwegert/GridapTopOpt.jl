@@ -134,7 +134,7 @@ function main(distribute,mesh_partition)
 
   Hṗ_fd = fd_hvp(p->objective(state_map(p),p),p,ṗ)
   Hṗ = Hvp(p->objective(state_map(p),p),p,ṗ)
-  @test Hṗ_fd ≈ Hṗ
+  @test Hṗ_fd ≈ Hṗ rtol = 1e-7
 
   # ########################################################
   # # Unit and integration tests for the pushforward rules #

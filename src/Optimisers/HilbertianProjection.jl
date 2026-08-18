@@ -137,7 +137,7 @@ struct HilbertianProjection{A} <: Optimiser
   ls_evolver        :: AbstractLevelSetEvolution
   vel_ext           :: AbstractVelocityExtension
   projector         :: HilbertianProjectionMap
-  history           :: OptimiserHistory{Float64}
+  history           :: OptimiserHistory
   converged         :: Function
   has_oscillations  :: Function
   params            :: NamedTuple
@@ -238,7 +238,8 @@ struct HilbertianProjection{A} <: Optimiser
     constraint_names = map(Symbol,constraint_names)
     al_keys = [:J,constraint_names...,:γ]
     al_bundles = Dict(:C => constraint_names)
-    history = OptimiserHistory(Float64,al_keys,al_bundles,maxiter,verbose)
+    T = eltype(get_vector_type(get_ls_space(ls_evolver)))
+    history = OptimiserHistory(T,al_keys,al_bundles,maxiter,verbose)
     projector = HilbertianProjectionMap(N,orthog,vel_ext;λ,α_min,α_max,debug)
 
     # Optimisation when not using AD

@@ -25,7 +25,7 @@ struct AugmentedLagrangian <: Optimiser
   problem           :: AbstractPDEConstrainedFunctionals
   ls_evolver        :: AbstractLevelSetEvolution
   vel_ext           :: AbstractVelocityExtension
-  history           :: OptimiserHistory{Float64}
+  history           :: OptimiserHistory
   converged         :: Function
   has_oscillations  :: Function
   params            :: NamedTuple
@@ -95,7 +95,8 @@ struct AugmentedLagrangian <: Optimiser
     Λ_names = map(i -> Symbol("Λ$i"),1:N)
     al_keys = [:L,:J,constraint_names...,:γ,λ_names...,Λ_names...]
     al_bundles = Dict(:C => constraint_names, :λ => λ_names, :Λ => Λ_names)
-    history = OptimiserHistory(Float64,al_keys,al_bundles,maxiter,verbose)
+    T = eltype(get_vector_type(get_ls_space(ls_evolver)))
+    history = OptimiserHistory(T,al_keys,al_bundles,maxiter,verbose)
 
     params = (;Λ_max,ζ,update_mod,reinit_mod,γ,os_γ_mult,Λ_update_tol,debug,initial_parameters)
     new(problem,ls_evolver,vel_ext,history,converged,has_oscillations,params,φ0)
