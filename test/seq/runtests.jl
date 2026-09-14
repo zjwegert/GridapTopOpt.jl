@@ -11,8 +11,10 @@ using Test
 @time @testset "PolytopalCuttersTests" begin
   include("PolytopalCuttersTests/runtests.jl")
   include("PolytopalCuttersTests/runtests1.jl")
-  include("PolytopalCuttersTests/runtests2.jl")
-  include("PolytopalCuttersTests/runtests3.jl")
+  include("PolytopalCuttersTests/runtests2_2d.jl")
+  include("PolytopalCuttersTests/runtests2_3d.jl")
+  include("PolytopalCuttersTests/runtests3_2d.jl")
+  include("PolytopalCuttersTests/runtests3_3d.jl")
 end
 
 end # module

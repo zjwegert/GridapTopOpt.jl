@@ -1,5 +1,5 @@
 # This module tests AD against analytic expressions
-module DifferentiableCutPolyTriangulationsTests_Analytic2
+module DifferentiableCutPolyTriangulationsTests_Analytic2_2d
 
 include("DifferentiableCutPolyTriangulationsTests_Utils.jl")
 
@@ -9,7 +9,7 @@ println("
 ################################################################
 ")
 
-for d in (2,3)
+for d in (2,)
   if d == 2
     @info "----------Running 2D test"
     φ1 = (x,y) -> (x-0.5)^2+(y-0.3)^2-(0.41)^2

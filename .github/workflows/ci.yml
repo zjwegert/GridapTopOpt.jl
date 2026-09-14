@@ -40,8 +40,10 @@ jobs:
           - seq-utility
           - seq-polycut
           - seq-polycut-analytic1
-          - seq-polycut-analytic2
-          - seq-polycut-analytic3
+          - seq-polycut-analytic2-2d
+          - seq-polycut-analytic2-3d
+          - seq-polycut-analytic3-2d
+          - seq-polycut-analytic3-3d
           - mpi-embedded
           - mpi-evolvers
           - mpi-gridaptopopt

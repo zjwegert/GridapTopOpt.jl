@@ -1,5 +1,5 @@
 # This module tests AD against analytic expressions
-module DifferentiableCutPolyTriangulationsTests_Analytic3
+module DifferentiableCutPolyTriangulationsTests_Analytic3_2d
 
 include("DifferentiableCutPolyTriangulationsTests_Utils.jl")
 
@@ -11,7 +11,7 @@ println("
 
 using Random
 
-for d in (2,3)
+for d in (2,)
   if d == 2
     @info "----------Running 2D test"
     bgmodel = generate_model(2,10)

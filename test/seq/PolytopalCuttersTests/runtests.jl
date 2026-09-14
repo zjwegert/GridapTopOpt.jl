@@ -22,9 +22,4 @@ using Test
 
 @time @testset "DifferentiableCutPolyTriangulationsTests" begin include("DifferentiableCutPolyTriangulationsTests.jl") end
 
-# # To remove
-# @time @testset "DifferentiableCutPolyTriangulationsTests_Analytic1" begin include("DifferentiableCutPolyTriangulationsTests_Analytic1.jl") end
-# @time @testset "DifferentiableCutPolyTriangulationsTests_Analytic2" begin include("DifferentiableCutPolyTriangulationsTests_Analytic2.jl") end
-# @time @testset "DifferentiableCutPolyTriangulationsTests_Analytic3" begin include("DifferentiableCutPolyTriangulationsTests_Analytic3.jl") end
-
 end

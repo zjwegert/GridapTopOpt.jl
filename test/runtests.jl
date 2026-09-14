@@ -37,12 +37,20 @@ if TESTCASE ∈ ("all", "seq", "seq-polycut-analytic1")
   include("seq/PolytopalCuttersTests/runtests1.jl")
 end
 
-if TESTCASE ∈ ("all", "seq", "seq-polycut-analytic2")
-  include("seq/PolytopalCuttersTests/runtests2.jl")
+if TESTCASE ∈ ("all", "seq", "seq-polycut-analytic2-2d")
+  include("seq/PolytopalCuttersTests/runtests2_2d.jl")
 end
 
-if TESTCASE ∈ ("all", "seq", "seq-polycut-analytic3")
-  include("seq/PolytopalCuttersTests/runtests3.jl")
+if TESTCASE ∈ ("all", "seq", "seq-polycut-analytic2-3d")
+  include("seq/PolytopalCuttersTests/runtests2_3d.jl")
+end
+
+if TESTCASE ∈ ("all", "seq", "seq-polycut-analytic3-2d")
+  include("seq/PolytopalCuttersTests/runtests3_2d.jl")
+end
+
+if TESTCASE ∈ ("all", "seq", "seq-polycut-analytic3-3d")
+  include("seq/PolytopalCuttersTests/runtests3_3d.jl")
 end
 
 # MPI tests
