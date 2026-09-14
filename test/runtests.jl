@@ -29,6 +29,22 @@ if TESTCASE ∈ ("all", "seq", "seq-utility")
   include("seq/UtilityTests/runtests.jl")
 end
 
+if TESTCASE ∈ ("all", "seq", "seq-polycut")
+  include("seq/PolytopalCuttersTests/runtests.jl")
+end
+
+if TESTCASE ∈ ("all", "seq", "seq-polycut-analytic1")
+  include("seq/PolytopalCuttersTests/runtests1.jl")
+end
+
+if TESTCASE ∈ ("all", "seq", "seq-polycut-analytic2")
+  include("seq/PolytopalCuttersTests/runtests2.jl")
+end
+
+if TESTCASE ∈ ("all", "seq", "seq-polycut-analytic3")
+  include("seq/PolytopalCuttersTests/runtests3.jl")
+end
+
 # MPI tests
 
 if TESTCASE ∈ ("all", "mpi", "mpi-embedded")
@@ -57,6 +73,10 @@ end
 
 if TESTCASE ∈ ("all", "mpi", "mpi-velext")
   include("mpi/VelocityExtensionTests/runtests.jl")
+end
+
+if TESTCASE ∈ ("all", "mpi", "mpi-polycut")
+  include("mpi/PolytopalCuttersTests/runtests.jl")
 end
 
 # Extensions

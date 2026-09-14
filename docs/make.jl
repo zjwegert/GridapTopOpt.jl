@@ -33,6 +33,7 @@ makedocs(
         "reference/zygote.md",
         "reference/levelsetevolution.md",
         "reference/embedded.md",
+        "reference/polytopalcutters.md",
         "reference/velext.md",
         "reference/io.md",
         "reference/utilities.md",
