@@ -9,8 +9,7 @@ using Test
 using GridapDistributed
 using PartitionedArrays
 
-using GridapTopOptMultiPhysics
-using GridapTopOptMultiPhysics: DifferentiableEmbeddedBoundary
+using GridapTopOpt
 
 function generate_model(D,n,simplex_bgmodel)
   domain = (D==2) ? (0,1,0,1) : (0,1,0,1,0,1)
