@@ -22,9 +22,9 @@ GridapTopOpt provides scalable automatic differentiation methods for generic PDE
 In order to give credit to the `GridapTopOpt` contributors, we ask that you please reference the above paper along with the required citations for [Gridap](https://github.com/gridap/Gridap.jl?tab=readme-ov-file#how-to-cite-gridap).
 
 ### Unfitted methods
-When using unfitted methods, we ask that you please reference the following manuscripts:
+When using unfitted methods, we ask that you please reference the above manuscripts as well as the following manuscripts:
 > Wegert, Z.J., Manyer, J., Mallon, C.N. et al. Level-set topology optimisation with unfitted finite elements and automatic shape differentiation. Comput Methods Appl Mech Engrg 445 (2025). [https://doi.org/10.1016/j.cma.2025.118203](https://doi.org/10.1016/j.cma.2025.118203)
 
 ### Multi-phase unfitted methods
-When using multi-phase unfitted methods, we ask that you please reference the above manuscript as well as the following manuscript:
+When using multi-phase unfitted methods, we ask that you please reference the above manuscripts as well as the following manuscript:
 > Zachary J. Wegert, Martin Berggren, and Vivien J. Challis (2026). "Shape calculus and automatic differentiation for multi-phase level-set topology optimisation with unfitted finite elements". [arXiv:2609.15084 [math.NA]](https://arxiv.org/abs/2609.15084).
