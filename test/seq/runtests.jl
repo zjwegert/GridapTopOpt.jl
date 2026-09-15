@@ -12,9 +12,15 @@ using Test
   include("PolytopalCuttersTests/runtests.jl")
   include("PolytopalCuttersTests/runtests1.jl")
   include("PolytopalCuttersTests/runtests2_2d.jl")
-  include("PolytopalCuttersTests/runtests2_3d.jl")
+  include("PolytopalCuttersTests/runtests2_3d_vol.jl")
+  include("PolytopalCuttersTests/runtests2_3d_boundary_caseB.jl")
+  include("PolytopalCuttersTests/runtests2_3d_boundary_caseC.jl")
+  include("PolytopalCuttersTests/runtests2_3d_boundary_MF.jl")
   include("PolytopalCuttersTests/runtests3_2d.jl")
-  include("PolytopalCuttersTests/runtests3_3d.jl")
+  include("PolytopalCuttersTests/runtests3_3d_vol.jl")
+  include("PolytopalCuttersTests/runtests3_3d_boundary_1.jl")
+  include("PolytopalCuttersTests/runtests3_3d_boundary_2.jl")
+  include("PolytopalCuttersTests/runtests3_3d_boundary_3.jl")
 end
 
 end # module

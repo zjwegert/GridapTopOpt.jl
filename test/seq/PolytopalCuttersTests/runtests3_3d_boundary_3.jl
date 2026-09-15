@@ -1,0 +1,7 @@
+module PolytopalCuttersTests3_3d_boundary_3
+
+using Test
+
+@time @testset "DifferentiableCutPolyTriangulationsTests_Analytic3_3d_boundary_3" begin include("DifferentiableCutPolyTriangulationsTests_Analytic3_3d_boundary_3.jl") end
+
+end

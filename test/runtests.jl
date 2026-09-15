@@ -41,8 +41,20 @@ if TESTCASE ∈ ("all", "seq", "seq-polycut-analytic2-2d")
   include("seq/PolytopalCuttersTests/runtests2_2d.jl")
 end
 
-if TESTCASE ∈ ("all", "seq", "seq-polycut-analytic2-3d")
-  include("seq/PolytopalCuttersTests/runtests2_3d.jl")
+if TESTCASE ∈ ("all", "seq", "seq-polycut-analytic2-3d-vol")
+  include("seq/PolytopalCuttersTests/runtests2_3d_vol.jl")
+end
+
+if TESTCASE ∈ ("all", "seq", "seq-polycut-analytic2-3d-boundary-caseB")
+  include("seq/PolytopalCuttersTests/runtests2_3d_boundary_caseB.jl")
+end
+
+if TESTCASE ∈ ("all", "seq", "seq-polycut-analytic2-3d-boundary-caseC")
+  include("seq/PolytopalCuttersTests/runtests2_3d_boundary_caseC.jl")
+end
+
+if TESTCASE ∈ ("all", "seq", "seq-polycut-analytic2-3d-boundary-MF")
+  include("seq/PolytopalCuttersTests/runtests2_3d_boundary_MF.jl")
 end
 
 if TESTCASE ∈ ("all", "seq", "seq-polycut-analytic3-2d")
@@ -53,8 +65,16 @@ if TESTCASE ∈ ("all", "seq", "seq-polycut-analytic3-3d-vol")
   include("seq/PolytopalCuttersTests/runtests3_3d_vol.jl")
 end
 
-if TESTCASE ∈ ("all", "seq", "seq-polycut-analytic3-3d-boundary")
-  include("seq/PolytopalCuttersTests/runtests3_3d_boundary.jl")
+if TESTCASE ∈ ("all", "seq", "seq-polycut-analytic3-3d-boundary-1")
+  include("seq/PolytopalCuttersTests/runtests3_3d_boundary_1.jl")
+end
+
+if TESTCASE ∈ ("all", "seq", "seq-polycut-analytic3-3d-boundary-2")
+  include("seq/PolytopalCuttersTests/runtests3_3d_boundary_2.jl")
+end
+
+if TESTCASE ∈ ("all", "seq", "seq-polycut-analytic3-3d-boundary-3")
+  include("seq/PolytopalCuttersTests/runtests3_3d_boundary_3.jl")
 end
 
 # MPI tests
@@ -69,6 +89,10 @@ end
 
 if TESTCASE ∈ ("all", "mpi", "mpi-gridaptopopt")
   include("mpi/GridapTopOptTests/runtests.jl")
+end
+
+if TESTCASE ∈ ("all", "mpi", "mpi-gridaptopopt-unfitted")
+  include("mpi/GridapTopOptTests_unfitted/runtests.jl")
 end
 
 if TESTCASE ∈ ("all", "mpi", "mpi-reinitialisers")
