@@ -1,9 +1,10 @@
 name = "GridapTopOpt"
 uuid = "27dd0110-1916-4fd6-8b4b-1bc109db1170"
 authors = ["Zachary Wegert <zach.wegert@hdr.qut.edu.au>", "Jordi Manyer <jordi.manyer@monash.edu>", "Connor Mallon <connor.mallon@qut.edu.au>", "Santiago Badia <santiago.badia@monash.edu>", "Vivien Challis <vivien.challis@qut.edu.au>"]
-version = "0.5.0"
+version = "0.5.1"
 
 [deps]
+AbstractTrees = "1520ce14-60c1-5f80-bbc7-55ef81b5835c"
 BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
 BlockArrays = "8e7c35d0-a365-5155-bbbb-fb81a777f24e"
 ChainRulesCore = "d360d2e6-b24c-11e9-a2a3-2a2ae2dbcce4"
@@ -29,6 +30,7 @@ SparseMatricesCSR = "a0a7dd2c-ebf4-11e9-1f05-cf50bc540ca1"
 Zygote = "e88e6eb3-aa80-5325-afca-941959d7151f"
 
 [compat]
+AbstractTrees = "0.4.5"
 BenchmarkTools = "1"
 BlockArrays = "1"
 ChainRulesCore = "1"
@@ -55,8 +57,8 @@ julia = "1.10"
 FiniteDiff = "6a86dc24-6348-571c-b903-95158fe2bd41"
 FiniteDifferences = "26cc04aa-876d-5657-8c51-4c34ba976000"
 MPIPreferences = "3da0fdf6-3ccc-4f1b-acd9-58baa6c99267"
-Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
 test = ["Test", "FiniteDiff", "FiniteDifferences", "Random"]

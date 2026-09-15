@@ -125,3 +125,13 @@ Here we use FiniteDifferences instead of FiniteDiff so that we can specify the f
     The map denoted by `(!!)` in the above has `... + 0κ` in the integrand. This is currently required for functionals that implicitly depond on the parameter. This will be investigated in future.
 
     Another issue is Gridap's long complilation time when computing Hessian's with AD. This will be investigated in future.
+
+## Automatic shape differentiation
+The above is fully compatible with the forward-mode automatic shape differentiation methods developed in
+> Wegert, Z.J., Manyer, J., Mallon, C.N. et al. Level-set topology optimisation with unfitted finite elements and automatic shape differentiation. Comput Methods Appl Mech Engrg 445 (2025). [https://doi.org/10.1016/j.cma.2025.118203](https://doi.org/10.1016/j.cma.2025.118203)
+
+and
+
+> Zachary J. Wegert, Martin Berggren, and Vivien J. Challis (2026). "Shape calculus and automatic differentiation for multi-phase level-set topology optimisation with unfitted finite elements". arXiv:...
+
+Further details can be found [`DifferentiableCutPolyTriangulationdFunctionals`](@ref).

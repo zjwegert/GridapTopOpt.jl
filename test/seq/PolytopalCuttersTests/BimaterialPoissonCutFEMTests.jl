@@ -1,0 +1,146 @@
+module BimaterialPoissonCutFEMTests
+
+using Gridap
+import Gridap: ∇
+using GridapEmbedded
+using Test
+
+using GridapTopOpt
+
+# Formulation: cutfem paper section 2.1
+# Stabilization coefficient like in reference [21] of this paper
+# rhs contribution associated with the flux jump at the interface also like in [21]
+
+# Manufactured solution
+const α1 = 4.0
+const α2 = 3.0
+u(x) = x[1] - 0.5*x[2]
+∇u(x) = VectorValue( 1.0, -0.5)
+q1(x) = α1*∇u(x)
+q2(x) = α2*∇u(x)
+j(x) = q1(x)-q2(x)
+Δu(x) = 0
+_f1(x) = - α1*Δu(x)
+_f2(x) = - α2*Δu(x)
+ud(x) = u(x)
+∇(::typeof(u)) = ∇u
+
+# Select geometry
+const _R = 0.7
+n = 30
+domain = (-1,1,-1,1)
+partition = (n,n)
+
+# Setup background model
+bgmodel = simplexify(CartesianDiscreteModel(domain,partition))
+Ω_bg  = Triangulation(bgmodel)
+
+reffe = ReferenceFE(lagrangian,Float64,1)
+V_φ = TestFESpace(bgmodel,reffe)
+φh1 = interpolate(x->(x[1])^2+(x[2])^2-_R^2,V_φ)
+geo1 = DiscreteGeometryFromFEFunction(φh1,bgmodel)
+geo2 = ! geo1
+
+# Cut the background model
+cutgeo = cut(PolytopalLevelSetCutter(),bgmodel,union(geo1,geo2))
+
+# Setup interpolation meshes
+Ω1_act = Triangulation(cutgeo,ACTIVE,geo1)
+Ω2_act = Triangulation(cutgeo,ACTIVE,geo2)
+
+# Setup integration meshes
+Ω1 = Triangulation(cutgeo,PHYSICAL,geo1)
+Ω2 = Triangulation(cutgeo,PHYSICAL,geo2)
+Γ = EmbeddedBoundary(cutgeo,geo1,geo2)
+
+# Setup normal vectors
+const _n_Γ = get_normal_vector(Γ)
+
+# Setup Lebesgue measures
+order = 1
+degree = 2*order
+dΩ1 = Measure(Ω1,degree)
+dΩ2 = Measure(Ω2,degree)
+dΓ = Measure(Γ,degree)
+
+# Setup FESpace
+
+V1 = TestFESpace(Ω1_act,ReferenceFE(lagrangian,Float64,order),conformity=:H1)
+
+V2 = TestFESpace(Ω2_act,
+                 ReferenceFE(lagrangian,Float64,order),
+                 conformity=:H1,
+                 dirichlet_tags="boundary")
+
+U1 = TrialFESpace(V1)
+U2 = TrialFESpace(V2,ud)
+
+V = MultiFieldFESpace([V1,V2])
+U = MultiFieldFESpace([U1,U2])
+
+# Setup stabilization parameters
+
+meas_K1 = get_cell_measure(Ω1, Ω_bg)
+meas_K2 = get_cell_measure(Ω2, Ω_bg)
+meas_KΓ = get_cell_measure(Γ, Ω_bg)
+
+# meas_K1_Γ = lazy_map(Reindex(meas_K1),get_cell_to_bgcell(Γ))
+# meas_K2_Γ = lazy_map(Reindex(meas_K2),get_cell_to_bgcell(Γ))
+# meas_KΓ_Γ = lazy_map(Reindex(meas_KΓ),get_cell_to_bgcell(Γ))
+
+#writevtk(model1,"model1")
+#writevtk(model2,"model2")
+#writevtk(Ω1,"trian1")
+#writevtk(Ω2,"trian2")
+#writevtk(Γ,"trianG",
+#  celldata=["K1"=>meas_K1_Γ,"K2"=>meas_K2_Γ,"KG"=>meas_KΓ_Γ],
+#  cellfields=["normal"=>__n_Γ])
+
+γ_hat = 2
+κ1 = CellField( (α2*meas_K1) ./ (α2*meas_K1 .+ α1*meas_K2), Ω_bg)
+κ2 = CellField( (α1*meas_K2) ./ (α2*meas_K1 .+ α1*meas_K2), Ω_bg)
+β = CellField( (γ_hat*meas_KΓ) ./ ( meas_K1/α1 .+ meas_K2/α2 ), Ω_bg)
+
+# Jump and mean operators for this formulation
+
+jump_u(u1,u2) = u1 - u2
+mean_q(u1,u2) = κ1*α1*∇(u1) + κ2*α2*∇(u2)
+mean_u(u1,u2) = κ2*u1 + κ1*u2
+
+# Weak form
+
+A((u1,u2),(v1,v2)) =
+  ∫( α1*∇(v1)⋅∇(u1) ) * dΩ1 + ∫( α2*∇(v2)⋅∇(u2) ) * dΩ2 +
+  ∫( β*jump_u(v1,v2)*jump_u(u1,u2)
+     - _n_Γ⋅mean_q(u1,u2)*jump_u(v1,v2)
+     - _n_Γ⋅mean_q(v1,v2)*jump_u(u1,u2) ) * dΓ
+
+L((v1,v2)) =
+  ∫( v1*_f1 ) * dΩ1 + ∫( v2*_f2 ) * dΩ2 +
+  ∫( mean_u(v1,v2)*(_n_Γ⋅j) ) * dΓ
+
+op = AffineFEOperator(A,L,U,V)
+uh1, uh2 = solve(op)
+uh = (uh1,uh2)
+
+e1 = u - uh1
+e2 = u - uh2
+e = (e1,e2)
+
+l2((u1,u2)) = sqrt( sum( ∫( u1*u1 )*dΩ1 ) + sum( ∫( u2*u2 )*dΩ2 ) )
+h1((u1,u2)) = sqrt( sum( ∫( u1*u1 + ∇(u1)⋅∇(u1) )*dΩ1 ) +
+                    sum( ∫( u2*u2 + ∇(u2)⋅∇(u2) )*dΩ2 ) )
+
+el2 = l2(e)
+eh1 = h1(e)
+ul2 = l2(uh)
+uh1 = h1(uh)
+
+# qh1 = α1*∇(uh1)
+# qh2 = α2*∇(uh2)
+# writevtk(Ω1,"results1",cellfields=["uh"=>uh1,"qh"=>qh1,"e"=>e1])
+# writevtk(Ω2,"results2",cellfields=["uh"=>uh2,"qh"=>qh2,"e"=>e2])
+@test el2/ul2 < 1.e-8
+@test eh1/uh1 < 1.e-7
+
+end # module

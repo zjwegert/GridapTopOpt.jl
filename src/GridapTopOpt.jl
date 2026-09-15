@@ -41,7 +41,7 @@ using GridapSolvers.NonlinearSolvers: NewtonCache
 using GridapEmbedded
 using GridapEmbedded.LevelSetCutters, GridapEmbedded.Interfaces
 using GridapEmbedded.Interfaces: SubFacetData, SubCellTriangulation, SubFacetTriangulation
-using GridapEmbedded.LevelSetCutters: DifferentiableTriangulation, update_trian!
+using GridapEmbedded.LevelSetCutters: DifferentiableTriangulation
 
 using Zygote, ReverseDiff
 using JLD2: save_object, load_object, jldsave
@@ -65,6 +65,10 @@ export EmbeddedCollection, update_collection!, add_recipe!
 export EmbeddedCollection_in_φh
 export CUT
 export get_isolated_volumes_mask_polytopal
+
+export PolytopalLevelSetCutter
+export DiscreteGeometryFromFEFunction
+export DifferentiableEmbeddedBoundary
 export DifferentiableTriangulation
 
 include("StateMaps/StateMaps.jl")

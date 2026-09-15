@@ -8,5 +8,13 @@ using Test
 @time @testset "ReinitialiserTests" begin include("ReinitialiserTests/runtests.jl") end
 @time @testset "EvolverTests" begin include("EvolverTests/runtests.jl") end
 @time @testset "GridapTopOptTests" begin include("GridapTopOptTests/runtests.jl") end
+@time @testset "PolytopalCuttersTests" begin
+  include("PolytopalCuttersTests/runtests.jl")
+  include("PolytopalCuttersTests/runtests1.jl")
+  include("PolytopalCuttersTests/runtests2_2d.jl")
+  include("PolytopalCuttersTests/runtests2_3d.jl")
+  include("PolytopalCuttersTests/runtests3_2d.jl")
+  include("PolytopalCuttersTests/runtests3_3d.jl")
+end
 
 end # module

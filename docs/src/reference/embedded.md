@@ -31,4 +31,4 @@ GridapTopOpt.evaluate!(pcf::EmbeddedPDEConstrainedFunctionals,φh;update_space::
 ```
 
 ## Automatic shape differentiation
-Automatic shape differentiation has been moved to [GridapEmbedded](https://gridap.github.io/GridapEmbedded.jl/stable/GeometricalDerivatives/#Geometrical-Derivatives).
+See discussion in PolytopalCutters.

@@ -1,6 +1,11 @@
-
 const CUT = 0
 
+# Util
 include("EmbeddedCollections.jl")
-include("IsolatedVolumes.jl")
-include("PolytopalCutters.jl")
+
+# Isolated volumes
+include("IsolatedVolumes/IsolatedVolumes.jl")
+include("IsolatedVolumes/PolytopalCutters.jl")
+
+# Polytopal cutters (DifferentiableTriangulation & DifferentiableEmbeddedBoundary)
+include("PolytopalCutters/PolytopalCutters.jl")
