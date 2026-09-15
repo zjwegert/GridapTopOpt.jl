@@ -27,4 +27,4 @@ When using unfitted methods, we ask that you please reference the following manu
 
 ### Multi-phase unfitted methods
 When using multi-phase unfitted methods, we ask that you please reference the above manuscript as well as the following manuscript:
-> Zachary J. Wegert, Martin Berggren, and Vivien J. Challis (2026). "Shape calculus and automatic differentiation for multi-phase level-set topology optimisation with unfitted finite elements". arXiv:...
+> Zachary J. Wegert, Martin Berggren, and Vivien J. Challis (2026). "Shape calculus and automatic differentiation for multi-phase level-set topology optimisation with unfitted finite elements". [arXiv:2609.15084 [math.NA]](https://arxiv.org/abs/2609.15084).
