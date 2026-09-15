@@ -136,33 +136,6 @@ for d in (3,)
     @info "   AD vs FDM:" err_fdm
     @test err_fdm < 1e-7
   end
-
-  function F7(φi,V_φi,Ωi_name,Ωj_name)
-    φhi = FEFunction(V_φi, φi)
-    cutgeo = compute_geo(φhi...)
-    Γ = EmbeddedBoundary(cutgeo,Ωi_name,Ωj_name)
-    dΓ = Measure(Γ,order*2)
-    return sum(∫(fh)dΓ)
-  end
-  function F7_ad(φi,V_φi,Ωi_name,Ωj_name)
-    φhi = FEFunction(V_φi, φi)
-    cutgeo = compute_geo(φhi...)
-    Γ = DifferentiableEmbeddedBoundary(cutgeo,Ωi_name,Ωj_name)
-    dΓ = Measure(Γ,order*2)
-    return _ -> ∫(fh)dΓ
-  end
-
-  for i = 1:8
-    for j = i+1:8
-      println(" #### Case b & c: φ -> ∫_{Γ_$i$j} f -- AD VS FDM ONLY")
-      _φi = get_free_dof_values(φhi)
-      dF_ad_vec = assemble_vector(gradient(F7_ad(_φi, V_φi, "Ω$i","Ω$j"),φhi),V_φi);
-      dF_fdm = FiniteDiff.finite_difference_gradient(φ -> F7(φ, V_φi, "Ω$i","Ω$j"), _φi);
-      err_fdm = maximum(abs, dF_fdm) > 0 ? maximum(abs, dF_fdm - dF_ad_vec) / maximum(abs, dF_fdm) : maximum(abs, dF_fdm - dF_ad_vec)
-      @info "   AD vs FDM:" err_fdm
-      @test err_fdm < 1e-6
-    end
-  end
 end
 
 end

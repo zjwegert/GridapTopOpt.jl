@@ -43,7 +43,8 @@ jobs:
           - seq-polycut-analytic2-2d
           - seq-polycut-analytic2-3d
           - seq-polycut-analytic3-2d
-          - seq-polycut-analytic3-3d
+          - seq-polycut-analytic3-3d-vol
+          - seq-polycut-analytic3-3d-boundary
           - mpi-embedded
           - mpi-evolvers
           - mpi-gridaptopopt
