@@ -61,6 +61,9 @@ for d in (3,)
 
   cutgeo = compute_geo(φh1,φh2,φh3)
 
+  f(x) = sin(x[1])*sin(x[2])
+  fh = interpolate(f,V0)
+
   function F7(φi,V_φi,Ωi_name,Ωj_name)
     φhi = FEFunction(V_φi, φi)
     cutgeo = compute_geo(φhi...)
