@@ -60,6 +60,9 @@ for d in (3,)
   end
 
   cutgeo = compute_geo(φh1,φh2,φh3)
+  _φ1 = get_free_dof_values(φh1)
+  _φ2 = get_free_dof_values(φh2)
+  _φ3 = get_free_dof_values(φh3)
 
   f(x) = sin(x[1])*sin(x[2])
   fh = interpolate(f,V0)
