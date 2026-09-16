@@ -250,8 +250,8 @@ for d in (3,)
   @test err_ad < 1e-13
   println("#### φ1 -> ∂D^(1)(φ1) ∩ D^(2)ᶜ(φ2) ∩ D^(3)ᶜ(φ3) = Γ15(φ1,φ2,φ3)")
   dF_analytic_vec = assemble_vector(F6_analytic(1,[φh1,φh2,φh3],2,3,"Ω1","Ω5",-1,-1),V_φ1);
-  dF_ad_vec = assemble_vector(gradient(F5_ad(_φ1, V_φ1, _φ2, V_φ2, _φ3, V_φ3, "Ω1","Ω5"),φh1),V_φ1);
-  dF_fdm = FiniteDiff.finite_difference_gradient(φ -> F5(φ, V_φ1, _φ2, V_φ2, _φ3, V_φ3, "Ω1","Ω5"), _φ1);
+  dF_ad_vec = assemble_vector(gradient(F6_ad(_φ1, V_φ1, _φ2, V_φ2, _φ3, V_φ3, "Ω1","Ω5"),φh1),V_φ1);
+  dF_fdm = FiniteDiff.finite_difference_gradient(φ -> F6(φ, V_φ1, _φ2, V_φ2, _φ3, V_φ3, "Ω1","Ω5"), _φ1);
   err_fdm = maximum(abs, dF_fdm) > 0 ? maximum(abs,dF_fdm - dF_ad_vec) / maximum(abs, dF_fdm) : maximum(abs,dF_fdm - dF_ad_vec)
   err_ad = maximum(abs, dF_analytic_vec) > 0 ? maximum(abs, dF_analytic_vec - dF_ad_vec) / maximum(abs, dF_analytic_vec) : maximum(abs, dF_analytic_vec - dF_ad_vec)
   @info "   AD vs FDM:" err_fdm
