@@ -37,6 +37,8 @@ function allocate_simplexify_data(
     num_possible_simplices = 2 * num_verts * 2^N
   elseif Dc == Dp  # Cell: single tree of depth N
     num_possible_simplices = max(1, num_verts - 4 + 2 * 2^N)
+  elseif Dc == Dp - 2 # Intersection: N(N-1)/2 points/segments, each cut into at most N-1 pieces
+    num_possible_simplices = max(1, div(N*(N-1),2) * (N-1))
   else             # Facet: N trees each of depth N-1, accumulated
     num_possible_simplices = N * max(1, num_verts - 4 + 2^N)
   end
@@ -208,6 +210,28 @@ function allocate_simplexify_cache(
 end
 
 function _copy_simplex_cache_to_dest!(::PolytopeType{1},dest,cache,parent_vertices,parent_normal,parent_inout)
+  vertices, normal, inout, simplex_i = dest
+  j = simplex_i[1] += 1
+  copyto!(vertices[j], parent_vertices)
+  normal[j] = first(parent_normal)
+  copyto!(inout[j], parent_inout)
+  nothing
+end
+## Point
+function simplexify!(::PolytopeType{0},cache,graph,vertices)
+  nothing
+end
+
+function allocate_simplexify_cache(
+  ::PolytopeType{0,Dp},
+  parent_graph::Vector{Vector{Ti}},
+  parent_verts::Vector{VectorValue{Dp,Tp}},
+  ls_maps
+) where {Dp,Ti<:Integer,Tp}
+  return nothing
+end
+
+function _copy_simplex_cache_to_dest!(::PolytopeType{0},dest,cache,parent_vertices,parent_normal,parent_inout)
   vertices, normal, inout, simplex_i = dest
   j = simplex_i[1] += 1
   copyto!(vertices[j], parent_vertices)

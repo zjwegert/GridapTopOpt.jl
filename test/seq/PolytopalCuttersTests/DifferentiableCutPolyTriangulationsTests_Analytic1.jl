@@ -65,7 +65,7 @@ function run_test(d)
   # writevtk(Γφ2,"results/Shape_calc/D_phi2_$(d)D")
 
   # Test IntersectionTriangulation
-  Σ = IntersectionTriangulation(Γφ1, Γφ2)
+  Σ = restrict_intersections(cut_intersections(cutgeo),"φ1","φ2")
   Gridap.Geometry.test_triangulation(Σ)
   @info "IntersectionTriangulation created" num_cells(Σ) num_point_dims(Σ) num_cell_dims(Σ)
 
@@ -244,9 +244,7 @@ for d in (2,3)
     return φ -> ∫(fh)dΓ
   end
   function F2_analytic(φhi,j,coeff=-1)
-    Γφ1 = EmbeddedBoundary(cutgeo,"φ1")
-    Γφ2 = EmbeddedBoundary(cutgeo,"φ2")
-    Σ = IntersectionTriangulation(Γφ1, Γφ2)
+    Σ = restrict_intersections(cut_intersections(cutgeo),"φ1","φ2")
     dΣ = Measure(Σ, order*2)
     n_Di_in_∂Dj = get_tangent_vector(Σ, j)
     ∇ˢφ_Σ = Operation(abs)(n_Di_in_∂Dj ⋅ ∇(φhi))
@@ -331,9 +329,7 @@ for d in (2,3)
     n_Γ_on_Σᴰ = get_subfacet_normal_vector(Σᴰ)
     n_Σᴰ = get_ghost_normal_vector(Σᴰ)
     # Σ
-    Γφ1 = EmbeddedBoundary(cutgeo,"φ1")
-    Γφ2 = EmbeddedBoundary(cutgeo,"φ2")
-    Σ = IntersectionTriangulation(Γφ1, Γφ2)
+    Σ = restrict_intersections(cut_intersections(cutgeo),"φ1","φ2")
     dΣ = Measure(Σ, order*2)
     n_Di_in_∂Dj = get_tangent_vector(Σ, j)
     n_Σ_1 = get_normal_vector(Σ, 1)

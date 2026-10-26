@@ -510,3 +510,41 @@ function copy_line_data_to_node!(
   end
   nothing
 end
+## Point
+# Points are never split, only classified. These are the intersections in 2D.
+function split!(::PolytopeType{0},cache,graph,vertices,vertex_values)
+  @check length(vertices) == length(vertex_values) == 1
+  @check !any(iszero,vertex_values)
+  return ifelse(first(vertex_values) < 0, :in, :out)
+end
+
+# Allocate splitter cache
+function allocate_splitter_cache(
+  ::PolytopeType{0,Dp},
+  parent_graph::Vector{Vector{Ti}},
+  parent_verts::Vector{VectorValue{Dp,Tp}},
+  ls_maps
+) where {Dp,Ti<:Integer,Tp}
+  return nothing
+end
+
+# Allocate tree-data cache
+function allocate_polytope_data(
+  ::PolytopeType{0,Dp},
+  parent_graph::Vector{Vector{Ti}},
+  parent_verts::Vector{VectorValue{Dp,Tp}},
+  ls_maps
+) where {Dp,Ti<:Integer,Tp}
+  graph = [[Ti(1)]]
+  _T = _get_map_eltype(ls_maps)
+  N = length(ls_maps)
+  vertices = zeros(VectorValue{Dp,_T}, 1)
+  inoutcut = zeros(Int8, N)
+  counters = zeros(Ti, 2) # num_vertices, inout_count
+  normal = zeros(VectorValue{Dp,_T}, 1) # This is only used for intersections
+  return (;graph, vertices, inoutcut, counters, normal)
+end
+
+function copy_data_to_node!(::PolytopeType{0},node::TouchedBinaryNode,cached_data)
+  @unreachable "Points are never split"
+end

@@ -86,7 +86,7 @@ for d in (3,)
     return _ -> ∫(fh)dΓ
   end
   function F5_analytic(φhi,i,j,c,Dφk,coeff=-1)
-    Σ = RestrictedIntersectionTriangulation(cutgeo,"φ$i","φ$j",Dφk)
+    Σ = restrict_intersections(cut_intersections(cutgeo),"φ$i","φ$j",Dφk)
     dΣ = Measure(Σ, order*3)
     n_Di_in_∂Dj = get_tangent_vector(Σ, c)
     ∇ˢφ_Σ = Operation(abs)(n_Di_in_∂Dj ⋅ ∇(φhi))
