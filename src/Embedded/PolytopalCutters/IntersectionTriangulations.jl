@@ -134,7 +134,9 @@ end
 function _is_inside(node,trian::IntersectionTriangulation,cell)
   op, = node.data
   if isnothing(node.leftchild) && isnothing(node.rightchild)
-    ls = trian.oid_to_ls[objectid(op)]
+    ls = get(trian.oid_to_ls,objectid(op),0)
+    iszero(ls) && error("The restriction geometry depends on a level set \"$(node.data[2])\" that is not one of "*
+      "the cut level sets. Build it from the geometry used to compute the intersections.")
     inout = trian.intersections.ls_to_cell_to_inoutcut[ls][cell]
     @check inout != CUT "The restriction geometry cannot depend on the intersecting level sets"
     return inout == IN
