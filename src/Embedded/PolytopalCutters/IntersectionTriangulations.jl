@@ -87,14 +87,10 @@ function Geometry.get_glue(t::IntersectionTriangulation{Dc,Dp},::Val{D}) where {
   D != Dp && return nothing
   st = t.intersections
   tface_to_mface = st.cell_to_bgcell
-  if iszero(length(tface_to_mface))
-    tface_to_mface_map = Fill(Fields.GenericField(identity),0)
-  else
-    reffe = first(get_reffes(t.subgrid))
-    cell_to_shapefuns = Fill(get_shapefuns(reffe),length(tface_to_mface))
-    cell_to_rcoords = lazy_map(Broadcasting(Reindex(st.point_to_rcoords)),st.cell_to_points)
-    tface_to_mface_map = lazy_map(Fields.linear_combination,cell_to_rcoords,cell_to_shapefuns)
-  end
+  reffe = first(get_reffes(t.subgrid))
+  cell_to_shapefuns = Fill(get_shapefuns(reffe),length(tface_to_mface))
+  cell_to_rcoords = lazy_map(Broadcasting(Reindex(st.point_to_rcoords)),st.cell_to_points)
+  tface_to_mface_map = lazy_map(Fields.linear_combination,cell_to_rcoords,cell_to_shapefuns)
   FaceToFaceGlue(tface_to_mface,tface_to_mface_map,nothing)
 end
 
