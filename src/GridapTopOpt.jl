@@ -70,6 +70,9 @@ export PolytopalLevelSetCutter
 export DiscreteGeometryFromFEFunction
 export DifferentiableEmbeddedBoundary
 export DifferentiableTriangulation
+export cut_intersections
+export IntersectionTriangulation
+export restrict_intersections
 
 include("StateMaps/StateMaps.jl")
 export PDEConstrainedFunctionals
