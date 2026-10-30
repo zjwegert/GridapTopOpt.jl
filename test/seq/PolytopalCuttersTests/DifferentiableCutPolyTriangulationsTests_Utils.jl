@@ -215,7 +215,7 @@ function Gridap.Geometry.BoundaryTriangulation(
   face_to_cell_bg = Gridap.Geometry.get_faces(bg_topo, Dc-1, Dc)
   cell_to_face_bg = Gridap.Geometry.get_faces(bg_topo, Dc, Dc-1)
   is_bgbdy(f)      = isone(length(view(face_to_cell_bg, f)))
-  bgcell_on_bdy(c) = any(f -> is_bgbdy(f), view(cell_to_face_bg, c))
+  bgcell_on_bdy(c) = findall(f -> is_bgbdy(f), view(cell_to_face_bg, c))
 
   Df = num_cell_dims(face_model)        # 1 in 2D, 2 in 3D
   face_topo          = get_grid_topology(face_model)
@@ -223,13 +223,34 @@ function Gridap.Geometry.BoundaryTriangulation(
   is_bdy_fm_facet    = get_isboundary_face(face_topo, Df-1)
   facet_to_bgcell    = effective_trian.subfacets.facet_to_bgcell
 
+  get_face_coordinates(topo,d) = lazy_map(Broadcasting(Reindex(get_vertex_coordinates(topo))), get_faces(topo, d, 0))
+  face_coords_bg = get_face_coordinates(bg_topo, Dc-1)
+  face_coords_fm = get_face_coordinates(face_topo, Df-1)
+  function on_face(cf,bgf)
+    cfx = face_coords_fm[cf]
+    bgx = face_coords_bg[bgf]
+    is_on_face(bgx, cfx)
+  end
+
+  function on_phys_body(f)
+    c = first(fm_facet_to_cells[f])
+    bgbndfacet_loc = bgcell_on_bdy(facet_to_bgcell[c])
+    if isempty(bgbndfacet_loc) # My attached bgcell is not on the boundary cell layer
+      is_on_phys_bdy[f] = false
+    else # I need to check if I am actually on that face
+      is_on_phys_bdy[f] = any(bgbndfacet_loc) do bgbndfacet_loc
+        bgbndfacet = view(cell_to_face_bg, facet_to_bgcell[c])[bgbndfacet_loc]
+        on_face(f,bgbndfacet)
+      end
+    end
+  end
+
   n_fm_facets    = num_faces(face_model, Df-1)   # == num_facets(face_model)
   is_on_phys_bdy = fill(false, n_fm_facets)
   for f in 1:n_fm_facets
     is_bdy_fm_facet[f] || continue
     # Topological boundary facet → exactly one incident cell in face_model
-    c = first(fm_facet_to_cells[f])
-    is_on_phys_bdy[f] = bgcell_on_bdy(facet_to_bgcell[c])
+    is_on_phys_bdy[f] = on_phys_body(f)
   end
 
   face_boundary  = BoundaryTriangulation(face_model, is_on_phys_bdy, fill(Int8(1), num_facets(face_model)))
@@ -241,4 +262,15 @@ function Gridap.Geometry.BoundaryTriangulation(
   return GridapEmbedded.Interfaces.CutFaceBoundaryTriangulation(
     face_model, effective_trian, cell_boundary, face_boundary, ghost_boundary, interface_sign
   )
+end
+
+function is_on_face(bgx::Vector{VectorValue{3,T}}, cfx::Vector{VectorValue{3,T}}) where T<:Number
+  n = cross(bgx[1] - bgx[2], bgx[1] - bgx[3])  # normal to bg-face
+  d = maximum(norm.(dot.(n, cfx .- bgx[1])))  # max distance of face_model facet vertices to bg-face plane
+  return d < 100eps()
+end
+
+function is_on_face(bgx::Vector{VectorValue{2,T}}, cfx::Vector{VectorValue{2,T}}) where T<:Number
+  d = norm(cross(bgx[2] - bgx[1], cfx[1] - bgx[1]))
+  return d < 100eps()
 end

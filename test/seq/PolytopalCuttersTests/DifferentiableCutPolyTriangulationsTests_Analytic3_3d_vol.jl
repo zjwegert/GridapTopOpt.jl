@@ -72,8 +72,8 @@ for d in (3,)
     φh1 = FEFunction(V_φ1, φ1)
     φh2 = FEFunction(V_φ2, φ2)
     φh3 = FEFunction(V_φ3, φ3)
-    cutgeo = compute_geo(φh1,φh2,φh3)
-    Di_cap_Dj = Triangulation(cutgeo,Ω_name)
+    _cutgeo = compute_geo(φh1,φh2,φh3)
+    Di_cap_Dj = Triangulation(_cutgeo,Ω_name)
     dΩ = Measure(Di_cap_Dj,order*2)
     return sum(∫(fh)dΩ)
   end
@@ -81,8 +81,8 @@ for d in (3,)
     φh1 = FEFunction(V_φ1, φ1)
     φh2 = FEFunction(V_φ2, φ2)
     φh3 = FEFunction(V_φ3, φ3)
-    cutgeo = compute_geo(φh1,φh2,φh3)
-    Di_cap_Dj = DifferentiableTriangulation(cutgeo,Ω_name)
+    _cutgeo = compute_geo(φh1,φh2,φh3)
+    Di_cap_Dj = DifferentiableTriangulation(_cutgeo,Ω_name)
     dΩ = Measure(Di_cap_Dj,order*2)
     return φ -> ∫(fh)dΩ
   end
@@ -118,23 +118,35 @@ for d in (3,)
   for case in keys(cases)
     _f_ad = F4_ad(_φ1,V_φ1,_φ2,V_φ2,_φ3,V_φ3,case)
     @info "Testing case φ1 -> $case(φ1,φ2,φ3)"
+    dF_analytic_vec = assemble_vector(F4_analytic(φh1, cases[case][1]...),V_φ1)
     dF_ad_vec = assemble_vector(gradient(_f_ad,φh1),V_φ1)
     dF_fdm = FiniteDiff.finite_difference_gradient(φ -> F4(φ, V_φ1, _φ2, V_φ2, _φ3, V_φ3, case), _φ1)
-    err_fdm = maximum(abs, dF_ad_vec) > 0 ? maximum(abs,dF_fdm - dF_ad_vec) / maximum(abs, dF_ad_vec) : maximum(abs,dF_fdm - dF_ad_vec)
+    err_fdm = maximum(abs, dF_fdm) > 0 ? maximum(abs,dF_fdm - dF_ad_vec) / maximum(abs, dF_fdm) : maximum(abs,dF_fdm - dF_ad_vec)
+    err_ad = maximum(abs, dF_analytic_vec) > 0 ? maximum(abs, dF_analytic_vec - dF_ad_vec) / maximum(abs, dF_analytic_vec) : maximum(abs, dF_analytic_vec - dF_ad_vec)
     @info "   AD vs FDM:" err_fdm
     @test err_fdm < 1e-6
+    @info "   Analytic vs AD:" err_ad
+    @test err_ad < 1e-13
     @info "Testing case φ2 -> $case(φ1,φ2,φ3)"
+    dF_analytic_vec = assemble_vector(F4_analytic(φh2, cases[case][2]...),V_φ2)
     dF_ad_vec = assemble_vector(gradient(_f_ad,φh2),V_φ2)
     dF_fdm = FiniteDiff.finite_difference_gradient(φ -> F4(_φ1, V_φ1, φ, V_φ2, _φ3, V_φ3, case), _φ2)
-    err_fdm = maximum(abs, dF_ad_vec) > 0 ? maximum(abs,dF_fdm - dF_ad_vec) / maximum(abs, dF_ad_vec) : maximum(abs,dF_fdm - dF_ad_vec)
+    err_fdm = maximum(abs, dF_fdm) > 0 ? maximum(abs,dF_fdm - dF_ad_vec) / maximum(abs, dF_fdm) : maximum(abs,dF_fdm - dF_ad_vec)
+    err_ad = maximum(abs, dF_analytic_vec) > 0 ? maximum(abs, dF_analytic_vec - dF_ad_vec) / maximum(abs, dF_analytic_vec) : maximum(abs, dF_analytic_vec - dF_ad_vec)
     @info "   AD vs FDM:" err_fdm
     @test err_fdm < 1e-7
+    @info "   Analytic vs AD:" err_ad
+    @test err_ad < 1e-14
     @info "Testing case φ3 -> $case(φ1,φ2,φ3)"
+    dF_analytic_vec = assemble_vector(F4_analytic(φh3, cases[case][3]...),V_φ3)
     dF_ad_vec = assemble_vector(gradient(_f_ad,φh3),V_φ3)
     dF_fdm = FiniteDiff.finite_difference_gradient(φ -> F4(_φ1, V_φ1, _φ2, V_φ2, φ, V_φ3, case), _φ3)
-    err_fdm = maximum(abs, dF_ad_vec) > 0 ? maximum(abs,dF_fdm - dF_ad_vec) / maximum(abs, dF_ad_vec) : maximum(abs,dF_fdm - dF_ad_vec)
+    err_fdm = maximum(abs, dF_fdm) > 0 ? maximum(abs,dF_fdm - dF_ad_vec) / maximum(abs, dF_fdm) : maximum(abs,dF_fdm - dF_ad_vec)
+    err_ad = maximum(abs, dF_analytic_vec) > 0 ? maximum(abs, dF_analytic_vec - dF_ad_vec) / maximum(abs, dF_analytic_vec) : maximum(abs, dF_analytic_vec - dF_ad_vec)
     @info "   AD vs FDM:" err_fdm
     @test err_fdm < 1e-7
+    @info "   Analytic vs AD:" err_ad
+    @test err_ad < 1e-12
   end
 end
 
