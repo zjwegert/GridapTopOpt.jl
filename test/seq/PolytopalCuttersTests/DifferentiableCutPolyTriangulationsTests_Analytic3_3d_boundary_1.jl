@@ -60,36 +60,287 @@ for d in (3,)
   end
 
   cutgeo = compute_geo(φh1,φh2,φh3)
+  _φ1 = get_free_dof_values(φh1)
+  _φ2 = get_free_dof_values(φh2)
+  _φ3 = get_free_dof_values(φh3)
 
   f(x) = sin(x[1])*sin(x[2])
   fh = interpolate(f,V0)
-
-  function F7(φi,V_φi,Ωi_name,Ωj_name)
-    φhi = FEFunction(V_φi, φi)
-    cutgeo = compute_geo(φhi...)
-    Γ = EmbeddedBoundary(cutgeo,Ωi_name,Ωj_name)
-    dΓ = Measure(Γ,order*2)
+  println(" #### Case b: φ↦∫_{∂D^(i) ∩ D^(j)(φ) ∩ D^(k)(φ)} f")
+  function F5(φ1,V_φ1,φ2,V_φ2,φ3,V_φ3,Ωi_name,Ωj_name)
+    φh1 = FEFunction(V_φ1, φ1)
+    φh2 = FEFunction(V_φ2, φ2)
+    φh3 = FEFunction(V_φ3, φ3)
+    _cutgeo = compute_geo(φh1,φh2,φh3)
+    Γ = EmbeddedBoundary(_cutgeo,Ωi_name,Ωj_name)
+    dΓ = Measure(Γ,order*3)
     return sum(∫(fh)dΓ)
   end
-  function F7_ad(φi,V_φi,Ωi_name,Ωj_name)
-    φhi = FEFunction(V_φi, φi)
-    cutgeo = compute_geo(φhi...)
-    Γ = DifferentiableEmbeddedBoundary(cutgeo,Ωi_name,Ωj_name)
+  function F5_ad(φ1,V_φ1,φ2,V_φ2,φ3,V_φ3,Ωi_name,Ωj_name)
+    φh1 = FEFunction(V_φ1, φ1)
+    φh2 = FEFunction(V_φ2, φ2)
+    φh3 = FEFunction(V_φ3, φ3)
+    _cutgeo = compute_geo(φh1,φh2,φh3)
+    Γ = DifferentiableEmbeddedBoundary(_cutgeo,Ωi_name,Ωj_name)
     dΓ = Measure(Γ,order*2)
     return _ -> ∫(fh)dΓ
   end
-
-  for i = 1:2
-    for j = i+1:8
-      println(" #### Case b & c: φ -> ∫_{Γ_$i$j} f -- AD VS FDM ONLY")
-      _φi = get_free_dof_values(φhi)
-      dF_ad_vec = assemble_vector(gradient(F7_ad(_φi, V_φi, "Ω$i","Ω$j"),φhi),V_φi);
-      dF_fdm = FiniteDiff.finite_difference_gradient(φ -> F7(φ, V_φi, "Ω$i","Ω$j"), _φi);
-      err_fdm = maximum(abs, dF_fdm) > 0 ? maximum(abs, dF_fdm - dF_ad_vec) / maximum(abs, dF_fdm) : maximum(abs, dF_fdm - dF_ad_vec)
-      @info "   AD vs FDM:" err_fdm
-      @test err_fdm < 1e-6
-    end
+  function F5_analytic(φhi,i,j,c,Dφk,coeff=-1)
+    Σ = restrict_intersections(cut_intersections(cutgeo),"φ$i","φ$j",Dφk)
+    dΣ = Measure(Σ, order*3)
+    n_Di_in_∂Dj = get_tangent_vector(Σ, c)
+    ∇ˢφ_Σ = Operation(abs)(n_Di_in_∂Dj ⋅ ∇(φhi))
+    return w -> ∫(coeff*(fh*w)/∇ˢφ_Σ)dΣ
   end
+
+  Dφ1 = get_geometry(cutgeo.geo,"φ1")
+  Dφ2 = get_geometry(cutgeo.geo,"φ2")
+  Dφ3 = get_geometry(cutgeo.geo,"φ3")
+
+  # writevtk(Triangulation(cutgeo,Dφ1), "Dφ1")
+  # writevtk(Triangulation(cutgeo,Dφ2), "Dφ2")
+  # writevtk(Triangulation(cutgeo,Dφ3), "Dφ3")
+
+  println("#### φ2 -> ∂D^(1)(φ1) ∩ D^(2)(φ2) ∩ D^(3)(φ3)  = Γ48(φ1,φ2,φ3)")
+  dF_analytic_vec = assemble_vector(F5_analytic(φh2,1,2,1,Dφ3,-1),V_φ2);
+  dF_ad_vec = assemble_vector(gradient(F5_ad(_φ1, V_φ1, _φ2, V_φ2, _φ3, V_φ3, "Ω4","Ω8"),φh2),V_φ2);
+  dF_fdm = FiniteDiff.finite_difference_gradient(φ -> F5(_φ1, V_φ1, φ, V_φ2, _φ3, V_φ3, "Ω4","Ω8"), _φ2);
+  err_fdm = maximum(abs, dF_fdm) > 0 ? maximum(abs,dF_fdm - dF_ad_vec) / maximum(abs, dF_fdm) : maximum(abs,dF_fdm - dF_ad_vec)
+  err_ad = maximum(abs, dF_analytic_vec) > 0 ? maximum(abs, dF_analytic_vec - dF_ad_vec) / maximum(abs, dF_analytic_vec) : maximum(abs, dF_analytic_vec - dF_ad_vec)
+  @info "   AD vs FDM:" err_fdm
+  @test err_fdm < 1e-6
+  @info "   Analytic vs AD:" err_ad
+  @test err_ad < 1e-13
+  println("#### φ3 -> ∂D^(1)(φ1) ∩ D^(2)(φ2) ∩ D^(3)(φ3)  = Γ48(φ1,φ2,φ3)")
+  dF_analytic_vec = assemble_vector(F5_analytic(φh3,1,3,1,Dφ2,-1),V_φ3);
+  dF_ad_vec = assemble_vector(gradient(F5_ad(_φ1, V_φ1, _φ2, V_φ2, _φ3, V_φ3, "Ω4","Ω8"),φh3),V_φ3);
+  dF_fdm = FiniteDiff.finite_difference_gradient(φ -> F5(_φ1, V_φ1, _φ2, V_φ2, φ, V_φ3, "Ω4","Ω8"), _φ3);
+  err_fdm = maximum(abs, dF_fdm) > 0 ? maximum(abs,dF_fdm - dF_ad_vec) / maximum(abs, dF_fdm) : maximum(abs,dF_fdm - dF_ad_vec)
+  err_ad = maximum(abs, dF_analytic_vec) > 0 ? maximum(abs, dF_analytic_vec - dF_ad_vec) / maximum(abs, dF_analytic_vec) : maximum(abs, dF_analytic_vec - dF_ad_vec)
+  @info "   AD vs FDM:" err_fdm
+  @test err_fdm < 1e-6
+  @info "   Analytic vs AD:" err_ad
+  @test err_ad < 1e-13
+  println("#### φ2 -> D^(1)(φ1) ∩ D^(2)(φ2)ᶜ ∩ ∂D^(3)(φ3) = Γ13(φ1,φ2,φ3)")
+  dF_analytic_vec = assemble_vector(F5_analytic(φh2,3,2,1,Dφ1,1),V_φ2);
+  dF_ad_vec = assemble_vector(gradient(F5_ad(_φ1, V_φ1, _φ2, V_φ2, _φ3, V_φ3, "Ω1","Ω3"),φh2),V_φ2);
+  dF_fdm = FiniteDiff.finite_difference_gradient(φ -> F5(_φ1, V_φ1, φ, V_φ2, _φ3, V_φ3, "Ω1","Ω3"), _φ2);
+  err_fdm = maximum(abs, dF_fdm) > 0 ? maximum(abs,dF_fdm - dF_ad_vec) / maximum(abs, dF_fdm) : maximum(abs,dF_fdm - dF_ad_vec)
+  err_ad = maximum(abs, dF_analytic_vec) > 0 ? maximum(abs, dF_analytic_vec - dF_ad_vec) / maximum(abs, dF_analytic_vec) : maximum(abs, dF_analytic_vec - dF_ad_vec)
+  @info "   AD vs FDM:" err_fdm
+  @test err_fdm < 1e-6
+  @info "   Analytic vs AD:" err_ad
+  @test err_ad < 1e-13
+  println("#### φ1 -> D^(1)(φ1) ∩ D^(2)(φ2)ᶜ ∩ ∂D^(3)(φ3) = Γ13(φ1,φ2,φ3)")
+  dF_analytic_vec = assemble_vector(F5_analytic(φh1,3,1,1,!Dφ2,-1),V_φ1);
+  dF_ad_vec = assemble_vector(gradient(F5_ad(_φ1, V_φ1, _φ2, V_φ2, _φ3, V_φ3, "Ω1","Ω3"),φh1),V_φ1);
+  dF_fdm = FiniteDiff.finite_difference_gradient(φ -> F5(φ, V_φ1, _φ2, V_φ2, _φ3, V_φ3, "Ω1","Ω3"), _φ1);
+  err_fdm = maximum(abs, dF_fdm) > 0 ? maximum(abs,dF_fdm - dF_ad_vec) / maximum(abs, dF_fdm) : maximum(abs,dF_fdm - dF_ad_vec)
+  err_ad = maximum(abs, dF_analytic_vec) > 0 ? maximum(abs, dF_analytic_vec - dF_ad_vec) / maximum(abs, dF_analytic_vec) : maximum(abs, dF_analytic_vec - dF_ad_vec)
+  @info "   AD vs FDM:" err_fdm
+  @test err_fdm < 1e-5
+  @info "   Analytic vs AD:" err_ad
+  @test err_ad < 1e-13
+  println("#### φ1 -> D^(1)(φ1) ∩ ∂D^(2)(φ2) ∩ D^(3)ᶜ(φ3) = Γ12(φ1,φ2,φ3)")
+  dF_analytic_vec = assemble_vector(F5_analytic(φh1,2,1,1,!Dφ3,-1),V_φ1);
+  dF_ad_vec = assemble_vector(gradient(F5_ad(_φ1, V_φ1, _φ2, V_φ2, _φ3, V_φ3, "Ω1","Ω2"),φh1),V_φ1);
+  dF_fdm = FiniteDiff.finite_difference_gradient(φ -> F5(φ, V_φ1, _φ2, V_φ2, _φ3, V_φ3, "Ω1","Ω2"), _φ1);
+  err_fdm = maximum(abs, dF_fdm) > 0 ? maximum(abs,dF_fdm - dF_ad_vec) / maximum(abs, dF_fdm) : maximum(abs,dF_fdm - dF_ad_vec)
+  err_ad = maximum(abs, dF_analytic_vec) > 0 ? maximum(abs, dF_analytic_vec - dF_ad_vec) / maximum(abs, dF_analytic_vec) : maximum(abs, dF_analytic_vec - dF_ad_vec)
+  @info "   AD vs FDM:" err_fdm
+  @test err_fdm < 1e-6
+  @info "   Analytic vs AD:" err_ad
+  @test err_ad < 1e-13
+  println("#### φ3 -> D^(1)(φ1) ∩ ∂D^(2)(φ2) ∩ D^(3)ᶜ(φ3) = Γ12(φ1,φ2,φ3)")
+  dF_analytic_vec = assemble_vector(F5_analytic(φh3,2,3,1,Dφ1,1),V_φ3);
+  dF_ad_vec = assemble_vector(gradient(F5_ad(_φ1, V_φ1, _φ2, V_φ2, _φ3, V_φ3, "Ω1","Ω2"),φh3),V_φ3);
+  dF_fdm = FiniteDiff.finite_difference_gradient(φ -> F5(_φ1, V_φ1, _φ2, V_φ2, φ, V_φ3, "Ω1","Ω2"), _φ3);
+  err_fdm = maximum(abs, dF_fdm) > 0 ? maximum(abs,dF_fdm - dF_ad_vec) / maximum(abs, dF_fdm) : maximum(abs,dF_fdm - dF_ad_vec)
+  err_ad = maximum(abs, dF_analytic_vec) > 0 ? maximum(abs, dF_analytic_vec - dF_ad_vec) / maximum(abs, dF_analytic_vec) : maximum(abs, dF_analytic_vec - dF_ad_vec)
+  @info "   AD vs FDM:" err_fdm
+  @test err_fdm < 1e-6
+  @info "   Analytic vs AD:" err_ad
+  @test err_ad < 1e-13
+  println("#### φ2 -> ∂D^(1)(φ1) ∩ D^(2)ᶜ(φ2) ∩ D^(3)ᶜ(φ3) = Γ15(φ1,φ2,φ3)")
+  dF_analytic_vec = assemble_vector(F5_analytic(φh2,1,2,1,!Dφ3,1),V_φ2);
+  dF_ad_vec = assemble_vector(gradient(F5_ad(_φ1, V_φ1, _φ2, V_φ2, _φ3, V_φ3, "Ω1","Ω5"),φh2),V_φ2);
+  dF_fdm = FiniteDiff.finite_difference_gradient(φ -> F5(_φ1, V_φ1, φ, V_φ2, _φ3, V_φ3, "Ω1","Ω5"), _φ2);
+  err_fdm = maximum(abs, dF_fdm) > 0 ? maximum(abs,dF_fdm - dF_ad_vec) / maximum(abs, dF_fdm) : maximum(abs,dF_fdm - dF_ad_vec)
+  err_ad = maximum(abs, dF_analytic_vec) > 0 ? maximum(abs, dF_analytic_vec - dF_ad_vec) / maximum(abs, dF_analytic_vec) : maximum(abs, dF_analytic_vec - dF_ad_vec)
+  @info "   AD vs FDM:" err_fdm
+  @test err_fdm < 1e-6
+  @info "   Analytic vs AD:" err_ad
+  @test err_ad < 1e-13
+  println("#### φ3 -> ∂D^(1)(φ1) ∩ D^(2)ᶜ(φ2) ∩ D^(3)ᶜ(φ3) = Γ15(φ1,φ2,φ3)")
+  dF_analytic_vec = assemble_vector(F5_analytic(φh3,1,3,1,!Dφ2,1),V_φ3);
+  dF_ad_vec = assemble_vector(gradient(F5_ad(_φ1, V_φ1, _φ2, V_φ2, _φ3, V_φ3, "Ω1","Ω5"),φh3),V_φ3);
+  dF_fdm = FiniteDiff.finite_difference_gradient(φ -> F5(_φ1, V_φ1, _φ2, V_φ2, φ, V_φ3, "Ω1","Ω5"), _φ3);
+  err_fdm = maximum(abs, dF_fdm) > 0 ? maximum(abs,dF_fdm - dF_ad_vec) / maximum(abs, dF_fdm) : maximum(abs,dF_fdm - dF_ad_vec)
+  err_ad = maximum(abs, dF_analytic_vec) > 0 ? maximum(abs, dF_analytic_vec - dF_ad_vec) / maximum(abs, dF_analytic_vec) : maximum(abs, dF_analytic_vec - dF_ad_vec)
+  @info "   AD vs FDM:" err_fdm
+  @test err_fdm < 1e-6
+  @info "   Analytic vs AD:" err_ad
+  @test err_ad < 1e-13
+  println("#### φ2 -> D^(1)(φ1) ∩ D^(2)(φ2) ∩ ∂D^(3)(φ3) = Γ24(φ1,φ2,φ3)")
+  dF_analytic_vec = assemble_vector(F5_analytic(φh2,3,2,1,Dφ1,-1),V_φ2);
+  dF_ad_vec = assemble_vector(gradient(F5_ad(_φ1, V_φ1, _φ2, V_φ2, _φ3, V_φ3, "Ω2","Ω4"),φh2),V_φ2);
+  dF_fdm = FiniteDiff.finite_difference_gradient(φ -> F5(_φ1, V_φ1, φ, V_φ2, _φ3, V_φ3, "Ω2","Ω4"), _φ2);
+  err_fdm = maximum(abs, dF_fdm) > 0 ? maximum(abs,dF_fdm - dF_ad_vec) / maximum(abs, dF_fdm) : maximum(abs,dF_fdm - dF_ad_vec)
+  err_ad = maximum(abs, dF_analytic_vec) > 0 ? maximum(abs, dF_analytic_vec - dF_ad_vec) / maximum(abs, dF_analytic_vec) : maximum(abs, dF_analytic_vec - dF_ad_vec)
+  @info "   AD vs FDM:" err_fdm
+  @test err_fdm < 1e-6
+  @info "   Analytic vs AD:" err_ad
+  @test err_ad < 1e-13
+  println("#### φ1 -> D^(1)(φ1) ∩ D^(2)(φ2) ∩ ∂D^(3)(φ3) = Γ24(φ1,φ2,φ3)")
+  dF_analytic_vec = assemble_vector(F5_analytic(φh1,3,1,1,Dφ2,-1),V_φ1);
+  dF_ad_vec = assemble_vector(gradient(F5_ad(_φ1, V_φ1, _φ2, V_φ2, _φ3, V_φ3, "Ω2","Ω4"),φh1),V_φ1);
+  dF_fdm = FiniteDiff.finite_difference_gradient(φ -> F5(φ, V_φ1, _φ2, V_φ2, _φ3, V_φ3, "Ω2","Ω4"), _φ1);
+  err_fdm = maximum(abs, dF_fdm) > 0 ? maximum(abs,dF_fdm - dF_ad_vec) / maximum(abs, dF_fdm) : maximum(abs,dF_fdm - dF_ad_vec)
+  err_ad = maximum(abs, dF_analytic_vec) > 0 ? maximum(abs, dF_analytic_vec - dF_ad_vec) / maximum(abs, dF_analytic_vec) : maximum(abs, dF_analytic_vec - dF_ad_vec)
+  @info "   AD vs FDM:" err_fdm
+  @test err_fdm < 1e-6
+  @info "   Analytic vs AD:" err_ad
+  @test err_ad < 1e-13
+  println("#### φ1 -> D^(1)ᶜ(φ1) ∩ D^(2)(φ2) ∩ ∂D^(3)(φ3) = Γ68(φ1,φ2,φ3)")
+  dF_analytic_vec = assemble_vector(F5_analytic(φh1,3,1,1,Dφ2,1),V_φ1);
+  dF_ad_vec = assemble_vector(gradient(F5_ad(_φ1, V_φ1, _φ2, V_φ2, _φ3, V_φ3, "Ω6","Ω8"),φh1),V_φ1);
+  dF_fdm = FiniteDiff.finite_difference_gradient(φ -> F5(φ, V_φ1, _φ2, V_φ2, _φ3, V_φ3, "Ω6","Ω8"), _φ1);
+  err_fdm = maximum(abs, dF_fdm) > 0 ? maximum(abs,dF_fdm - dF_ad_vec) / maximum(abs, dF_fdm) : maximum(abs,dF_fdm - dF_ad_vec)
+  err_ad = maximum(abs, dF_analytic_vec) > 0 ? maximum(abs, dF_analytic_vec - dF_ad_vec) / maximum(abs, dF_analytic_vec) : maximum(abs, dF_analytic_vec - dF_ad_vec)
+  @info "   AD vs FDM:" err_fdm
+  @test err_fdm < 1e-6
+  @info "   Analytic vs AD:" err_ad
+  @test err_ad < 1e-13
+  println("#### φ2 -> D^(1)ᶜ(φ1) ∩ D^(2)(φ2) ∩ ∂D^(3)(φ3) = Γ68(φ1,φ2,φ3)")
+  dF_analytic_vec = assemble_vector(F5_analytic(φh2,3,2,1,!Dφ1,-1),V_φ1);
+  dF_ad_vec = assemble_vector(gradient(F5_ad(_φ1, V_φ1, _φ2, V_φ2, _φ3, V_φ3, "Ω6","Ω8"),φh2),V_φ2);
+  dF_fdm = FiniteDiff.finite_difference_gradient(φ -> F5(_φ1, V_φ1, φ, V_φ2, _φ3, V_φ3, "Ω6","Ω8"), _φ2);
+  err_fdm = maximum(abs, dF_fdm) > 0 ? maximum(abs,dF_fdm - dF_ad_vec) / maximum(abs, dF_fdm) : maximum(abs,dF_fdm - dF_ad_vec)
+  err_ad = maximum(abs, dF_analytic_vec) > 0 ? maximum(abs, dF_analytic_vec - dF_ad_vec) / maximum(abs, dF_analytic_vec) : maximum(abs, dF_analytic_vec - dF_ad_vec)
+  @info "   AD vs FDM:" err_fdm
+  @test err_fdm < 1e-6
+  @info "   Analytic vs AD:" err_ad
+  @test err_ad < 1e-13
+  println("#### φ1 -> D^(1)ᶜ(φ1) ∩ D^(2)ᶜ(φ2) ∩ ∂D^(3)(φ3) = Γ57(φ1,φ2,φ3)")
+  dF_analytic_vec = assemble_vector(F5_analytic(φh1,3,1,1,!Dφ2,1),V_φ1);
+  dF_ad_vec = assemble_vector(gradient(F5_ad(_φ1, V_φ1, _φ2, V_φ2, _φ3, V_φ3, "Ω5","Ω7"),φh1),V_φ1);
+  dF_fdm = FiniteDiff.finite_difference_gradient(φ -> F5(φ, V_φ1, _φ2, V_φ2, _φ3, V_φ3, "Ω5","Ω7"), _φ1);
+  err_fdm = maximum(abs, dF_fdm) > 0 ? maximum(abs,dF_fdm - dF_ad_vec) / maximum(abs, dF_fdm) : maximum(abs,dF_fdm - dF_ad_vec)
+  err_ad = maximum(abs, dF_analytic_vec) > 0 ? maximum(abs, dF_analytic_vec - dF_ad_vec) / maximum(abs, dF_analytic_vec) : maximum(abs, dF_analytic_vec - dF_ad_vec)
+  @info "   AD vs FDM:" err_fdm
+  @test err_fdm < 1e-6
+  @info "   Analytic vs AD:" err_ad
+  @test err_ad < 1e-13
+  println("#### φ2 -> D^(1)ᶜ(φ1) ∩ D^(2)ᶜ(φ2) ∩ ∂D^(3)(φ3) = Γ57(φ1,φ2,φ3)")
+  dF_analytic_vec = assemble_vector(F5_analytic(φh2,3,2,1,!Dφ1,1),V_φ2);
+  dF_ad_vec = assemble_vector(gradient(F5_ad(_φ1, V_φ1, _φ2, V_φ2, _φ3, V_φ3, "Ω5","Ω7"),φh2),V_φ2);
+  dF_fdm = FiniteDiff.finite_difference_gradient(φ -> F5(_φ1, V_φ1, φ, V_φ2, _φ3, V_φ3, "Ω5","Ω7"), _φ2);
+  err_fdm = maximum(abs, dF_fdm) > 0 ? maximum(abs,dF_fdm - dF_ad_vec) / maximum(abs, dF_fdm) : maximum(abs,dF_fdm - dF_ad_vec)
+  err_ad = maximum(abs, dF_analytic_vec) > 0 ? maximum(abs, dF_analytic_vec - dF_ad_vec) / maximum(abs, dF_analytic_vec) : maximum(abs, dF_analytic_vec - dF_ad_vec)
+  @info "   AD vs FDM:" err_fdm
+  @test err_fdm < 1e-6
+  @info "   Analytic vs AD:" err_ad
+  @test err_ad < 1e-13
+  println("#### φ1 -> D^(1)(φ1) ∩ ∂D^(2)(φ2) ∩ D^(3)(φ3)  = Γ43(φ1,φ2,φ3)")
+  dF_analytic_vec = assemble_vector(F5_analytic(φh1,2,1,1,Dφ3,-1),V_φ1);
+  dF_ad_vec = assemble_vector(gradient(F5_ad(_φ1, V_φ1, _φ2, V_φ2, _φ3, V_φ3, "Ω4","Ω3"),φh1),V_φ1);
+  dF_fdm = FiniteDiff.finite_difference_gradient(φ -> F5(φ, V_φ1, _φ2, V_φ2, _φ3, V_φ3, "Ω4","Ω3"), _φ1);
+  err_fdm = maximum(abs, dF_fdm) > 0 ? maximum(abs,dF_fdm - dF_ad_vec) / maximum(abs, dF_fdm) : maximum(abs,dF_fdm - dF_ad_vec)
+  err_ad = maximum(abs, dF_analytic_vec) > 0 ? maximum(abs, dF_analytic_vec - dF_ad_vec) / maximum(abs, dF_analytic_vec) : maximum(abs, dF_analytic_vec - dF_ad_vec)
+  @info "   AD vs FDM:" err_fdm
+  @test err_fdm < 1e-6
+  @info "   Analytic vs AD:" err_ad
+  @test err_ad < 1e-13
+  println("#### φ3 -> D^(1)(φ1) ∩ ∂D^(2)(φ2) ∩ D^(3)(φ3)  = Γ43(φ1,φ2,φ3)")
+  dF_analytic_vec = assemble_vector(F5_analytic(φh3,2,3,1,Dφ1,-1),V_φ3);
+  dF_ad_vec = assemble_vector(gradient(F5_ad(_φ1, V_φ1, _φ2, V_φ2, _φ3, V_φ3, "Ω4","Ω3"),φh3),V_φ3);
+  dF_fdm = FiniteDiff.finite_difference_gradient(φ -> F5(_φ1, V_φ1, _φ2, V_φ2, φ, V_φ3, "Ω4","Ω3"), _φ3);
+  err_fdm = maximum(abs, dF_fdm) > 0 ? maximum(abs,dF_fdm - dF_ad_vec) / maximum(abs, dF_fdm) : maximum(abs,dF_fdm - dF_ad_vec)
+  err_ad = maximum(abs, dF_analytic_vec) > 0 ? maximum(abs, dF_analytic_vec - dF_ad_vec) / maximum(abs, dF_analytic_vec) : maximum(abs, dF_analytic_vec - dF_ad_vec)
+  @info "   AD vs FDM:" err_fdm
+  @test err_fdm < 1e-6
+  @info "   Analytic vs AD:" err_ad
+  @test err_ad < 1e-13
+  println("#### φ1 -> D^(1)ᶜ(φ1) ∩ ∂D^(2)(φ2) ∩ D^(3)(φ3) = Γ78(φ1,φ2,φ3)")
+  dF_analytic_vec = assemble_vector(F5_analytic(φh1,2,1,1,Dφ3,1),V_φ1);
+  dF_ad_vec = assemble_vector(gradient(F5_ad(_φ1, V_φ1, _φ2, V_φ2, _φ3, V_φ3, "Ω7","Ω8"),φh1),V_φ1);
+  dF_fdm = FiniteDiff.finite_difference_gradient(φ -> F5(φ, V_φ1, _φ2, V_φ2, _φ3, V_φ3, "Ω7","Ω8"), _φ1);
+  err_fdm = maximum(abs, dF_fdm) > 0 ? maximum(abs,dF_fdm - dF_ad_vec) / maximum(abs, dF_fdm) : maximum(abs,dF_fdm - dF_ad_vec)
+  err_ad = maximum(abs, dF_analytic_vec) > 0 ? maximum(abs, dF_analytic_vec - dF_ad_vec) / maximum(abs, dF_analytic_vec) : maximum(abs, dF_analytic_vec - dF_ad_vec)
+  @info "   AD vs FDM:" err_fdm
+  @test err_fdm < 1e-6
+  @info "   Analytic vs AD:" err_ad
+  @test err_ad < 1e-13
+  println("#### φ3 -> D^(1)ᶜ(φ1) ∩ ∂D^(2)(φ2) ∩ D^(3)(φ3) = Γ78(φ1,φ2,φ3)")
+  dF_analytic_vec = assemble_vector(F5_analytic(φh3,2,3,1,!Dφ1,-1),V_φ1);
+  dF_ad_vec = assemble_vector(gradient(F5_ad(_φ1, V_φ1, _φ2, V_φ2, _φ3, V_φ3, "Ω7","Ω8"),φh3),V_φ3);
+  dF_fdm = FiniteDiff.finite_difference_gradient(φ -> F5(_φ1, V_φ1, _φ2, V_φ2, φ, V_φ3, "Ω7","Ω8"), _φ3);
+  err_fdm = maximum(abs, dF_fdm) > 0 ? maximum(abs,dF_fdm - dF_ad_vec) / maximum(abs, dF_fdm) : maximum(abs,dF_fdm - dF_ad_vec)
+  err_ad = maximum(abs, dF_analytic_vec) > 0 ? maximum(abs, dF_analytic_vec - dF_ad_vec) / maximum(abs, dF_analytic_vec) : maximum(abs, dF_analytic_vec - dF_ad_vec)
+  @info "   AD vs FDM:" err_fdm
+  @test err_fdm < 1e-6
+  @info "   Analytic vs AD:" err_ad
+  @test err_ad < 1e-13
+  println("#### φ1 -> D^(1)ᶜ(φ1) ∩ ∂D^(2)(φ2) ∩ D^(3)ᶜ(φ3) = Γ56(φ1,φ2,φ3)")
+  dF_analytic_vec = assemble_vector(F5_analytic(φh1,2,1,1,!Dφ3,1),V_φ1);
+  dF_ad_vec = assemble_vector(gradient(F5_ad(_φ1, V_φ1, _φ2, V_φ2, _φ3, V_φ3, "Ω5","Ω6"),φh1),V_φ1);
+  dF_fdm = FiniteDiff.finite_difference_gradient(φ -> F5(φ, V_φ1, _φ2, V_φ2, _φ3, V_φ3, "Ω5","Ω6"), _φ1);
+  err_fdm = maximum(abs, dF_fdm) > 0 ? maximum(abs,dF_fdm - dF_ad_vec) / maximum(abs, dF_fdm) : maximum(abs,dF_fdm - dF_ad_vec)
+  err_ad = maximum(abs, dF_analytic_vec) > 0 ? maximum(abs, dF_analytic_vec - dF_ad_vec) / maximum(abs, dF_analytic_vec) : maximum(abs, dF_analytic_vec - dF_ad_vec)
+  @info "   AD vs FDM:" err_fdm
+  @test err_fdm < 1e-6
+  @info "   Analytic vs AD:" err_ad
+  @test err_ad < 1e-13
+  println("#### φ3 -> D^(1)ᶜ(φ1) ∩ ∂D^(2)(φ2) ∩ D^(3)ᶜ(φ3) = Γ56(φ1,φ2,φ3)")
+  dF_analytic_vec = assemble_vector(F5_analytic(φh3,2,3,1,!Dφ1,1),V_φ1);
+  dF_ad_vec = assemble_vector(gradient(F5_ad(_φ1, V_φ1, _φ2, V_φ2, _φ3, V_φ3, "Ω5","Ω6"),φh3),V_φ3);
+  dF_fdm = FiniteDiff.finite_difference_gradient(φ -> F5(_φ1, V_φ1, _φ2, V_φ2, φ, V_φ3, "Ω5","Ω6"), _φ3);
+  err_fdm = maximum(abs, dF_fdm) > 0 ? maximum(abs,dF_fdm - dF_ad_vec) / maximum(abs, dF_fdm) : maximum(abs,dF_fdm - dF_ad_vec)
+  err_ad = maximum(abs, dF_analytic_vec) > 0 ? maximum(abs, dF_analytic_vec - dF_ad_vec) / maximum(abs, dF_analytic_vec) : maximum(abs, dF_analytic_vec - dF_ad_vec)
+  @info "   AD vs FDM:" err_fdm
+  @test err_fdm < 1e-6
+  @info "   Analytic vs AD:" err_ad
+  @test err_ad < 1e-13
+  println("#### φ2 -> ∂D^(1)(φ1) ∩ D^(2)ᶜ(φ2) ∩ D^(3)(φ3) = Γ37(φ1,φ2,φ3)")
+  dF_analytic_vec = assemble_vector(F5_analytic(φh2,1,2,1,Dφ3,1),V_φ2);
+  dF_ad_vec = assemble_vector(gradient(F5_ad(_φ1, V_φ1, _φ2, V_φ2, _φ3, V_φ3, "Ω3","Ω7"),φh2),V_φ2);
+  dF_fdm = FiniteDiff.finite_difference_gradient(φ -> F5(_φ1, V_φ1, φ, V_φ2, _φ3, V_φ3, "Ω3","Ω7"), _φ2);
+  err_fdm = maximum(abs, dF_fdm) > 0 ? maximum(abs,dF_fdm - dF_ad_vec) / maximum(abs, dF_fdm) : maximum(abs,dF_fdm - dF_ad_vec)
+  err_ad = maximum(abs, dF_analytic_vec) > 0 ? maximum(abs, dF_analytic_vec - dF_ad_vec) / maximum(abs, dF_analytic_vec) : maximum(abs, dF_analytic_vec - dF_ad_vec)
+  @info "   AD vs FDM:" err_fdm
+  @test err_fdm < 1e-6
+  @info "   Analytic vs AD:" err_ad
+  @test err_ad < 1e-13
+  println("#### φ3 -> ∂D^(1)(φ1) ∩ D^(2)ᶜ(φ2) ∩ D^(3)(φ3) = Γ37(φ1,φ2,φ3)")
+  dF_analytic_vec = assemble_vector(F5_analytic(φh3,1,3,1,!Dφ2,-1),V_φ3);
+  dF_ad_vec = assemble_vector(gradient(F5_ad(_φ1, V_φ1, _φ2, V_φ2, _φ3, V_φ3, "Ω3","Ω7"),φh3),V_φ3);
+  dF_fdm = FiniteDiff.finite_difference_gradient(φ -> F5(_φ1, V_φ1, _φ2, V_φ2, φ, V_φ3, "Ω3","Ω7"), _φ3);
+  err_fdm = maximum(abs, dF_fdm) > 0 ? maximum(abs,dF_fdm - dF_ad_vec) / maximum(abs, dF_fdm) : maximum(abs,dF_fdm - dF_ad_vec)
+  err_ad = maximum(abs, dF_analytic_vec) > 0 ? maximum(abs, dF_analytic_vec - dF_ad_vec) / maximum(abs, dF_analytic_vec) : maximum(abs, dF_analytic_vec - dF_ad_vec)
+  @info "   AD vs FDM:" err_fdm
+  @test err_fdm < 1e-6
+  @info "   Analytic vs AD:" err_ad
+  @test err_ad < 1e-13
+  println("#### φ2 -> ∂D^(1)(φ1) ∩ D^(2)(φ2) ∩ D^(3)ᶜ(φ3) = Γ26(φ1,φ2,φ3)")
+  dF_analytic_vec = assemble_vector(F5_analytic(φh2,1,2,1,!Dφ3,-1),V_φ2);
+  dF_ad_vec = assemble_vector(gradient(F5_ad(_φ1, V_φ1, _φ2, V_φ2, _φ3, V_φ3, "Ω2","Ω6"),φh2),V_φ2);
+  dF_fdm = FiniteDiff.finite_difference_gradient(φ -> F5(_φ1, V_φ1, φ, V_φ2, _φ3, V_φ3, "Ω2","Ω6"), _φ2);
+  err_fdm = maximum(abs, dF_fdm) > 0 ? maximum(abs,dF_fdm - dF_ad_vec) / maximum(abs, dF_fdm) : maximum(abs,dF_fdm - dF_ad_vec)
+  err_ad = maximum(abs, dF_analytic_vec) > 0 ? maximum(abs, dF_analytic_vec - dF_ad_vec) / maximum(abs, dF_analytic_vec) : maximum(abs, dF_analytic_vec - dF_ad_vec)
+  @info "   AD vs FDM:" err_fdm
+  @test err_fdm < 1e-6
+  @info "   Analytic vs AD:" err_ad
+  @test err_ad < 1e-13
+  println("#### φ3 -> ∂D^(1)(φ1) ∩ D^(2)(φ2) ∩ D^(3)ᶜ(φ3) = Γ26(φ1,φ2,φ3)")
+  dF_analytic_vec = assemble_vector(F5_analytic(φh3,1,3,1,Dφ2,1),V_φ1);
+  dF_ad_vec = assemble_vector(gradient(F5_ad(_φ1, V_φ1, _φ2, V_φ2, _φ3, V_φ3, "Ω2","Ω6"),φh3),V_φ3);
+  dF_fdm = FiniteDiff.finite_difference_gradient(φ -> F5(_φ1, V_φ1, _φ2, V_φ2, φ, V_φ3, "Ω2","Ω6"), _φ3);
+  err_fdm = maximum(abs, dF_fdm) > 0 ? maximum(abs,dF_fdm - dF_ad_vec) / maximum(abs, dF_fdm) : maximum(abs,dF_fdm - dF_ad_vec)
+  err_ad = maximum(abs, dF_analytic_vec) > 0 ? maximum(abs, dF_analytic_vec - dF_ad_vec) / maximum(abs, dF_analytic_vec) : maximum(abs, dF_analytic_vec - dF_ad_vec)
+  @info "   AD vs FDM:" err_fdm
+  @test err_fdm < 1e-6
+  @info "   Analytic vs AD:" err_ad
+  @test err_ad < 1e-13
 end
 
 end

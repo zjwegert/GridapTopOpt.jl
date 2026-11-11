@@ -201,6 +201,133 @@ function get_fsubcell_inout(cache)
   return @views simplexified_cell_data[3][1:num_cells]
 end
 
+### Intersection cutter map
+
+# Computes the intersections Σᵢⱼ = Γᵢ ∩ Γⱼ (i < j) of pairs of level sets, i.e. points in 2D and
+#  segments in 3D. These are only needed for shape derivatives, so they are computed separately
+#  from the cells/facets.
+struct PolytopalIntersectionCutterMap{D,N,Nc} <: PolytopalCutterMap{D,N,Nc} end
+
+PolytopalIntersectionCutterMap(D,N,Nc) = PolytopalIntersectionCutterMap{D,N,Nc}();
+
+function Arrays.return_cache(
+  ::PolytopalIntersectionCutterMap{D,A},
+  pvertices::Vector{VectorValue{D,Tp}},
+  pgraph::Vector{Vector{Ti}},
+  cell_ref_to_phys_map::Field,
+  ls_maps::Field...
+) where {D,A,Tp,Ti}
+  _T = _get_map_eltype(ls_maps)
+  p2φs_cache = map(Base.Fix2(return_cache,zero(Point{D,_T})),ls_maps)
+  r2p_cache = return_cache(cell_ref_to_phys_map,zero(Point{D,_T}))
+  φ_val_cache = zeros(_T,2*length(pvertices))
+  phys_vert_cache = zeros(Point{D,_T},2*length(pvertices))
+  ## Cell caches (only the root is split)
+  cell_data = allocate_polytope_data(PolytopeType(D,D),pgraph,pvertices,ls_maps);
+  cell_tree = preallocate_tree(cell_data,0);
+  # splitter cache
+  cell_splitter_cache = allocate_splitter_cache(PolytopeType(D,D),pgraph,pvertices,ls_maps);
+  ## Facet caches (only the root is split)
+  facet_data = allocate_polytope_data(PolytopeType(D-1,D),pgraph,pvertices,ls_maps);
+  facet_tree = preallocate_tree(facet_data,0);
+  # splitter cache
+  facet_splitter_cache = allocate_splitter_cache(PolytopeType(D-1,D),pgraph,pvertices,ls_maps);
+  ## Intersection caches
+  intersection_data = allocate_polytope_data(PolytopeType(D-2,D),pgraph,pvertices,ls_maps);
+  intersection_tree = preallocate_tree(intersection_data,max(A-2,0));
+  # splitter cache
+  intersection_splitter_cache = allocate_splitter_cache(PolytopeType(D-2,D),pgraph,pvertices,ls_maps);
+  # simplexify data/cache
+  simplexified_intersection_data = allocate_simplexify_data(PolytopeType(D-2,D),pgraph,pvertices,ls_maps)
+  simplexify_intersection_cache = allocate_simplexify_cache(PolytopeType(D-2,D),pgraph,pvertices,ls_maps)
+  # normal of the second level set and degeneracy flag
+  intersection_normals = similar(simplexified_intersection_data[2])
+  intersection_isdegenerate = zeros(Bool,1)
+  # Return caches
+  ls_map_caches = (p2φs_cache, φ_val_cache)
+  ref_to_phys_map_caches = (r2p_cache, phys_vert_cache)
+  cell_caches = (cell_tree, cell_splitter_cache)
+  facet_caches = (facet_tree, facet_splitter_cache)
+  intersection_caches = (intersection_tree, intersection_splitter_cache, simplexify_intersection_cache,
+    intersection_normals, intersection_isdegenerate)
+  return simplexified_intersection_data, cell_caches, facet_caches, intersection_caches, ls_map_caches, ref_to_phys_map_caches
+end
+
+function _reset!(::PolytopalIntersectionCutterMap{D},cache) where D
+  simplexified_intersection_data, cell_caches, facet_caches, intersection_caches, _, _ = cache
+  cell_tree, _ = cell_caches
+  facet_tree, _ = facet_caches
+  intersection_tree, _, _, _, intersection_isdegenerate = intersection_caches
+  # Reset tree data, we don't fill with zero as we reset caches inside the splitting/simplexifying functions
+  #  where needed
+  reset_touched!(cell_tree)
+  reset_touched!(facet_tree)
+  reset_touched!(intersection_tree)
+  # Reset intersection counter and degeneracy flag
+  simplexified_intersection_data[end][1] = 0
+  intersection_isdegenerate[1] = false
+  nothing
+end
+
+# No cells cut, return cache
+function Arrays.evaluate!(
+  cache,
+  k::PolytopalIntersectionCutterMap{D,N,0},
+  pvertices::Vector{VectorValue{D,Tp}},
+  pgraph::Vector{Vector{Ti}},
+  cell_ref_to_phys_map::Field,
+  ls_maps::Field...
+) where {D,N,Tp,Ti}
+  return cache
+end
+
+function Arrays.evaluate!(
+  cache,
+  k::PolytopalIntersectionCutterMap{D,A},
+  pvertices::Vector{VectorValue{D,Tp}},
+  pgraph::Vector{Vector{Ti}},
+  cell_ref_to_phys_map::Field,
+  ls_maps::Field...
+) where {D,A,Tp,Ti}
+  # Reset cache
+  _reset!(k,cache)
+  # Initialise cell tree
+  simplexified_intersection_data, cell_caches, facet_caches, intersection_caches, ls_map_caches, ref_to_phys_map_caches = cache
+  cell_tree, _ = cell_caches
+  copy_polytope_data_to_cell_tree!(cell_tree,pvertices,pgraph)
+  # Intersections
+  recursively_cut_and_simplexify_intersections!(k,simplexified_intersection_data,ls_maps,cell_ref_to_phys_map,
+    cell_caches,facet_caches,intersection_caches,ls_map_caches,ref_to_phys_map_caches)
+  return cache
+end
+
+function get_intersection_rvertices(cache)
+  simplexified_intersection_data, _, _, _, _, _ = cache
+  num_intersections = simplexified_intersection_data[end][1]
+  return @views simplexified_intersection_data[1][1:num_intersections]
+end
+
+# Normals of Γᵢ and Γⱼ for each piece of Σᵢⱼ
+function get_intersection_normals(cache)
+  simplexified_intersection_data, _, _, intersection_caches, _, _ = cache
+  _, _, _, intersection_normals, _ = intersection_caches
+  num_intersections = simplexified_intersection_data[end][1]
+  return @views simplexified_intersection_data[2][1:num_intersections], intersection_normals[1:num_intersections]
+end
+
+# CUT for the pair (i,j) of level sets defining the intersection, IN/OUT for the rest
+function get_intersections_cutinout(cache)
+  simplexified_intersection_data, _, _, _, _, _ = cache
+  num_intersections = simplexified_intersection_data[end][1]
+  return @views simplexified_intersection_data[3][1:num_intersections]
+end
+
+function get_intersection_isdegenerate(cache)
+  _, _, _, intersection_caches, _, _ = cache
+  _, _, _, _, intersection_isdegenerate = intersection_caches
+  return first(intersection_isdegenerate)
+end
+
 ### Recursively cut and simplexify
 
 function recursively_cut_and_simplexify_cells!(
@@ -264,13 +391,96 @@ function recursively_cut_and_simplexify_facet!(
   return nothing
 end
 
+# For each pair i < j, split the polytope by φᵢ (the new vertices form Γᵢ ∩ K), split Γᵢ ∩ K by φⱼ
+#  (the new vertices form Σᵢⱼ ∩ K) and recursively cut Σᵢⱼ ∩ K by the remaining level sets.
+# We assume that Σᵢⱼ does not touch the boundary of the polytope, as integrals over Σᵢⱼ are not
+#  differentiable otherwise. Such pieces are skipped and the polytope is flagged as degenerate.
+function recursively_cut_and_simplexify_intersections!(
+  k::PolytopalCutterMap{D,N},
+  simplexified_intersection_data,
+  ls_maps::Tuple{Vararg{<:Field}},
+  cell_ref_to_phys_map,
+  cell_caches,
+  facet_caches,
+  intersection_caches,
+  ls_map_caches,
+  ref_to_phys_map_caches
+) where {D,N}
+  cell_tree, cell_splitter_cache = cell_caches
+  facet_tree, facet_splitter_cache = facet_caches
+  intersection_tree, intersection_splitter_cache, simplexify_intersection_cache,
+    intersection_normals, intersection_isdegenerate = intersection_caches
+  p2φs_cache, φ_val_cache = ls_map_caches
+  r2p_cache, phys_vert_cache = ref_to_phys_map_caches
+  graph, vertices, inout, counters = cell_tree.data
+  verts_i = first(counters);
+  for i in 1:N-1
+    reset_touched!(facet_tree)
+    _φi_map = ls_maps[i]
+    _p2φi_cache = p2φs_cache[i];
+    # Split polytope by φᵢ
+    _vertices, _graph, _vtx_vals = _prepare_data_views(verts_i,vertices,graph,φ_val_cache,_φi_map,_p2φi_cache);
+    state = split!(PolytopeType(D,D),cell_splitter_cache,_graph,_vertices,_vtx_vals)
+    (state == :in || state == :out) && continue
+    # Initialise facet root and get normal
+    new_vertices = _get_new_vertices(PolytopeType(D,D),cell_splitter_cache,verts_i)
+    reorder_vertices!(new_vertices)
+    build_facet_tree_root!(PolytopeType(D-1,D),facet_tree,new_vertices)
+    n = facet_tree.data.normal
+    _compute_normal!(PolytopeType(D,D),n,_vertices,new_vertices,_φi_map,cell_ref_to_phys_map,
+      _p2φi_cache,r2p_cache,φ_val_cache,phys_vert_cache);
+    fgraph, fvertices, finout, fcounters = facet_tree.data
+    verts_f = first(fcounters);
+    for j in i+1:N
+      reset_touched!(intersection_tree)
+      _φj_map = ls_maps[j]
+      _p2φj_cache = p2φs_cache[j];
+      # Normal of Γⱼ: split polytope by φⱼ
+      _vertices, _graph, _vtx_vals = _prepare_data_views(verts_i,vertices,graph,φ_val_cache,_φj_map,_p2φj_cache);
+      φj_scale = maximum(abs,_vtx_vals)
+      state = split!(PolytopeType(D,D),cell_splitter_cache,_graph,_vertices,_vtx_vals)
+      (state == :in || state == :out) && continue
+      new_vertices = _get_new_vertices(PolytopeType(D,D),cell_splitter_cache,verts_i)
+      _nj = intersection_tree.data.normal
+      _compute_normal!(PolytopeType(D,D),_nj,_vertices,new_vertices,_φj_map,cell_ref_to_phys_map,
+        _p2φj_cache,r2p_cache,φ_val_cache,phys_vert_cache);
+      nj = first(_nj) # The leaves normal is overwritten below
+      # Split Γᵢ by φⱼ
+      _fvertices, _fgraph, _fvtx_vals = _prepare_data_views(verts_f,fvertices,fgraph,φ_val_cache,_φj_map,_p2φj_cache);
+      if _is_degenerate(_fvtx_vals,φj_scale)
+        intersection_isdegenerate[1] = true
+        continue
+      end
+      state = split!(PolytopeType(D-1,D),facet_splitter_cache,_fgraph,_fvertices,_fvtx_vals)
+      (state == :in || state == :out) && continue
+      new_fvertices = _get_new_vertices(PolytopeType(D-1,D),facet_splitter_cache,verts_f)
+      if _is_degenerate_triple_point(k,new_fvertices,_vertices,ls_maps,p2φs_cache,φ_val_cache,(i,j))
+        intersection_isdegenerate[1] = true
+        continue
+      end
+      # Initialise intersection root and recursively cut
+      build_intersection_tree_root!(PolytopeType(D-2,D),intersection_tree,new_fvertices)
+      recursively_cut!(k, PolytopeType(D-2,D), intersection_tree, ls_maps,
+        p2φs_cache, intersection_splitter_cache, φ_val_cache, (i,j))
+      _set_leaves_normal!(n,intersection_tree)
+      # Simplexify
+      num_intersections = first(simplexified_intersection_data[end])
+      simplexify_leaves!(PolytopeType(D-2,D),simplexified_intersection_data,simplexify_intersection_cache,intersection_tree)
+      my_setindex!(intersection_normals,nj,num_intersections+one(num_intersections),
+        first(simplexified_intersection_data[end]))
+    end
+  end
+  return nothing
+end
+
 function recursively_cut!(k::PolytopalCutterMap{D,N}, p::PolytopeType, node,
     remaining_ls_maps, remaining_p2φs_cache, splitter_cache, φ_val_cache, skip=0) where {D,N}
   isempty(remaining_ls_maps) && return
   N_rem = length(remaining_ls_maps)
   graph, vertices, inout, counters = node.data
-  # Skip a level-set, this is used for facet cutting
-  if skip>0 && skip == N - N_rem + 1
+  # Skip a level-set, this is used for facet cutting (one level-set) and
+  #  intersection cutting (a tuple of two level-sets)
+  if _is_skipped(skip, N - N_rem + 1)
     io_i = counters[end] += 1
     inout[io_i] = CUT # Technically not needed as CUT = 0
     recursively_cut!(k, p, node, @views(remaining_ls_maps[2:end]), @views(remaining_p2φs_cache[2:end]),
@@ -302,6 +512,39 @@ function recursively_cut!(k::PolytopalCutterMap{D,N}, p::PolytopeType, node,
 end
 
 ### Cutter helpers
+
+_is_skipped(skip::Integer,i) = skip>0 && skip == i
+_is_skipped(skip::Tuple,i) = i ∈ skip
+
+# New vertices created by the last split
+function _get_new_vertices(::PolytopeType,splitter_cache,verts_i)
+  sp_verts = splitter_cache.vertices
+  sp_counter = splitter_cache.counters
+  max_vert_i = max(sp_counter[end-1],sp_counter[end])
+  return @views sp_verts[verts_i+1:max_vert_i]
+end
+
+function _get_new_vertices(::PolytopeType{1},splitter_cache,verts_i)
+  return @views splitter_cache.vertices[end:end]
+end
+
+# Vertex values (almost) vanishing w.r.t. the scale of the level set on the polytope
+_is_degenerate(vtx_vals,scale;rtol=1e-10) = any(v -> abs(v) ≤ rtol*scale,vtx_vals)
+
+# A remaining level set (almost) vanishing at the vertices of Σᵢⱼ ∩ K, i.e., a triple point on ∂K
+function _is_degenerate_triple_point(
+  k::PolytopalCutterMap{D,N},intersection_vertices,pvertices,ls_maps,p2φs_cache,φ_val_cache,skip
+) where {D,N}
+  for l in Base.OneTo(N)
+    l ∈ skip && continue
+    _, _, _vtx_vals = _prepare_data_views(length(pvertices),pvertices,nothing,φ_val_cache,ls_maps[l],p2φs_cache[l])
+    φl_scale = maximum(abs,_vtx_vals)
+    _, _, _ivtx_vals = _prepare_data_views(length(intersection_vertices),intersection_vertices,nothing,
+      φ_val_cache,ls_maps[l],p2φs_cache[l])
+    _is_degenerate(_ivtx_vals,φl_scale) && return true
+  end
+  return false
+end
 
 function _prepare_data_views(i,vertices,graph,φ_vals,φ_map,p2φs_cache)
   _vertices = @views vertices[1:i]
@@ -430,6 +673,14 @@ function build_facet_tree_root!(::PolytopeType{2,3},tree,vertices)
     graph[i][1] = iprev
     graph[i][2] = inext
   end
+  tree.data.counters[1] = length(vertices)
+  tree.data.counters[2] = 0
+  tree.touched = true
+  nothing
+end
+
+function build_intersection_tree_root!(::Union{PolytopeType{0},PolytopeType{1}},tree,vertices)
+  copyto!(tree.data.vertices, vertices)
   tree.data.counters[1] = length(vertices)
   tree.data.counters[2] = 0
   tree.touched = true

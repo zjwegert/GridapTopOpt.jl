@@ -336,6 +336,138 @@ function cut_facets(::PolytopalLevelSetCutter,model::DiscreteModel,geom::Discret
   )
 end
 
+"""
+    cut_intersections(model::DiscreteModel,geom::DiscreteGeometryFromFEFunction)
+    cut_intersections(::PolytopalLevelSetCutter,model::DiscreteModel,geom::DiscreteGeometryFromFEFunction)
+    cut_intersections(cutgeo::EmbeddedDiscretization)
+
+Compute the pairwise intersections Σᵢⱼ = Γᵢ ∩ Γⱼ (i < j) of the level sets in `geom`
+(points in 2D and segments in 3D) and return them as an `IntersectionTriangulation`, see
+`restrict_intersections` to select a pair of level sets. We assume that Σᵢⱼ does not touch
+the boundary of the background cells (otherwise integrals over Σᵢⱼ are not differentiable),
+an error is thrown if it does.
+"""
+function cut_intersections(model::DiscreteModel,geom::DiscreteGeometryFromFEFunction)
+  cut_intersections(PolytopalLevelSetCutter(),model,geom)
+end
+
+function cut_intersections(cutgeo::EmbeddedDiscretization)
+  cut_intersections(PolytopalLevelSetCutter(),cutgeo.bgmodel,cutgeo.geo)
+end
+
+function cut_intersections(::PolytopalLevelSetCutter,model::DiscreteModel,geom::DiscreteGeometryFromFEFunction{D,T}) where {D,T}
+  tree = get_tree(geom)
+  φh_s, oid_to_ls = _find_unique_leaves(tree);
+  cell_map_ls = get_data.(φh_s);
+  cell_values = map(Base.Fix1(extract_dualized_cell_values,model),φh_s)
+
+  num_ls = length(φh_s)
+  p0 = zero(Point{D,T})
+
+  ## Cell maps and caches
+  cell_r2p = get_cell_map(model)
+  cell_r2p_cache = array_cache(cell_r2p)
+  cell_val_cache = array_cache(first(cell_values))
+  ## Some cell info
+  topo = get_grid_topology(model)
+  polys = get_polytopes(topo)
+  p_ref = first(polys)
+  @assert isone(length(polys)) "Only models with a single reference polytope are currently supported."
+  @assert is_simplex(p_ref) "Only simplex background meshes are currently supported."
+  cell_nodes = Geometry.get_faces(topo,D,0)
+  Tn = eltype(eltype(cell_nodes))
+  expected_intersection_simplex = ReferenceFEs.simplex_polytope(Val(D-2))
+  intersection_simplex_num_verts = num_vertices(expected_intersection_simplex)
+  ## More caches
+  cell_r2p_isimplex_map_cache = return_cache(first(cell_r2p),[p0 for _ in 1:intersection_simplex_num_verts])
+  ## Compute in/out for bgcells
+  cell_iscut = [zeros(Bool,num_cells(model)) for _ in Base.OneTo(num_ls)];
+  ls_to_bgcell_to_inoutcut = [zeros(Int8,num_cells(model)) for _ in Base.OneTo(num_ls)];
+  compute_ls_to_bgcell_inoutcut_and_iscut!(ls_to_bgcell_to_inoutcut,cell_iscut,cell_values,cell_val_cache)
+
+  ## Upper bounds, only bgcells cut by at least two level sets have intersections
+  cut_bgcells = findall(x->x>1,sum(cell_iscut))
+  num_cut = length(cut_bgcells)
+  max_intersections = num_cut * max(1, div(num_ls*(num_ls-1),2) * (num_ls-1))
+  ## Preallocate intersection data
+  intersection_to_bgcell = Vector{eltype(cut_bgcells)}(undef,max_intersections)
+  intersection_to_normal_i = Vector{VectorValue{D,T}}(undef,max_intersections)
+  intersection_to_normal_j = Vector{VectorValue{D,T}}(undef,max_intersections)
+  intersection_point_to_coords = Vector{Point{D,T}}(undef,intersection_simplex_num_verts*max_intersections)
+  intersection_point_to_rcoords = Vector{Point{D,T}}(undef,intersection_simplex_num_verts*max_intersections)
+  ## Preallocate IN/OUT/CUT data
+  ls_to_intersection_to_inoutcut = zeros(Int8,num_ls,max_intersections)
+
+  # Setup cutter
+  bg_vertices = get_cell_ref_coordinates(model)
+  bg_ctypes = get_cell_type(model)
+  bgcell_to_polys = expand_cell_data(get_polytopes(model),bg_ctypes)
+  bgcell_to_graph = lazy_map(pref_to_gen_polytope_graph,bgcell_to_polys);
+  cut_bgcell_graph = lazy_map(Reindex(bgcell_to_graph),cut_bgcells);
+  cut_bgcell_vertices = lazy_map(Reindex(bg_vertices),cut_bgcells);
+  cut_bgcell_to_ls_maps = map(a->lazy_map(Reindex(a),cut_bgcells),cell_map_ls);
+  cell_ref_to_phys_map = lazy_map(Reindex(cell_r2p),cut_bgcells)
+  pcutter = lazy_map(PolytopalIntersectionCutterMap{D,num_ls,num_cut}(),cut_bgcell_vertices,cut_bgcell_graph,
+    cell_ref_to_phys_map,cut_bgcell_to_ls_maps...);
+  pcutter_cache = array_cache(pcutter);
+
+  intersection_count = 0
+  intersection_node_count = 0
+  for (i,cell) in enumerate(cut_bgcells)
+    cache = getindex!(pcutter_cache,pcutter,i)
+    if get_intersection_isdegenerate(cache)
+      error("Level-set intersections touch the boundary of background cell $cell. This configuration "*
+        "is degenerate (intersection integrals are not differentiable), perturb the level sets.")
+    end
+    intersection_rvertices = get_intersection_rvertices(cache)
+    intersection_normals_i, intersection_normals_j = get_intersection_normals(cache)
+    intersections_cutinout = get_intersections_cutinout(cache)
+    num_new_intersections = length(intersection_rvertices)
+    num_new_intersection_nodes = num_new_intersections*intersection_simplex_num_verts
+    # Store cut/in/out data
+    my_setindex!(ls_to_intersection_to_inoutcut,intersections_cutinout,intersection_count+1,intersection_count+num_new_intersections)
+    # intersection to bgcell
+    my_setindex!(intersection_to_bgcell,cell,intersection_count+1,intersection_count+num_new_intersections)
+    # intersection points to coords/rcoords
+    cell_map = getindex!(cell_r2p_cache,cell_r2p,cell)
+    set_points_from_coords!(intersection_point_to_coords,intersection_point_to_rcoords,
+      intersection_rvertices,intersection_node_count,intersection_simplex_num_verts,cell_map,cell_r2p_isimplex_map_cache)
+    # intersection to normals
+    my_setindex!(intersection_to_normal_i,intersection_normals_i,intersection_count+1,intersection_count+num_new_intersections)
+    my_setindex!(intersection_to_normal_j,intersection_normals_j,intersection_count+1,intersection_count+num_new_intersections)
+
+    intersection_count += num_new_intersections
+    intersection_node_count += num_new_intersection_nodes
+  end
+
+  # Resize
+  _ls_to_intersection_to_inoutcut = [ls_to_intersection_to_inoutcut[i,1:intersection_count] for i in 1:size(ls_to_intersection_to_inoutcut,1)]
+  resize!(intersection_to_bgcell,intersection_count)
+  resize!(intersection_to_normal_i,intersection_count)
+  resize!(intersection_to_normal_j,intersection_count)
+  resize!(intersection_point_to_coords,intersection_node_count)
+  resize!(intersection_point_to_rcoords,intersection_node_count)
+
+  intersection_to_bgcell = convert(Vector{Tn},intersection_to_bgcell)
+
+  # Intersection to points
+  intersection_to_points_data = Base.OneTo(Tn(intersection_node_count+intersection_simplex_num_verts))
+  intersection_to_points_prts = convert(StepRange{Tn,Tn},1:intersection_simplex_num_verts:intersection_node_count+intersection_simplex_num_verts)
+  intersection_to_points = Table(collect(intersection_to_points_data),collect(intersection_to_points_prts))
+
+  # Intersection data
+  intersections = IntersectionData(
+    intersection_to_points,
+    intersection_to_bgcell,
+    (intersection_to_normal_i,intersection_to_normal_j),
+    _ls_to_intersection_to_inoutcut,
+    intersection_point_to_coords,
+    intersection_point_to_rcoords
+  )
+
+  IntersectionTriangulation(intersections,model,geom,oid_to_ls)
+end
+
 function compute_bgcell_to_inoutcut(model::DiscreteModel,geom::DiscreteGeometryFromFEFunction)
   compute_bgcell_to_inoutcut(PolytopalLevelSetCutter(),model,geom)
 end
@@ -499,5 +631,7 @@ end
 end
 
 include("DifferentiableCutPolyTriangulations.jl")
+
+include("IntersectionTriangulations.jl")
 
 include("DistributedPolytopalCutters.jl")
